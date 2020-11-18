@@ -2,6 +2,7 @@
 An embedded key-value store for modern SSDs.
 
 ## Building from source
+CMake 3.17+ is required for building this project.
 
 ```bash
 mkdir build && cd build

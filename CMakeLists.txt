@@ -18,11 +18,16 @@ target_include_directories(llsm PUBLIC include)
 
 # Add API headers to the target for IDE support
 set(llsm_inc include/llsm)
-set(llsm_api ${llsm_inc}/db.h)
+set(llsm_api
+  ${llsm_inc}/db.h
+  ${llsm_inc}/options.h
+  ${llsm_inc}/slice.h
+  ${llsm_inc}/status.h)
 target_sources(llsm PUBLIC ${llsm_api})
 
 # Add our sources by traversing the repository
 add_subdirectory(db)
+add_subdirectory(util)
 
 # Build the tests iff requested
 if(LLSM_BUILD_TESTS)
