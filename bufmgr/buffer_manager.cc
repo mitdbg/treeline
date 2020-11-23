@@ -1,0 +1,183 @@
+// Draft version based on
+// https://github.com/mschrimpf/dbimpl/blob/master/src/database/buffer/BufferManager.cpp
+
+#include "buffer_manager.h"
+
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <mutex>
+
+#include "file_manager.h"
+#include "twoqueue_eviction.h"
+
+namespace llsm {
+
+////////////////////////////////////////////////////////////////////////////////
+// Public Functions
+////////////////////////////////////////////////////////////////////////////////
+
+// Initialize a BufferManager to keep up to `buffer_manager_size` frames in main
+// memory. Bypasses file system cache if `use_direct_io` is true.
+BufferManager::BufferManager()
+    : BufferManager(BufferManager::kDefaultBufMgrSize,
+                    /*use_direct_io = */ false) {}
+BufferManager::BufferManager(const size_t buffer_manager_size)
+    : BufferManager(buffer_manager_size, /*use_direct_io = */ false) {}
+BufferManager::BufferManager(const bool use_direct_io)
+    : BufferManager(BufferManager::kDefaultBufMgrSize, use_direct_io) {}
+BufferManager::BufferManager(const size_t buffer_manager_size,
+                             const bool use_direct_io) {
+  buffer_manager_size_ = buffer_manager_size;
+
+  // Allocate space with alignment because of O_DIRECT requirements.
+  // No need to zero out because data brought here will come from the database
+  // file, which is zeroed out upon expansion by the FileManager.
+  pages_cache_ = aligned_alloc(512, buffer_manager_size_ * kPageSizeBytes);
+
+  char* page_ptr = (char*)pages_cache_;
+  for (size_t i = 0; i < buffer_manager_size_;
+       ++i, page_ptr += kPageSizeBytes) {
+    free_pages_.push_back((void*)page_ptr);
+  }
+  page_to_frame_map_.reserve(buffer_manager_size_);
+
+  page_eviction_strategy_ = new TwoQueueEviction(buffer_manager_size_);
+  file_manager_ = new FileManager(kPageSizeBytes, use_direct_io);
+}
+
+// Writes all dirty pages back and frees resources.
+BufferManager::~BufferManager() {
+  LockMapMutex();
+  LockEvictionMutex();
+
+  // Write all the dirty pages back.
+  BufferFrame* frame;
+  while ((frame = page_eviction_strategy_->Evict()) != nullptr) {
+    frame->Lock(/*exclusive=*/false);
+    if (frame->IsDirty()) WritePageOut(frame);
+    frame->Unlock();
+  }
+
+  // Delete space for in-memory frames.
+  for (auto pair : page_to_frame_map_) {
+    if (pair.second != nullptr) {
+      delete (pair.second);
+    }
+  }
+
+  free(pages_cache_);
+
+  delete page_eviction_strategy_;
+  delete file_manager_;
+
+  UnlockEvictionMutex();
+  UnlockMapMutex();
+}
+
+// Retrieve the page given by `page_id`, to be held exclusively or not
+// based on the value of `exclusive`. Pages are stored on disk in files with
+// the same name as the page ID (e.g. 1).
+BufferFrame& BufferManager::FixPage(const uint64_t page_id,
+                                    const bool exclusive) {
+  BufferFrame* frame;
+
+  // Check if page is already loaded in some frame.
+  LockMapMutex();
+  auto frame_lookup = page_to_frame_map_.find(page_id);
+  auto end_lookup = page_to_frame_map_.end();
+  UnlockMapMutex();
+
+  // If yes, load the corresponding frame
+  if (frame_lookup != end_lookup) {
+    frame = frame_lookup->second;
+
+    // Delete frame from the eviction strategy, if it was there.
+    LockEvictionMutex();
+    if (frame->IncFixCount() == 1) page_eviction_strategy_->Delete(frame);
+    UnlockEvictionMutex();
+
+  } else {  // If not, we have to bring it in from disk.
+
+    if (!free_pages_.empty()) {  // No need to evict, just create a new frame.
+      frame = CreateFrame(page_id);
+      frame->IncFixCount();
+    } else {  // Must evict something to make space.
+
+      // Note: Block here until you can evict something
+      do {
+        LockEvictionMutex();
+        frame = page_eviction_strategy_->Evict();
+        UnlockEvictionMutex();
+      } while (frame == nullptr);
+
+      // Write out evicted page if necessary
+      if (frame->IsDirty()) {
+        WritePageOut(frame);
+        frame->UnsetDirty();
+      }
+
+      // Reset frame to new page_id
+      ResetFrame(frame, page_id);
+      frame->IncFixCount();
+    }
+
+    // Read the page from disk into the selected frame.
+    ReadPageIn(frame);
+  }
+
+  frame->Lock(exclusive);
+
+  return *frame;
+}
+
+// Unfix a page updating whether it is dirty or not.
+void BufferManager::UnfixPage(BufferFrame& frame, const bool isDirty) {
+  if (isDirty) frame.SetDirty();
+
+  // Since this page is now unfixed, check if it can be considered for eviction.
+  LockEvictionMutex();
+  if (frame.DecFixCount() == 0) page_eviction_strategy_->Insert(&frame);
+  UnlockEvictionMutex();
+
+  frame.Unlock();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Private Functions
+////////////////////////////////////////////////////////////////////////////////
+
+// Writes the page held by `frame` to disk.
+void BufferManager::WritePageOut(BufferFrame* frame) const {
+  file_manager_->WritePage(frame->GetPageId(), frame->GetData());
+}
+
+// Reads a page from disk into `frame`.
+void BufferManager::ReadPageIn(BufferFrame* frame) {
+  file_manager_->ReadPage(frame->GetPageId(), frame->GetData());
+}
+
+// Creates a new frame and specifies that it will hold the page with `page_id`.
+BufferFrame* BufferManager::CreateFrame(const uint64_t page_id) {
+  LockMapMutex();
+  void* page = free_pages_.front();
+  free_pages_.pop_front();
+
+  BufferFrame* frame = new BufferFrame(page_id, page);
+  page_to_frame_map_.insert({page_id, frame});
+  UnlockMapMutex();
+  return frame;
+}
+
+// Resets an exisiting frame to hold the page with `new_page_id`.
+void BufferManager::ResetFrame(BufferFrame* frame, const uint64_t new_page_id) {
+  LockMapMutex();
+  page_to_frame_map_.erase(frame->GetPageId());
+  frame->UnsetAllFlags();
+  frame->SetPageId(new_page_id);
+  page_to_frame_map_.insert({new_page_id, frame});
+  UnlockMapMutex();
+}
+}  // namespace llsm
