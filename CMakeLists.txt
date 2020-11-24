@@ -26,6 +26,7 @@ set(llsm_api
 target_sources(llsm PUBLIC ${llsm_api})
 
 # Add our sources by traversing the repository
+add_subdirectory(bufmgr)
 add_subdirectory(db)
 add_subdirectory(util)
 

@@ -1,6 +1,3 @@
-// Draft version based on
-// https://github.com/mschrimpf/dbimpl/blob/master/src/database/buffer/BufferManager.cpp
-
 #include "buffer_manager.h"
 
 #include <inttypes.h>
@@ -14,10 +11,6 @@
 #include "twoqueue_eviction.h"
 
 namespace llsm {
-
-////////////////////////////////////////////////////////////////////////////////
-// Public Functions
-////////////////////////////////////////////////////////////////////////////////
 
 // Initialize a BufferManager to keep up to `buffer_manager_size` frames in main
 // memory. Bypasses file system cache if `use_direct_io` is true.
@@ -106,7 +99,7 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
       frame->IncFixCount();
     } else {  // Must evict something to make space.
 
-      // Note: Block here until you can evict something
+      // Block here until you can evict something
       do {
         LockEvictionMutex();
         frame = page_eviction_strategy_->Evict();
@@ -144,10 +137,6 @@ void BufferManager::UnfixPage(BufferFrame& frame, const bool isDirty) {
 
   frame.Unlock();
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// Private Functions
-////////////////////////////////////////////////////////////////////////////////
 
 // Writes the page held by `frame` to disk.
 void BufferManager::WritePageOut(BufferFrame* frame) const {

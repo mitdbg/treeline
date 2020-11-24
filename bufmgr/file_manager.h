@@ -17,7 +17,7 @@ class FileManager {
   FileManager(const size_t page_size);
   FileManager(const size_t page_size, const bool use_direct_io);
 
-  // Frees all resources by closing a database file.
+  // Closes a database file.
   ~FileManager();
 
   // Reads the part of the on-disk database file corresponding to `page_id` into

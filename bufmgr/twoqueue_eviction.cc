@@ -3,10 +3,8 @@
 #include <inttypes.h>
 
 #include <iostream>
+
 namespace llsm {
-////////////////////////////////////////////////////////////////////////////////
-// Public Functions
-////////////////////////////////////////////////////////////////////////////////
 
 // Create a new eviction strategy.
 TwoQueueEviction::TwoQueueEviction(size_t num_elements) {
@@ -66,15 +64,15 @@ BufferFrame* TwoQueueEviction::Evict() {
 // Prints the state of the eviction strategy, namely the contents of the two
 // queues.
 void TwoQueueEviction::PrintState() {
-  std::cout << "---------------------------\n"
+  std::cout << "---------------------------" << std::endl
             << "Printing the state of 2Q..." << std::endl;
 
-  std::cout << "\nPrinting FIFO contents" << std::endl;
+  std::cout << "Printing FIFO contents" << std::endl;
   for (auto it = fifo_->begin(); it != fifo_->end(); ++it) {
     std::cout << (*it)->GetPageId() << std::endl;
   }
 
-  std::cout << "\nPrinting LRU contents" << std::endl;
+  std::cout << "Printing LRU contents" << std::endl;
   for (auto it = lru_->begin(); it != lru_->end(); ++it) {
     std::cout << (*it)->GetPageId() << std::endl;
   }

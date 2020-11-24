@@ -1,5 +1,3 @@
-// Draft version based on
-// https://github.com/mschrimpf/dbimpl/blob/master/src/database/buffer/BufferManager.hpp
 
 #pragma once
 

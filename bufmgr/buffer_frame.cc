@@ -1,15 +1,8 @@
-// Draft version based on
-// https://github.com/mschrimpf/dbimpl/blob/master/src/database/buffer/BufferFrame.cpp
-
 #include "buffer_frame.h"
 
 #include <pthread.h>
 
 namespace llsm {
-
-////////////////////////////////////////////////////////////////////////////////
-// Public Functions
-////////////////////////////////////////////////////////////////////////////////
 
 // Initialize a buffer frame based on the page with the specified `page_id`,
 // which is pointed to by `data`.

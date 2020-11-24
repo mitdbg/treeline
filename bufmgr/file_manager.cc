@@ -8,9 +8,6 @@
 #include <unistd.h>
 
 namespace llsm {
-////////////////////////////////////////////////////////////////////////////////
-// Public Functions
-////////////////////////////////////////////////////////////////////////////////
 
 // Creates a file manager for `page_size`-sized pages by opening a database
 // file. Bypasses file system cache if `use_direct_io` is true.
@@ -28,7 +25,7 @@ FileManager::FileManager(const size_t page_size, const bool use_direct_io) {
   ZeroOut();
 }
 
-// Frees all resources by closing a database file.
+// Closes a database file.
 FileManager::~FileManager() { close(database_fd_); }
 
 // Reads the part of the on-disk database file corresponding to `page_id` into
@@ -48,10 +45,6 @@ void FileManager::WritePage(const uint64_t page_id, void* data) {
   ssize_t ret = pwrite(database_fd_, data, page_size_, offset);
   if (ret < 0) perror("WritePage failed");
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// Private Functions
-////////////////////////////////////////////////////////////////////////////////
 
 // Fill kZeroOutPages sequential pages with zeroes, starting with next_page_id_.
 // Update next_page_id_ accordingly at the end.

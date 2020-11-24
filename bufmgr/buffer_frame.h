@@ -1,6 +1,3 @@
-// Draft version based on
-// https://github.com/mschrimpf/dbimpl/blob/master/src/database/buffer/BufferFrame.hpp
-
 #pragma once
 
 #include <pthread.h>

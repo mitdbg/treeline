@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+
 namespace llsm {
 
 // The default minimum number of elements based on which the buckets are set.
