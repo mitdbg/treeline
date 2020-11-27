@@ -17,7 +17,9 @@ if (LLSM_BUILD_SHARED)
 else()
   add_library(llsm STATIC)
 endif()
-target_include_directories(llsm PUBLIC include)
+target_include_directories(llsm
+  PUBLIC include
+  PRIVATE .)
 
 # Add API headers to the target for IDE support
 set(llsm_inc include/llsm)
