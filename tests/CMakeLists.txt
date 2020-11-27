@@ -1,6 +1,7 @@
 add_executable(tester)
 target_sources(tester
   PRIVATE
+    memtable_test.cc
     packed_map_test.cc
     sanity_test.cc)
 target_link_libraries(tester llsm gtest gtest_main Threads::Threads)
