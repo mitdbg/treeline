@@ -5,6 +5,9 @@ set(CMAKE_CXX_STANDARD 17)
 option(LLSM_BUILD_TESTS "Set to build the Learned LSM test suite." OFF)
 option(LLSM_BUILD_SHARED "Set to build the Learned LSM database as a shared library." OFF)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 # Load any third party dependencies
 add_subdirectory(third_party)
 
