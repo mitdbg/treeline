@@ -80,12 +80,11 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
   // Check if page is already loaded in some frame.
   LockMapMutex();
   auto frame_lookup = page_to_frame_map_.find(page_id);
-  auto end_lookup = page_to_frame_map_.end();
-  UnlockMapMutex();
 
   // If yes, load the corresponding frame
-  if (frame_lookup != end_lookup) {
+  if (frame_lookup != page_to_frame_map_.end()) {
     frame = frame_lookup->second;
+    UnlockMapMutex();
 
     // Delete frame from the eviction strategy, if it was there.
     LockEvictionMutex();
@@ -93,12 +92,11 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
     UnlockEvictionMutex();
 
   } else {  // If not, we have to bring it in from disk.
+    UnlockMapMutex();
 
-    if (!free_pages_.empty()) {  // No need to evict, just create a new frame.
-      frame = CreateFrame(page_id);
-      frame->IncFixCount();
-    } else {  // Must evict something to make space.
+    frame = CreateFrame(page_id);
 
+    if (frame == nullptr) {  // Must evict something to make space.
       // Block here until you can evict something
       do {
         LockEvictionMutex();
@@ -114,10 +112,10 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
 
       // Reset frame to new page_id
       ResetFrame(frame, page_id);
-      frame->IncFixCount();
     }
 
     // Read the page from disk into the selected frame.
+    frame->IncFixCount();
     ReadPageIn(frame);
   }
 
@@ -127,8 +125,8 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
 }
 
 // Unfix a page updating whether it is dirty or not.
-void BufferManager::UnfixPage(BufferFrame& frame, const bool isDirty) {
-  if (isDirty) frame.SetDirty();
+void BufferManager::UnfixPage(BufferFrame& frame, const bool is_dirty) {
+  if (is_dirty) frame.SetDirty();
 
   // Since this page is now unfixed, check if it can be considered for eviction.
   LockEvictionMutex();
@@ -149,8 +147,13 @@ void BufferManager::ReadPageIn(BufferFrame* frame) {
 }
 
 // Creates a new frame and specifies that it will hold the page with `page_id`.
+// Returns nullptr if no new frame can be created.
 BufferFrame* BufferManager::CreateFrame(const uint64_t page_id) {
   LockMapMutex();
+  if (free_pages_.empty()) {
+    UnlockMapMutex();
+    return nullptr;
+  }
   void* page = free_pages_.front();
   free_pages_.pop_front();
 
