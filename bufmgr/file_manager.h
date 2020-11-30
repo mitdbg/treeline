@@ -6,7 +6,10 @@
 #include <atomic>
 
 namespace llsm {
-// Manages I/O to on-disk files on behalf of BufferManager.
+
+// A wrapper for I/O to on-disk files.
+//
+// This class helps make `BufferManager` OS-independent.
 class FileManager {
   // The number of pages to zero out whenever ZeroOut() is called
   static const size_t kZeroOutPages = 256;

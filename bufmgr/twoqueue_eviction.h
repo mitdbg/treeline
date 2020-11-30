@@ -19,6 +19,13 @@ static const uint8_t kHasBeenInFifo = 4;  // 0000 0100
 static const uint8_t kHasBeenInLru = 2;  // 0000 0010
 
 // The 2Q strategy for evicting in-memory pages back to disk.
+//
+// Upon inserting a page, it is either entered into a FIFO queue (if this is the
+// first time it was inserted into the strategy), or into an LRU
+// queue. Upon deleting a page, it is removed from these queues, if it were in
+// any. Upon needing to evict a page, we evict the head of the FIFO queue; if
+// the FIFO queue is empty, we evict the head of the LRU queue; else, we return
+// nullptr.
 class TwoQueueEviction : public PageEvictionStrategy {
  public:
   // Create a new eviction strategy.

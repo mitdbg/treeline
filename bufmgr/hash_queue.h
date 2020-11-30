@@ -7,8 +7,10 @@ namespace llsm {
 // The default minimum number of elements based on which the buckets are set.
 static const size_t kDefaultMinNumElements = 1024;
 
-// A FIFO queue that supports (amortized) constant-time removal of random items
-// using an std::unordered_map
+// A FIFO queue that supports fast random-item removal.
+//
+// This class implements a doubly-linked list that supports (amortized)
+// constant-time removal of random items using an std::unordered_map
 template <class T>
 class HashQueue {
   // A node of the HashQueue.

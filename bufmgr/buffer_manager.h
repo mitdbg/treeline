@@ -12,7 +12,25 @@
 #include "page_eviction_strategy.h"
 
 namespace llsm {
-// Manages an in-memory buffer of pages.
+
+// A manager for an in-memory cache of pages.
+//
+// The client can "fix" and "unfix" pages as they are needed, and the
+// `BufferManager` will attempt to minimize disk IO following these requests.
+//
+// A page is only evicted back to disk if it is unfixed and there is no space
+// in the in-memory buffer to serve an incoming fix request for some page not
+// currently buffered.
+//
+// To manage page eviction, this class uses the "two-queue" strategy. Upon
+// unfixing a page, it is either entered into a FIFO queue (if this is the first
+// time it was unfixed since first entering the buffer), or into an LRU queue.
+// Upon fixing a page, it is removed from these queues, if it were in any. Upon
+// needing to evict a page, we evict the head of the FIFO queue; if the FIFO
+// queue is empty, we evict the head of the LRU queue; else, we wait.
+//
+// This class is thread-safe; mutexes are used to serialize accesses to critical
+// data structures.
 class BufferManager {
   // The page size in bytes.
   static const size_t kPageSizeBytes = 4096;

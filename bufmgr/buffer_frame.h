@@ -7,7 +7,10 @@
 
 namespace llsm {
 
-// Wraps an in-memory page with necessary metadata for use with BufferManager.
+// A wrapper for memory pages, containing metadata used by the buffer manager.
+//
+// Note that the `BufferFrame` does not own the memory used to store the page
+// itself, only the metadata.
 class BufferFrame {
   // Constants for flags. 1 bit for page dirtiness, 2 bits to be used by the
   // page eviction strategy.
