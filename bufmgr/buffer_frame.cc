@@ -46,7 +46,7 @@ uint8_t BufferFrame::GetEviction() const { return flags_ & kEvictionFlags; }
 // Unset all flags of the current frame.
 void BufferFrame::UnsetAllFlags() { flags_ = 0; }
 
-// Increment/decrement/get the fix count of the current frame.
+// Increment/decrement/get/clear the fix count of the current frame.
 // IncFixCount/DecFixCount return the new value of the fix count.
 size_t BufferFrame::IncFixCount() { return ++fix_count_; }
 size_t BufferFrame::DecFixCount() {
@@ -54,5 +54,6 @@ size_t BufferFrame::DecFixCount() {
   return --fix_count_;
 }
 size_t BufferFrame::GetFixCount() const { return fix_count_; }
+size_t BufferFrame::ClearFixCount() { return fix_count_ = 0; }
 
 }  // namespace llsm

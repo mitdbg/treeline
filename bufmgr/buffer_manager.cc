@@ -79,30 +79,34 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
 
   // Check if page is already loaded in some frame.
   LockMapMutex();
+  LockEvictionMutex();
   auto frame_lookup = page_to_frame_map_.find(page_id);
 
   // If yes, load the corresponding frame
   if (frame_lookup != page_to_frame_map_.end()) {
     frame = frame_lookup->second;
-    UnlockMapMutex();
-
-    // Delete frame from the eviction strategy, if it was there.
-    LockEvictionMutex();
     if (frame->IncFixCount() == 1) page_eviction_strategy_->Delete(frame);
     UnlockEvictionMutex();
+    UnlockMapMutex();
 
   } else {  // If not, we have to bring it in from disk.
+    UnlockEvictionMutex();
     UnlockMapMutex();
 
     frame = CreateFrame(page_id);
 
     if (frame == nullptr) {  // Must evict something to make space.
       // Block here until you can evict something
-      do {
+      while (frame == nullptr) {
+        LockMapMutex();
         LockEvictionMutex();
         frame = page_eviction_strategy_->Evict();
+        if (frame != nullptr) {
+          page_to_frame_map_.erase(frame->GetPageId());
+        }
         UnlockEvictionMutex();
-      } while (frame == nullptr);
+        UnlockMapMutex();
+      }
 
       // Write out evicted page if necessary
       if (frame->IsDirty()) {
@@ -117,6 +121,11 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
     // Read the page from disk into the selected frame.
     frame->IncFixCount();
     ReadPageIn(frame);
+
+    // Insert the frame into the map.
+    LockMapMutex();
+    page_to_frame_map_.insert({page_id, frame});
+    UnlockMapMutex();
   }
 
   frame->Lock(exclusive);
@@ -149,27 +158,24 @@ void BufferManager::ReadPageIn(BufferFrame* frame) {
 // Creates a new frame and specifies that it will hold the page with `page_id`.
 // Returns nullptr if no new frame can be created.
 BufferFrame* BufferManager::CreateFrame(const uint64_t page_id) {
-  LockMapMutex();
+  LockFreePagesMutex();
   if (free_pages_.empty()) {
-    UnlockMapMutex();
+    UnlockFreePagesMutex();
     return nullptr;
   }
   void* page = free_pages_.front();
   free_pages_.pop_front();
+  UnlockFreePagesMutex();
 
   BufferFrame* frame = new BufferFrame(page_id, page);
-  page_to_frame_map_.insert({page_id, frame});
-  UnlockMapMutex();
+
   return frame;
 }
 
 // Resets an exisiting frame to hold the page with `new_page_id`.
 void BufferManager::ResetFrame(BufferFrame* frame, const uint64_t new_page_id) {
-  LockMapMutex();
-  page_to_frame_map_.erase(frame->GetPageId());
   frame->UnsetAllFlags();
   frame->SetPageId(new_page_id);
-  page_to_frame_map_.insert({new_page_id, frame});
-  UnlockMapMutex();
+  frame->ClearFixCount();
 }
 }  // namespace llsm

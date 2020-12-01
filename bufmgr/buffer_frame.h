@@ -51,11 +51,12 @@ class BufferFrame {
   // Unset all flags of the current frame.
   void UnsetAllFlags();
 
-  // Increment/decrement/get the fix count of the current frame.
+  // Increment/decrement/get/clear the fix count of the current frame.
   // IncFixCount/DecFixCount return the new value of the fix count.
   size_t IncFixCount();
   size_t DecFixCount();
   size_t GetFixCount() const;
+  size_t ClearFixCount();
 
  private:
   // Set/Unset the specified flags of the current frame.

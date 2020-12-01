@@ -64,6 +64,10 @@ class BufferManager {
   // Reads a page from disk into `frame`.
   void ReadPageIn(BufferFrame* frame);
 
+  // Locks/unlocks the mutex for editing free_pages_.
+  void LockFreePagesMutex() { free_pages_mutex_.lock(); }
+  void UnlockFreePagesMutex() { free_pages_mutex_.unlock(); }
+  
   // Locks/unlocks the mutex for editing page_to_frame_map_.
   void LockMapMutex() { map_mutex_.lock(); }
   void UnlockMapMutex() { map_mutex_.unlock(); }
@@ -88,6 +92,7 @@ class BufferManager {
   // Pointers to available page-sized chunks in memory, for fixing pages from
   // disk.
   std::list<void*> free_pages_;
+  std::mutex free_pages_mutex_;
 
   // Map from page_id to the buffer frame (if any) that currently holds that
   // page in memory, and a mutex for editing it.
