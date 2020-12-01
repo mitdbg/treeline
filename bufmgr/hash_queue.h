@@ -4,9 +4,6 @@
 
 namespace llsm {
 
-// The default minimum number of elements based on which the buckets are set.
-static const size_t kDefaultMinNumElements = 1024;
-
 // A FIFO queue that supports fast random-item removal.
 //
 // This class implements a doubly-linked list that supports (amortized)
@@ -22,6 +19,9 @@ class HashQueue {
   };
 
  public:
+  // The default minimum number of elements based on which the buckets are set.
+  static const size_t kDefaultMinNumElements = 1024;
+  
   // Construct a new HashQueue of type T, optionally reserving enough space for
   // the buckets needed to efficiently access `num_elements`.
   HashQueue<T>() : HashQueue<T>::HashQueue(kDefaultMinNumElements) {}

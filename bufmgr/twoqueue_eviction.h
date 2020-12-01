@@ -10,14 +10,6 @@
 #include "page_eviction_strategy.h"
 namespace llsm {
 
-// Flag for whether the page in a frame has previously been in the FIFO eviction
-// queue.
-static const uint8_t kHasBeenInFifo = 4;  // 0000 0100
-
-// Flag for whether the page in a frame has previously been in the LRU eviction
-// queue.
-static const uint8_t kHasBeenInLru = 2;  // 0000 0010
-
 // The 2Q strategy for evicting in-memory pages back to disk.
 //
 // Upon inserting a page, it is either entered into a FIFO queue (if this is the
@@ -49,6 +41,14 @@ class TwoQueueEviction : public PageEvictionStrategy {
   void PrintState();
 
  private:
+  // Flag for whether the page in a frame has previously been in the FIFO
+  // eviction queue.
+  static const uint8_t kHasBeenInFifo = 4;  // 0000 0100
+
+  // Flag for whether the page in a frame has previously been in the LRU
+  // eviction queue.
+  static const uint8_t kHasBeenInLru = 2;  // 0000 0010
+  
   // Queries whether the page in a frame has previously been in the FIFO
   // eviction queue.
   bool HasBeenInFifo(uint8_t eviction_flags) const {

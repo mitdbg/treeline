@@ -11,10 +11,13 @@ namespace llsm {
 //
 // This class helps make `BufferManager` OS-independent.
 class FileManager {
+ public:
   // The number of pages to zero out whenever ZeroOut() is called
   static const size_t kZeroOutPages = 256;
 
- public:
+  // The name of the database file
+  static constexpr char kFileName[] = "database.dat";
+
   // Creates a file manager for `page_size`-sized pages by opening a database
   // file. Bypasses file system cache if `use_direct_io` is true.
   FileManager(const size_t page_size);
@@ -37,10 +40,10 @@ class FileManager {
   void ZeroOut();
 
   // The file descriptor of the database file
-  int database_fd_;
+  int db_fd_;
 
   // The size of a page (in bytes)
-  size_t page_size_;
+  const size_t page_size_;
 
   // The lowest page id that has never been written to
   size_t next_page_id_;
