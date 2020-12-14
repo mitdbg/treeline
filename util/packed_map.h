@@ -7,7 +7,8 @@
 
 namespace llsm {
 
-// An ordered map with a configurable compile-time fixed size of at most 64 kiB.
+// An ordered map with a configurable compile-time fixed size that is strictly
+// less than 64 KiB.
 //
 // Keys and payloads are treated as arbitrary bytes. This map keeps keys ordered
 // lexicographically. Keys have a maximum size, specified by
@@ -21,6 +22,14 @@ namespace llsm {
 // This map is not thread safe; it requires external mutual exclusion.
 template <uint16_t MapSizeBytes>
 class PackedMap {
+  // We want `sizeof(PackedMap<MapSizeBytes>) == MapSizeBytes` to be true to
+  // make it easier to reason about this class. If the requested map size is not
+  // divisible by 8 (should be architecture-specific), the compiler will add
+  // extra padding to this class. For simplicity, we require `MapSizeBytes` to
+  // be divisible by 8.
+  static_assert(MapSizeBytes % 8 == 0,
+                "The PackedMap must have a size that is divisible by 8.");
+
  public:
   // Create a map without key bounds. The `PackedMap` will not use prefix
   // encoding in this case.
