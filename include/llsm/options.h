@@ -18,6 +18,9 @@ struct Options {
 
   // If set, prevent the database from being opened if it already exists
   bool error_if_exists = false;
+
+  uint64_t num_keys = 5000000;
+  unsigned num_flush_threads = 4;
 };
 
 struct ReadOptions {};

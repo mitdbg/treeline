@@ -23,7 +23,7 @@ class DBImpl : public DB {
   Status Get(const ReadOptions& options, const Slice& key,
              std::string* value_out) override;
   Status Delete(const WriteOptions& options, const Slice& key) override;
-  Status FlushMemTable() override;
+  Status FlushMemTable();
 
   Status Initialize();
 

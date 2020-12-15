@@ -32,8 +32,8 @@ namespace llsm {
 // This class is thread-safe; mutexes are used to serialize accesses to critical
 // data structures.
 class BufferManager {
-  // The page size in bytes.
-  static const size_t kPageSizeBytes = 4096;
+  // Default page size in bytes.
+  static const size_t kDefaultPageSizeBytes = 4096;
 
   // Default number of pages in buffer manager.
   static const size_t kDefaultBufMgrSize = 16384;
@@ -43,8 +43,9 @@ class BufferManager {
   // main memory. Bypasses file system cache if `use_direct_io` is true.
   BufferManager();
   BufferManager(const size_t buffer_manager_size);
-  BufferManager(const bool use_direct_io);
-  BufferManager(const size_t buffer_manager_size, const bool use_direct_io);
+  BufferManager(const size_t buffer_manager_size, const size_t page_size);
+  BufferManager(const size_t buffer_manager_size, const size_t page_size,
+                const bool use_direct_io);
 
   // Writes all dirty pages back and frees resources.
   ~BufferManager();
@@ -67,7 +68,7 @@ class BufferManager {
   // Locks/unlocks the mutex for editing free_pages_.
   void LockFreePagesMutex() { free_pages_mutex_.lock(); }
   void UnlockFreePagesMutex() { free_pages_mutex_.unlock(); }
-  
+
   // Locks/unlocks the mutex for editing page_to_frame_map_.
   void LockMapMutex() { map_mutex_.lock(); }
   void UnlockMapMutex() { map_mutex_.unlock(); }
@@ -85,6 +86,9 @@ class BufferManager {
 
   // The number of pages the buffer manager should keep in memory.
   size_t buffer_manager_size_;
+
+  // The size of each page
+  size_t page_size_;
 
   // Space in memory to hold the cached pages.
   void* pages_cache_;

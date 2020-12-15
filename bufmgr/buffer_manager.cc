@@ -15,30 +15,34 @@ namespace llsm {
 // Initialize a BufferManager to keep up to `buffer_manager_size` frames in main
 // memory. Bypasses file system cache if `use_direct_io` is true.
 BufferManager::BufferManager()
-    : BufferManager(BufferManager::kDefaultBufMgrSize,
+    : BufferManager(BufferManager::kDefaultBufMgrSize, kDefaultPageSizeBytes,
                     /*use_direct_io = */ false) {}
 BufferManager::BufferManager(const size_t buffer_manager_size)
-    : BufferManager(buffer_manager_size, /*use_direct_io = */ false) {}
-BufferManager::BufferManager(const bool use_direct_io)
-    : BufferManager(BufferManager::kDefaultBufMgrSize, use_direct_io) {}
+    : BufferManager(buffer_manager_size, kDefaultPageSizeBytes,
+                    /*use_direct_io = */ false) {}
 BufferManager::BufferManager(const size_t buffer_manager_size,
-                             const bool use_direct_io) {
+                             const size_t page_size)
+    : BufferManager(buffer_manager_size, page_size,
+                    /*use_direct_io = */ false) {}
+BufferManager::BufferManager(const size_t buffer_manager_size,
+                             const size_t page_size, const bool use_direct_io) {
   buffer_manager_size_ = buffer_manager_size;
+  page_size_ = page_size;
 
   // Allocate space with alignment because of O_DIRECT requirements.
   // No need to zero out because data brought here will come from the database
   // file, which is zeroed out upon expansion by the FileManager.
-  pages_cache_ = aligned_alloc(512, buffer_manager_size_ * kPageSizeBytes);
+  pages_cache_ = aligned_alloc(512, buffer_manager_size_ * page_size_);
 
   char* page_ptr = (char*)pages_cache_;
   for (size_t i = 0; i < buffer_manager_size_;
-       ++i, page_ptr += kPageSizeBytes) {
+       ++i, page_ptr += page_size_) {
     free_pages_.push_back((void*)page_ptr);
   }
   page_to_frame_map_.reserve(buffer_manager_size_);
 
   page_eviction_strategy_ = new TwoQueueEviction(buffer_manager_size_);
-  file_manager_ = new FileManager(kPageSizeBytes, use_direct_io);
+  file_manager_ = new FileManager(page_size_, use_direct_io);
 }
 
 // Writes all dirty pages back and frees resources.
