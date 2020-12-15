@@ -5,38 +5,12 @@
 #include <cassert>
 #include <cstring>
 
+#include "util/key.h"
+
 namespace llsm {
 namespace packed_map_detail {
 
 static unsigned Min(unsigned a, unsigned b) { return a < b ? a : b; }
-
-template <class T>
-static T LoadUnaligned(const void* p) {
-  T x;
-  memcpy(&x, p, sizeof(T));
-  return x;
-}
-
-// Get order-preserving head of key (assuming little endian)
-static uint32_t Head(const uint8_t* key, unsigned key_length) {
-  switch (key_length) {
-    case 0:
-      return 0;
-    case 1:
-      return static_cast<uint32_t>(key[0]) << 24;
-    case 2:
-      return static_cast<uint32_t>(
-                 __builtin_bswap16(LoadUnaligned<uint16_t>(key)))
-             << 16;
-    case 3:
-      return (static_cast<uint32_t>(
-                  __builtin_bswap16(LoadUnaligned<uint16_t>(key)))
-              << 16) |
-             (static_cast<uint32_t>(key[2]) << 8);
-    default:
-      return __builtin_bswap32(LoadUnaligned<uint32_t>(key));
-  }
-}
 
 static uint16_t KeyPrefixLength(const uint8_t* lower_key,
                                 unsigned lower_key_length,
@@ -134,7 +108,7 @@ void PackedMap<MapSizeBytes>::StoreKeyValue(uint16_t slot_id,
   // slot
   key += header_.prefix_length;
   key_length -= header_.prefix_length;
-  slot_[slot_id].head = packed_map_detail::Head(key, key_length);
+  slot_[slot_id].head = key_utils::ExtractHead(key, key_length);
   slot_[slot_id].key_length = key_length;
   slot_[slot_id].payload_length = payload_length;
   // key
@@ -295,7 +269,7 @@ unsigned PackedMap<MapSizeBytes>::LowerBound(const uint8_t* key,
   // check hint
   unsigned lower = 0;
   unsigned upper = header_.count;
-  uint32_t key_head = packed_map_detail::Head(key, key_length);
+  uint32_t key_head = key_utils::ExtractHead(key, key_length);
   SearchHint(key_head, lower, upper);
 
   // binary search on remaining range
@@ -416,7 +390,7 @@ void PackedMap<MapSizeBytes>::CopyKeyValueRange(PackedMap<MapSizeBytes>& dst,
       uint8_t* key = GetKey(src_slot + i) + diff;
       memcpy(dst.GetKey(dst_slot + i), key, space);
       dst.slot_[dst_slot + i].head =
-          packed_map_detail::Head(key, new_key_length);
+          key_utils::ExtractHead(key, new_key_length);
       dst.slot_[dst_slot + i].key_length = new_key_length;
       dst.slot_[dst_slot + i].payload_length =
           slot_[src_slot + i].payload_length;
