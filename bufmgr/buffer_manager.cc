@@ -14,35 +14,25 @@ namespace llsm {
 
 // Initialize a BufferManager to keep up to `buffer_manager_size` frames in main
 // memory. Bypasses file system cache if `use_direct_io` is true.
-BufferManager::BufferManager()
-    : BufferManager(BufferManager::kDefaultBufMgrSize, kDefaultPageSizeBytes,
-                    /*use_direct_io = */ false) {}
-BufferManager::BufferManager(const size_t buffer_manager_size)
-    : BufferManager(buffer_manager_size, kDefaultPageSizeBytes,
-                    /*use_direct_io = */ false) {}
-BufferManager::BufferManager(const size_t buffer_manager_size,
-                             const size_t page_size)
-    : BufferManager(buffer_manager_size, page_size,
-                    /*use_direct_io = */ false) {}
-BufferManager::BufferManager(const size_t buffer_manager_size,
-                             const size_t page_size, const bool use_direct_io) {
-  buffer_manager_size_ = buffer_manager_size;
-  page_size_ = page_size;
+BufferManager::BufferManager(const BufMgrOptions options, std::string db_path)
+    : options_(options),
+      buffer_manager_size_(options.buffer_manager_size),
+      page_size_(options.page_size) {
 
   // Allocate space with alignment because of O_DIRECT requirements.
   // No need to zero out because data brought here will come from the database
   // file, which is zeroed out upon expansion by the FileManager.
-  pages_cache_ = aligned_alloc(512, buffer_manager_size_ * page_size_);
+  pages_cache_ = reinterpret_cast<Page*>(
+      aligned_alloc(options.alignment, buffer_manager_size_ * page_size_));
 
-  char* page_ptr = (char*)pages_cache_;
-  for (size_t i = 0; i < buffer_manager_size_;
-       ++i, page_ptr += page_size_) {
-    free_pages_.push_back((void*)page_ptr);
+  Page* page_ptr = pages_cache_;
+  for (size_t i = 0; i < buffer_manager_size_; ++i, ++page_ptr) {
+    free_pages_.push_back(page_ptr);
   }
   page_to_frame_map_.reserve(buffer_manager_size_);
 
   page_eviction_strategy_ = new TwoQueueEviction(buffer_manager_size_);
-  file_manager_ = new FileManager(page_size_, use_direct_io);
+  file_manager_ = new FileManager(options_, db_path);
 }
 
 // Writes all dirty pages back and frees resources.
@@ -149,14 +139,31 @@ void BufferManager::UnfixPage(BufferFrame& frame, const bool is_dirty) {
   frame.Unlock();
 }
 
+// Write all dirty pages to disk (without unfixing)
+void BufferManager::FlushDirty() {
+  LockMapMutex();
+
+  for (auto pair : page_to_frame_map_) {
+    auto frame = pair.second;
+    if (frame->IsDirty()) {
+      frame->Lock(/*exclusive=*/false);
+      WritePageOut(frame);
+      frame->UnsetDirty();
+      frame->Unlock();
+    }
+  }
+
+  UnlockMapMutex();
+}
+
 // Writes the page held by `frame` to disk.
 void BufferManager::WritePageOut(BufferFrame* frame) const {
-  file_manager_->WritePage(frame->GetPageId(), frame->GetData());
+  file_manager_->WritePage(frame->GetPageId(), frame->GetPage());
 }
 
 // Reads a page from disk into `frame`.
 void BufferManager::ReadPageIn(BufferFrame* frame) {
-  file_manager_->ReadPage(frame->GetPageId(), frame->GetData());
+  file_manager_->ReadPage(frame->GetPageId(), frame->GetPage());
 }
 
 // Creates a new frame and specifies that it will hold the page with `page_id`.
@@ -167,7 +174,7 @@ BufferFrame* BufferManager::CreateFrame(const uint64_t page_id) {
     UnlockFreePagesMutex();
     return nullptr;
   }
-  void* page = free_pages_.front();
+  Page* page = free_pages_.front();
   free_pages_.pop_front();
   UnlockFreePagesMutex();
 

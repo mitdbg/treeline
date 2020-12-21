@@ -5,6 +5,8 @@
 
 #include <atomic>
 
+#include "db/page.h"
+
 namespace llsm {
 
 // A wrapper for memory pages, containing metadata used by the buffer manager.
@@ -21,13 +23,13 @@ class BufferFrame {
  public:
   // Initialize a buffer frame based on the page with the specified `page_id`,
   // which is pointed to by `data`.
-  BufferFrame(const uint64_t page_id, void* data);
+  BufferFrame(const uint64_t page_id, Page* page);
 
   // Free all resources.
   ~BufferFrame();
 
-  // Return the data contained in the page held in the current frame.
-  void* GetData() const;
+  // Return the page held in the current frame.
+  Page* GetPage() const;
 
   // Set/get the page ID of the page held in the current frame.
   void SetPageId(const uint64_t page_id);
@@ -63,8 +65,8 @@ class BufferFrame {
   void SetFlags(const uint8_t flags) { flags_ |= flags; }
   void UnsetFlags(const uint8_t flags) { flags_ &= ~flags; }
 
-  // The data of the page held by the frame.
-  void* data_;
+  // The page held by the frame.
+  Page* page_;
 
   // The id of the page held by the frame.
   uint64_t page_id_;

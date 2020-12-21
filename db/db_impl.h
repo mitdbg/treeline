@@ -5,6 +5,7 @@
 
 #include "llsm/db.h"
 #include "db/memtable.h"
+#include "bufmgr/buffer_manager.h"
 
 namespace llsm {
 
@@ -36,6 +37,7 @@ class DBImpl : public DB {
   const std::string db_path_;
   MemTable mtable_;
   std::vector<std::unique_ptr<File>> files_;
+  std::unique_ptr<BufferManager> buf_mgr_;
 
   uint32_t total_pages_ = 0;
   uint32_t pages_per_segment_ = 0;

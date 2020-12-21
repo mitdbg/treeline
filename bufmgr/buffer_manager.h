@@ -10,6 +10,7 @@
 #include "buffer_frame.h"
 #include "file_manager.h"
 #include "page_eviction_strategy.h"
+#include "llsm/options.h"
 
 namespace llsm {
 
@@ -32,21 +33,11 @@ namespace llsm {
 // This class is thread-safe; mutexes are used to serialize accesses to critical
 // data structures.
 class BufferManager {
-  // Default page size in bytes.
-  static const size_t kDefaultPageSizeBytes = 4096;
-
-  // Default number of pages in buffer manager.
-  static const size_t kDefaultBufMgrSize = 16384;
-
+ 
  public:
-  // Initialize a BufferManager to keep up to `buffer_manager_size` frames in
-  // main memory. Bypasses file system cache if `use_direct_io` is true.
-  BufferManager();
-  BufferManager(const size_t buffer_manager_size);
-  BufferManager(const size_t buffer_manager_size, const size_t page_size);
-  BufferManager(const size_t buffer_manager_size, const size_t page_size,
-                const bool use_direct_io);
-
+  // Initialize a BufferManager with the options specified in `options`.
+  BufferManager(const BufMgrOptions options, std::string db_path);
+  
   // Writes all dirty pages back and frees resources.
   ~BufferManager();
 
@@ -57,6 +48,9 @@ class BufferManager {
 
   // Unfix a page updating whether it is dirty or not.
   void UnfixPage(BufferFrame& frame, const bool is_dirty);
+
+  // Write all dirty pages to disk (without unfixing)
+  void FlushDirty();
 
  private:
   // Writes the page held by `frame` to disk.
@@ -84,18 +78,21 @@ class BufferManager {
   // Resets an exisiting frame to hold the page with `new_page_id`.
   void ResetFrame(BufferFrame* frame, const uint64_t new_page_id);
 
+  // Options provided upon creation
+  const BufMgrOptions options_;
+
   // The number of pages the buffer manager should keep in memory.
-  size_t buffer_manager_size_;
+  const size_t buffer_manager_size_;
 
   // The size of each page
-  size_t page_size_;
+  const size_t page_size_;
 
   // Space in memory to hold the cached pages.
-  void* pages_cache_;
+  Page* pages_cache_;
 
   // Pointers to available page-sized chunks in memory, for fixing pages from
   // disk.
-  std::list<void*> free_pages_;
+  std::list<Page*> free_pages_;
   std::mutex free_pages_mutex_;
 
   // Map from page_id to the buffer frame (if any) that currently holds that
