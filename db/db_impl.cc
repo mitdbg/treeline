@@ -207,8 +207,8 @@ map_offset, num)); map_offset += num;
 }
 */
 
-Status DBImpl::FlushMemTable() {
-  PinToCore(0);
+Status DBImpl::FlushMemTable() { // FIXME: Make MemTable iterator work with range for
+  /*PinToCore(0);
   ThreadPool workers(options_.num_flush_threads);
   uint32_t current_page = UINT32_MAX;
   std::vector<std::pair<const Slice*, const Slice*>> records_for_page;
@@ -232,7 +232,7 @@ Status DBImpl::FlushMemTable() {
     }
     records_for_page.emplace_back(std::make_pair(&kv.first, &kv.second.first));
   }
-  // ThreadPool destructor waits for work to finish
+  // ThreadPool destructor waits for work to finish*/
   return Status::OK();
 }
 

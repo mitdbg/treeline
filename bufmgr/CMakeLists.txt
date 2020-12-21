@@ -5,6 +5,7 @@ target_sources(llsm PRIVATE
   buffer_manager.h
   file_manager.cc
   file_manager.h
+  file.h
   hash_queue.h
   page_eviction_strategy.h
   twoqueue_eviction.cc

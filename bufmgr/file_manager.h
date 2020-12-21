@@ -1,14 +1,10 @@
 #pragma once
 
-#include <stdint.h>
-#include <stdlib.h>
-
-#include <atomic>
 #include <memory>
-#include <vector>
 
-#include "llsm/options.h"
 #include "db/page.h"
+#include "file.h"
+#include "llsm/options.h"
 
 namespace llsm {
 
