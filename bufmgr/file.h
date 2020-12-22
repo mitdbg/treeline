@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string>
 
-#include "llsm/options.h"
+#include "options.h"
 
 #define CHECK_ERROR(call)                                                    \
   do {                                                                       \
@@ -36,7 +36,7 @@ class File {
   void WritePage(size_t offset, const void* data) const {
     CHECK_ERROR(pwrite(fd_, data, page_size_, offset));
   }
-  void Sync() const { fsync(fd_); }
+  void Sync() const { CHECK_ERROR(fsync(fd_)); }
 
   void ZeroOut(size_t offset) {
     if (max_offset_written_ > offset + page_size_) return;
@@ -46,10 +46,11 @@ class File {
 
     CHECK_ERROR(ftruncate(fd_, max_offset_written_));
   }
-  const size_t page_size_;
+  size_t GetPageSize() const { return page_size_; }
 
  private:
   int fd_;
+  const size_t page_size_;
   size_t max_offset_written_;
   const size_t growth_bytes_;
 };

@@ -164,49 +164,6 @@ Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
   return Status::NotSupported("Unimplemented.");
 }
 
-/*
-Status DBImpl::FlushMemTable() {
-  // Map records to page_ids
-  PageMap page_map;
-  uint32_t current_page = UINT32_MAX;
-  for (const auto& kv : mtable_) {
-    uint64_t raw_key = *reinterpret_cast<const uint64_t*>(kv.first.data());
-    double rel_pos = (double) __builtin_bswap64(raw_key) / (double)
-options_.num_keys; uint32_t page_id = rel_pos * total_pages_;
-    // The memtable is in sorted order - once we "pass" a page, we won't return
-to it if (page_id != current_page) {
-      page_map.emplace_back(std::make_pair(page_id, std::vector<std::pair<const
-Slice*, const Slice*>>())); current_page = page_id;
-    }
-    auto& page_entries = page_map.back();
-    page_entries.second.emplace_back(std::make_pair(&kv.first,
-&kv.second.first));
-  }
-
-  std::vector<std::thread> workers;
-  workers.reserve(options_.num_flush_threads);
-  size_t pages_to_flush = page_map.size();
-  size_t pages_per_thread = pages_to_flush / options_.num_flush_threads;
-  size_t pages_remainder = pages_to_flush % options_.num_flush_threads;
-
-  size_t map_offset = 0;
-  for (unsigned i = 0; i < options_.num_flush_threads; i++) {
-    size_t num = pages_per_thread;
-    if (i < pages_remainder) num += 1;
-    if (num == 0) continue;
-    workers.emplace_back(std::thread(&DBImpl::ThreadFlushMain, this, &page_map,
-map_offset, num)); map_offset += num;
-  }
-  for (auto& worker : workers) {
-    worker.join();
-  }
-  for (auto& file : files_) {
-    file->Sync();
-  }
-  return Status::OK();
-}
-*/
-
 Status DBImpl::FlushMemTable() { // FIXME: Make MemTable iterator work with range for
   /*PinToCore(0);
   ThreadPool workers(options_.num_flush_threads);
@@ -234,24 +191,6 @@ Status DBImpl::FlushMemTable() { // FIXME: Make MemTable iterator work with rang
   }
   // ThreadPool destructor waits for work to finish*/
   return Status::OK();
-}
-
-void DBImpl::ThreadFlushMain(const PageMap* to_flush, size_t offset,
-                             size_t num) {
-  for (unsigned i = offset; i < offset + num; i++) {
-    auto& vec_pair = (*to_flush)[i];
-    uint32_t page_id = vec_pair.first;
-
-    auto& bf = buf_mgr_->FixPage(page_id, /*exclusive = */ true);
-    Page* page = bf.GetPage();
-
-    for (const auto& kv : vec_pair.second) {
-      auto s = page->Put(*kv.first, *kv.second);
-      assert(s.ok());
-    }
-
-    buf_mgr_->UnfixPage(bf, /*is_dirty = */ true);
-  }
 }
 
 void DBImpl::ThreadFlushMain2(

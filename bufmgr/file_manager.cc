@@ -18,7 +18,7 @@ FileManager::FileManager(const BufMgrOptions options, std::string db_path)
 void FileManager::ReadPage(const uint64_t page_id, Page* page) {
   size_t segment_id = page_id / pages_per_segment_;
   auto& file = db_files_[segment_id];
-  size_t offset = (page_id % pages_per_segment_) * file->page_size_;
+  size_t offset = (page_id % pages_per_segment_) * file->GetPageSize();
 
   file->ZeroOut(offset);
   file->ReadPage(
@@ -30,7 +30,7 @@ void FileManager::ReadPage(const uint64_t page_id, Page* page) {
 void FileManager::WritePage(const uint64_t page_id, Page* page) {
   size_t segment_id = page_id / pages_per_segment_;
   auto& file = db_files_[segment_id];
-  size_t offset = (page_id % pages_per_segment_) * file->page_size_;
+  size_t offset = (page_id % pages_per_segment_) * file->GetPageSize();
 
   file->ZeroOut(offset);
   file->WritePage(

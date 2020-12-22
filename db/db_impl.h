@@ -29,8 +29,6 @@ class DBImpl : public DB {
   Status Initialize();
 
  private:
-  using PageMap = std::vector<std::pair<uint32_t, std::vector<std::pair<const Slice*, const Slice*>>>>;
-  void ThreadFlushMain(const PageMap* to_flush, size_t offset, size_t num);
   void ThreadFlushMain2(const std::vector<std::pair<const Slice*, const Slice*>>& records, size_t page_id);
 
   const Options options_;

@@ -143,7 +143,7 @@ void BufferManager::UnfixPage(BufferFrame& frame, const bool is_dirty) {
 void BufferManager::FlushDirty() {
   LockMapMutex();
 
-  for (auto pair : page_to_frame_map_) {
+  for (const auto& pair : page_to_frame_map_) {
     auto frame = pair.second;
     if (frame->IsDirty()) {
       frame->Lock(/*exclusive=*/false);
