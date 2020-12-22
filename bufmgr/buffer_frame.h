@@ -23,13 +23,16 @@ class BufferFrame {
  public:
   // Initialize a buffer frame based on the page with the specified `page_id`,
   // which is pointed to by `data`.
-  BufferFrame(const uint64_t page_id, Page* page);
+  BufferFrame(const uint64_t page_id, void* data);
 
   // Free all resources.
   ~BufferFrame();
 
   // Return the page held in the current frame.
-  Page* GetPage() const;
+  Page GetPage() const;
+
+  // Get a pointer to the data of the page held in the current frame.
+  void* GetData() const;
 
   // Set/get the page ID of the page held in the current frame.
   void SetPageId(const uint64_t page_id);
@@ -65,8 +68,8 @@ class BufferFrame {
   void SetFlags(const uint8_t flags) { flags_ |= flags; }
   void UnsetFlags(const uint8_t flags) { flags_ &= ~flags; }
 
-  // The page held by the frame.
-  Page* page_;
+  // The data of the page held by the frame.
+  void* data_;
 
   // The id of the page held by the frame.
   uint64_t page_id_;

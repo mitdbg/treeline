@@ -19,12 +19,12 @@ class FileManager {
   FileManager(const BufMgrOptions options, std::string db_path);
 
   // Reads the part of the on-disk database file corresponding to `page_id` into
-  // the in-memory page-sized block pointed to by `page`.
-  void ReadPage(const uint64_t page_id, Page* page);
+  // the in-memory page-sized block pointed to by `data`.
+  void ReadPage(const uint64_t page_id, void* data);
 
-  // Writes from the in-memory page-sized block pointed to by `page` to the part
+  // Writes from the in-memory page-sized block pointed to by `data` to the part
   // of the on-disk database file corresponding to `page_id`.
-  void WritePage(const uint64_t page_id, Page* page);
+  void WritePage(const uint64_t page_id, void* data);
 
  private:
   // The database files

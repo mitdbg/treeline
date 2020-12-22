@@ -137,7 +137,7 @@ Status DBImpl::Initialize() {
     uint64_t swapped_lower = __builtin_bswap64(lower_key);
     uint64_t swapped_upper = __builtin_bswap64(upper_key);
     auto& bf = buf_mgr_->FixPage(page_id, /*exclusive = */ true);
-    Page page(reinterpret_cast<void*>(bf.GetPage()),
+    Page page(bf.GetData(),
               Slice(reinterpret_cast<const char*>(&swapped_lower), 8),
               Slice(reinterpret_cast<const char*>(&swapped_upper), 8));
     buf_mgr_->UnfixPage(bf, /*is_dirty = */ true);
@@ -198,10 +198,10 @@ void DBImpl::ThreadFlushMain2(
     size_t page_id) {
   
   auto& bf = buf_mgr_->FixPage(page_id, /*exclusive = */ true);
-  Page* page = bf.GetPage();
+  Page page(bf.GetPage());
   
   for (const auto& kv : records) {
-    auto s = page->Put(*kv.first, *kv.second);
+    auto s = page.Put(*kv.first, *kv.second);
     assert(s.ok());
   }
   buf_mgr_->UnfixPage(bf, /*is_dirty = */ true);

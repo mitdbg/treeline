@@ -88,11 +88,11 @@ class BufferManager {
   const size_t page_size_;
 
   // Space in memory to hold the cached pages.
-  Page* pages_cache_;
+  void* pages_cache_;
 
   // Pointers to available page-sized chunks in memory, for fixing pages from
   // disk.
-  std::list<Page*> free_pages_;
+  std::list<void*> free_pages_;
   std::mutex free_pages_mutex_;
 
   // Map from page_id to the buffer frame (if any) that currently holds that

@@ -21,13 +21,13 @@ BufferManager::BufferManager(const BufMgrOptions options, std::string db_path)
 
   // Allocate space with alignment because of O_DIRECT requirements.
   // No need to zero out because data brought here will come from the database
-  // file, which is zeroed out upon expansion by the FileManager.
-  pages_cache_ = reinterpret_cast<Page*>(
-      aligned_alloc(options.alignment, buffer_manager_size_ * page_size_));
+  // `File`, which is zeroed out upon expansion.
+  pages_cache_ =
+      aligned_alloc(options.alignment, buffer_manager_size_ * page_size_);
 
-  Page* page_ptr = pages_cache_;
-  for (size_t i = 0; i < buffer_manager_size_; ++i, ++page_ptr) {
-    free_pages_.push_back(page_ptr);
+  char* page_ptr = reinterpret_cast<char*>(pages_cache_);
+  for (size_t i = 0; i < buffer_manager_size_; ++i, page_ptr += page_size_) {
+    free_pages_.push_back((void*)page_ptr);
   }
   page_to_frame_map_.reserve(buffer_manager_size_);
 
@@ -158,12 +158,12 @@ void BufferManager::FlushDirty() {
 
 // Writes the page held by `frame` to disk.
 void BufferManager::WritePageOut(BufferFrame* frame) const {
-  file_manager_->WritePage(frame->GetPageId(), frame->GetPage());
+  file_manager_->WritePage(frame->GetPageId(), frame->GetData());
 }
 
 // Reads a page from disk into `frame`.
 void BufferManager::ReadPageIn(BufferFrame* frame) {
-  file_manager_->ReadPage(frame->GetPageId(), frame->GetPage());
+  file_manager_->ReadPage(frame->GetPageId(), frame->GetData());
 }
 
 // Creates a new frame and specifies that it will hold the page with `page_id`.
@@ -174,11 +174,11 @@ BufferFrame* BufferManager::CreateFrame(const uint64_t page_id) {
     UnlockFreePagesMutex();
     return nullptr;
   }
-  Page* page = free_pages_.front();
+  void* data = free_pages_.front();
   free_pages_.pop_front();
   UnlockFreePagesMutex();
 
-  BufferFrame* frame = new BufferFrame(page_id, page);
+  BufferFrame* frame = new BufferFrame(page_id, data);
 
   return frame;
 }

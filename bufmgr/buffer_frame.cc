@@ -6,8 +6,8 @@ namespace llsm {
 
 // Initialize a buffer frame based on the page with the specified `page_id`,
 // which is pointed to by `data`.
-BufferFrame::BufferFrame(const uint64_t page_id, Page* page) {
-  page_ = page;
+BufferFrame::BufferFrame(const uint64_t page_id, void* data) {
+  data_ = data;
   SetPageId(page_id);
   pthread_rwlock_init(&rwlock_, nullptr);
   UnsetAllFlags();
@@ -18,7 +18,10 @@ BufferFrame::BufferFrame(const uint64_t page_id, Page* page) {
 BufferFrame::~BufferFrame() { pthread_rwlock_destroy(&rwlock_); }
 
 // Get the page held in the current frame.
-Page* BufferFrame::GetPage() const { return page_; }
+Page BufferFrame::GetPage() const { return Page(data_); }
+
+// Get a pointer to the data of the page held in the current frame.
+void* BufferFrame::GetData() const { return data_; }
 
 // Set/get the page ID of the page held in the current frame.
 void BufferFrame::SetPageId(uint64_t page_id) { page_id_ = page_id; }

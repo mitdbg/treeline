@@ -14,27 +14,25 @@ FileManager::FileManager(const BufMgrOptions options, std::string db_path)
 }
 
 // Reads the part of the on-disk database file corresponding to `page_id` into
-// the in-memory page-sized block pointed to by `page`.
-void FileManager::ReadPage(const uint64_t page_id, Page* page) {
+// the in-memory page-sized block pointed to by `data`.
+void FileManager::ReadPage(const uint64_t page_id, void* data) {
   size_t segment_id = page_id / pages_per_segment_;
   auto& file = db_files_[segment_id];
   size_t offset = (page_id % pages_per_segment_) * file->GetPageSize();
 
   file->ZeroOut(offset);
-  file->ReadPage(
-      offset, reinterpret_cast<void*>(const_cast<char*>(page->data().data())));
+  file->ReadPage(offset, data);
 }
 
-// Writes from the in-memory page-sized block pointed to by `page` to the part
+// Writes from the in-memory page-sized block pointed to by `data` to the part
 // of the on-disk database file corresponding to `page_id`.
-void FileManager::WritePage(const uint64_t page_id, Page* page) {
+void FileManager::WritePage(const uint64_t page_id, void* data) {
   size_t segment_id = page_id / pages_per_segment_;
   auto& file = db_files_[segment_id];
   size_t offset = (page_id % pages_per_segment_) * file->GetPageSize();
 
   file->ZeroOut(offset);
-  file->WritePage(
-      offset, reinterpret_cast<void*>(const_cast<char*>(page->data().data())));
+  file->WritePage(offset, data);
 }
 
 }  // namespace llsm
