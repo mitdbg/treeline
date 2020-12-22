@@ -3,7 +3,11 @@ project(learnedlsm LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 
 option(LLSM_BUILD_TESTS "Set to build the Learned LSM test suite." OFF)
+option(LLSM_BUILD_BENCHMARKS "Set to build the Learned LSM benchmarks." OFF)
 option(LLSM_BUILD_SHARED "Set to build the Learned LSM database as a shared library." OFF)
+
+# Allows us to set CMake project options for subprojects that we include.
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -38,4 +42,9 @@ add_subdirectory(util)
 # Build the tests iff requested
 if(LLSM_BUILD_TESTS)
   add_subdirectory(tests)
+endif()
+
+# Build the benchmarks iff requested
+if(LLSM_BUILD_BENCHMARKS)
+  add_subdirectory(bench)
 endif()
