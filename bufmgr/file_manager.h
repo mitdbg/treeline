@@ -4,7 +4,6 @@
 
 #include "db/page.h"
 #include "file.h"
-#include "llsm/options.h"
 
 namespace llsm {
 
@@ -33,7 +32,13 @@ class FileManager {
   // The path to the database
   std::string db_path_;
 
-  const size_t pages_per_segment_;
+  // The number of bits in the page_id that index *within* the same segment.
+  // i.e. this is 4 if there are 16 pages per segment.
+  size_t pages_per_segment_bits_ = 0;
+
+  // A given bit of this mask is 1 iff it indexes *within* the same segment.
+  // i.e. this is 000...01111 if there are 16 pages per segment.
+  size_t pages_per_segment_mask_ = 0;
 };
 
 }  // namespace llsm

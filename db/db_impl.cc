@@ -126,16 +126,17 @@ Status DBImpl::Initialize() {
   BufMgrOptions buf_mgr_options;
   buf_mgr_options.num_files = segments_;
   buf_mgr_options.page_size = Page::kSize;
-  buf_mgr_options.pages_per_segment_ = pages_per_segment_;
+  buf_mgr_options.pages_per_segment = pages_per_segment_;
+  buf_mgr_options.use_direct_io = options_.use_direct_io;
   buf_mgr_ = std::make_unique<BufferManager>(buf_mgr_options, db_path_);
 
   // Preallocate the pages with the key space
   uint64_t lower_key = 0;
   uint64_t upper_key =
       records_per_page;  // TODO - Linearly space the input records
-  for (unsigned page_id = 0; page_id < total_pages_; page_id++) {
-    uint64_t swapped_lower = __builtin_bswap64(lower_key);
-    uint64_t swapped_upper = __builtin_bswap64(upper_key);
+  for (unsigned page_id = 0; page_id < total_pages_; ++page_id) {
+    const uint64_t swapped_lower = __builtin_bswap64(lower_key);
+    const uint64_t swapped_upper = __builtin_bswap64(upper_key);
     auto& bf = buf_mgr_->FixPage(page_id, /*exclusive = */ true);
     Page page(bf.GetData(),
               Slice(reinterpret_cast<const char*>(&swapped_lower), 8),
@@ -164,13 +165,17 @@ Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
   return Status::NotSupported("Unimplemented.");
 }
 
-Status DBImpl::FlushMemTable() { // FIXME: Make MemTable iterator work with range for
-  /*PinToCore(0);
+Status DBImpl::FlushMemTable() {
+  PinToCore(0);
   ThreadPool workers(options_.num_flush_threads);
   uint32_t current_page = UINT32_MAX;
-  std::vector<std::pair<const Slice*, const Slice*>> records_for_page;
-  for (const auto& kv : mtable_) {
-    uint64_t raw_key = *reinterpret_cast<const uint64_t*>(kv.first.data());
+  std::vector<std::pair<const Slice, const Slice>>
+      records_for_page;  // FIXME: This should have Slice*, not Slice, to limit
+                         // memory use.
+
+  for (auto it = mtable_.GetIterator(); it.Valid(); it.Next()) {
+    uint64_t raw_key =
+        *reinterpret_cast<const uint64_t*>(it.key().data());  // TODO: length
     double rel_pos =
         (double)__builtin_bswap64(raw_key) / (double)options_.num_keys;
     uint32_t page_id = rel_pos * total_pages_;
@@ -187,21 +192,21 @@ Status DBImpl::FlushMemTable() { // FIXME: Make MemTable iterator work with rang
       }
       current_page = page_id;
     }
-    records_for_page.emplace_back(std::make_pair(&kv.first, &kv.second.first));
+    records_for_page.emplace_back(std::make_pair(it.key(), it.value()));
   }
-  // ThreadPool destructor waits for work to finish*/
+  // ThreadPool destructor waits for work to finish
   return Status::OK();
 }
 
 void DBImpl::ThreadFlushMain2(
-    const std::vector<std::pair<const Slice*, const Slice*>>& records,
+    const std::vector<std::pair<const Slice, const Slice>>& records,
     size_t page_id) {
   
   auto& bf = buf_mgr_->FixPage(page_id, /*exclusive = */ true);
   Page page(bf.GetPage());
   
   for (const auto& kv : records) {
-    auto s = page.Put(*kv.first, *kv.second);
+    auto s = page.Put(kv.first, kv.second);
     assert(s.ok());
   }
   buf_mgr_->UnfixPage(bf, /*is_dirty = */ true);

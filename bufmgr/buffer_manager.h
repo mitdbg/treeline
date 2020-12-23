@@ -10,7 +10,6 @@
 #include "buffer_frame.h"
 #include "file_manager.h"
 #include "page_eviction_strategy.h"
-#include "llsm/options.h"
 
 namespace llsm {
 
@@ -35,21 +34,21 @@ namespace llsm {
 class BufferManager {
  
  public:
-  // Initialize a BufferManager with the options specified in `options`.
+  // Initializes a BufferManager with the options specified in `options`.
   BufferManager(const BufMgrOptions options, std::string db_path);
   
   // Writes all dirty pages back and frees resources.
   ~BufferManager();
 
-  // Retrieve the page given by `page_id`, to be held exclusively or not
+  // Retrieves the page given by `page_id`, to be held exclusively or not
   // based on the value of `exclusive`. Pages are stored on disk in files with
   // the same name as the page ID (e.g. 1).
   BufferFrame& FixPage(const uint64_t page_id, const bool exclusive);
 
-  // Unfix a page updating whether it is dirty or not.
+  // Unfixes a page updating whether it is dirty or not.
   void UnfixPage(BufferFrame& frame, const bool is_dirty);
 
-  // Write all dirty pages to disk (without unfixing)
+  // Writes all dirty pages to disk (without unfixing)
   void FlushDirty();
 
  private:

@@ -29,7 +29,7 @@ class DBImpl : public DB {
   Status Initialize();
 
  private:
-  void ThreadFlushMain2(const std::vector<std::pair<const Slice*, const Slice*>>& records, size_t page_id);
+  void ThreadFlushMain2(const std::vector<std::pair<const Slice, const Slice>>& records, size_t page_id);
 
   const Options options_;
   const std::string db_path_;

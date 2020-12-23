@@ -19,7 +19,7 @@ struct Options {
   // If set, prevent the database from being opened if it already exists
   bool error_if_exists = false;
 
-  // Use direct I/O when writing to/reding from database files
+  // Use direct I/O when writing to/reading from database files
   bool use_direct_io = false;
 
   uint64_t num_keys = 5000000;

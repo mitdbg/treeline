@@ -12,7 +12,7 @@
 
 namespace llsm {
 
-// Initialize a BufferManager to keep up to `buffer_manager_size` frames in main
+// Initializes a BufferManager to keep up to `buffer_manager_size` frames in main
 // memory. Bypasses file system cache if `use_direct_io` is true.
 BufferManager::BufferManager(const BufMgrOptions options, std::string db_path)
     : options_(options),
@@ -64,7 +64,7 @@ BufferManager::~BufferManager() {
   UnlockMapMutex();
 }
 
-// Retrieve the page given by `page_id`, to be held exclusively or not
+// Retrieves the page given by `page_id`, to be held exclusively or not
 // based on the value of `exclusive`. Pages are stored on disk in files with
 // the same name as the page ID (e.g. 1).
 BufferFrame& BufferManager::FixPage(const uint64_t page_id,
@@ -127,7 +127,7 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
   return *frame;
 }
 
-// Unfix a page updating whether it is dirty or not.
+// Unfixes a page updating whether it is dirty or not.
 void BufferManager::UnfixPage(BufferFrame& frame, const bool is_dirty) {
   if (is_dirty) frame.SetDirty();
 
@@ -139,7 +139,7 @@ void BufferManager::UnfixPage(BufferFrame& frame, const bool is_dirty) {
   frame.Unlock();
 }
 
-// Write all dirty pages to disk (without unfixing)
+// Writes all dirty pages to disk (without unfixing)
 void BufferManager::FlushDirty() {
   LockMapMutex();
 
