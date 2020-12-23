@@ -26,6 +26,7 @@ DEFINE_string(db_path, "", "The path where the database(s) should be stored.");
 DEFINE_uint32(trials, 1, "The number of times to repeat the experiment.");
 
 DEFINE_uint64(data_mib, 64, "The amount of user data to write, in MiB.");
+DEFINE_uint32(record_size_bytes, 16, "The size of each record, in bytes.");
 DEFINE_uint64(cache_size_mib, 64,
               "The size of the database's in memory cache, in MiB.");
 DEFINE_uint64(block_size_kib, 64, "The size of a block, in KiB.");
@@ -129,7 +130,8 @@ int main(int argc, char* argv[]) {
   }
 
   const llsm::bench::U64Dataset dataset =
-      llsm::bench::GenerateOrderedData(FLAGS_data_mib);
+      llsm::bench::U64Dataset::GenerateOrdered(FLAGS_data_mib,
+                                               FLAGS_record_size_bytes);
 
   std::cout << "db,data_size_mib,bg_threads,throughput_mib_per_s" << std::endl;
 
