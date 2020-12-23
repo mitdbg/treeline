@@ -5,6 +5,8 @@
 
 #include <atomic>
 
+#include "db/page.h"
+
 namespace llsm {
 
 // A wrapper for memory pages, containing metadata used by the buffer manager.
@@ -26,7 +28,10 @@ class BufferFrame {
   // Free all resources.
   ~BufferFrame();
 
-  // Return the data contained in the page held in the current frame.
+  // Return the page held in the current frame.
+  Page GetPage() const;
+
+  // Get a pointer to the data of the page held in the current frame.
   void* GetData() const;
 
   // Set/get the page ID of the page held in the current frame.

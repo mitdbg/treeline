@@ -17,7 +17,10 @@ BufferFrame::BufferFrame(const uint64_t page_id, void* data) {
 // Free all resources.
 BufferFrame::~BufferFrame() { pthread_rwlock_destroy(&rwlock_); }
 
-// Get the data contained in the page held in the current frame.
+// Get the page held in the current frame.
+Page BufferFrame::GetPage() const { return Page(data_); }
+
+// Get a pointer to the data of the page held in the current frame.
 void* BufferFrame::GetData() const { return data_; }
 
 // Set/get the page ID of the page held in the current frame.

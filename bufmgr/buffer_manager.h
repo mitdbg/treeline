@@ -32,30 +32,24 @@ namespace llsm {
 // This class is thread-safe; mutexes are used to serialize accesses to critical
 // data structures.
 class BufferManager {
-  // The page size in bytes.
-  static const size_t kPageSizeBytes = 4096;
-
-  // Default number of pages in buffer manager.
-  static const size_t kDefaultBufMgrSize = 16384;
-
+ 
  public:
-  // Initialize a BufferManager to keep up to `buffer_manager_size` frames in
-  // main memory. Bypasses file system cache if `use_direct_io` is true.
-  BufferManager();
-  BufferManager(const size_t buffer_manager_size);
-  BufferManager(const bool use_direct_io);
-  BufferManager(const size_t buffer_manager_size, const bool use_direct_io);
-
+  // Initializes a BufferManager with the options specified in `options`.
+  BufferManager(const BufMgrOptions options, std::string db_path);
+  
   // Writes all dirty pages back and frees resources.
   ~BufferManager();
 
-  // Retrieve the page given by `page_id`, to be held exclusively or not
+  // Retrieves the page given by `page_id`, to be held exclusively or not
   // based on the value of `exclusive`. Pages are stored on disk in files with
   // the same name as the page ID (e.g. 1).
   BufferFrame& FixPage(const uint64_t page_id, const bool exclusive);
 
-  // Unfix a page updating whether it is dirty or not.
+  // Unfixes a page updating whether it is dirty or not.
   void UnfixPage(BufferFrame& frame, const bool is_dirty);
+
+  // Writes all dirty pages to disk (without unfixing)
+  void FlushDirty();
 
  private:
   // Writes the page held by `frame` to disk.
@@ -67,7 +61,7 @@ class BufferManager {
   // Locks/unlocks the mutex for editing free_pages_.
   void LockFreePagesMutex() { free_pages_mutex_.lock(); }
   void UnlockFreePagesMutex() { free_pages_mutex_.unlock(); }
-  
+
   // Locks/unlocks the mutex for editing page_to_frame_map_.
   void LockMapMutex() { map_mutex_.lock(); }
   void UnlockMapMutex() { map_mutex_.unlock(); }
@@ -83,8 +77,14 @@ class BufferManager {
   // Resets an exisiting frame to hold the page with `new_page_id`.
   void ResetFrame(BufferFrame* frame, const uint64_t new_page_id);
 
+  // Options provided upon creation
+  const BufMgrOptions options_;
+
   // The number of pages the buffer manager should keep in memory.
-  size_t buffer_manager_size_;
+  const size_t buffer_manager_size_;
+
+  // The size of each page
+  const size_t page_size_;
 
   // Space in memory to hold the cached pages.
   void* pages_cache_;

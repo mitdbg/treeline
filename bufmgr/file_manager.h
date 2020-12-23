@@ -1,30 +1,21 @@
 #pragma once
 
-#include <stdint.h>
-#include <stdlib.h>
+#include <memory>
 
-#include <atomic>
+#include "db/page.h"
+#include "file.h"
 
 namespace llsm {
+
+class File;
 
 // A wrapper for I/O to on-disk files.
 //
 // This class helps make `BufferManager` OS-independent.
 class FileManager {
  public:
-  // The number of pages to zero out whenever ZeroOut() is called
-  static const size_t kZeroOutPages = 256;
-
-  // The name of the database file
-  static constexpr char kFileName[] = "database.dat";
-
-  // Creates a file manager for `page_size`-sized pages by opening a database
-  // file. Bypasses file system cache if `use_direct_io` is true.
-  FileManager(const size_t page_size);
-  FileManager(const size_t page_size, const bool use_direct_io);
-
-  // Closes a database file.
-  ~FileManager();
+  // Creates a file manager according to the options specified in `options`.
+  FileManager(const BufMgrOptions options, std::string db_path);
 
   // Reads the part of the on-disk database file corresponding to `page_id` into
   // the in-memory page-sized block pointed to by `data`.
@@ -35,18 +26,19 @@ class FileManager {
   void WritePage(const uint64_t page_id, void* data);
 
  private:
-  // Fill kZeroOutPages sequential pages with zeroes, starting with
-  // next_page_id_. Update next_page_id_ accordingly at the end.
-  void ZeroOut();
+  // The database files
+  std::vector<std::unique_ptr<File>> db_files_;
 
-  // The file descriptor of the database file
-  int db_fd_;
+  // The path to the database
+  std::string db_path_;
 
-  // The size of a page (in bytes)
-  const size_t page_size_;
+  // The number of bits in the page_id that index *within* the same segment.
+  // i.e. this is 4 if there are 16 pages per segment.
+  size_t pages_per_segment_bits_ = 0;
 
-  // The lowest page id that has never been written to
-  size_t next_page_id_;
+  // A given bit of this mask is 1 iff it indexes *within* the same segment.
+  // i.e. this is 000...01111 if there are 16 pages per segment.
+  size_t pages_per_segment_mask_ = 0;
 };
 
 }  // namespace llsm
