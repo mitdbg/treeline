@@ -23,6 +23,7 @@ if(LLSM_BUILD_BENCHMARKS)
     GIT_REPOSITORY https://github.com/facebook/rocksdb
     GIT_TAG        v6.14.6
   )
+  set(WITH_GFLAGS OFF)
   set(WITH_JNI OFF)
   set(WITH_TESTS OFF)
   set(WITH_BENCHMARK_TOOLS OFF)
