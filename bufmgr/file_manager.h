@@ -26,19 +26,30 @@ class FileManager {
   void WritePage(const uint64_t page_id, void* data);
 
  private:
+  // Stores the segment and byte-offset within the segment where a specific page
+  // can be found.
+  struct SegmentAddress {
+    size_t segment_id;
+    size_t offset;
+  };
+  SegmentAddress AddressFromPageId(size_t page_id) const;
+
   // The database files
   std::vector<std::unique_ptr<File>> db_files_;
 
   // The path to the database
-  std::string db_path_;
+  const std::string db_path_;
+
+  // The size of a page, in bytes.
+  const size_t page_size_;
 
   // The number of bits in the page_id that index *within* the same segment.
   // i.e. this is 4 if there are 16 pages per segment.
-  size_t pages_per_segment_bits_ = 0;
+  const size_t pages_per_segment_bits_;
 
   // A given bit of this mask is 1 iff it indexes *within* the same segment.
   // i.e. this is 000...01111 if there are 16 pages per segment.
-  size_t pages_per_segment_mask_ = 0;
+  const size_t pages_per_segment_mask_;
 };
 
 }  // namespace llsm

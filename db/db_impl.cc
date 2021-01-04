@@ -126,7 +126,6 @@ Status DBImpl::Initialize() {
   BufMgrOptions buf_mgr_options;
   buf_mgr_options.num_files = segments_;
   buf_mgr_options.page_size = Page::kSize;
-  buf_mgr_options.pages_per_segment = pages_per_segment_;
   buf_mgr_options.use_direct_io = options_.use_direct_io;
   buf_mgr_ = std::make_unique<BufferManager>(buf_mgr_options, db_path_);
 
