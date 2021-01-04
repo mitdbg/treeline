@@ -8,7 +8,7 @@ parameters:
       - Release
 
 trigger:
-  - main
+  - master
 
 pool:
   vmImage: ubuntu-20.04
