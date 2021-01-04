@@ -15,20 +15,9 @@
 #include <unordered_map>
 
 #include "db/page.h"
+#include "util/affinity.h"
 
 namespace {
-
-void PinToCore(uint32_t core_id) {
-  cpu_set_t cpuset;
-  CPU_ZERO(&cpuset);
-  CPU_SET(core_id, &cpuset);
-
-  pthread_t thread = pthread_self();
-  if (pthread_setaffinity_np(thread, sizeof(cpuset), &cpuset) < 0) {
-    throw std::runtime_error("Error pinning thread to core " +
-                             std::to_string(core_id));
-  }
-}
 
 class ThreadPool {
  public:
@@ -60,7 +49,7 @@ class ThreadPool {
 
  private:
   void WorkerMain(uint32_t id) {
-    PinToCore(id);
+    llsm::affinity::PinToCore(id);
     std::function<void(void)> next_job;
     while (true) {
       {
@@ -90,7 +79,6 @@ class ThreadPool {
 namespace llsm {
 
 static constexpr double kFillPct = 0.5;
-static constexpr size_t kRecordSize = 16;
 
 Status DB::Open(const Options& options, const std::string& path, DB** db_out) {
   std::unique_ptr<DBImpl> db = std::make_unique<DBImpl>(options, path);
@@ -103,9 +91,15 @@ Status DB::Open(const Options& options, const std::string& path, DB** db_out) {
 }
 
 DBImpl::DBImpl(Options options, std::string db_path)
-    : options_(std::move(options)), db_path_(std::move(db_path)) {}
+    : options_(std::move(options)),
+      db_path_(std::move(db_path)),
+      mtable_(std::make_unique<MemTable>()) {}
 
 Status DBImpl::Initialize() {
+  if (options_.key_step_size == 0) {
+    return Status::InvalidArgument("Options::key_step_size cannot be 0.");
+  }
+
   // Create directory and an appropriate number of files (segments), one per
   // worker thread.
   if (mkdir(db_path_.c_str(), 0755) != 0) {
@@ -113,11 +107,14 @@ Status DBImpl::Initialize() {
   }
   segments_ = options_.num_flush_threads;
 
-  // Compute records per page to achieve kFillPct
-  uint32_t records_per_page = Page::kSize * 0.9 * kFillPct / kRecordSize;
+  // The rest of the code in this method preallocates the database "pages"
+  // based on the configuration provided by the user in `llsm::Options`.
 
-  total_pages_ = options_.num_keys / records_per_page;
-  if (options_.num_keys % records_per_page != 0) ++total_pages_;
+  // Compute the maximum number of records per page to allow us to achieve an
+  // upper limit on how full each page can be
+  const uint32_t max_records_per_page = Page::kSize * 0.9 * kFillPct / options_.record_size;
+  total_pages_ = options_.num_keys / max_records_per_page;
+  if (options_.num_keys % max_records_per_page != 0) ++total_pages_;
 
   pages_per_segment_ = total_pages_ / segments_;
   if (total_pages_ % segments_ != 0) ++pages_per_segment_;
@@ -127,12 +124,16 @@ Status DBImpl::Initialize() {
   buf_mgr_options.num_files = segments_;
   buf_mgr_options.page_size = Page::kSize;
   buf_mgr_options.use_direct_io = options_.use_direct_io;
+  buf_mgr_options.pages_per_file = pages_per_segment_;
   buf_mgr_ = std::make_unique<BufferManager>(buf_mgr_options, db_path_);
 
+  uint32_t records_per_page = options_.num_keys / total_pages_;
+  if (options_.num_keys % total_pages_ != 0) ++records_per_page;
+
   // Preallocate the pages with the key space
+  uint64_t page_key_range = records_per_page * options_.key_step_size;
   uint64_t lower_key = 0;
-  uint64_t upper_key =
-      records_per_page;  // TODO - Linearly space the input records
+  uint64_t upper_key = page_key_range;
   for (unsigned page_id = 0; page_id < total_pages_; ++page_id) {
     const uint64_t swapped_lower = __builtin_bswap64(lower_key);
     const uint64_t swapped_upper = __builtin_bswap64(upper_key);
@@ -142,8 +143,8 @@ Status DBImpl::Initialize() {
               Slice(reinterpret_cast<const char*>(&swapped_upper), 8));
     buf_mgr_->UnfixPage(bf, /*is_dirty = */ true);
 
-    lower_key += records_per_page;
-    upper_key += records_per_page;
+    lower_key += page_key_range;
+    upper_key += page_key_range;
   }
   buf_mgr_->FlushDirty();
   last_key_ = lower_key;
@@ -152,7 +153,7 @@ Status DBImpl::Initialize() {
 
 Status DBImpl::Put(const WriteOptions& options, const Slice& key,
                    const Slice& value) {
-  return mtable_.Put(key, value);
+  return mtable_->Put(key, value);
 }
 
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
@@ -164,46 +165,50 @@ Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
   return Status::NotSupported("Unimplemented.");
 }
 
-Status DBImpl::FlushMemTable() {
-  PinToCore(0);
-  ThreadPool workers(options_.num_flush_threads);
-  uint32_t current_page = UINT32_MAX;
-  std::vector<std::pair<const Slice, const Slice>>
-      records_for_page;  // FIXME: This should have Slice*, not Slice, to limit
-                         // memory use.
+Status DBImpl::FlushMemTable(const WriteOptions& options) {
+  affinity::PinInScope run_on_core(0);
+  {
+    ThreadPool workers(options_.num_flush_threads);
+    uint32_t current_page = UINT32_MAX;
+    std::vector<std::pair<const Slice, const Slice>>
+        records_for_page;  // FIXME: This should have Slice*, not Slice, to limit
+                           // memory use.
 
-  for (auto it = mtable_.GetIterator(); it.Valid(); it.Next()) {
-    uint64_t raw_key =
-        *reinterpret_cast<const uint64_t*>(it.key().data());  // TODO: length
-    double rel_pos =
-        (double)__builtin_bswap64(raw_key) / (double)options_.num_keys;
-    uint32_t page_id = rel_pos * total_pages_;
-    // The memtable is in sorted order - once we "pass" a page, we won't return
-    // to it
-    if (page_id != current_page) {
-      if (current_page != UINT32_MAX) {
-        // Submit flush job to workers - this is not the "first" page
-        workers.Submit([records_for_page(std::move(records_for_page)), this,
-                        current_page]() {
-          ThreadFlushMain2(records_for_page, current_page);
-        });
-        records_for_page.clear();
+    auto it = mtable_->GetIterator();
+    for (it.SeekToFirst(); it.Valid(); it.Next()) {
+      uint64_t raw_key =
+          *reinterpret_cast<const uint64_t*>(it.key().data());  // TODO: length
+      double rel_pos =
+          (double)__builtin_bswap64(raw_key) / (double)options_.num_keys;
+      uint32_t page_id = rel_pos * total_pages_;
+      // The memtable is in sorted order - once we "pass" a page, we won't return
+      // to it
+      if (page_id != current_page) {
+        if (current_page != UINT32_MAX) {
+          // Submit flush job to workers - this is not the "first" page
+          workers.Submit([records_for_page(std::move(records_for_page)), this,
+                          current_page]() {
+            FlushWorkerMain(records_for_page, current_page);
+          });
+          records_for_page.clear();
+        }
+        current_page = page_id;
       }
-      current_page = page_id;
+      records_for_page.emplace_back(std::make_pair(it.key(), it.value()));
     }
-    records_for_page.emplace_back(std::make_pair(it.key(), it.value()));
+    // ThreadPool destructor waits for work to finish
   }
-  // ThreadPool destructor waits for work to finish
+  buf_mgr_->FlushDirty();
+  mtable_.reset(new MemTable());
   return Status::OK();
 }
 
-void DBImpl::ThreadFlushMain2(
+void DBImpl::FlushWorkerMain(
     const std::vector<std::pair<const Slice, const Slice>>& records,
     size_t page_id) {
-  
   auto& bf = buf_mgr_->FixPage(page_id, /*exclusive = */ true);
   Page page(bf.GetPage());
-  
+
   for (const auto& kv : records) {
     auto s = page.Put(kv.first, kv.second);
     assert(s.ok());

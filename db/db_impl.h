@@ -24,17 +24,16 @@ class DBImpl : public DB {
   Status Get(const ReadOptions& options, const Slice& key,
              std::string* value_out) override;
   Status Delete(const WriteOptions& options, const Slice& key) override;
-  Status FlushMemTable();
+  Status FlushMemTable(const WriteOptions& options) override;
 
   Status Initialize();
 
  private:
-  void ThreadFlushMain2(const std::vector<std::pair<const Slice, const Slice>>& records, size_t page_id);
+  void FlushWorkerMain(const std::vector<std::pair<const Slice, const Slice>>& records, size_t page_id);
 
   const Options options_;
   const std::string db_path_;
-  MemTable mtable_;
-  std::vector<std::unique_ptr<File>> files_;
+  std::unique_ptr<MemTable> mtable_;
   std::unique_ptr<BufferManager> buf_mgr_;
 
   uint32_t total_pages_ = 0;

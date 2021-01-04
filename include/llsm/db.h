@@ -55,6 +55,9 @@ class DB {
   // It is not an error if `key` does not exist in the database; this method
   // will be an effective "no-op" in this case.
   virtual Status Delete(const WriteOptions& options, const Slice& key) = 0;
+
+  // Flush the data stored in the MemTable to persistent storage.
+  virtual Status FlushMemTable(const WriteOptions& options) = 0;
 };
 
 }  // namespace llsm

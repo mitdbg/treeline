@@ -1,13 +1,19 @@
 #include "bufmgr/buffer_manager.h"
-#include "bufmgr/options.h"
 
 #include <filesystem>
 #include <vector>
 
+#include "bufmgr/options.h"
 #include "gtest/gtest.h"
 
 // Total number of pages.
 const size_t kNumPages = 65536;
+
+// Total number of files used to store the pages.
+const size_t kNumFiles = 1;
+static_assert(
+    kNumPages % kNumFiles == 0,
+    "The total number of pages must be divisible by the number of files used.");
 
 // Number of pages in buffer manager.
 const size_t kBufferManagerSize = 16384;
@@ -40,6 +46,8 @@ TEST(BufferManagerTest, WriteReadSequential) {
   // Create BufferManager.
   llsm::BufMgrOptions options;
   options.buffer_manager_size = kBufferManagerSize;
+  options.num_files = kNumFiles;
+  options.pages_per_file = kNumPages / kNumFiles;
   llsm::BufferManager buffer_manager(options, dbname);
 
   // Store `i` to page i

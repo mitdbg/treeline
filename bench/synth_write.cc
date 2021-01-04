@@ -8,6 +8,8 @@
 #include "bench/guard.h"
 #include "bench/timing.h"
 #include "gflags/gflags.h"
+#include "llsm/db.h"
+#include "llsm/options.h"
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/table.h"
@@ -35,6 +37,8 @@ DEFINE_uint64(write_batch_size, 1024,
 DEFINE_uint32(bg_threads, 1,
               "The number background threads that RocksDB/LLSM should use.");
 DEFINE_bool(use_direct_io, true, "Whether or not to use direct I/O.");
+DEFINE_uint64(memtable_size_mib, 64,
+              "The size of the memtable before it should be flushed, in MiB.");
 
 std::chrono::nanoseconds RunRocksDBExperiment(
     const llsm::bench::U64Dataset& dataset) {
@@ -45,6 +49,7 @@ std::chrono::nanoseconds RunRocksDBExperiment(
   options.compression = rocksdb::CompressionType::kNoCompression;
   options.use_direct_reads = FLAGS_use_direct_io;
   options.use_direct_io_for_flush_and_compaction = FLAGS_use_direct_io;
+  options.write_buffer_size = FLAGS_memtable_size_mib * 1024 * 1024;
   options.PrepareForBulkLoad();
   options.IncreaseParallelism(FLAGS_bg_threads);
 
@@ -98,15 +103,64 @@ std::chrono::nanoseconds RunRocksDBExperiment(
 
 std::chrono::nanoseconds RunLLSMExperiment(
     const llsm::bench::U64Dataset& dataset) {
-  return std::chrono::nanoseconds(0);
+  llsm::DB* db = nullptr;
+  llsm::Options options;
+  options.num_keys = dataset.size();
+  options.use_direct_io = FLAGS_use_direct_io;
+  options.num_flush_threads = FLAGS_bg_threads;
+  options.record_size = FLAGS_record_size_bytes;
+
+  // TODO: LLSM should automatically initiate flushes after the memtable exceeds
+  // this size
+  const size_t memtable_flush_size = FLAGS_memtable_size_mib * 1024 * 1024;
+  const size_t record_size = sizeof(uint64_t) + dataset.value_size();
+
+  const std::string dbname = FLAGS_db_path + "/llsm";
+  llsm::Status status = llsm::DB::Open(options, dbname, &db);
+  if (!status.ok()) {
+    throw std::runtime_error("Failed to open LLSM: " + status.ToString());
+  }
+
+  const llsm::bench::CallOnExit guard([db]() { delete db; });
+  return llsm::bench::MeasureRunTime(
+      [db, &dataset, record_size, memtable_flush_size]() {
+        llsm::WriteOptions woptions;
+        llsm::Status status;
+        size_t memtable_size = 0;
+        for (const auto& record : dataset) {
+          status = db->Put(woptions, record.key(), record.value());
+          if (!status.ok()) {
+            throw std::runtime_error("Failed to write record to LLSM.");
+          }
+          memtable_size += record_size;
+          if (memtable_size >= memtable_flush_size) {
+            status = db->FlushMemTable(woptions);
+            if (!status.ok()) {
+              throw std::runtime_error("Failed to flush the LLSM memtable.");
+            }
+            memtable_size = 0;
+          }
+        }
+        if (memtable_size > 0) {
+          status = db->FlushMemTable(woptions);
+          if (!status.ok()) {
+            throw std::runtime_error("Failed to flush the LLSM memtable.");
+          }
+          memtable_size = 0;
+        }
+      });
 }
 
 void PrintExperimentResult(const std::string& db,
+                           const llsm::bench::U64Dataset& dataset,
                            std::chrono::nanoseconds run_time) {
   const std::chrono::duration<double> run_time_s = run_time;
   const double throughput_mib_per_s = FLAGS_data_mib / run_time_s.count();
+  const double throughput_mops_per_s =
+      dataset.size() / run_time_s.count() / 1e6;
   std::cout << db << "," << FLAGS_data_mib << "," << FLAGS_bg_threads << ","
-            << throughput_mib_per_s << std::endl;
+            << FLAGS_record_size_bytes << "," << throughput_mib_per_s << ","
+            << throughput_mops_per_s << std::endl;
 }
 
 }  // namespace
@@ -133,16 +187,18 @@ int main(int argc, char* argv[]) {
       llsm::bench::U64Dataset::GenerateOrdered(FLAGS_data_mib,
                                                FLAGS_record_size_bytes);
 
-  std::cout << "db,data_size_mib,bg_threads,throughput_mib_per_s" << std::endl;
+  std::cout << "db,data_size_mib,bg_threads,record_size_bytes,throughput_mib_"
+               "per_s,throughput_mops_per_s"
+            << std::endl;
 
   for (uint32_t i = 0; i < FLAGS_trials; ++i) {
     fs::create_directory(FLAGS_db_path);
 
     if (FLAGS_db == kAll || FLAGS_db == kRocksDB) {
-      PrintExperimentResult(kRocksDB, RunRocksDBExperiment(dataset));
+      PrintExperimentResult(kRocksDB, dataset, RunRocksDBExperiment(dataset));
     }
     if (FLAGS_db == kAll || FLAGS_db == kLLSM) {
-      PrintExperimentResult(kLLSM, RunLLSMExperiment(dataset));
+      PrintExperimentResult(kLLSM, dataset, RunLLSMExperiment(dataset));
     }
 
     fs::remove_all(FLAGS_db_path);

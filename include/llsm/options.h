@@ -22,7 +22,15 @@ struct Options {
   // Use direct I/O when writing to/reading from database files
   bool use_direct_io = false;
 
+  // Temporary options used to inform the database about the key space (the
+  // distribution is assumed to be uniform).
   uint64_t num_keys = 5000000;
+  uint64_t min_key = 0;
+  uint64_t key_step_size = 1;
+  size_t record_size = 16;
+
+  // The number of worker threads to use when flushing in-memory writes to
+  // persistent storage.
   unsigned num_flush_threads = 4;
 };
 

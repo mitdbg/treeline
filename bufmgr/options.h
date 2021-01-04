@@ -11,7 +11,8 @@ struct BufMgrOptions {
 
   // Intended for the file manager
   bool use_direct_io = false;
-  size_t num_files = 1; // Must be at least 1.
+  size_t num_files = 1;
+  size_t pages_per_file = 16384;
   size_t growth_pages = 256;
 };
 

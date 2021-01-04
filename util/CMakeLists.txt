@@ -1,4 +1,5 @@
 target_sources(llsm PRIVATE
+  affinity.h
   arena.cc
   arena.h
   key.h
