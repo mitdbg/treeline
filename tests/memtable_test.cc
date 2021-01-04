@@ -180,7 +180,7 @@ TEST(MemTableTest, MultiWriteIterate) {
   ASSERT_FALSE(it.Valid());
 }
 
-TEST(MemTable, SimilarGet) {
+TEST(MemTableTest, SimilarGet) {
   MemTable table;
   std::string value_out;
   MemTable::EntryType entry_type_out;

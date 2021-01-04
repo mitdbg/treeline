@@ -1,4 +1,5 @@
-#include "../bufmgr/buffer_manager.h"
+#include "bufmgr/buffer_manager.h"
+#include "bufmgr/options.h"
 
 #include <filesystem>
 #include <vector>
@@ -32,8 +33,14 @@ TEST(BufferManagerTest, CreateValues) {
 }
 
 TEST(BufferManagerTest, WriteReadSequential) {
+  std::string dbname = "/tmp/llsm-bufmgr-test";
+  std::filesystem::remove_all(dbname);
+  std::filesystem::create_directory(dbname);
+
   // Create BufferManager.
-  llsm::BufferManager buffer_manager(kBufferManagerSize, false);
+  llsm::BufMgrOptions options;
+  options.buffer_manager_size = kBufferManagerSize;
+  llsm::BufferManager buffer_manager(options, dbname);
 
   // Store `i` to page i
   for (size_t i = 0; i < kNumPages; ++i) {
@@ -50,7 +57,7 @@ TEST(BufferManagerTest, WriteReadSequential) {
     buffer_manager.UnfixPage(bf, false);
   }
 
-  std::filesystem::remove("database.dat");
+  std::filesystem::remove_all(dbname);
 }
 
 }  // namespace
