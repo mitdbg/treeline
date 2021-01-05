@@ -107,7 +107,7 @@ TEST(BufferManagerTest, FlushDirty) {
     FileAddress address = AddressFromPageId(i, options);
     int fd = open((dbpath + "/segment-" + std::to_string(address.file_id)).c_str(), 
               O_RDWR | O_SYNC | (options.use_direct_io ? O_DIRECT : 0),
-              S_IRUSR | S_IWUSR));
+              S_IRUSR | S_IWUSR);
     pread(fd, reinterpret_cast<void*>(&j), options.page_size, address.offset);
     close(fd);
     ASSERT_EQ(i, j);
