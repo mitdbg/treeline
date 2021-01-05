@@ -30,6 +30,17 @@ std::vector<T> CreateValues(const size_t num_values) {
   return values;
 }
 
+struct FileAddress {
+  size_t file_id;
+  size_t offset;
+};
+FileAddress AddressFromPageId(size_t page_id, llsm::BufMgrOptions options) {
+  FileAddress address;
+  address.file_id = page_id / options.pages_per_file;
+  address.offset = (page_id % options.pages_per_file) * options.page_size;
+  return address;
+}
+
 // *** Tests ***
 
 TEST(BufferManagerTest, CreateValues) {
@@ -80,7 +91,6 @@ TEST(BufferManagerTest, FlushDirty) {
   options.pages_per_file = kNumPages / kNumFiles;
   options.page_size = sizeof(size_t);
   llsm::BufferManager buffer_manager(options, dbpath);
-  llsm::FileManager file_manager(options, dbpath);
 
   // Store `i` to page i for the first kBufferManagerSize pages.
   for (size_t i = 0; i < kBufferManagerSize; ++i) {
@@ -92,11 +102,16 @@ TEST(BufferManagerTest, FlushDirty) {
   buffer_manager.FlushDirty();
 
   // Read all pages directly from disk.
-  /*size_t j;
+  size_t j;
   for (size_t i = 0; i < kBufferManagerSize; ++i) {
-    file_manager.ReadPage(i, reinterpret_cast<void*>(&j));
+    FileManager address = AddressFromPageId(i, options);
+    fd = open((dbpath + "/segment-" + std::to_string(address.file_id)).c_str(), 
+              O_RDWR | O_SYNC | (options.use_direct_io ? O_DIRECT : 0),
+              S_IRUSR | S_IWUSR));
+    pread(fd, reinterpret_cast<void*>(&j), options.page_size, address.offset);
+    close(fd);
     ASSERT_EQ(i, j);
-  }*/
+  }
 
   std::filesystem::remove_all(dbpath);
 }
