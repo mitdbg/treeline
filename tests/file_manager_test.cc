@@ -35,7 +35,7 @@ TEST(FileManagerTest, FileConstruction) {
   // Check created files.
   for (size_t i = 0; i < options.num_files; ++i) {
     ASSERT_TRUE(
-        std::filesystem::exists(db_path_ + "/segment-" + std::to_string(i)));
+        std::filesystem::exists(dbpath + "/segment-" + std::to_string(i)));
   }
 
   std::filesystem::remove_all(dbpath);
