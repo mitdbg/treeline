@@ -51,6 +51,7 @@ TEST(FileManagerTest, WriteReadSequential) {
   options.buffer_manager_size = kBufferManagerSize;
   options.num_files = kNumFiles;
   options.pages_per_file = kNumPages / kNumFiles;
+  options.page_size = sizeof(size_t);
   llsm::FileManager file_manager(options, dbpath);
 
   // Store `i` to page i
