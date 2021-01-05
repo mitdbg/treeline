@@ -48,20 +48,20 @@ TEST(BufferManagerTest, WriteReadSequential) {
   options.buffer_manager_size = kBufferManagerSize;
   options.num_files = kNumFiles;
   options.pages_per_file = kNumPages / kNumFiles;
+  options.page_size = sizeof(size_t);
   llsm::BufferManager buffer_manager(options, dbpath);
 
   // Store `i` to page i
   for (size_t i = 0; i < kNumPages; ++i) {
     llsm::BufferFrame& bf = buffer_manager.FixPage(i, true);
-    reinterpret_cast<uint64_t*>(bf.GetData())[0] = static_cast<uint64_t>(i);
+    *reinterpret_cast<size_t*>(bf.GetData()) = i;
     buffer_manager.UnfixPage(bf, true);
   }
 
   // Read all pages.
   for (size_t i = 0; i < kNumPages; ++i) {
     llsm::BufferFrame& bf = buffer_manager.FixPage(i, false);
-    ASSERT_EQ(reinterpret_cast<uint64_t*>(bf.GetData())[0],
-              static_cast<uint64_t>(i));
+    ASSERT_EQ(*reinterpret_cast<size_t*>(bf.GetData()), i);
     buffer_manager.UnfixPage(bf, false);
   }
 
@@ -85,7 +85,7 @@ TEST(BufferManagerTest, FlushDirty) {
   // Store `i` to page i for the first kBufferManagerSize pages.
   for (size_t i = 0; i < kBufferManagerSize; ++i) {
     llsm::BufferFrame& bf = buffer_manager.FixPage(i, true);
-    reinterpret_cast<size_t*>(bf.GetData()) = i;
+    *reinterpret_cast<size_t*>(bf.GetData()) = i;
     buffer_manager.UnfixPage(bf, true);
   }
 
