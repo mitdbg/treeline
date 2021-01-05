@@ -5,6 +5,7 @@ add_executable(tester)
 target_sources(tester
   PRIVATE
     buffer_manager_test.cc
+    file_manager_test.cc
     memtable_test.cc
     packed_map_test.cc
     sanity_test.cc)
