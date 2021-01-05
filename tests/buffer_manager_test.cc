@@ -50,9 +50,9 @@ TEST(BufferManagerTest, CreateValues) {
 }
 
 TEST(BufferManagerTest, WriteReadSequential) {
-  std::string dbpath = "/tmp/llsm-bufmgr-test";
-  std::filesystem::remove_all(dbpath);
-  std::filesystem::create_directory(dbpath);
+  std::string dbname = "/tmp/llsm-bufmgr-test";
+  std::filesystem::remove_all(dbname);
+  std::filesystem::create_directory(dbname);
 
   // Create BufferManager.
   llsm::BufMgrOptions options;
@@ -60,7 +60,7 @@ TEST(BufferManagerTest, WriteReadSequential) {
   options.num_files = kNumFiles;
   options.pages_per_file = kNumPages / kNumFiles;
   options.page_size = sizeof(size_t);
-  llsm::BufferManager buffer_manager(options, dbpath);
+  llsm::BufferManager buffer_manager(options, dbname);
 
   // Store `i` to page i
   for (size_t i = 0; i < kNumPages; ++i) {
@@ -76,13 +76,13 @@ TEST(BufferManagerTest, WriteReadSequential) {
     buffer_manager.UnfixPage(bf, false);
   }
 
-  std::filesystem::remove_all(dbpath);
+  std::filesystem::remove_all(dbname);
 }
 
 TEST(BufferManagerTest, FlushDirty) {
-  std::string dbpath = "/tmp/llsm-bufmgr-test";
-  std::filesystem::remove_all(dbpath);
-  std::filesystem::create_directory(dbpath);
+  std::string dbname = "/tmp/llsm-bufmgr-test";
+  std::filesystem::remove_all(dbname);
+  std::filesystem::create_directory(dbname);
 
   // Create BufferManager.
   llsm::BufMgrOptions options;
@@ -90,7 +90,7 @@ TEST(BufferManagerTest, FlushDirty) {
   options.num_files = kNumFiles;
   options.pages_per_file = kNumPages / kNumFiles;
   options.page_size = sizeof(size_t);
-  llsm::BufferManager buffer_manager(options, dbpath);
+  llsm::BufferManager buffer_manager(options, dbname);
 
   // Store `i` to page i for the first kBufferManagerSize pages.
   for (size_t i = 0; i < kBufferManagerSize; ++i) {
@@ -105,7 +105,7 @@ TEST(BufferManagerTest, FlushDirty) {
   size_t j;
   for (size_t i = 0; i < kBufferManagerSize; ++i) {
     FileAddress address = AddressFromPageId(i, options);
-    int fd = open((dbpath + "/segment-" + std::to_string(address.file_id)).c_str(), 
+    int fd = open((dbname + "/segment-" + std::to_string(address.file_id)).c_str(), 
               O_RDWR | O_SYNC | (options.use_direct_io ? O_DIRECT : 0),
               S_IRUSR | S_IWUSR);
     pread(fd, reinterpret_cast<void*>(&j), options.page_size, address.offset);
@@ -113,7 +113,7 @@ TEST(BufferManagerTest, FlushDirty) {
     ASSERT_EQ(i, j);
   }
 
-  std::filesystem::remove_all(dbpath);
+  std::filesystem::remove_all(dbname);
 }
 
 }  // namespace
