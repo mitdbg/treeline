@@ -41,4 +41,31 @@ TEST(FileManagerTest, FileConstruction) {
   std::filesystem::remove_all(dbpath);
 }
 
+TEST(FileManagerTest, WriteReadSequential) {
+  std::string dbpath = "/tmp/llsm-filemgr-test";
+  std::filesystem::remove_all(dbpath);
+  std::filesystem::create_directory(dbpath);
+
+  // Create FileManager.
+  llsm::BufMgrOptions options;
+  options.buffer_manager_size = kBufferManagerSize;
+  options.num_files = kNumFiles;
+  options.pages_per_file = kNumPages / kNumFiles;
+  llsm::FileManager file_manager(options, dbpath);
+
+  // Store `i` to page i
+  for (size_t i = 0; i < kNumPages; ++i) {
+    file_manager.WritePage(i, reinterpret_cast<void*>(&i));
+  }
+
+  // Read all pages.
+  size_t j;
+  for (size_t i = 0; i < kNumPages; ++i) {
+    file_manager.ReadPage(i, reinterpret_cast<void*>(&j));
+    ASSERT_EQ(i, j);
+  }
+
+  std::filesystem::remove_all(dbname);
+}
+
 }  // namespace
