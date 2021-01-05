@@ -65,7 +65,7 @@ TEST(FileManagerTest, WriteReadSequential) {
     ASSERT_EQ(i, j);
   }
 
-  std::filesystem::remove_all(dbname);
+  std::filesystem::remove_all(dbpath);
 }
 
 }  // namespace
