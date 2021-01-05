@@ -39,16 +39,16 @@ TEST(BufferManagerTest, CreateValues) {
 }
 
 TEST(BufferManagerTest, WriteReadSequential) {
-  std::string dbname = "/tmp/llsm-bufmgr-test";
-  std::filesystem::remove_all(dbname);
-  std::filesystem::create_directory(dbname);
+  std::string dbpath = "/tmp/llsm-bufmgr-test";
+  std::filesystem::remove_all(dbpath);
+  std::filesystem::create_directory(dbpath);
 
   // Create BufferManager.
   llsm::BufMgrOptions options;
   options.buffer_manager_size = kBufferManagerSize;
   options.num_files = kNumFiles;
   options.pages_per_file = kNumPages / kNumFiles;
-  llsm::BufferManager buffer_manager(options, dbname);
+  llsm::BufferManager buffer_manager(options, dbpath);
 
   // Store `i` to page i
   for (size_t i = 0; i < kNumPages; ++i) {
@@ -65,7 +65,40 @@ TEST(BufferManagerTest, WriteReadSequential) {
     buffer_manager.UnfixPage(bf, false);
   }
 
-  std::filesystem::remove_all(dbname);
+  std::filesystem::remove_all(dbpath);
+}
+
+TEST(BufferManagerTest, FlushDirty) {
+  std::string dbpath = "/tmp/llsm-bufmgr-test";
+  std::filesystem::remove_all(dbpath);
+  std::filesystem::create_directory(dbpath);
+
+  // Create BufferManager.
+  llsm::BufMgrOptions options;
+  options.buffer_manager_size = kBufferManagerSize;
+  options.num_files = kNumFiles;
+  options.pages_per_file = kNumPages / kNumFiles;
+  options.page_size = sizeof(size_t);
+  llsm::BufferManager buffer_manager(options, dbpath);
+  llsm::FileManager file_manager(options, dbpath);
+
+  // Store `i` to page i for the first kBufferManagerSize pages.
+  for (size_t i = 0; i < kBufferManagerSize; ++i) {
+    llsm::BufferFrame& bf = buffer_manager.FixPage(i, true);
+    reinterpret_cast<size_t*>(bf.GetData()) = i;
+    buffer_manager.UnfixPage(bf, true);
+  }
+
+  buffer_manager.FlushDirty();
+
+  // Read all pages directly from disk.
+  size_t j;
+  for (size_t i = 0; i < kBufferManagerSize; ++i) {
+    file_manager.ReadPage(i, reinterpret_cast<void*>(&j));
+    ASSERT_EQ(i, j);
+  }
+
+  std::filesystem::remove_all(dbpath);
 }
 
 }  // namespace
