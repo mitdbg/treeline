@@ -78,8 +78,6 @@ class ThreadPool {
 
 namespace llsm {
 
-static constexpr double kFillPct = 0.5;
-
 Status DB::Open(const Options& options, const std::string& path, DB** db_out) {
   std::unique_ptr<DBImpl> db = std::make_unique<DBImpl>(options, path);
   Status s = db->Initialize();
@@ -99,6 +97,10 @@ Status DBImpl::Initialize() {
   if (options_.key_step_size == 0) {
     return Status::InvalidArgument("Options::key_step_size cannot be 0.");
   }
+  if (options_.page_fill_pct < 1 || options_.page_fill_pct > 100) {
+    return Status::InvalidArgument(
+        "Options::page_fill_pct must be a value between 1 and 100 inclusive.");
+  }
 
   // Create directory and an appropriate number of files (segments), one per
   // worker thread.
@@ -112,7 +114,9 @@ Status DBImpl::Initialize() {
 
   // Compute the maximum number of records per page to allow us to achieve an
   // upper limit on how full each page can be
-  const uint32_t max_records_per_page = Page::kSize * 0.9 * kFillPct / options_.record_size;
+  double fill_pct = options_.page_fill_pct / 100.;
+  const uint32_t max_records_per_page =
+      Page::kSize * fill_pct / options_.record_size;
   total_pages_ = options_.num_keys / max_records_per_page;
   if (options_.num_keys % max_records_per_page != 0) ++total_pages_;
 

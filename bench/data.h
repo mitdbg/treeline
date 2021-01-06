@@ -15,23 +15,33 @@ namespace bench {
 // dataset will have the same size.
 class U64Dataset {
  public:
-  // Generates a dataset containing ordered synthetic records with a total size
-  // of `size_mib`.
+  // Options used to configure the generated dataset.
+  struct GenerateOptions {
+    size_t record_size = 16;
+    uint64_t start_key = 0;
+    uint64_t step_size = 1;
+
+    bool shuffle = false;
+    int rng_seed = 42;
+  };
+
+  // Generates a dataset containing synthetic records with a total size of
+  // `size_mib`.
   //
   // Callers must ensure that `size_mib` (in bytes) is divisible by
-  // `record_size`. Otherwise, this method will throw an `std::illegal_argument`
-  // exception. Note that `record_size` allows you to indirectly set the value
-  // size; the key size is always 8 bytes.
-  //
-  // The record keys are in ascending order when compared lexicographically. The
+  // `options.record_size`. Otherwise, this method will throw an
+  // `std::illegal_argument` exception. Note that `options.record_size` allows
+  // you to indirectly set the value size; the key size is always 8 bytes. The
   // data generation code assumes that the system is little endian.
   //
-  // Set the `start_key` and `step_size` to configure the start key and the size
-  // of the difference between successive keys. The generated keys are uniformly
-  // distributed.
-  static U64Dataset GenerateOrdered(size_t size_mib, size_t record_size = 16,
-                                    uint64_t start_key = 0,
-                                    uint64_t step_size = 1);
+  // Set `options.start_key` and `options.step_size` to configure the start key
+  // and the size of the difference between successive keys. The generated keys
+  // are uniformly distributed.
+  //
+  // If `options.shuffle` is false, the generated record keys are in ascending
+  // order when compared lexicographically. Otherwise, the records will be
+  // shuffled into a random order.
+  static U64Dataset Generate(size_t size_mib, const GenerateOptions& options);
 
   class Record;
   // Retrieve the record at `index` with bounds checking.

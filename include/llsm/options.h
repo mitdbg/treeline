@@ -29,6 +29,10 @@ struct Options {
   uint64_t key_step_size = 1;
   size_t record_size = 16;
 
+  // How full each database page should be, as a value between 1 and 100
+  // inclusive (representing a percentage).
+  uint32_t page_fill_pct = 50;
+
   // The number of worker threads to use when flushing in-memory writes to
   // persistent storage.
   unsigned num_flush_threads = 4;

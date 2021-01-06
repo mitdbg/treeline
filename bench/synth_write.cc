@@ -27,6 +27,10 @@ DEFINE_string(db, kAll, "Which database(s) to use {all, rocksdb, llsm}.");
 DEFINE_string(db_path, "", "The path where the database(s) should be stored.");
 DEFINE_uint32(trials, 1, "The number of times to repeat the experiment.");
 
+DEFINE_bool(shuffle, false, "Whether or not to shuffle the generated dataset.");
+DEFINE_uint32(seed, 42,
+              "The seed to use for the PRNG (to ensure reproducibility).");
+
 DEFINE_uint64(data_mib, 64, "The amount of user data to write, in MiB.");
 DEFINE_uint32(record_size_bytes, 16, "The size of each record, in bytes.");
 DEFINE_uint64(cache_size_mib, 64,
@@ -39,6 +43,9 @@ DEFINE_uint32(bg_threads, 1,
 DEFINE_bool(use_direct_io, true, "Whether or not to use direct I/O.");
 DEFINE_uint64(memtable_size_mib, 64,
               "The size of the memtable before it should be flushed, in MiB.");
+DEFINE_uint32(llsm_page_fill_pct, 50,
+              "How full each LLSM page should be, as a value between 1 and 100 "
+              "inclusive.");
 
 std::chrono::nanoseconds RunRocksDBExperiment(
     const llsm::bench::U64Dataset& dataset) {
@@ -109,6 +116,7 @@ std::chrono::nanoseconds RunLLSMExperiment(
   options.use_direct_io = FLAGS_use_direct_io;
   options.num_flush_threads = FLAGS_bg_threads;
   options.record_size = FLAGS_record_size_bytes;
+  options.page_fill_pct = FLAGS_llsm_page_fill_pct;
 
   // TODO: LLSM should automatically initiate flushes after the memtable exceeds
   // this size
@@ -183,9 +191,12 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  llsm::bench::U64Dataset::GenerateOptions dataset_options;
+  dataset_options.record_size = FLAGS_record_size_bytes;
+  dataset_options.shuffle = FLAGS_shuffle;
+  dataset_options.rng_seed = FLAGS_seed;
   const llsm::bench::U64Dataset dataset =
-      llsm::bench::U64Dataset::GenerateOrdered(FLAGS_data_mib,
-                                               FLAGS_record_size_bytes);
+      llsm::bench::U64Dataset::Generate(FLAGS_data_mib, dataset_options);
 
   std::cout << "db,data_size_mib,bg_threads,record_size_bytes,throughput_mib_"
                "per_s,throughput_mops_per_s"
