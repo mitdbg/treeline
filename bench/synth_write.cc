@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "bench/data.h"
-#include "bench/guard.h"
-#include "bench/timing.h"
+#include "bench/common/data.h"
+#include "bench/common/guard.h"
+#include "bench/common/timing.h"
 #include "gflags/gflags.h"
 #include "llsm/db.h"
 #include "llsm/options.h"

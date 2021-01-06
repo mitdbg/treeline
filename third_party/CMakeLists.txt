@@ -19,6 +19,15 @@ if(LLSM_BUILD_BENCHMARKS)
   FetchContent_MakeAvailable(gflags)
 
   FetchContent_Declare(
+    benchmark
+    GIT_REPOSITORY https://github.com/google/benchmark
+    GIT_TAG        v1.5.2
+  )
+  set(BENCHMARK_ENABLE_TESTING OFF)
+  set(BENCHMARK_ENABLE_INSTALL OFF)
+  FetchContent_MakeAvailable(benchmark)
+
+  FetchContent_Declare(
     rocksdb
     GIT_REPOSITORY https://github.com/facebook/rocksdb
     GIT_TAG        v6.14.6
