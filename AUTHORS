@@ -1,11 +1,10 @@
-# The Learned LSM project uses code and concepts from LevelDB. We reproduce the
-# original LevelDB AUTHORS file below.
+# The Learned LSM project uses code and concepts from LevelDB and RocksDB. We
+# reproduce the LevelDB and RocksDB AUTHORS file below.
 
-# Names should be added to this file like so:
-# Name or Organization <email address>
+Facebook Inc.
+Facebook Engineering Team
 
 Google Inc.
-
 # Initial version authors:
 Jeffrey Dean <jeff@google.com>
 Sanjay Ghemawat <sanjay@google.com>
@@ -13,3 +12,4 @@ Sanjay Ghemawat <sanjay@google.com>
 # Partial list of contributors:
 Kevin Regan <kevin.d.regan@gmail.com>
 Johan Bilien <jobi@litl.com>
+Matthew Von-Maszewski <https://github.com/matthewvon> (Basho Technologies)

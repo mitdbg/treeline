@@ -8,10 +8,11 @@ namespace {
 
 using namespace llsm;
 
-void MemTableInsert_64MiB(benchmark::State& state) {
+void MemTableInsert_64MiB(benchmark::State& state, bool shuffle) {
   constexpr size_t kDatasetSizeMiB = 64;
   bench::U64Dataset::GenerateOptions options;
   options.record_size = state.range(0);
+  options.shuffle = shuffle;
   bench::U64Dataset dataset =
       bench::U64Dataset::Generate(kDatasetSizeMiB, options);
   Status s;
@@ -27,7 +28,12 @@ void MemTableInsert_64MiB(benchmark::State& state) {
   state.SetBytesProcessed(state.iterations() * kDatasetSizeMiB * 1024 * 1024);
 }
 
-BENCHMARK(MemTableInsert_64MiB)
+BENCHMARK_CAPTURE(MemTableInsert_64MiB, in_order, /*shuffle=*/false)
+    ->Arg(16)  // Record size in bytes
+    ->Arg(512)
+    ->Unit(benchmark::kMillisecond);
+
+BENCHMARK_CAPTURE(MemTableInsert_64MiB, shuffled, /*shuffle=*/true)
     ->Arg(16)  // Record size in bytes
     ->Arg(512)
     ->Unit(benchmark::kMillisecond);

@@ -3,7 +3,7 @@
 #include "llsm/slice.h"
 #include "llsm/status.h"
 #include "util/arena.h"
-#include "util/skiplist.h"
+#include "util/inlineskiplist.h"
 
 namespace llsm {
 
@@ -40,41 +40,67 @@ class MemTable {
   size_t ApproximateMemoryUsage() const;
 
  private:
+  // Represents a key-value entry in this `MemTable`. Records stored in this
+  // `MemTable` are allocated in memory so that their key and value are stored
+  // immediately after the end of this struct.
   struct Record {
-    Record();
-    Record(const char* data, uint32_t key_length, uint32_t value_length,
-           uint32_t key_head, uint64_t sequence_number);
-    // Key and value are stored contiguously
-    const char* const data;
-    const uint32_t key_length;
-    const uint32_t value_length;
-    // We store the first 4 bytes of the key inside the skip list node to
-    // hopefully avoid the need to dereference `data` in most cases.
-    const uint32_t key_head;
+    static const Record* FromRawBytes(const char* raw_record) {
+      return reinterpret_cast<const Record*>(raw_record);
+    }
+    static Record* FromRawBytes(char* raw_record) {
+      return reinterpret_cast<Record*>(raw_record);
+    }
+
+    // The key and value are stored contiguously in the bytes immediately
+    // following this Record.
+    inline const char* key() const {
+      return reinterpret_cast<const char*>(this) + sizeof(Record);
+    }
+    inline const char* value() const { return key() + key_length; }
+    inline char* key() { return reinterpret_cast<char*>(this) + sizeof(Record); }
+    inline char* value() { return key() + key_length; }
+
+    // The lengths of the key and value, in bytes.
+    uint32_t key_length, value_length;
+
     // The sequence number is used to de-duplicate `Record`s with the same
     // `key`. If multiple `Record`s share the same key, the one with the largest
     // sequence number is the most recent entry.
     //
-    // The upper 7 bytes store the sequence number (max 2^56 - 1) and the lowest
-    // byte stores the `EntryType`.
-    const uint64_t sequence_number;
+    // The most significant 7 bytes store the sequence number (max. 2^56 - 1)
+    // and the least significant byte stores the `EntryType`.
+    uint64_t sequence_number;
   };
+
+  // A comparison functor used by `InlineSkipList` to establish a total ordering
+  // over `Record`s.
   class Comparator {
    public:
+    // Expected by the InlineSkipList.
+    using DecodedType = const Record*;
+    DecodedType decode_key(const char* key) const {
+      return Record::FromRawBytes(key);
+    }
     // Classical comparison semantics. We return a:
     // - Negative integer if `r1 < r2`
     // - Zero if `r1 == r2`
     // - Positive integer if `r1 > r2`
-    int operator()(const Record& r1, const Record& r2) const;
+    // Note that although the `InlineSkipList` expects a `const char*`, `r1` is
+    // actually a pointer to a `const Record`.
+    int operator()(const char* r1, const Record* r2) const;
+    int operator()(const char* r1, const char* r2) const {
+      return operator()(r1, decode_key(r2));
+    }
   };
-  using Table = SkipList<Record, Comparator>;
+
+  using Table = InlineSkipList<Comparator>;
 
   // A helper method used to implement Put() and Delete(), which are both
   // considered `MemTable` "inserts" (see comments at the top of this class).
   Status InsertImpl(const Slice& key, const Slice& value,
                     MemTable::EntryType entry_type);
 
-  // A custom memory-managed arena that stores the actual keys and values.
+  // A custom memory-managed arena that stores the `Record`s, keys, and values.
   Arena arena_;
   Table table_;
   uint64_t next_sequence_num_;
@@ -115,12 +141,8 @@ class MemTable::Iterator {
   friend class MemTable;
   explicit Iterator(Table::Iterator it) : it_(it) {}
 
-  // A helper method that returns a `Record` that can be used to search in the
-  // underlying skip list for a given raw `key`.
-  MemTable::Record GetLookupKey(const Slice& key) const;
-
   // A helper method that returns the key stored in an internal record.
-  Slice KeyFromRecord(const MemTable::Record& record) const;
+  Slice KeyFromRecord(const char* raw_record) const;
 
   Table::Iterator it_;
 };
