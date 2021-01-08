@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cstdlib>
+#include <cstdint>
 
 namespace llsm {
 

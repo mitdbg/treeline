@@ -8,11 +8,11 @@ namespace llsm {
 FileManager::FileManager(const BufMgrOptions options, std::string db_path)
     : db_path_(std::move(db_path)),
       page_size_(options.page_size),
-      pages_per_file_(options.pages_per_file) {
-  assert(options.num_files >= 1);
-  assert(options.pages_per_file >= 1);
+      pages_per_segment_(options.pages_per_segment) {
+  assert(options.num_segments >= 1);
+  assert(options.pages_per_segment >= 1);
 
-  for (size_t i = 0; i < options.num_files; ++i) {
+  for (size_t i = 0; i < options.num_segments; ++i) {
     db_files_.push_back(std::make_unique<File>(
         options, db_path_ + "/segment-" + std::to_string(i)));
   }
@@ -21,7 +21,7 @@ FileManager::FileManager(const BufMgrOptions options, std::string db_path)
 // Reads the part of the on-disk database file corresponding to `page_id` into
 // the in-memory page-sized block pointed to by `data`.
 void FileManager::ReadPage(const uint64_t page_id, void* data) {
-  const FileAddress address = AddressFromPageId(page_id);
+  const FileAddress address = PageIdToAddress(page_id);
   const auto& file = db_files_[address.file_id];
   file->ZeroOut(address.offset);
   file->ReadPage(address.offset, data);
@@ -30,17 +30,17 @@ void FileManager::ReadPage(const uint64_t page_id, void* data) {
 // Writes from the in-memory page-sized block pointed to by `data` to the part
 // of the on-disk database file corresponding to `page_id`.
 void FileManager::WritePage(const uint64_t page_id, void* data) {
-  const FileAddress address = AddressFromPageId(page_id);
+  const FileAddress address = PageIdToAddress(page_id);
   const auto& file = db_files_[address.file_id];
   file->ZeroOut(address.offset);
   file->WritePage(address.offset, data);
 }
 
-FileManager::FileAddress FileManager::AddressFromPageId(
-    size_t page_id) const {
+// Uses the model to derive a FileAddress given a `page_id`.
+FileAddress FileManager::PageIdToAddress(const size_t page_id) const {
   FileAddress address;
-  address.file_id = page_id / pages_per_file_;
-  address.offset = (page_id % pages_per_file_) * page_size_;
+  address.file_id = page_id / pages_per_segment_;
+  address.offset = (page_id % pages_per_segment_) * page_size_;
   return address;
 }
 

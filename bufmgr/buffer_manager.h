@@ -10,6 +10,7 @@
 #include "buffer_frame.h"
 #include "file_manager.h"
 #include "page_eviction_strategy.h"
+#include "options.h"
 
 namespace llsm {
 

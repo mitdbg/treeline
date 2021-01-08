@@ -38,6 +38,7 @@ target_sources(llsm PUBLIC ${llsm_api})
 add_subdirectory(bufmgr)
 add_subdirectory(db)
 add_subdirectory(util)
+add_subdirectory(model)
 
 # Build the tests iff requested
 if(LLSM_BUILD_TESTS)

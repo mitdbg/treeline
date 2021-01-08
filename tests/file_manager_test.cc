@@ -1,24 +1,16 @@
 #include "bufmgr/file_manager.h"
 
 #include <filesystem>
+#include <memory>
 #include <vector>
 
 #include "bufmgr/options.h"
 #include "gtest/gtest.h"
-
-// Total number of pages.
-const size_t kNumPages = 65536;
-
-// Total number of files used to store the pages.
-const size_t kNumFiles = 8;
-static_assert(
-    kNumPages % kNumFiles == 0,
-    "The total number of pages must be divisible by the number of files used.");
-
-// Number of pages in buffer manager.
-const size_t kBufferManagerSize = 16384;
+#include "llsm/options.h"
+#include "model/direct_model.h"
 
 namespace {
+using namespace llsm;
 
 TEST(FileManagerTest, FileConstruction) {
   std::string dbpath = "/tmp/llsm-filemgr-test";
@@ -26,14 +18,14 @@ TEST(FileManagerTest, FileConstruction) {
   std::filesystem::create_directory(dbpath);
 
   // Create FileManager.
-  llsm::BufMgrOptions options;
-  options.buffer_manager_size = kBufferManagerSize;
-  options.num_files = kNumFiles;
-  options.pages_per_file = kNumPages / kNumFiles;
-  llsm::FileManager file_manager(options, dbpath);
+  llsm::BufMgrOptions buf_mgr_options;
+  llsm::Options options;
+  std::unique_ptr<DirectModel> model =
+      std::make_unique<DirectModel>(options, &buf_mgr_options);
+  llsm::FileManager file_manager(buf_mgr_options, dbpath);
 
   // Check created files.
-  for (size_t i = 0; i < options.num_files; ++i) {
+  for (size_t i = 0; i < buf_mgr_options.num_segments; ++i) {
     ASSERT_TRUE(
         std::filesystem::exists(dbpath + "/segment-" + std::to_string(i)));
   }
@@ -47,25 +39,29 @@ TEST(FileManagerTest, WriteReadSequential) {
   std::filesystem::create_directory(dbpath);
 
   // Create FileManager.
-  llsm::BufMgrOptions options;
-  options.buffer_manager_size = kBufferManagerSize;
-  options.num_files = kNumFiles;
-  options.pages_per_file = kNumPages / kNumFiles;
-  options.page_size = sizeof(size_t);
-  llsm::FileManager file_manager(options, dbpath);
+  llsm::BufMgrOptions buf_mgr_options;
+  llsm::Options options;
+  std::unique_ptr<DirectModel> model =
+      std::make_unique<DirectModel>(options, &buf_mgr_options);
+  std::unique_ptr<BufferManager> buffer_manager =
+      std::make_unique<BufferManager>(buf_mgr_options, dbpath);
+  llsm::FileManager file_manager(buf_mgr_options, dbpath);
+  model->Preallocate(buffer_manager);
 
   // Store `i` to page i
-  for (size_t i = 0; i < kNumPages; ++i) {
+  for (size_t i = 0; i < buf_mgr_options.total_pages; ++i) {
     file_manager.WritePage(i, reinterpret_cast<void*>(&i));
   }
 
   // Read all pages.
   size_t j;
-  for (size_t i = 0; i < kNumPages; ++i) {
-    file_manager.ReadPage(i, reinterpret_cast<void*>(&j));
+  void* data = calloc(1, buf_mgr_options.page_size);
+  for (size_t i = 0; i < buf_mgr_options.total_pages; ++i) {
+    file_manager.ReadPage(i, data);
+    j = *reinterpret_cast<size_t*>(data);
     ASSERT_EQ(i, j);
   }
-
+  free(data);
   std::filesystem::remove_all(dbpath);
 }
 

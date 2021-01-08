@@ -15,6 +15,7 @@
 #include <unordered_map>
 
 #include "db/page.h"
+#include "model/direct_model.h"
 #include "util/affinity.h"
 
 namespace {
@@ -107,51 +108,13 @@ Status DBImpl::Initialize() {
   if (mkdir(db_path_.c_str(), 0755) != 0) {
     return Status::IOError("Failed to create new directory:", db_path_);
   }
-  segments_ = options_.num_flush_threads;
 
-  // The rest of the code in this method preallocates the database "pages"
-  // based on the configuration provided by the user in `llsm::Options`.
-
-  // Compute the maximum number of records per page to allow us to achieve an
-  // upper limit on how full each page can be
-  double fill_pct = options_.page_fill_pct / 100.;
-  const uint32_t max_records_per_page =
-      Page::kSize * fill_pct / options_.record_size;
-  total_pages_ = options_.num_keys / max_records_per_page;
-  if (options_.num_keys % max_records_per_page != 0) ++total_pages_;
-
-  pages_per_segment_ = total_pages_ / segments_;
-  if (total_pages_ % segments_ != 0) ++pages_per_segment_;
-
-  // Initialize buffer manager
   BufMgrOptions buf_mgr_options;
-  buf_mgr_options.num_files = segments_;
-  buf_mgr_options.page_size = Page::kSize;
-  buf_mgr_options.use_direct_io = options_.use_direct_io;
-  buf_mgr_options.pages_per_file = pages_per_segment_;
+  model_ = std::make_unique<DirectModel>(options_, &buf_mgr_options);
   buf_mgr_ = std::make_unique<BufferManager>(buf_mgr_options, db_path_);
 
-  uint32_t records_per_page = options_.num_keys / total_pages_;
-  if (options_.num_keys % total_pages_ != 0) ++records_per_page;
+  model_->Preallocate(buf_mgr_);
 
-  // Preallocate the pages with the key space
-  uint64_t page_key_range = records_per_page * options_.key_step_size;
-  uint64_t lower_key = 0;
-  uint64_t upper_key = page_key_range;
-  for (unsigned page_id = 0; page_id < total_pages_; ++page_id) {
-    const uint64_t swapped_lower = __builtin_bswap64(lower_key);
-    const uint64_t swapped_upper = __builtin_bswap64(upper_key);
-    auto& bf = buf_mgr_->FixPage(page_id, /*exclusive = */ true);
-    Page page(bf.GetData(),
-              Slice(reinterpret_cast<const char*>(&swapped_lower), 8),
-              Slice(reinterpret_cast<const char*>(&swapped_upper), 8));
-    buf_mgr_->UnfixPage(bf, /*is_dirty = */ true);
-
-    lower_key += page_key_range;
-    upper_key += page_key_range;
-  }
-  buf_mgr_->FlushDirty();
-  last_key_ = lower_key;
   return Status::OK();
 }
 
@@ -175,18 +138,14 @@ Status DBImpl::FlushMemTable(const WriteOptions& options) {
     ThreadPool workers(options_.num_flush_threads);
     uint32_t current_page = UINT32_MAX;
     std::vector<std::pair<const Slice, const Slice>>
-        records_for_page;  // FIXME: This should have Slice*, not Slice, to limit
-                           // memory use.
+        records_for_page;  // FIXME: This should have Slice*, not Slice, to
+                           // limit memory use.
 
     auto it = mtable_->GetIterator();
     for (it.SeekToFirst(); it.Valid(); it.Next()) {
-      uint64_t raw_key =
-          *reinterpret_cast<const uint64_t*>(it.key().data());  // TODO: length
-      double rel_pos =
-          (double)__builtin_bswap64(raw_key) / (double)options_.num_keys;
-      uint32_t page_id = rel_pos * total_pages_;
-      // The memtable is in sorted order - once we "pass" a page, we won't return
-      // to it
+      size_t page_id = model_->KeyToPageId(it.key());
+      // The memtable is in sorted order - once we "pass" a page, we won't
+      // return to it
       if (page_id != current_page) {
         if (current_page != UINT32_MAX) {
           // Submit flush job to workers - this is not the "first" page

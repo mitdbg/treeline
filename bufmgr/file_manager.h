@@ -4,10 +4,18 @@
 
 #include "db/page.h"
 #include "file.h"
+#include "model/model.h"
 
 namespace llsm {
 
 class File;
+
+// Stores the file and byte-offset within the file where a specific page can
+// be found.
+struct FileAddress {
+  size_t file_id;
+  size_t offset;
+};
 
 // A wrapper for I/O to on-disk files.
 //
@@ -25,16 +33,11 @@ class FileManager {
   // of the on-disk database file corresponding to `page_id`.
   void WritePage(const uint64_t page_id, void* data);
 
- private:
-  // Stores the file and byte-offset within the file where a specific page can
-  // be found.
-  struct FileAddress {
-    size_t file_id;
-    size_t offset;
-  };
-  FileAddress AddressFromPageId(size_t page_id) const;
+  // Derives a FileAddress given a `page_id`.
+  FileAddress PageIdToAddress(size_t page_id) const;
 
-  // The database files
+ private:
+    // The database files
   std::vector<std::unique_ptr<File>> db_files_;
 
   // The path to the database
@@ -44,7 +47,7 @@ class FileManager {
   const size_t page_size_;
 
   // The number of pages stored in one file.
-  const size_t pages_per_file_;
+  const size_t pages_per_segment_;
 };
 
 }  // namespace llsm

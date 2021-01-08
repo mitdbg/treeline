@@ -6,6 +6,7 @@
 #include "llsm/db.h"
 #include "db/memtable.h"
 #include "bufmgr/buffer_manager.h"
+#include "model/direct_model.h"
 
 namespace llsm {
 
@@ -35,11 +36,7 @@ class DBImpl : public DB {
   const std::string db_path_;
   std::unique_ptr<MemTable> mtable_;
   std::unique_ptr<BufferManager> buf_mgr_;
-
-  uint32_t total_pages_ = 0;
-  uint32_t pages_per_segment_ = 0;
-  uint32_t segments_ = 0;
-  uint64_t last_key_ = 0;
+  std::unique_ptr<DirectModel> model_;
 };
 
 }  // namespace llsm
