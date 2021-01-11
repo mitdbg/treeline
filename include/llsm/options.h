@@ -23,6 +23,9 @@ struct Options {
   // Use direct I/O when writing to/reading from database files
   bool use_direct_io = false;
 
+  // The maximum size of LLSM's buffer pool, in bytes.
+  size_t buffer_pool_size = 64 * 1024 * 1024;
+
   // Temporary options used to inform the database about the key space (the
   // distribution is assumed to be uniform).
   uint64_t num_keys = 5000000;

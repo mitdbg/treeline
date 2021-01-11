@@ -43,6 +43,9 @@ DEFINE_uint32(bg_threads, 1,
 DEFINE_bool(use_direct_io, true, "Whether or not to use direct I/O.");
 DEFINE_uint64(memtable_size_mib, 64,
               "The size of the memtable before it should be flushed, in MiB.");
+DEFINE_uint64(buffer_pool_size_mib, 64,
+              "The size of the buffer pool (LLSM) or block cache (RocksDB) to "
+              "use, in MiB.");
 DEFINE_uint32(llsm_page_fill_pct, 50,
               "How full each LLSM page should be, as a value between 1 and 100 "
               "inclusive.");
@@ -60,9 +63,12 @@ std::chrono::nanoseconds RunRocksDBExperiment(
   options.PrepareForBulkLoad();
   options.IncreaseParallelism(FLAGS_bg_threads);
 
+  rocksdb::LRUCacheOptions cache_options;
+  cache_options.capacity = FLAGS_buffer_pool_size_mib * 1024 * 1024;
   rocksdb::BlockBasedTableOptions table_options;
   table_options.block_size = FLAGS_block_size_kib * 1024;
   table_options.checksum = rocksdb::kNoChecksum;
+  table_options.block_cache = rocksdb::NewLRUCache(cache_options);
   options.table_factory.reset(
       rocksdb::NewBlockBasedTableFactory(table_options));
 
@@ -112,6 +118,7 @@ std::chrono::nanoseconds RunLLSMExperiment(
     const llsm::bench::U64Dataset& dataset) {
   llsm::DB* db = nullptr;
   llsm::Options options;
+  options.buffer_pool_size = FLAGS_buffer_pool_size_mib * 1024 * 1024;
   options.num_keys = dataset.size();
   options.use_direct_io = FLAGS_use_direct_io;
   options.num_flush_threads = FLAGS_bg_threads;

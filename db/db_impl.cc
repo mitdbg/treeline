@@ -103,6 +103,13 @@ Status DBImpl::Initialize() {
         "Options::page_fill_pct must be a value between 1 and 100 inclusive.");
   }
 
+  size_t buffer_manager_size = options_.buffer_pool_size / Page::kSize;
+  if (buffer_manager_size == 0) {
+    return Status::InvalidArgument(
+        "Options::buffer_pool_size is too small. It must be at least " +
+        std::to_string(Page::kSize) + " bytes.");
+  }
+
   // Create directory and an appropriate number of files (segments), one per
   // worker thread.
   if (mkdir(db_path_.c_str(), 0755) != 0) {
@@ -110,6 +117,7 @@ Status DBImpl::Initialize() {
   }
 
   BufMgrOptions buf_mgr_options;
+  buf_mgr_options.buffer_manager_size = buffer_manager_size;
   model_ = std::make_unique<DirectModel>(options_, &buf_mgr_options);
   buf_mgr_ = std::make_unique<BufferManager>(buf_mgr_options, db_path_);
 
