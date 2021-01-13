@@ -7,7 +7,7 @@ namespace {
 
 TEST(SanityCheck, Create) {
   llsm::DB* db = nullptr;
-  llsm::Options options;
+  const llsm::Options options;
   const std::string dbname = "/tmp/llsm-test";
   std::filesystem::remove_all(dbname);
   auto status = llsm::DB::Open(options, dbname, &db);

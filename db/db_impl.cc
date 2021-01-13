@@ -15,8 +15,8 @@
 #include <unordered_map>
 
 #include "db/page.h"
-#include "model/direct_model.h"
 #include "util/affinity.h"
+#include "util/key.h"
 
 namespace {
 
@@ -103,8 +103,7 @@ Status DBImpl::Initialize() {
         "Options::page_fill_pct must be a value between 1 and 100 inclusive.");
   }
 
-  size_t buffer_manager_size = options_.buffer_pool_size / Page::kSize;
-  if (buffer_manager_size == 0) {
+  if (options_.buffer_pool_size < Page::kSize) {
     return Status::InvalidArgument(
         "Options::buffer_pool_size is too small. It must be at least " +
         std::to_string(Page::kSize) + " bytes.");
@@ -116,12 +115,18 @@ Status DBImpl::Initialize() {
     return Status::IOError("Failed to create new directory:", db_path_);
   }
 
-  BufMgrOptions buf_mgr_options;
-  buf_mgr_options.buffer_manager_size = buffer_manager_size;
-  model_ = std::make_unique<DirectModel>(options_, &buf_mgr_options);
-  buf_mgr_ = std::make_unique<BufferManager>(buf_mgr_options, db_path_);
+  auto values = key_utils::CreateValues<uint64_t>(options_);
+  auto records = key_utils::CreateRecords<uint64_t>(values);
 
-  model_->Preallocate(buf_mgr_);
+  // Compute the number of records per page.
+  double fill_pct = options_.page_fill_pct / 100.;
+  options_.records_per_page = Page::kSize * fill_pct / options_.record_size;
+
+  RSModel* model = new RSModel(options_, records);
+  buf_mgr_ = std::make_unique<BufferManager>(options_, db_path_);
+
+  model->Preallocate(records, buf_mgr_);
+  model_.reset(model); 
 
   return Status::OK();
 }
@@ -170,7 +175,7 @@ Status DBImpl::FlushMemTable(const WriteOptions& options) {
     // ThreadPool destructor waits for work to finish
   }
   buf_mgr_->FlushDirty();
-  mtable_.reset(new MemTable());
+  mtable_.reset(new MemTable()); 
   return Status::OK();
 }
 

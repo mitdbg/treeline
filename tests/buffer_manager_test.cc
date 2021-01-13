@@ -4,66 +4,57 @@
 #include <memory>
 #include <vector>
 
-#include "bufmgr/options.h"
+#include "db/page.h"
 #include "gtest/gtest.h"
 #include "llsm/options.h"
-#include "model/direct_model.h"
+#include "model/rs_model.h"
+#include "util/key.h"
 
 namespace {
 
 using namespace llsm;
 
-// *** Helper methods ***
-
-template <typename T>
-std::vector<T> CreateValues(const size_t num_values) {
-  std::vector<T> values;
-  values.reserve(num_values);
-  for (size_t i = 0; i < num_values; ++i) values.push_back(i);
-  return values;
-}
-
-// Uses the model to derive a FileAddress given a `page_id`.
-FileAddress PageIdToAddress(const size_t page_id,
-                            const size_t pages_per_segment,
-                            const size_t page_size) {
-  FileAddress address;
-  address.file_id = page_id / pages_per_segment;
-  address.offset = (page_id % pages_per_segment) * page_size;
-  return address;
-}
-
 // *** Tests ***
 
 TEST(BufferManagerTest, CreateValues) {
-  const size_t num_values = 100;
-  const std::vector<uint64_t> values = CreateValues<uint64_t>(num_values);
-  ASSERT_EQ(values.size(), num_values);
+  Options options;
+  options.num_keys = 100;
+  const std::vector<uint64_t> values =
+      key_utils::CreateValues<uint64_t>(options);
+  ASSERT_EQ(values.size(), options.num_keys);
 }
 
 TEST(BufferManagerTest, WriteReadSequential) {
-  std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname = "/tmp/llsm-bufmgr-test";
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 
-  // Create BufferManager.
-  llsm::BufMgrOptions buf_mgr_options;
+  // Create data.
   llsm::Options options;
-  std::unique_ptr<DirectModel> model =
-      std::make_unique<DirectModel>(options, &buf_mgr_options);
-  std::unique_ptr<BufferManager> buffer_manager =
-      std::make_unique<BufferManager>(buf_mgr_options, dbname);
-  model->Preallocate(buffer_manager);
+  const auto values = key_utils::CreateValues<uint64_t>(options);
+  const auto records = key_utils::CreateRecords<uint64_t>(values);
+
+  // Compute the number of records per page.
+  const double fill_pct = options.page_fill_pct / 100.;
+  options.records_per_page = Page::kSize * fill_pct / options.record_size;
+
+  // Create buffer manager.
+  const std::unique_ptr<RSModel> model =
+      std::make_unique<RSModel>(options, records);
+  const std::unique_ptr<BufferManager> buffer_manager =
+      std::make_unique<BufferManager>(options, dbname);
+  model->Preallocate(records, buffer_manager);
 
   // Store `i` to page i
-  for (size_t i = 0; i < buf_mgr_options.total_pages; ++i) {
+  const size_t num_pages = buffer_manager->GetFileManager()->GetNumPages();
+  for (size_t i = 0; i < num_pages; ++i) {
     llsm::BufferFrame& bf = buffer_manager->FixPage(i, true);
     *reinterpret_cast<size_t*>(bf.GetData()) = i;
     buffer_manager->UnfixPage(bf, true);
   }
 
   // Read all pages.
-  for (size_t i = 0; i < buf_mgr_options.total_pages; ++i) {
+  for (size_t i = 0; i < num_pages; ++i) {
     llsm::BufferFrame& bf = buffer_manager->FixPage(i, false);
     ASSERT_EQ(*reinterpret_cast<size_t*>(bf.GetData()), i);
     buffer_manager->UnfixPage(bf, false);
@@ -73,21 +64,31 @@ TEST(BufferManagerTest, WriteReadSequential) {
 }
 
 TEST(BufferManagerTest, FlushDirty) {
-  std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname = "/tmp/llsm-bufmgr-test";
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 
-  // Create BufferManager.
-  llsm::BufMgrOptions buf_mgr_options;
+  // Create data.
   llsm::Options options;
-  std::unique_ptr<DirectModel> model =
-      std::make_unique<DirectModel>(options, &buf_mgr_options);
- std::unique_ptr<BufferManager> buffer_manager =
-      std::make_unique<BufferManager>(buf_mgr_options, dbname);
-  model->Preallocate(buffer_manager);
+  const auto values = key_utils::CreateValues<uint64_t>(options);
+  const auto records = key_utils::CreateRecords<uint64_t>(values);
+
+  // Compute the number of records per page.
+  const double fill_pct = options.page_fill_pct / 100.;
+  options.records_per_page = Page::kSize * fill_pct / options.record_size;
+
+  // Create buffer manager.
+  const std::unique_ptr<RSModel> model =
+      std::make_unique<RSModel>(options, records);
+  const std::unique_ptr<BufferManager> buffer_manager =
+      std::make_unique<BufferManager>(options, dbname);
+  model->Preallocate(records, buffer_manager);
 
   // Store `i` to page i for the first few pages.
-  for (size_t i = 0; i < 3; ++i) {
+  const size_t few_pages = std::min(
+      static_cast<size_t>(3), buffer_manager->GetFileManager()->GetNumPages());
+
+  for (size_t i = 0; i < few_pages; ++i) {
     llsm::BufferFrame& bf = buffer_manager->FixPage(i, true);
     *reinterpret_cast<size_t*>(bf.GetData()) = i;
     buffer_manager->UnfixPage(bf, true);
@@ -95,18 +96,11 @@ TEST(BufferManagerTest, FlushDirty) {
 
   buffer_manager->FlushDirty();
 
-  // Read all pages directly from disk.
+  // Read all pages bypassing buffer manager.
   size_t j;
-  void* data = calloc(1, buf_mgr_options.page_size);
-  for (size_t i = 0; i < 3; ++i) {
-    llsm::FileAddress address = PageIdToAddress(
-        i, buf_mgr_options.pages_per_segment, buf_mgr_options.page_size);
-    int fd =
-        open((dbname + "/segment-" + std::to_string(address.file_id)).c_str(),
-             O_RDWR | O_SYNC | (buf_mgr_options.use_direct_io ? O_DIRECT : 0),
-             S_IRUSR | S_IWUSR);
-    pread(fd, data, buf_mgr_options.page_size, address.offset);
-    close(fd);
+  void* data = calloc(1, Page::kSize);
+  for (size_t i = 0; i < few_pages; ++i) {
+    buffer_manager->GetFileManager()->ReadPage(i, data);
     j = *reinterpret_cast<size_t*>(data);
     ASSERT_EQ(i, j);
   }

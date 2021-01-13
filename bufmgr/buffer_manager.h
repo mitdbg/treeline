@@ -9,8 +9,8 @@
 
 #include "buffer_frame.h"
 #include "file_manager.h"
+#include "llsm/options.h"
 #include "page_eviction_strategy.h"
-#include "options.h"
 
 namespace llsm {
 
@@ -33,11 +33,12 @@ namespace llsm {
 // This class is thread-safe; mutexes are used to serialize accesses to critical
 // data structures.
 class BufferManager {
- 
  public:
+  const size_t kAlignment = 512;  // Required by O_DIRECT
+
   // Initializes a BufferManager with the options specified in `options`.
-  BufferManager(const BufMgrOptions options, std::string db_path);
-  
+  BufferManager(const Options options, std::string db_path);
+
   // Writes all dirty pages back and frees resources.
   ~BufferManager();
 
@@ -51,6 +52,9 @@ class BufferManager {
 
   // Writes all dirty pages to disk (without unfixing)
   void FlushDirty();
+
+  // Provides access to the underlying FileManager
+  FileManager* GetFileManager() const { return file_manager_; }
 
  private:
   // Writes the page held by `frame` to disk.
@@ -78,14 +82,11 @@ class BufferManager {
   // Resets an exisiting frame to hold the page with `new_page_id`.
   void ResetFrame(BufferFrame* frame, const uint64_t new_page_id);
 
-  // Options provided upon creation
-  const BufMgrOptions options_;
+  // Options provided upon creation.
+  const Options options_;
 
   // The number of pages the buffer manager should keep in memory.
   const size_t buffer_manager_size_;
-
-  // The size of each page
-  const size_t page_size_;
 
   // Space in memory to hold the cached pages.
   void* pages_cache_;

@@ -13,8 +13,8 @@ class File;
 // Stores the file and byte-offset within the file where a specific page can
 // be found.
 struct FileAddress {
-  size_t file_id;
-  size_t offset;
+  size_t file_id = 0;
+  size_t offset = 0;
 };
 
 // A wrapper for I/O to on-disk files.
@@ -23,7 +23,7 @@ struct FileAddress {
 class FileManager {
  public:
   // Creates a file manager according to the options specified in `options`.
-  FileManager(const BufMgrOptions options, std::string db_path);
+  FileManager(const Options options, std::string db_path);
 
   // Reads the part of the on-disk database file corresponding to `page_id` into
   // the in-memory page-sized block pointed to by `data`.
@@ -36,6 +36,15 @@ class FileManager {
   // Derives a FileAddress given a `page_id`.
   FileAddress PageIdToAddress(size_t page_id) const;
 
+  // Provides the total number of pages currently used.
+  size_t GetNumPages() const {return total_pages_;}
+
+  // Provides the total number of segments currently used.
+  size_t GetNumSegments() const {return db_files_.size();}
+
+  // Provides the page_id of the first page of each segment.
+  std::vector<size_t> GetPageAllocation() const {return page_allocation_;}
+
  private:
     // The database files
   std::vector<std::unique_ptr<File>> db_files_;
@@ -43,11 +52,11 @@ class FileManager {
   // The path to the database
   const std::string db_path_;
 
-  // The size of a page, in bytes.
-  const size_t page_size_;
+  // The page_id of the first page of each segment.
+  std::vector<size_t> page_allocation_;
 
-  // The number of pages stored in one file.
-  const size_t pages_per_segment_;
+  // The total number of pages used.
+  size_t total_pages_;
 };
 
 }  // namespace llsm

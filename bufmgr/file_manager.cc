@@ -5,14 +5,25 @@
 namespace llsm {
 
 // Creates a file manager according to the options specified in `options`.
-FileManager::FileManager(const BufMgrOptions options, std::string db_path)
-    : db_path_(std::move(db_path)),
-      page_size_(options.page_size),
-      pages_per_segment_(options.pages_per_segment) {
-  assert(options.num_segments >= 1);
-  assert(options.pages_per_segment >= 1);
+FileManager::FileManager(const Options options, std::string db_path)
+    : db_path_(std::move(db_path)) {
 
-  for (size_t i = 0; i < options.num_segments; ++i) {
+  // Get number of segments.
+  const size_t segments = options.num_flush_threads;
+  assert(segments >= 1);
+
+  // Compute the number of pages needed.
+  total_pages_ = options.num_keys / options.records_per_page;
+  if (options.num_keys % options.records_per_page != 0) ++total_pages_;
+
+  // Compute the page allocation
+  size_t pages_per_segment = total_pages_ / segments;
+  if (total_pages_ % segments != 0) ++pages_per_segment;
+  for (size_t i = 0, j = 0; i < segments; ++i, j += pages_per_segment)
+    page_allocation_.push_back(j);
+
+  // Create the db_files
+  for (size_t i = 0; i < segments; ++i) {
     db_files_.push_back(std::make_unique<File>(
         options, db_path_ + "/segment-" + std::to_string(i)));
   }
@@ -37,10 +48,14 @@ void FileManager::WritePage(const uint64_t page_id, void* data) {
 }
 
 // Uses the model to derive a FileAddress given a `page_id`.
+// TODO: add a rank support structure to allow for O(1) computation.
 FileAddress FileManager::PageIdToAddress(const size_t page_id) const {
-  FileAddress address;
-  address.file_id = page_id / pages_per_segment_;
-  address.offset = (page_id % pages_per_segment_) * page_size_;
+  assert(page_id < GetNumPages());
+
+  FileAddress address {GetNumSegments() - 1, 0};
+  while(page_id < page_allocation_.at(address.file_id)) --address.file_id;
+  address.offset =
+      (page_id - page_allocation_.at(address.file_id)) * Page::kSize;
   return address;
 }
 

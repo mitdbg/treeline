@@ -1,12 +1,12 @@
 #pragma once
 
-#include <memory>
 #include <cstdint>
+#include <memory>
 
-#include "llsm/db.h"
-#include "db/memtable.h"
 #include "bufmgr/buffer_manager.h"
-#include "model/direct_model.h"
+#include "db/memtable.h"
+#include "llsm/db.h"
+#include "model/rs_model.h"
 
 namespace llsm {
 
@@ -30,13 +30,15 @@ class DBImpl : public DB {
   Status Initialize();
 
  private:
-  void FlushWorkerMain(const std::vector<std::pair<const Slice, const Slice>>& records, size_t page_id);
+  void FlushWorkerMain(
+      const std::vector<std::pair<const Slice, const Slice>>& records,
+      size_t page_id);
 
-  const Options options_;
+  Options options_;
   const std::string db_path_;
   std::unique_ptr<MemTable> mtable_;
   std::unique_ptr<BufferManager> buf_mgr_;
-  std::unique_ptr<DirectModel> model_;
+  std::unique_ptr<Model> model_;
 };
 
 }  // namespace llsm

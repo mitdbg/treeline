@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <cstdlib>
 #include <cstdint>
+#include <cstdlib>
 
 namespace llsm {
 
@@ -29,13 +29,14 @@ struct Options {
   // Temporary options used to inform the database about the key space (the
   // distribution is assumed to be uniform).
   uint64_t num_keys = 5000000;
-  uint64_t min_key = 0;
   uint64_t key_step_size = 1;
   size_t record_size = 16;
 
   // How full each database page should be, as a value between 1 and 100
   // inclusive (representing a percentage).
   uint32_t page_fill_pct = 50;
+  size_t records_per_page = 0;  // User doesn't need to provide this, filled in
+                                // by our code based on page fill_pct.
 
   // The number of worker threads to use when flushing in-memory writes to
   // persistent storage.

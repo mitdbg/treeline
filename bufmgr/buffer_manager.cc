@@ -12,21 +12,18 @@
 
 namespace llsm {
 
-// Initializes a BufferManager to keep up to `buffer_manager_size` frames in main
-// memory. Bypasses file system cache if `use_direct_io` is true.
-BufferManager::BufferManager(const BufMgrOptions options, std::string db_path)
+// Initializes a BufferManager to keep up to `buffer_manager_size` frames in
+// main memory. Bypasses file system cache if `use_direct_io` is true.
+BufferManager::BufferManager(const Options options, std::string db_path)
     : options_(options),
-      buffer_manager_size_(options.buffer_manager_size),
-      page_size_(options.page_size) {
-
+      buffer_manager_size_(options.buffer_pool_size / Page::kSize) {
   // Allocate space with alignment because of O_DIRECT requirements.
   // No need to zero out because data brought here will come from the database
   // `File`, which is zeroed out upon expansion.
-  pages_cache_ =
-      aligned_alloc(options.alignment, buffer_manager_size_ * page_size_);
+  pages_cache_ = aligned_alloc(kAlignment, options_.buffer_pool_size);
 
   char* page_ptr = reinterpret_cast<char*>(pages_cache_);
-  for (size_t i = 0; i < buffer_manager_size_; ++i, page_ptr += page_size_) {
+  for (size_t i = 0; i < buffer_manager_size_; ++i, page_ptr += Page::kSize) {
     free_pages_.push_back((void*)page_ptr);
   }
   page_to_frame_map_.reserve(buffer_manager_size_);
