@@ -16,7 +16,9 @@ add_executable(synth_write synth_write.cc)
 target_link_libraries(synth_write bench_common gflags llsm rocksdb)
 
 # Microbench: An executable containing all of LLSM's microbenchmarks.
-add_executable(microbench memtable_benchmark.cc)
+add_executable(microbench
+  memtable_benchmark.cc
+  thread_pool_benchmark.cc)
 target_link_libraries(microbench
   bench_common
   llsm

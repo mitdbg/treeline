@@ -10,4 +10,6 @@ target_sources(llsm PRIVATE
   random.cc
   random.h
   skiplist.h
-  status.cc)
+  status.cc
+  thread_pool.cc
+  thread_pool.h)
