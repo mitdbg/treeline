@@ -17,27 +17,45 @@ namespace llsm {
 // Data is stored in a custom memory-managed arena. Once this `MemTable` is done
 // being used, it should be deleted to free its allocated memory.
 //
-// The `Put()` and `Delete()` methods are not thread-safe; external mutual
-// exclusion is required when calling these methods.
-//
-// `Get()` or `GetIterator()` (including the Iterator methods) are thread-safe
-// and can be used without external mutual exclusion. This `MemTable` must
-// remain valid while any `Get()` calls are being executed and while any
-// `Iterator`s are being used.
+// External mutual exclusion is required if calls to `Add()`, `Put()`,
+// `Delete()`, `Get()`, and `GetIterator()` occur concurrently. If only the
+// `const` methods are called concurrently, no mutual exclusion is needed.
 class MemTable {
  public:
   enum class EntryType : uint8_t { kWrite = 0, kDelete = 1 };
 
   MemTable();
+
+  // Add an entry to this table. The `EntryType` is used to disambiguate between
+  // regular writes and deletes. When deleting, `value` is ignored.
+  Status Add(const Slice& key, const Slice& value, EntryType entry_type);
+
+  // Record a write of `key` with value `value`.
+  // This is a convenience method that calls `Add()` with `EntryType::kWrite`.
   Status Put(const Slice& key, const Slice& value);
+
+  // Record a delete of `key`.
+  // This is a convenience method that calls `Add()` with `EntryType::kDelete`.
+  Status Delete(const Slice& key);
+
+  // Retrieve the entry associated with `key`.
+  //
+  // If an entry is found, this method will return an OK status;
+  // `entry_type_out` will contain the entry type (write or delete) and
+  // `value_out` will contain the value if the entry is a write.
   Status Get(const Slice& key, EntryType* entry_type_out,
              std::string* value_out) const;
-  Status Delete(const Slice& key);
 
   class Iterator;
   Iterator GetIterator() const;
 
+  // Returns an estimate of this table's memory usage, in bytes. Note that this
+  // estimate includes memory used by the underlying data structure.
   size_t ApproximateMemoryUsage() const;
+
+  // Returns true iff there is at least one entry (added through `Add()`) in
+  // this table.
+  bool HasEntries() const { return has_entries_; }
 
  private:
   // Represents a key-value entry in this `MemTable`. Records stored in this
@@ -57,7 +75,9 @@ class MemTable {
       return reinterpret_cast<const char*>(this) + sizeof(Record);
     }
     inline const char* value() const { return key() + key_length; }
-    inline char* key() { return reinterpret_cast<char*>(this) + sizeof(Record); }
+    inline char* key() {
+      return reinterpret_cast<char*>(this) + sizeof(Record);
+    }
     inline char* value() { return key() + key_length; }
 
     // The lengths of the key and value, in bytes.
@@ -95,15 +115,11 @@ class MemTable {
 
   using Table = InlineSkipList<Comparator>;
 
-  // A helper method used to implement Put() and Delete(), which are both
-  // considered `MemTable` "inserts" (see comments at the top of this class).
-  Status InsertImpl(const Slice& key, const Slice& value,
-                    MemTable::EntryType entry_type);
-
   // A custom memory-managed arena that stores the `Record`s, keys, and values.
   Arena arena_;
   Table table_;
   uint64_t next_sequence_num_;
+  bool has_entries_;
 };
 
 // An iterator for the MemTable.

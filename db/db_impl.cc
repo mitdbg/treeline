@@ -133,7 +133,7 @@ Status DBImpl::Initialize() {
 
 Status DBImpl::Put(const WriteOptions& options, const Slice& key,
                    const Slice& value) {
-  return mtable_->Put(key, value);
+  return mtable_->Add(key, value, MemTable::EntryType::kWrite);
 }
 
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,

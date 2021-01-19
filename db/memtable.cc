@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <limits>
+
 #include "util/key.h"
 
 namespace {
@@ -15,10 +16,11 @@ namespace llsm {
 MemTable::MemTable()
     : arena_(),
       table_(MemTable::Comparator(), &arena_),
-      next_sequence_num_(0) {}
+      next_sequence_num_(0),
+      has_entries_(false) {}
 
 Status MemTable::Put(const Slice& key, const Slice& value) {
-  return InsertImpl(key, value, MemTable::EntryType::kWrite);
+  return Add(key, value, MemTable::EntryType::kWrite);
 }
 
 Status MemTable::Get(const Slice& key, EntryType* entry_type_out,
@@ -34,19 +36,17 @@ Status MemTable::Get(const Slice& key, EntryType* entry_type_out,
 }
 
 Status MemTable::Delete(const Slice& key) {
-  return InsertImpl(key, Slice(), MemTable::EntryType::kDelete);
+  return Add(key, Slice(), MemTable::EntryType::kDelete);
 }
 
 MemTable::Iterator MemTable::GetIterator() const {
   return MemTable::Iterator(MemTable::Table::Iterator(&table_));
 }
 
-size_t MemTable::ApproximateMemoryUsage() const {
-  return arena_.MemoryUsage();
-}
+size_t MemTable::ApproximateMemoryUsage() const { return arena_.MemoryUsage(); }
 
-Status MemTable::InsertImpl(const Slice& key, const Slice& value,
-                            MemTable::EntryType entry_type) {
+Status MemTable::Add(const Slice& key, const Slice& value,
+                     EntryType entry_type) {
   // This implementation assumes that re-inserts or insert-then-deletes
   // are rare, so we always allocate new space for the key and value.
   const size_t user_data_bytes = key.size() + value.size();
@@ -62,6 +62,7 @@ Status MemTable::InsertImpl(const Slice& key, const Slice& value,
   memcpy(record->value(), value.data(), value.size());
 
   table_.Insert(buf);
+  has_entries_ = true;
   return Status::OK();
 }
 
@@ -70,7 +71,8 @@ int MemTable::Comparator::operator()(const char* r1_raw,
   const Record* r1 = Record::FromRawBytes(r1_raw);
 
   // Check entire keys first.
-  const Slice r1_key(r1->key(), r1->key_length), r2_key(r2->key(), r2->key_length);
+  const Slice r1_key(r1->key(), r1->key_length),
+      r2_key(r2->key(), r2->key_length);
   int comp = r1_key.compare(r2_key);
   if (comp != 0) {
     return comp;
@@ -88,10 +90,10 @@ int MemTable::Comparator::operator()(const char* r1_raw,
   // number. However, since each record has a distinct sequence number (mod
   // 2^56), we can just compare the numbers directly here.
   if (r1->sequence_number < r2->sequence_number) {
-    // We purposely report r1 > r2 here so the latest record (r2) is ordered ahead
+    // We report r1 > r2 here so the latest record (r2) is ordered ahead
     return 1;
   } else if (r1->sequence_number > r2->sequence_number) {
-    // We purposely report r1 < r2 here so the latest record (r1) is ordered ahead
+    // We report r1 < r2 here so the latest record (r1) is ordered ahead
     return -1;
   } else {
     return 0;
@@ -114,7 +116,8 @@ Slice MemTable::Iterator::value() const {
 MemTable::EntryType MemTable::Iterator::type() const {
   assert(Valid());
   const Record* rec = Record::FromRawBytes(it_.key());
-  return static_cast<MemTable::EntryType>(rec->sequence_number & kEntryTypeMask);
+  return static_cast<MemTable::EntryType>(rec->sequence_number &
+                                          kEntryTypeMask);
 }
 
 void MemTable::Iterator::Next() {
@@ -155,9 +158,7 @@ void MemTable::Iterator::Seek(const Slice& target) {
   it_.Seek(buf);
 }
 
-void MemTable::Iterator::SeekToFirst() {
-  it_.SeekToFirst();
-}
+void MemTable::Iterator::SeekToFirst() { it_.SeekToFirst(); }
 
 Slice MemTable::Iterator::KeyFromRecord(const char* raw_record) const {
   const Record* record = Record::FromRawBytes(raw_record);
