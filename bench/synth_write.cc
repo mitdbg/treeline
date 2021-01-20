@@ -119,16 +119,13 @@ std::chrono::nanoseconds RunLLSMExperiment(
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.buffer_pool_size = FLAGS_buffer_pool_size_mib * 1024 * 1024;
+  options.memtable_flush_threshold = FLAGS_memtable_size_mib * 1024 * 1024;
   options.num_keys = dataset.size();
   options.use_direct_io = FLAGS_use_direct_io;
-  options.num_flush_threads = FLAGS_bg_threads;
+  options.background_threads = FLAGS_bg_threads;
   options.record_size = FLAGS_record_size_bytes;
   options.page_fill_pct = FLAGS_llsm_page_fill_pct;
-
-  // TODO: LLSM should automatically initiate flushes after the memtable exceeds
-  // this size
-  const size_t memtable_flush_size = FLAGS_memtable_size_mib * 1024 * 1024;
-  const size_t record_size = sizeof(uint64_t) + dataset.value_size();
+  options.pin_threads = true;
 
   const std::string dbname = FLAGS_db_path + "/llsm";
   llsm::Status status = llsm::DB::Open(options, dbname, &db);
@@ -136,34 +133,17 @@ std::chrono::nanoseconds RunLLSMExperiment(
     throw std::runtime_error("Failed to open LLSM: " + status.ToString());
   }
 
-  const llsm::bench::CallOnExit guard([db]() { delete db; });
-  return llsm::bench::MeasureRunTime(
-      [db, &dataset, record_size, memtable_flush_size]() {
-        llsm::WriteOptions woptions;
-        llsm::Status status;
-        size_t memtable_size = 0;
-        for (const auto& record : dataset) {
-          status = db->Put(woptions, record.key(), record.value());
-          if (!status.ok()) {
-            throw std::runtime_error("Failed to write record to LLSM.");
-          }
-          memtable_size += record_size;
-          if (memtable_size >= memtable_flush_size) {
-            status = db->FlushMemTable(woptions);
-            if (!status.ok()) {
-              throw std::runtime_error("Failed to flush the LLSM memtable.");
-            }
-            memtable_size = 0;
-          }
-        }
-        if (memtable_size > 0) {
-          status = db->FlushMemTable(woptions);
-          if (!status.ok()) {
-            throw std::runtime_error("Failed to flush the LLSM memtable.");
-          }
-          memtable_size = 0;
-        }
-      });
+  return llsm::bench::MeasureRunTime([db, &dataset]() {
+    llsm::WriteOptions woptions;
+    llsm::Status status;
+    for (const auto& record : dataset) {
+      status = db->Put(woptions, record.key(), record.value());
+      if (!status.ok()) {
+        throw std::runtime_error("Failed to write record to LLSM.");
+      }
+    }
+    delete db;
+  });
 }
 
 void PrintExperimentResult(const std::string& db,

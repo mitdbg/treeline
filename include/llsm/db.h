@@ -56,7 +56,8 @@ class DB {
   // will be an effective "no-op" in this case.
   virtual Status Delete(const WriteOptions& options, const Slice& key) = 0;
 
-  // Flush the data stored in the MemTable to persistent storage.
+  // Manually request LLSM to flush the data stored in its MemTable to
+  // persistent storage. This method will block until the flush completes.
   virtual Status FlushMemTable(const WriteOptions& options) = 0;
 };
 

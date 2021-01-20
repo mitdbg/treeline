@@ -36,7 +36,7 @@ TEST(FileManagerTest, FileConstruction) {
   const llsm::FileManager file_manager(options, dbpath);
 
   // Check created files.
-  for (size_t i = 0; i < options.num_flush_threads; ++i) {
+  for (size_t i = 0; i < options.background_threads; ++i) {
     ASSERT_TRUE(
         std::filesystem::exists(dbpath + "/segment-" + std::to_string(i)));
   }

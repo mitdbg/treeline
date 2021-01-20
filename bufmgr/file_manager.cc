@@ -9,7 +9,7 @@ FileManager::FileManager(const Options options, std::string db_path)
     : db_path_(std::move(db_path)) {
 
   // Get number of segments.
-  const size_t segments = options.num_flush_threads;
+  const size_t segments = options.background_threads;
   assert(segments >= 1);
 
   // Compute the number of pages needed.
