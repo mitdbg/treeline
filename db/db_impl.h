@@ -51,7 +51,8 @@ class DBImpl : public DB {
   //
   // REQUIRES: `mutex_` is held.
   // REQUIRES: The thread has already called `WriterWaitIfNeeded()`.
-  void ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock);
+  void ScheduleMemTableFlush(const WriteOptions& options,
+                             std::unique_lock<std::mutex>& lock);
 
   // Returns true iff `mtable_` is "full".
   // REQUIRES: `mutex_` is held.
@@ -61,10 +62,15 @@ class DBImpl : public DB {
   // REQUIRES: `mutex_` is held.
   bool FlushInProgress(const std::unique_lock<std::mutex>& lock) const;
 
-  // Code run by a worker thread to write out `records` to page `page_id`.
+  // Code run by a worker thread to write out `records` to the page held by
+  // `bf`.
   void FlushWorker(
+      const WriteOptions& options,
       const std::vector<std::pair<const Slice, const Slice>>& records,
-      size_t page_id);
+      std::future<BufferFrame*>& bf_future);
+
+  // Code run by a worker thread to fix the page with `page_id`.
+  void FixWorker(size_t page_id, std::promise<BufferFrame*>& bf_promise);
 
   // All writing threads must call this method "on entry" to ensure they wait if
   // needed (when the memtables are all full).

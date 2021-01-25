@@ -1,7 +1,7 @@
+#include <filesystem>
+
 #include "gtest/gtest.h"
 #include "llsm/db.h"
-
-#include <filesystem>
 
 namespace {
 
@@ -31,7 +31,8 @@ TEST(SanityCheck, WriteFlushRead) {
 
   const uint64_t key_as_int = __builtin_bswap64(1ULL);
   const std::string value = "Hello world!";
-  llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), sizeof(key_as_int));
+  llsm::Slice key(reinterpret_cast<const char*>(&key_as_int),
+                  sizeof(key_as_int));
   status = db->Put(llsm::WriteOptions(), key, value);
   ASSERT_TRUE(status.ok());
 
@@ -41,7 +42,9 @@ TEST(SanityCheck, WriteFlushRead) {
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value_out, value);
 
-  status = db->FlushMemTable(llsm::WriteOptions());
+  llsm::WriteOptions write_options = {/*sorted_load = */ true,
+                                      /*perform_checks = */ false};
+  status = db->FlushMemTable(write_options);
   ASSERT_TRUE(status.ok());
 
   // Should be a page read (but will be cached in the buffer pool).

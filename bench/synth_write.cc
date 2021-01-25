@@ -38,7 +38,7 @@ DEFINE_uint64(cache_size_mib, 64,
 DEFINE_uint64(block_size_kib, 64, "The size of a block, in KiB.");
 DEFINE_uint64(write_batch_size, 1024,
               "The size of a write batch used by RocksDB.");
-DEFINE_uint32(bg_threads, 1,
+DEFINE_uint32(bg_threads, 2, // LLSM needs at least 2 background threads.
               "The number background threads that RocksDB/LLSM should use.");
 DEFINE_bool(use_direct_io, true, "Whether or not to use direct I/O.");
 DEFINE_uint64(memtable_size_mib, 64,
@@ -135,6 +135,10 @@ std::chrono::nanoseconds RunLLSMExperiment(
 
   return llsm::bench::MeasureRunTime([db, &dataset]() {
     llsm::WriteOptions woptions;
+    if(!FLAGS_shuffle) {
+      woptions.sorted_load = true;
+      woptions.perform_checks = false;
+    }
     llsm::Status status;
     for (const auto& record : dataset) {
       status = db->Put(woptions, record.key(), record.value());

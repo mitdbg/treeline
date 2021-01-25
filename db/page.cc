@@ -39,10 +39,23 @@ Page::Page(void* data, const Slice& lower_key, const Slice& upper_key)
 }
 
 Status Page::Put(const Slice& key, const Slice& value) {
-  if (!AsMapPtr(data_)->Insert(
-          reinterpret_cast<const uint8_t*>(key.data()), key.size(),
-          reinterpret_cast<const uint8_t*>(value.data()), value.size())) {
-    return Status::InvalidArgument("Page is full.");
+  return Put(WriteOptions(), key, value);
+}
+
+Status Page::Put(const WriteOptions& options, const Slice& key, const Slice& value) {
+  if (options.sorted_load) {
+    if (!AsMapPtr(data_)->Append(reinterpret_cast<const uint8_t*>(key.data()),
+                                 key.size(),
+                                 reinterpret_cast<const uint8_t*>(value.data()),
+                                 value.size(), options.perform_checks)) {
+      return Status::InvalidArgument("Page is full.");
+    }
+  } else {
+    if (!AsMapPtr(data_)->Insert(
+            reinterpret_cast<const uint8_t*>(key.data()), key.size(),
+            reinterpret_cast<const uint8_t*>(value.data()), value.size())) {
+      return Status::InvalidArgument("Page is full.");
+    }
   }
   return Status::OK();
 }

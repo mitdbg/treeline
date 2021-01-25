@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 namespace llsm {
@@ -42,10 +43,38 @@ class PackedMap {
   PackedMap(const uint8_t* lower_key, unsigned lower_key_length,
             const uint8_t* upper_key, unsigned upper_key_length);
 
-  // Insert `key` and `payload` and return true if the insert succeeded.
+  // Insert `key` and `payload` and return true iff the insert succeeded.
   // Duplicate key insertions will just override the payload.
   bool Insert(const uint8_t* key, unsigned key_length, const uint8_t* payload,
               unsigned payload_length);
+
+  // Insert `key` and `payload` and return true iff the insert succeeded. `key`
+  // must be lexicographically greater than the largest key currently in the
+  // map.
+  //
+  // If `perform_checks` is set to true, this key sorting condition will be
+  // checked by calling CanAppend(), and Insert() or HandleDuplicateInsertion()
+  // will be called instead if necessary. Otherwise, it is the user's
+  // responsibility to maintain this requirement and undefined behavior will
+  // result from violating it.
+  //
+  // Recommended for bulk insertions of unique keys in sorted order.
+  //
+  // Like Insert(), this function treats key re-insertions as overwrites. This
+  // is consistent with what LevelDB/RocksDB do. To support non-unique keys, we
+  // would need to decide on the desired behavior of Get() and Remove() when
+  // dealing with keys with multiple associated values.
+  bool Append(const uint8_t* key, unsigned key_length, const uint8_t* payload,
+              unsigned payload_length, bool perform_checks);
+
+  // Checks whether Append() can be used efficiently by lexicographically
+  // comparing `key` to the largest key currently in the map.
+  //
+  // Returns `val` with:
+  // -- val < 0 if `key` is smaller than the largest key currently in the map.
+  // -- val == 0 if `key` is equal to the largest key currently in the map.
+  // -- val > 0 if 'key` is larger than the largest key currently in the map.
+  int8_t CanAppend(const uint8_t* key, unsigned key_length);
 
   // Remove the record associated with the specified key and return true if
   // the removal succeeded.
@@ -120,6 +149,9 @@ class PackedMap {
   const uint8_t* Ptr() const;
   const uint8_t* GetPrefix() const;
 
+  bool HandleDuplicateInsertion(uint16_t slot_id, const uint8_t* key,
+                                unsigned key_length, const uint8_t* payload,
+                                unsigned payload_length);
   void StoreKeyValue(uint16_t slot_id, const uint8_t* key, unsigned key_length,
                      const uint8_t* payload, unsigned payload_length);
   bool RemoveSlot(unsigned slot_id);

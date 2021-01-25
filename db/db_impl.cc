@@ -96,8 +96,8 @@ DBImpl::~DBImpl() {
     assert(waiting_writers_.empty());
 
     // Any data in the active memtable should be flushed to persistent storage.
-    if (mtable_->HasEntries()) {
-      ScheduleMemTableFlush(lock);
+    if (mtable_ && mtable_->HasEntries()) {
+      ScheduleMemTableFlush(WriteOptions(), lock);
     }
 
     // Not absolutely needed because there should not be any additional writers.
@@ -189,7 +189,7 @@ Status DBImpl::FlushMemTable(const WriteOptions& options) {
   {
     std::unique_lock<std::mutex> lock(mutex_);
     WriterWaitIfNeeded(lock);
-    ScheduleMemTableFlush(lock);
+    ScheduleMemTableFlush(options, lock);
     local_last_flush = last_flush_;
     NotifyWaitingWriterIfNeeded(lock);
   }
@@ -215,14 +215,15 @@ Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
   std::unique_lock<std::mutex> lock(mutex_);
   WriterWaitIfNeeded(lock);
   if (ActiveMemTableFull(lock)) {
-    ScheduleMemTableFlush(lock);
+    ScheduleMemTableFlush(options, lock);
   }
   Status write_result = mtable_->Add(key, value, entry_type);
   NotifyWaitingWriterIfNeeded(lock);
   return write_result;
 }
 
-void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock) {
+void DBImpl::ScheduleMemTableFlush(const WriteOptions& options,
+                                   std::unique_lock<std::mutex>& lock) {
   assert(lock.owns_lock());
 
   // If a flush is in progress, we need to wait for it to complete before we can
@@ -247,9 +248,10 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock) {
   mtable_ = std::make_shared<MemTable>();
 
   // Schedule the flush to run in the background.
-  last_flush_ = workers_->Submit([this]() {
+  last_flush_ = workers_->Submit([this, options]() {
     size_t current_page = std::numeric_limits<size_t>::max();
     std::vector<std::future<void>> page_write_futures;
+    std::future<BufferFrame*> bf_future;
     std::vector<std::pair<const Slice, const Slice>> records_for_page;
 
     // Iterate through the immutable memtable, aggregate entries into pages,
@@ -263,13 +265,21 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock) {
         if (current_page != std::numeric_limits<size_t>::max()) {
           // Submit flush job to workers - this is not the "first" page.
           page_write_futures.emplace_back(workers_->Submit(
-              [this, records_for_page = std::move(records_for_page),
-               current_page]() {
-                FlushWorker(records_for_page, current_page);
+              [this, options, records_for_page = std::move(records_for_page),
+               bf_future = std::move(bf_future)]() mutable {
+                FlushWorker(options, records_for_page, bf_future);
               }));
           records_for_page.clear();
         }
         current_page = page_id;
+        // As soon as we begin seeing records from a new page, fix it in the
+        // background.
+        std::promise<BufferFrame*> bf_promise;
+        bf_future = bf_promise.get_future();
+        workers_->Submit(
+            [this, current_page, bf_promise = std::move(bf_promise)]() mutable {
+              FixWorker(current_page, bf_promise);
+            });
       }
       records_for_page.emplace_back(std::make_pair(it.key(), it.value()));
     }
@@ -278,8 +288,10 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock) {
     if (!records_for_page.empty()) {
       assert(current_page != std::numeric_limits<size_t>::max());
       page_write_futures.emplace_back(workers_->Submit(
-          [this, records_for_page = std::move(records_for_page),
-           current_page]() { FlushWorker(records_for_page, current_page); }));
+          [this, options, records_for_page = std::move(records_for_page),
+           bf_future = std::move(bf_future)]() mutable {
+            FlushWorker(options, records_for_page, bf_future);
+          }));
       records_for_page.clear();
     }
 
@@ -302,16 +314,29 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock) {
 }
 
 void DBImpl::FlushWorker(
+    const WriteOptions& options,
     const std::vector<std::pair<const Slice, const Slice>>& records,
-    size_t page_id) {
-  auto& bf = buf_mgr_->FixPage(page_id, /*exclusive = */ true);
-  Page page(bf.GetPage());
+    std::future<BufferFrame*>& bf_future) {
+  auto bf = bf_future.get();
+  // Lock the frame again for use. This does not increment the fix count of
+  // the frame, i.e. there is no danger of "double-fixing".
+  bf->Lock(/*exclusive = */ true);
+  Page page(bf->GetPage());
 
   for (const auto& kv : records) {
-    auto s = page.Put(kv.first, kv.second);
+    auto s = page.Put(options, kv.first, kv.second);
     assert(s.ok());
   }
-  buf_mgr_->UnfixPage(bf, /*is_dirty = */ true);
+  buf_mgr_->UnfixPage(*bf, /*is_dirty = */ true);
+}
+
+void DBImpl::FixWorker(size_t page_id, std::promise<BufferFrame*>& bf_promise) {
+  BufferFrame& bf = buf_mgr_->FixPage(page_id, /*exclusive = */ true);
+  // Unlock the frame so that it can be "handed over" to a FlushWorker thread.
+  // This does not decrement the fix count of the frame, i.e. there's no danger
+  // of eviction before we can use it.
+  bf.Unlock();
+  bf_promise.set_value(&bf);
 }
 
 class DBImpl::WaitingWriter {

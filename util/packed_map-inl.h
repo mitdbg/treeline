@@ -12,20 +12,6 @@ namespace packed_map_detail {
 
 static unsigned Min(unsigned a, unsigned b) { return a < b ? a : b; }
 
-static uint16_t KeyPrefixLength(const uint8_t* lower_key,
-                                unsigned lower_key_length,
-                                const uint8_t* upper_key,
-                                unsigned upper_key_length) {
-  uint16_t prefix_length;
-  for (prefix_length = 0;
-       (prefix_length <
-        packed_map_detail::Min(lower_key_length, upper_key_length)) &&
-       (lower_key[prefix_length] == upper_key[prefix_length]);
-       ++prefix_length)
-    ;
-  return prefix_length;
-}
-
 }  // namespace packed_map_detail
 
 template <uint16_t MapSizeBytes>
@@ -40,10 +26,7 @@ PackedMap<MapSizeBytes>::PackedMap(const uint8_t* lower_key,
              packed_map_detail::Min(lower_key_length, upper_key_length));
   assert(cmp < 0 || (cmp == 0 && lower_key_length < upper_key_length));
 
-  header_.prefix_length = packed_map_detail::KeyPrefixLength(
-      lower_key, lower_key_length, upper_key, upper_key_length);
-  InsertFence(header_.lower_fence, lower_key, lower_key_length);
-  InsertFence(header_.upper_fence, upper_key, upper_key_length);
+  SetFences(lower_key, lower_key_length, upper_key, upper_key_length);
 }
 
 template <uint16_t MapSizeBytes>
@@ -54,38 +37,9 @@ bool PackedMap<MapSizeBytes>::Insert(const uint8_t* key, unsigned key_length,
   const unsigned slot_id = LowerBound(key, key_length, found);
 
   // Duplicate insertion; need to check the payload length.
-  if (found) {
-    int length_diff = payload_length - slot_[slot_id].payload_length;
-    if (length_diff <= 0) {
-      memcpy(GetPayload(slot_id), payload, payload_length);
-      // If the payloads are the same length, this is a no-op. Otherwise it
-      // adjusts the space used correctly.
-      slot_[slot_id].payload_length = payload_length;
-      header_.space_used -= static_cast<uint16_t>(-length_diff);
-      return true;
-    }
-
-    // The new payload is longer than the existing payload. Can we just store
-    // the key and payload again to avoid compaction?
-    if (FreeSpace() >=
-        (SpaceNeeded(key_length, payload_length) - sizeof(Slot))) {
-      header_.space_used -= slot_[slot_id].key_length;
-      header_.space_used -= slot_[slot_id].payload_length;
-      StoreKeyValue(slot_id, key, key_length, payload, payload_length);
-      // No need to update the hint because the key was already in the map
-      return true;
-    }
-
-    if (FreeSpaceAfterCompaction() < length_diff) {
-      // Not enough free space left, even if we compact
-      return false;
-    }
-
-    RemoveFromHeapAndCompact(slot_id);
-    StoreKeyValue(slot_id, key, key_length, payload, payload_length);
-    // No need to update the hint because the key was already in the map
-    return true;
-  }
+  if (found)
+    return HandleDuplicateInsertion(slot_id, key, key_length, payload,
+                                    payload_length);
 
   // Genuine insertion.
   if (!RequestSpaceFor(SpaceNeeded(key_length, payload_length)))
@@ -96,6 +50,41 @@ bool PackedMap<MapSizeBytes>::Insert(const uint8_t* key, unsigned key_length,
   StoreKeyValue(slot_id, key, key_length, payload, payload_length);
   ++header_.count;
   UpdateHint(slot_id);
+  return true;
+}
+
+template <uint16_t MapSizeBytes>
+bool PackedMap<MapSizeBytes>::HandleDuplicateInsertion(
+    uint16_t slot_id, const uint8_t* key, unsigned key_length,
+    const uint8_t* payload, unsigned payload_length) {
+  int length_diff = payload_length - slot_[slot_id].payload_length;
+  if (length_diff <= 0) {
+    memcpy(GetPayload(slot_id), payload, payload_length);
+    // If the payloads are the same length, this is a no-op. Otherwise it
+    // adjusts the space used correctly.
+    slot_[slot_id].payload_length = payload_length;
+    header_.space_used -= static_cast<uint16_t>(-length_diff);
+    return true;
+  }
+
+  // The new payload is longer than the existing payload. Can we just store
+  // the key and payload again to avoid compaction?
+  if (FreeSpace() >= (SpaceNeeded(key_length, payload_length) - sizeof(Slot))) {
+    header_.space_used -= slot_[slot_id].key_length;
+    header_.space_used -= slot_[slot_id].payload_length;
+    StoreKeyValue(slot_id, key, key_length, payload, payload_length);
+    // No need to update the hint because the key was already in the map
+    return true;
+  }
+
+  if (FreeSpaceAfterCompaction() < length_diff) {
+    // Not enough free space left, even if we compact
+    return false;
+  }
+
+  RemoveFromHeapAndCompact(slot_id);
+  StoreKeyValue(slot_id, key, key_length, payload, payload_length);
+  // No need to update the hint because the key was already in the map
   return true;
 }
 
@@ -189,6 +178,55 @@ void PackedMap<MapSizeBytes>::InsertFence(typename Header::FenceKeySlot& fk,
   fk.offset = header_.data_offset;
   fk.length = key_length;
   memcpy(Ptr() + header_.data_offset, key, key_length);
+}
+
+template <uint16_t MapSizeBytes>
+bool PackedMap<MapSizeBytes>::Append(const uint8_t* key, unsigned key_length,
+                                     const uint8_t* payload,
+                                     unsigned payload_length,
+                                     bool perform_checks) {
+  if (!RequestSpaceFor(SpaceNeeded(key_length, payload_length)))
+    return false;  // no space, append fails
+
+  // If the `perform_checks` flag is set, ensure the sorted order is not
+  // violated.
+  if (perform_checks) {
+    int8_t check = CanAppend(key, key_length);
+    if (check == 0) {  // Duplicate insertion.
+      return HandleDuplicateInsertion(header_.count - 1, key, key_length,
+                                      payload, payload_length);
+    } else if (check < 0) {
+      return Insert(key, key_length, payload, payload_length);
+    }
+  }
+
+  StoreKeyValue(header_.count, key, key_length, payload, payload_length);
+  UpdateHint(header_.count);
+  ++header_.count;
+  return true;
+}
+
+template <uint16_t MapSizeBytes>
+int8_t PackedMap<MapSizeBytes>::CanAppend(const uint8_t* key,
+                                          unsigned key_length) {
+  if (header_.count == 0) return 1;  // If empty, can append.
+
+  const uint8_t* trunc_key = key + header_.prefix_length;
+  const unsigned trunc_key_length = key_length - header_.prefix_length;
+  const uint8_t* top_key = GetKey(header_.count - 1);
+  const unsigned top_key_length = slot_[header_.count - 1].key_length;
+
+  int cmp = memcmp(trunc_key, top_key,
+                   packed_map_detail::Min(trunc_key_length, top_key_length));
+
+  if (cmp == 0 && trunc_key_length == top_key_length) {  // Duplicate insertion.
+    return 0;
+  } else if ((cmp < 0) || (cmp == 0 && trunc_key_length <
+                                           top_key_length)) {  // Can't append.
+    return -1;
+  } else {  // Can append.
+    return 1;
+  }
 }
 
 template <uint16_t MapSizeBytes>

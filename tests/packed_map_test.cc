@@ -1,4 +1,4 @@
-#include "gtest/gtest.h"
+#include "util/packed_map.h"
 
 #include <algorithm>
 #include <random>
@@ -6,15 +6,15 @@
 #include <utility>
 #include <vector>
 
+#include "gtest/gtest.h"
 #include "llsm/slice.h"
-#include "util/packed_map.h"
 
 namespace {
 
-using llsm::Slice;
 using llsm::PackedMap;
+using llsm::Slice;
 
-template<uint16_t Size>
+template <uint16_t Size>
 class PackedMapShim {
  public:
   PackedMapShim() = default;
@@ -26,6 +26,17 @@ class PackedMapShim {
     return m_.Insert(reinterpret_cast<const uint8_t*>(key.data()), key.size(),
                      reinterpret_cast<const uint8_t*>(value.data()),
                      value.size());
+  }
+
+  bool Append(const Slice& key, const Slice& value, const bool perform_checks) {
+    return m_.Append(reinterpret_cast<const uint8_t*>(key.data()), key.size(),
+                     reinterpret_cast<const uint8_t*>(value.data()),
+                     value.size(), perform_checks);
+  }
+
+  int8_t CanAppend(const Slice& key) {
+    return m_.CanAppend(reinterpret_cast<const uint8_t*>(key.data()),
+                        key.size());
   }
 
   bool Remove(const Slice& key) {
@@ -146,7 +157,7 @@ TEST(PackedMapTest, VariableSizeInsertAndRead) {
       {"azabdefgaaa", "much longer payload"},
       {"az", "x"},
       {"ahello", "A very very very long payload, relatively speaking."},
-      {"amuchmuchlongerkey", ""}, // Length 0 payloads are allowed
+      {"amuchmuchlongerkey", ""},  // Length 0 payloads are allowed
       {"abcdefg", "hello"},
       {"abc", "hello world 123"},
       {"azzza", "llsm"},
@@ -173,6 +184,68 @@ TEST(PackedMapTest, VariableSizeInsertAndRead) {
     ASSERT_TRUE(map.Get(record.first, &value_out));
     ASSERT_EQ(value_out, record.second);
   }
+}
+
+TEST(PackedMapTest, AppendRead) {
+  PackedMapShim<4096> map("aa", "az");
+  std::string ab_out, ac_out, ae_out, af_out, ag_out;
+
+  // Simple case
+  ASSERT_TRUE(map.Append("aa", "hello111", false));
+  ASSERT_TRUE(map.Append("ab", "hello222", false));
+  ASSERT_TRUE(map.Append("ad", "hello444", false));
+  ASSERT_TRUE(map.Append("ae", "hello555", false));
+
+  ASSERT_TRUE(map.Get("ab", &ab_out));
+  ASSERT_EQ(ab_out, "hello222");
+
+  // Try to append smaller key (should succeed but use Insert() under the hood).
+  ASSERT_TRUE(map.Append("ac", "hello333", true));
+  ASSERT_TRUE(map.Get("ac", &ac_out));
+
+  // Try to change payload of top key
+  ASSERT_TRUE(map.Append("ae", "hello000", true));  // equal length
+  ASSERT_TRUE(map.Get("ae", &ae_out));
+  ASSERT_EQ(ae_out, "hello000");
+
+  ASSERT_TRUE(map.Append("ae", "hello55", true));  // shorter
+  ASSERT_TRUE(map.Get("ae", &ae_out));
+  ASSERT_EQ(ae_out, "hello55");
+
+  ASSERT_TRUE(map.Append("ae", "hello5555", true));  // longer
+  ASSERT_TRUE(map.Get("ae", &ae_out));
+  ASSERT_EQ(ae_out, "hello5555");
+
+  // Mix insert/append
+  ASSERT_TRUE(map.Append("ag", "hello777", false));
+  ASSERT_TRUE(map.Insert("af", "hello666"));
+  ASSERT_TRUE(map.Append("ai", "hello999", false));
+  ASSERT_TRUE(map.Insert("ah", "hello888"));
+
+  ASSERT_TRUE(map.Get("af", &af_out));
+  ASSERT_TRUE(map.Get("ag", &ag_out));
+  ASSERT_EQ(af_out, "hello666");
+  ASSERT_EQ(ag_out, "hello777");
+}
+
+TEST(PackedMapTest, CanAppend) {
+  PackedMapShim<4096> map("aa", "az");
+
+  // Can append when empty
+  ASSERT_EQ(map.CanAppend("aa"), (int8_t)1);
+
+  ASSERT_TRUE(map.Append("aa", "hello111", false));
+  ASSERT_TRUE(map.Append("ac", "hello333", false));
+
+  // Can't append smaller
+  ASSERT_EQ(map.CanAppend("ab"), (int8_t)-1);
+
+  // Can append larger
+  ASSERT_EQ(map.CanAppend("ad"), (int8_t)1);
+  ASSERT_TRUE(map.Append("ad", "hello444", false));
+
+  // Can update largest
+  ASSERT_EQ(map.CanAppend("ad"), (int8_t)0);
 }
 
 }  // namespace

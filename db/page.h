@@ -1,5 +1,6 @@
 #pragma once
 
+#include "llsm/options.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
 
@@ -12,9 +13,9 @@ namespace llsm {
 // actually store the keys and values inserted into an LLSM database.
 //
 // A `Page` object does not actually own the buffer where it stores its data. As
-// a result, users must ensure that the `data` buffer used to construct a `Page` is
-// (i) kept valid for the lifetime of the `Page`, and (ii) that its size is at
-// least as large as `Page::kSize`. Not meeting these constraints leads to
+// a result, users must ensure that the `data` buffer used to construct a `Page`
+// is (i) kept valid for the lifetime of the `Page`, and (ii) that its size is
+// at least as large as `Page::kSize`. Not meeting these constraints leads to
 // undefined behavior.
 //
 // This class is not thread-safe; external mutual exclusion is required.
@@ -31,6 +32,7 @@ class Page {
   Page(void* data, const Slice& lower_key, const Slice& upper_key);
 
   Status Put(const Slice& key, const Slice& value);
+  Status Put(const WriteOptions& options, const Slice& key, const Slice& value);
   Status Get(const Slice& key, std::string* value_out);
   Status Delete(const Slice& key);
 

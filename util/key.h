@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstring>
+#include <vector>
 
 #include "llsm/options.h"
+#include "llsm/slice.h"
 
 namespace llsm {
 namespace key_utils {

@@ -54,6 +54,13 @@ struct Options {
 
 struct ReadOptions {};
 
-struct WriteOptions {};
+struct WriteOptions {
+  // If true, LLSM will optimize inserts for bulk loading sorted keys.
+  bool sorted_load = false;
+  // Only checked when `sorted_load` is true. If true, the inserted values will
+  // be checked to ensure they are indeed sorted. If not, the user is responsible 
+  // for ensuring that.
+  bool perform_checks = true;
+};
 
 }  // namespace llsm

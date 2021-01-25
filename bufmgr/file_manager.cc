@@ -7,7 +7,6 @@ namespace llsm {
 // Creates a file manager according to the options specified in `options`.
 FileManager::FileManager(const Options options, std::string db_path)
     : db_path_(std::move(db_path)) {
-
   // Get number of segments.
   const size_t segments = options.background_threads;
   assert(segments >= 1);
@@ -48,15 +47,22 @@ void FileManager::WritePage(const uint64_t page_id, void* data) {
 }
 
 // Uses the model to derive a FileAddress given a `page_id`.
-// TODO: add a rank support structure to allow for O(1) computation.
+//
+// Deriving the right segment currently takes time logarithmic in the number of
+// segments, which is probably efficient enough for a small number of
+// segments.
 FileAddress FileManager::PageIdToAddress(const size_t page_id) const {
   assert(page_id < GetNumPages());
 
-  FileAddress address {GetNumSegments() - 1, 0};
-  while(page_id < page_allocation_.at(address.file_id)) --address.file_id;
-  address.offset =
-      (page_id - page_allocation_.at(address.file_id)) * Page::kSize;
-  return address;
+  // Find file_id
+  const size_t file_id = std::upper_bound(page_allocation_.begin(),
+                                          page_allocation_.end(), page_id) -
+                         1 - page_allocation_.begin();
+
+  // Find offset
+  const size_t offset =
+      (page_id - page_allocation_.at(file_id)) * Page::kSize;
+  return FileAddress{file_id, offset};
 }
 
 }  // namespace llsm
