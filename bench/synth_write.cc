@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "bench/common/config.h"
 #include "bench/common/data.h"
-#include "bench/common/guard.h"
 #include "bench/common/timing.h"
 #include "gflags/gflags.h"
 #include "llsm/db.h"
@@ -15,62 +15,23 @@
 #include "rocksdb/table.h"
 #include "rocksdb/write_batch.h"
 
-namespace fs = std::filesystem;
-
 namespace {
 
-static const std::string kAll = "all";
-static const std::string kRocksDB = "rocksdb";
-static const std::string kLLSM = "llsm";
-
-DEFINE_string(db, kAll, "Which database(s) to use {all, rocksdb, llsm}.");
-DEFINE_string(db_path, "", "The path where the database(s) should be stored.");
-DEFINE_uint32(trials, 1, "The number of times to repeat the experiment.");
-
-DEFINE_bool(shuffle, false, "Whether or not to shuffle the generated dataset.");
-DEFINE_uint32(seed, 42,
-              "The seed to use for the PRNG (to ensure reproducibility).");
+namespace fs = std::filesystem;
+using llsm::bench::DBType;
 
 DEFINE_uint64(data_mib, 64, "The amount of user data to write, in MiB.");
-DEFINE_uint32(record_size_bytes, 16, "The size of each record, in bytes.");
-DEFINE_uint64(cache_size_mib, 64,
-              "The size of the database's in memory cache, in MiB.");
-DEFINE_uint64(block_size_kib, 64, "The size of a block, in KiB.");
 DEFINE_uint64(write_batch_size, 1024,
               "The size of a write batch used by RocksDB.");
-DEFINE_uint32(bg_threads, 2, // LLSM needs at least 2 background threads.
-              "The number background threads that RocksDB/LLSM should use.");
-DEFINE_bool(use_direct_io, true, "Whether or not to use direct I/O.");
-DEFINE_uint64(memtable_size_mib, 64,
-              "The size of the memtable before it should be flushed, in MiB.");
-DEFINE_uint64(buffer_pool_size_mib, 64,
-              "The size of the buffer pool (LLSM) or block cache (RocksDB) to "
-              "use, in MiB.");
-DEFINE_uint32(llsm_page_fill_pct, 50,
-              "How full each LLSM page should be, as a value between 1 and 100 "
-              "inclusive.");
+DEFINE_bool(shuffle, false, "Whether or not to shuffle the generated dataset.");
 
 std::chrono::nanoseconds RunRocksDBExperiment(
     const llsm::bench::U64Dataset& dataset) {
   rocksdb::DB* db = nullptr;
-  rocksdb::Options options;
+  rocksdb::Options options = llsm::bench::BuildRocksDBOptions();
+  options.PrepareForBulkLoad();
   options.create_if_missing = true;
   options.error_if_exists = true;
-  options.compression = rocksdb::CompressionType::kNoCompression;
-  options.use_direct_reads = FLAGS_use_direct_io;
-  options.use_direct_io_for_flush_and_compaction = FLAGS_use_direct_io;
-  options.write_buffer_size = FLAGS_memtable_size_mib * 1024 * 1024;
-  options.PrepareForBulkLoad();
-  options.IncreaseParallelism(FLAGS_bg_threads);
-
-  rocksdb::LRUCacheOptions cache_options;
-  cache_options.capacity = FLAGS_buffer_pool_size_mib * 1024 * 1024;
-  rocksdb::BlockBasedTableOptions table_options;
-  table_options.block_size = FLAGS_block_size_kib * 1024;
-  table_options.checksum = rocksdb::kNoChecksum;
-  table_options.block_cache = rocksdb::NewLRUCache(cache_options);
-  options.table_factory.reset(
-      rocksdb::NewBlockBasedTableFactory(table_options));
 
   const std::string dbname = FLAGS_db_path + "/rocksdb";
   rocksdb::Status status = rocksdb::DB::Open(options, dbname, &db);
@@ -78,7 +39,6 @@ std::chrono::nanoseconds RunRocksDBExperiment(
     throw std::runtime_error("Failed to open RocksDB: " + status.ToString());
   }
 
-  const llsm::bench::CallOnExit guard([db]() { delete db; });
   return llsm::bench::MeasureRunTime([db, &dataset]() {
     rocksdb::WriteOptions woptions;
     woptions.disableWAL = true;
@@ -111,21 +71,22 @@ std::chrono::nanoseconds RunRocksDBExperiment(
     if (!status.ok()) {
       throw std::runtime_error("Failed to flush memtable at the end.");
     }
+    // Compact the entire key range
+    rocksdb::CompactRangeOptions coptions;
+    coptions.change_level = true;
+    status = db->CompactRange(coptions, nullptr, nullptr);
+    if (!status.ok()) {
+      throw std::runtime_error("Failed to compact at the end.");
+    }
+    delete db;
   });
 }
 
 std::chrono::nanoseconds RunLLSMExperiment(
     const llsm::bench::U64Dataset& dataset) {
   llsm::DB* db = nullptr;
-  llsm::Options options;
-  options.buffer_pool_size = FLAGS_buffer_pool_size_mib * 1024 * 1024;
-  options.memtable_flush_threshold = FLAGS_memtable_size_mib * 1024 * 1024;
+  llsm::Options options = llsm::bench::BuildLLSMOptions();
   options.num_keys = dataset.size();
-  options.use_direct_io = FLAGS_use_direct_io;
-  options.background_threads = FLAGS_bg_threads;
-  options.record_size = FLAGS_record_size_bytes;
-  options.page_fill_pct = FLAGS_llsm_page_fill_pct;
-  options.pin_threads = true;
 
   const std::string dbname = FLAGS_db_path + "/llsm";
   llsm::Status status = llsm::DB::Open(options, dbname, &db);
@@ -135,7 +96,7 @@ std::chrono::nanoseconds RunLLSMExperiment(
 
   return llsm::bench::MeasureRunTime([db, &dataset]() {
     llsm::WriteOptions woptions;
-    if(!FLAGS_shuffle) {
+    if (!FLAGS_shuffle) {
       woptions.sorted_load = true;
       woptions.perform_checks = false;
     }
@@ -173,14 +134,11 @@ int main(int argc, char* argv[]) {
     std::cerr << "ERROR: --data_mib must be greater than 0." << std::endl;
     return 1;
   }
-  if (FLAGS_db_path.empty()) {
-    std::cerr << "ERROR: --db_path must be specified." << std::endl;
-    return 1;
-  }
   if (fs::exists(FLAGS_db_path)) {
     std::cerr << "ERROR: The provided --db_path already exists." << std::endl;
     return 1;
   }
+  DBType db = llsm::bench::ParseDBType(FLAGS_db).value();
 
   llsm::bench::U64Dataset::GenerateOptions dataset_options;
   dataset_options.record_size = FLAGS_record_size_bytes;
@@ -196,11 +154,11 @@ int main(int argc, char* argv[]) {
   for (uint32_t i = 0; i < FLAGS_trials; ++i) {
     fs::create_directory(FLAGS_db_path);
 
-    if (FLAGS_db == kAll || FLAGS_db == kRocksDB) {
-      PrintExperimentResult(kRocksDB, dataset, RunRocksDBExperiment(dataset));
+    if (db == DBType::kAll || db == DBType::kRocksDB) {
+      PrintExperimentResult("rocksdb", dataset, RunRocksDBExperiment(dataset));
     }
-    if (FLAGS_db == kAll || FLAGS_db == kLLSM) {
-      PrintExperimentResult(kLLSM, dataset, RunLLSMExperiment(dataset));
+    if (db == DBType::kAll || db == DBType::kLLSM) {
+      PrintExperimentResult("llsm", dataset, RunLLSMExperiment(dataset));
     }
 
     fs::remove_all(FLAGS_db_path);
