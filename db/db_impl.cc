@@ -3,6 +3,7 @@
 #include <cassert>
 #include <condition_variable>
 #include <cstdlib>
+#include <iostream>
 #include <limits>
 
 #include "db/page.h"
@@ -112,21 +113,24 @@ DBImpl::~DBImpl() {
 
 // Reading a value consists of up to three steps:
 //
-// 1. Search the active memtable (`mtable_`).
-//    - We must hold the `mutex_` during this step because the active memtable
-//      can also take writes.
+// 1. Make copies of the memtable pointers so that we can search them without
+//     holding the `mutex_`.
+//
+// 2. Search the active memtable (`mtable_`).
+//    - We do not need to hold the `mutex_` because the memtable's underlying
+//      data structure (a skip list) supports concurrent reads during a write.
 //    - If the memtable contains a `EntryType::kDelete` entry for `key`, we can
 //      safely return `Status::NotFound()` because the key was recently deleted.
 //    - If the memtable contains a `EntryType::kWrite` entry for `key`, we can
 //      return the value directly.
 //    - If no entry was found, we move on to the next step.
 //
-// 2. Search the currently-being-flushed memtable (`im_mtable_`), if it exists.
+// 3. Search the currently-being-flushed memtable (`im_mtable_`), if it exists.
 //    - We do not need to hold the `mutex_` during the search because the
 //      currently-being-flushed memtable is immutable.
-//    - We use the same search protocol as specified in step 1.
+//    - We use the same search protocol as specified in step 2.
 //
-// 3. Search the on-disk page that should store the data associated with `key`,
+// 4. Search the on-disk page that should store the data associated with `key`,
 //    based on the key to page model.
 //    - We do not need to hold the `mutex_` during the search because the buffer
 //      manager manages the mutual exclusion for us.
@@ -135,30 +139,31 @@ DBImpl::~DBImpl() {
 // value associated with a key (i.e., writes always go to the memtable first).
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
                    std::string* value_out) {
+  std::shared_ptr<MemTable> local_mtable = nullptr;
   std::shared_ptr<MemTable> local_im_mtable = nullptr;
 
-  // 1. Check the active memtable.
+  // 1. Get copies of the memtable pointers so we can search them without
+  //    holding the database lock.
   {
     std::unique_lock<std::mutex> lock(mutex_);
-    MemTable::EntryType entry_type;
-    Status s = mtable_->Get(key, &entry_type, value_out);
-    if (s.ok()) {
-      if (entry_type == MemTable::EntryType::kDelete) {
-        return Status::NotFound("Key not found.");
-      }
-      return Status::OK();
-    }
-
-    // Make a copy of the pointer to the immutable memtable to allow us to
-    // perform the search without holding the `mutex_`.
+    local_mtable = mtable_;
     local_im_mtable = im_mtable_;
   }
 
-  // 2. Check the immutable memtable, if it exists.
+  // 2. Search the active memtable.
+  MemTable::EntryType entry_type;
+  Status status = local_mtable->Get(key, &entry_type, value_out);
+  if (status.ok()) {
+    if (entry_type == MemTable::EntryType::kDelete) {
+      return Status::NotFound("Key not found.");
+    }
+    return Status::OK();
+  }
+
+  // 3. Check the immutable memtable, if it exists.
   if (local_im_mtable != nullptr) {
-    MemTable::EntryType entry_type;
-    Status s = local_im_mtable->Get(key, &entry_type, value_out);
-    if (s.ok()) {
+    status = local_im_mtable->Get(key, &entry_type, value_out);
+    if (status.ok()) {
       if (entry_type == MemTable::EntryType::kDelete) {
         return Status::NotFound("Key not found.");
       }
@@ -166,13 +171,13 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     }
   }
 
-  // 3. Check the on-disk page.
+  // 4. Check the on-disk page.
   size_t page_id = model_->KeyToPageId(key);
   auto& bf = buf_mgr_->FixPage(page_id, /*exclusive=*/false);
-  Status s = bf.GetPage().Get(key, value_out);
+  status = bf.GetPage().Get(key, value_out);
   buf_mgr_->UnfixPage(bf, /*is_dirty=*/false);
 
-  return s;
+  return status;
 }
 
 Status DBImpl::Put(const WriteOptions& options, const Slice& key,
@@ -325,7 +330,14 @@ void DBImpl::FlushWorker(
 
   for (const auto& kv : records) {
     auto s = page.Put(options, kv.first, kv.second);
-    assert(s.ok());
+    if (!s.ok()) {
+      // TODO: Handle full pages. For now we should force an exit here to
+      // prevent a silent write failure in our benchmarks (assertions are
+      // disabled in release builds).
+      std::cerr << "ERROR: Attempted to write to a full page. Aborting."
+                << std::endl;
+      exit(1);
+    }
   }
   buf_mgr_->UnfixPage(*bf, /*is_dirty = */ true);
 }
