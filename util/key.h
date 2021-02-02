@@ -104,8 +104,12 @@ template <typename T>
 std::vector<T> CreateValues(const Options options) {
   std::vector<T> values;
   values.reserve(options.num_keys);
-  for (size_t i = 0; i < options.num_keys; i += options.key_step_size)
-    values.push_back(__builtin_bswap64(i));
+  const size_t max_value =
+      options.min_key + (options.num_keys - 1) * options.key_step_size;
+  for (size_t value = options.min_key; value <= max_value;
+       value += options.key_step_size) {
+    values.push_back(__builtin_bswap64(value));
+  }
   return values;
 }
 

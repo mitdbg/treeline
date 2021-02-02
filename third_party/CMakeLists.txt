@@ -38,6 +38,7 @@ if(LLSM_BUILD_BENCHMARKS)
   set(WITH_BENCHMARK_TOOLS OFF)
   set(WITH_CORE_TOOLS OFF)
   set(WITH_TOOLS OFF)
+  set(ROCKSDB_BUILD_SHARED OFF)
   FetchContent_MakeAvailable(rocksdb)
 
   # The RocksDB CMakeLists.txt exports RocksDB as a static library called
@@ -46,4 +47,11 @@ if(LLSM_BUILD_BENCHMARKS)
   # it were a subproject within our project.
   target_include_directories(rocksdb
     PUBLIC $<BUILD_INTERFACE:${rocksdb_SOURCE_DIR}/include>)
+
+  FetchContent_Declare(
+    ycsbrunner
+    GIT_REPOSITORY git@ssh.dev.azure.com:v3/msr-dsail/LearnedLSM/ycsb-runner
+    GIT_TAG        76253d9868d0b3d00196e8922321e3b8bf7b4941
+  )
+  FetchContent_MakeAvailable(ycsbrunner)
 endif()

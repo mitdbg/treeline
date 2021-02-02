@@ -21,6 +21,10 @@ target_link_libraries(bench_common_config PUBLIC bench_common gflags rocksdb)
 add_executable(synth_write synth_write.cc)
 target_link_libraries(synth_write bench_common_config)
 
+# YCSB: Run extracted YCSB workloads against LLSM and RocksDB.
+add_executable(ycsb ycsb.cc)
+target_link_libraries(ycsb bench_common_config ycsbrunner)
+
 # Microbench: An executable containing all of LLSM's microbenchmarks.
 add_executable(microbench
   memtable_benchmark.cc

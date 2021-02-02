@@ -33,6 +33,7 @@ struct Options {
   // Temporary options used to inform the database about the key space (the
   // distribution is assumed to be uniform).
   uint64_t num_keys = 5000000;
+  uint64_t min_key = 0;
   uint64_t key_step_size = 1;
   size_t record_size = 16;
 
