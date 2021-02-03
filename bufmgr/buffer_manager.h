@@ -34,8 +34,6 @@ namespace llsm {
 // data structures.
 class BufferManager {
  public:
-  const size_t kAlignment = 512;  // Required by O_DIRECT
-
   // Initializes a BufferManager with the options specified in `options`.
   BufferManager(const Options options, std::string db_path);
 
@@ -57,6 +55,13 @@ class BufferManager {
   FileManager* GetFileManager() const { return file_manager_; }
 
  private:
+  // To support efficient direct I/O, LLSM needs to align its memory buffers to
+  // the block size of the underlying file system. On start up, LLSM will
+  // attempt to automatically determine the file system's block size. In the
+  // unlikely event that LLSM is unable to find the block size, it will fall
+  // back to using this default alignment.
+  static constexpr size_t kDefaultAlignment = 4096;
+
   // Writes the page held by `frame` to disk.
   void WritePageOut(BufferFrame* frame) const;
 

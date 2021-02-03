@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/statvfs.h>
 
 #include <mutex>
 
@@ -17,10 +18,15 @@ namespace llsm {
 BufferManager::BufferManager(const Options options, std::string db_path)
     : options_(options),
       buffer_manager_size_(options.buffer_pool_size / Page::kSize) {
+  size_t alignment = BufferManager::kDefaultAlignment;
+  struct statvfs fs_stats;
+  if (statvfs(db_path.c_str(), &fs_stats) == 0) {
+    alignment = fs_stats.f_bsize;
+  }
   // Allocate space with alignment because of O_DIRECT requirements.
   // No need to zero out because data brought here will come from the database
   // `File`, which is zeroed out upon expansion.
-  pages_cache_ = aligned_alloc(kAlignment, options_.buffer_pool_size);
+  pages_cache_ = aligned_alloc(alignment, options_.buffer_pool_size);
 
   char* page_ptr = reinterpret_cast<char*>(pages_cache_);
   for (size_t i = 0; i < buffer_manager_size_; ++i, page_ptr += Page::kSize) {
