@@ -27,7 +27,7 @@ class DBImpl : public DB {
   Status Get(const ReadOptions& options, const Slice& key,
              std::string* value_out) override;
   Status Delete(const WriteOptions& options, const Slice& key) override;
-  Status FlushMemTable(const WriteOptions& options) override;
+  Status FlushMemTable(const FlushOptions& options) override;
 
   // Must be called exactly once after `DBImpl` is constructed to initialize the
   // database's internal state. Other public `DBImpl` methods can be called
@@ -51,7 +51,7 @@ class DBImpl : public DB {
   //
   // REQUIRES: `mutex_` is held.
   // REQUIRES: The thread has already called `WriterWaitIfNeeded()`.
-  void ScheduleMemTableFlush(const WriteOptions& options,
+  void ScheduleMemTableFlush(const FlushOptions& options,
                              std::unique_lock<std::mutex>& lock);
 
   // Returns true iff `mtable_` is "full".
@@ -62,15 +62,25 @@ class DBImpl : public DB {
   // REQUIRES: `mutex_` is held.
   bool FlushInProgress(const std::unique_lock<std::mutex>& lock) const;
 
+  bool ShouldFlush(const FlushOptions& options, size_t num_records,
+                   size_t num_deferrals) const;
+
   // Code run by a worker thread to write out `records` to the page held by
   // `bf`.
   void FlushWorker(
-      const WriteOptions& options,
-      const std::vector<std::pair<const Slice, const Slice>>& records,
+      const std::vector<std::tuple<const Slice, const Slice,
+                                   const MemTable::EntryType>>& records,
       std::future<BufferFrame*>& bf_future);
 
   // Code run by a worker thread to fix the page with `page_id`.
   void FixWorker(size_t page_id, std::promise<BufferFrame*>& bf_promise);
+
+  // Code run by a worker thread to reinsert `records` into the now-active
+  // memtable if their flush was deferred.
+  void ReinsertionWorker(
+      const std::vector<std::tuple<const Slice, const Slice,
+                                   const MemTable::EntryType>>& records,
+      size_t current_page_deferral_count);
 
   // All writing threads must call this method "on entry" to ensure they wait if
   // needed (when the memtables are all full).

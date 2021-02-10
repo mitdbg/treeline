@@ -1,10 +1,10 @@
-#include "gtest/gtest.h"
+#include "db/memtable.h"
 
 #include <algorithm>
 #include <vector>
 
+#include "gtest/gtest.h"
 #include "llsm/status.h"
-#include "db/memtable.h"
 
 namespace {
 
@@ -186,6 +186,34 @@ TEST(MemTableTest, SimilarGet) {
   MemTable::EntryType entry_type_out;
   ASSERT_TRUE(table.Put("abcd", "hello").ok());
   ASSERT_TRUE(table.Get("abc", &entry_type_out, &value_out).IsNotFound());
+}
+
+TEST(MemTableTest, AddFromDeferral) {
+  MemTable table(/*reserved_sequence_numbers = */ 1);
+
+  ASSERT_TRUE(table.Put("abcd", "hello1").ok());
+  ASSERT_TRUE(table
+                  .Add("abcd", "hello2", MemTable::EntryType::kWrite,
+                       /*from_deferral = */ true,
+                       /*injected_sequence_number = */ 0)
+                  .ok());
+
+  // Check that you don't read it out
+  std::string value_out;
+  MemTable::EntryType entry_type_out;
+  Status s = table.Get("abcd", &entry_type_out, &value_out);
+  ASSERT_EQ(value_out, "hello1");
+
+  // Check that it's skipped by the iterator
+  ASSERT_TRUE(table.Put("abcc", "hello1").ok());
+  ASSERT_TRUE(table.Put("abce", "hello1").ok());
+  MemTable::Iterator it = table.GetIterator();
+  it.SeekToFirst();
+  ASSERT_TRUE(it.Valid());
+  for (; it.Valid(); it.Next()) {
+    ASSERT_EQ(it.value(), "hello1");
+  }
+
 }
 
 }  // namespace

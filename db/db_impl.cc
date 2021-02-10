@@ -68,7 +68,7 @@ Status DBImpl::Initialize() {
 
   model->Preallocate(records, buf_mgr_);
   model_.reset(model);
-  mtable_ = std::make_shared<MemTable>();
+  mtable_ = std::make_shared<MemTable>(options_.deferred_io_max_deferrals);
 
   if (options_.pin_threads) {
     std::vector<size_t> core_map;
@@ -97,8 +97,10 @@ DBImpl::~DBImpl() {
     assert(waiting_writers_.empty());
 
     // Any data in the active memtable should be flushed to persistent storage.
+    FlushOptions options;
+    options.disable_deferred_io = true;
     if (mtable_ && mtable_->HasEntries()) {
-      ScheduleMemTableFlush(WriteOptions(), lock);
+      ScheduleMemTableFlush(options, lock);
     }
 
     // Not absolutely needed because there should not be any additional writers.
@@ -186,10 +188,10 @@ Status DBImpl::Put(const WriteOptions& options, const Slice& key,
 }
 
 Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
-  return Status::NotSupported("Unimplemented.");
+  return WriteImpl(options, key, Slice(), MemTable::EntryType::kDelete);
 }
 
-Status DBImpl::FlushMemTable(const WriteOptions& options) {
+Status DBImpl::FlushMemTable(const FlushOptions& options) {
   std::shared_future<void> local_last_flush;
   {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -220,14 +222,14 @@ Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
   std::unique_lock<std::mutex> lock(mutex_);
   WriterWaitIfNeeded(lock);
   if (ActiveMemTableFull(lock)) {
-    ScheduleMemTableFlush(options, lock);
+    ScheduleMemTableFlush(FlushOptions(), lock);
   }
   Status write_result = mtable_->Add(key, value, entry_type);
   NotifyWaitingWriterIfNeeded(lock);
   return write_result;
 }
 
-void DBImpl::ScheduleMemTableFlush(const WriteOptions& options,
+void DBImpl::ScheduleMemTableFlush(const FlushOptions& options,
                                    std::unique_lock<std::mutex>& lock) {
   assert(lock.owns_lock());
 
@@ -243,21 +245,25 @@ void DBImpl::ScheduleMemTableFlush(const WriteOptions& options,
     // to allow reads to proceed concurrently and to allow the flush thread to
     // remove the immutable memtable when it is done. Because
     // `all_memtables_full_` is now true, all additional writer threads will
-    // also wait on entry.
+    // also wait on entry (except writes due to deferred I/O, which will
+    // proceed).
     local_last_flush.get();
     lock.lock();
   }
 
   // Mark the active memtable as immutable and create a new active memtable.
   im_mtable_ = std::move(mtable_);
-  mtable_ = std::make_shared<MemTable>();
+  mtable_ = std::make_shared<MemTable>(options_.deferred_io_max_deferrals);
 
   // Schedule the flush to run in the background.
   last_flush_ = workers_->Submit([this, options]() {
     size_t current_page = std::numeric_limits<size_t>::max();
+    size_t current_page_deferral_count = 0;
+    bool current_page_dispatched_fixer = false;
     std::vector<std::future<void>> page_write_futures;
     std::future<BufferFrame*> bf_future;
-    std::vector<std::pair<const Slice, const Slice>> records_for_page;
+    std::vector<std::tuple<const Slice, const Slice, const MemTable::EntryType>>
+        records_for_page;
 
     // Iterate through the immutable memtable, aggregate entries into pages,
     // and dispatch page updates.
@@ -268,34 +274,67 @@ void DBImpl::ScheduleMemTableFlush(const WriteOptions& options,
       // return to it.
       if (page_id != current_page) {
         if (current_page != std::numeric_limits<size_t>::max()) {
-          // Submit flush job to workers - this is not the "first" page.
-          page_write_futures.emplace_back(workers_->Submit(
-              [this, options, records_for_page = std::move(records_for_page),
-               bf_future = std::move(bf_future)]() mutable {
-                FlushWorker(options, records_for_page, bf_future);
-              }));
-          records_for_page.clear();
+          if (ShouldFlush(options, records_for_page.size(),
+                          current_page_deferral_count)) {
+            // Submit flush job to workers - this is not the "first" page.
+            page_write_futures.emplace_back(workers_->Submit(
+                [this, options, records_for_page = std::move(records_for_page),
+                 bf_future = std::move(bf_future)]() mutable {
+                  FlushWorker(records_for_page, bf_future);
+                }));
+            records_for_page.clear();
+          } else {
+            // Submit re-insertion job to workers.
+            page_write_futures.emplace_back(workers_->Submit(
+                [this, records_for_page = std::move(records_for_page),
+                 current_page_deferral_count]() {
+                  ReinsertionWorker(records_for_page,
+                                    current_page_deferral_count);
+                }));
+            records_for_page.clear();
+          }
         }
         current_page = page_id;
-        // As soon as we begin seeing records from a new page, fix it in the
-        // background.
+        current_page_deferral_count = 0;
+        current_page_dispatched_fixer = false;
+      }
+      records_for_page.emplace_back(
+          std::make_tuple(it.key(), it.value(), it.type()));
+
+      if (it.seq_num() < options_.deferred_io_max_deferrals &&
+          (it.seq_num() + 1) > current_page_deferral_count)
+        current_page_deferral_count = it.seq_num() + 1;
+
+      // As soon as we are sure we will flush to this page, fix it in the
+      // background.
+      if (ShouldFlush(options, records_for_page.size(),
+                      current_page_deferral_count) &&
+          !current_page_dispatched_fixer) {
         std::promise<BufferFrame*> bf_promise;
         bf_future = bf_promise.get_future();
-        workers_->Submit(
+        workers_->SubmitNoWait(
             [this, current_page, bf_promise = std::move(bf_promise)]() mutable {
               FixWorker(current_page, bf_promise);
             });
+        current_page_dispatched_fixer = true;
       }
-      records_for_page.emplace_back(std::make_pair(it.key(), it.value()));
     }
 
     // Flush entries in the last page.
-    if (!records_for_page.empty()) {
+    if (ShouldFlush(options, records_for_page.size(),
+                    current_page_deferral_count)) {
       assert(current_page != std::numeric_limits<size_t>::max());
       page_write_futures.emplace_back(workers_->Submit(
           [this, options, records_for_page = std::move(records_for_page),
            bf_future = std::move(bf_future)]() mutable {
-            FlushWorker(options, records_for_page, bf_future);
+            FlushWorker(records_for_page, bf_future);
+          }));
+      records_for_page.clear();
+    } else {
+      page_write_futures.emplace_back(workers_->Submit(
+          [this, records_for_page = std::move(records_for_page),
+           current_page_deferral_count]() {
+            ReinsertionWorker(records_for_page, current_page_deferral_count);
           }));
       records_for_page.clear();
     }
@@ -318,9 +357,16 @@ void DBImpl::ScheduleMemTableFlush(const WriteOptions& options,
   // in FIFO order (and to avoid possible starvation of the waiting writers).
 }
 
+bool DBImpl::ShouldFlush(const FlushOptions& options, size_t num_records,
+                         size_t num_deferrals) const {
+  return (options.disable_deferred_io ||
+          (num_records >= options_.deferred_io_min_entries) ||
+          (num_deferrals >= options_.deferred_io_max_deferrals));
+}
+
 void DBImpl::FlushWorker(
-    const WriteOptions& options,
-    const std::vector<std::pair<const Slice, const Slice>>& records,
+    const std::vector<std::tuple<const Slice, const Slice,
+                                 const MemTable::EntryType>>& records,
     std::future<BufferFrame*>& bf_future) {
   auto bf = bf_future.get();
   // Lock the frame again for use. This does not increment the fix count of
@@ -329,8 +375,13 @@ void DBImpl::FlushWorker(
   Page page(bf->GetPage());
 
   for (const auto& kv : records) {
-    auto s = page.Put(options, kv.first, kv.second);
-    if (!s.ok()) {
+    Status s;
+    if (std::get<2>(kv) == MemTable::EntryType::kWrite) {
+      s = page.Put(WriteOptions(), std::get<0>(kv), std::get<1>(kv));
+    } else {
+      s = page.Delete(std::get<0>(kv));
+    }
+    if (s.IsInvalidArgument()) {
       // TODO: Handle full pages. For now we should force an exit here to
       // prevent a silent write failure in our benchmarks (assertions are
       // disabled in release builds).
@@ -349,6 +400,20 @@ void DBImpl::FixWorker(size_t page_id, std::promise<BufferFrame*>& bf_promise) {
   // of eviction before we can use it.
   bf.Unlock();
   bf_promise.set_value(&bf);
+}
+
+void DBImpl::ReinsertionWorker(
+    const std::vector<std::tuple<const Slice, const Slice,
+                                 const MemTable::EntryType>>& records,
+    size_t current_page_deferral_count) {
+  for (auto& kv : records) {
+    // This add will proceed even if mtable_ appears full to regular writers.
+    Status s =
+        mtable_->Add(std::get<0>(kv), std::get<1>(kv), std::get<2>(kv),
+                     /* from_deferral = */ true,
+                     /* injected_sequence_num = */ current_page_deferral_count);
+    assert(s.ok());
+  }
 }
 
 class DBImpl::WaitingWriter {

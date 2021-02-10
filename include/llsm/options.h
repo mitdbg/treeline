@@ -30,6 +30,14 @@ struct Options {
   // storage, in bytes.
   size_t memtable_flush_threshold = 64 * 1024 * 1024;
 
+  // The minimum number of memtable entries associated with a certain page
+  // necessary to actually copy the entries out during a memtable flush.
+  size_t deferred_io_min_entries = 1;
+
+  // The maximum number of times that we are allowed to not copy some page out during
+  // a memtable flush.
+  uint64_t deferred_io_max_deferrals = 0;
+
   // Temporary options used to inform the database about the key space (the
   // distribution is assumed to be uniform).
   uint64_t num_keys = 5000000;
@@ -62,6 +70,11 @@ struct WriteOptions {
   // be checked to ensure they are indeed sorted. If not, the user is responsible 
   // for ensuring that.
   bool perform_checks = true;
+};
+
+struct FlushOptions {
+  // Disable I/O deferral during a MemTable flush.
+  bool disable_deferred_io = false;
 };
 
 }  // namespace llsm

@@ -233,7 +233,7 @@ template <uint16_t MapSizeBytes>
 bool PackedMap<MapSizeBytes>::Remove(const uint8_t* key, unsigned key_length) {
   bool found;
   const unsigned slot_id = LowerBound(key, key_length, found);
-  if (!found) return false;
+  if (!found) return false; 
   return RemoveSlot(slot_id);
 }
 

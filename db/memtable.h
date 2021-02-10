@@ -24,11 +24,21 @@ class MemTable {
  public:
   enum class EntryType : uint8_t { kWrite = 0, kDelete = 1 };
 
-  MemTable();
+  // Create a new MemTable, optionally with some `reserved_sequence_numbers` for
+  // special uses (currently used to handle deferred I/O).
+  MemTable(const uint64_t reserved_sequence_numbers = 0);
 
   // Add an entry to this table. The `EntryType` is used to disambiguate between
   // regular writes and deletes. When deleting, `value` is ignored.
-  Status Add(const Slice& key, const Slice& value, EntryType entry_type);
+  //
+  // If true, the `from_deferral` flag indicates that this call is part of our
+  // deferred I/O strategy and that `value` should not overwrite the current
+  // value associated with `key` in this memtable, if any. This is achieved by
+  // associating this Add() operation with `injected_sequence_num`, which is
+  // lower than sequence numbers assigned to genuine inserts.
+  Status Add(const Slice& key, const Slice& value, EntryType entry_type,
+             const bool from_deferral = false,
+             const uint64_t injected_sequence_num = 0);
 
   // Record a write of `key` with value `value`.
   // This is a convenience method that calls `Add()` with `EntryType::kWrite`.
@@ -119,6 +129,7 @@ class MemTable {
   Arena arena_;
   Table table_;
   uint64_t next_sequence_num_;
+  uint64_t reserved_sequence_numbers_; // Used to count number of I/O deferrals.
   bool has_entries_;
 };
 
@@ -143,6 +154,9 @@ class MemTable::Iterator {
   // Returns the entry type at the current position.
   // REQUIRES: `Valid()`
   MemTable::EntryType type() const;
+  // Returns the sequence number at the current position.
+  // REQUIRES: `Valid()`
+  uint64_t seq_num() const;
 
   // Advances to the next position.
   // REQUIRES: Valid()

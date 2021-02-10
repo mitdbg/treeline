@@ -8,15 +8,17 @@
 namespace {
 
 constexpr uint64_t kEntryTypeMask = 0xFF;
+constexpr uint64_t kEntryTypeBitWidth = 8;
 
 }  // namespace
 
 namespace llsm {
 
-MemTable::MemTable()
+MemTable::MemTable(const uint64_t reserved_sequence_numbers)
     : arena_(),
       table_(MemTable::Comparator(), &arena_),
-      next_sequence_num_(0),
+      next_sequence_num_(reserved_sequence_numbers),
+      reserved_sequence_numbers_(reserved_sequence_numbers),
       has_entries_(false) {}
 
 Status MemTable::Put(const Slice& key, const Slice& value) {
@@ -45,8 +47,9 @@ MemTable::Iterator MemTable::GetIterator() const {
 
 size_t MemTable::ApproximateMemoryUsage() const { return arena_.MemoryUsage(); }
 
-Status MemTable::Add(const Slice& key, const Slice& value,
-                     EntryType entry_type) {
+Status MemTable::Add(const Slice& key, const Slice& value, EntryType entry_type,
+                     const bool from_deferral,
+                     const uint64_t injected_sequence_num) {
   // This implementation assumes that re-inserts or insert-then-deletes
   // are rare, so we always allocate new space for the key and value.
   const size_t user_data_bytes = key.size() + value.size();
@@ -55,8 +58,14 @@ Status MemTable::Add(const Slice& key, const Slice& value,
   Record* record = Record::FromRawBytes(buf);
   record->key_length = key.size();
   record->value_length = value.size();
-  record->sequence_number =
-      (next_sequence_num_++ << 8) | static_cast<uint8_t>(entry_type);
+  if (!from_deferral) {
+    record->sequence_number =
+        (next_sequence_num_++ << kEntryTypeBitWidth) | static_cast<uint8_t>(entry_type);
+  } else {
+    assert(injected_sequence_num < reserved_sequence_numbers_);
+    record->sequence_number =
+        (injected_sequence_num << kEntryTypeBitWidth) | static_cast<uint8_t>(entry_type);
+  }
 
   memcpy(record->key(), key.data(), key.size());
   memcpy(record->value(), value.data(), value.size());
@@ -118,6 +127,12 @@ MemTable::EntryType MemTable::Iterator::type() const {
   const Record* rec = Record::FromRawBytes(it_.key());
   return static_cast<MemTable::EntryType>(rec->sequence_number &
                                           kEntryTypeMask);
+}
+
+uint64_t MemTable::Iterator::seq_num() const {
+  assert(Valid());
+  const Record* rec = Record::FromRawBytes(it_.key());
+  return (rec->sequence_number >> kEntryTypeBitWidth);
 }
 
 void MemTable::Iterator::Next() {

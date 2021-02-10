@@ -78,7 +78,7 @@ TEST(PackedMapTest, SimpleRemove) {
   const std::string value = "world";
   ASSERT_TRUE(map.Insert(key, value));
   ASSERT_TRUE(map.Remove(key));
-  ASSERT_FALSE(map.Remove(key));
+  ASSERT_FALSE(map.Remove(key)); // Will be no-op
   std::string read_value;
   ASSERT_FALSE(map.Get(key, &read_value));
 }

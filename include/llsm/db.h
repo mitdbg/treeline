@@ -58,7 +58,7 @@ class DB {
 
   // Manually request LLSM to flush the data stored in its MemTable to
   // persistent storage. This method will block until the flush completes.
-  virtual Status FlushMemTable(const WriteOptions& options) = 0;
+  virtual Status FlushMemTable(const FlushOptions& options) = 0;
 };
 
 }  // namespace llsm

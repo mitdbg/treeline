@@ -1,3 +1,5 @@
+bench/results/
+bench/workloads/
 build/
 cmake-build-debug/
 cmake-build-release/
