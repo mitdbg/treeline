@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
   // Bookkeeping.
   std::vector<size_t> memtable_entries_per_page(num_pages, 0);
   std::vector<uint64_t> page_deferral_count(num_pages, 0);
-  std::vector<bool> flushed_this_time(, num_pages, false);
+  std::vector<bool> flushed_this_time(num_pages, false);
   llsm::MemTable* memtable = new llsm::MemTable();
   llsm::MemTable* backup_memtable = new llsm::MemTable();
   size_t num_flushes = 0;

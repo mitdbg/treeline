@@ -406,7 +406,8 @@ void DBImpl::ReinsertionWorker(
     const std::vector<std::tuple<const Slice, const Slice,
                                  const MemTable::EntryType>>& records,
     size_t current_page_deferral_count) {
-  for (auto& kv : records) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    for (auto& kv : records) {
     // This add will proceed even if mtable_ appears full to regular writers.
     Status s =
         mtable_->Add(std::get<0>(kv), std::get<1>(kv), std::get<2>(kv),

@@ -194,7 +194,7 @@ class LLSMInterface {
         throw std::runtime_error("Failed to bulk load a record!");
       }
     }
-    db_->FlushMemTable(llsm::WriteOptions());
+    db_->FlushMemTable(llsm::FlushOptions());
   }
 
   // Update the value at the specified key. Return true if the update succeeded.

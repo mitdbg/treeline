@@ -5,8 +5,8 @@
 #include <string>
 
 #include "gflags/gflags.h"
-#include "rocksdb/options.h"
 #include "llsm/options.h"
+#include "rocksdb/options.h"
 
 // This header declares all the common configuration flags used across the LLSM
 // benchmarks as well as a few utility functions that use these flags.
@@ -45,15 +45,19 @@ DECLARE_uint64(memtable_size_mib);
 // inclusive.
 DECLARE_uint32(llsm_page_fill_pct);
 
+// The minimum number of operations to a given page that need to be encoutered
+// while flushing a memtable in order to trigger a flush.
+DECLARE_uint64(io_threshold);
+
+// The maximum number of times that a given operation can be deferred to a
+// future flush.
+DECLARE_uint64(max_deferrals);
+
 namespace llsm {
 namespace bench {
 
 // An enum that represents the `db` flag above.
-enum class DBType : uint32_t {
-  kAll = 0,
-  kLLSM = 1,
-  kRocksDB = 2
-};
+enum class DBType : uint32_t { kAll = 0, kLLSM = 1, kRocksDB = 2 };
 
 // Returns the `DBType` enum value associated with a given string.
 // - "all" maps to `kAll`
