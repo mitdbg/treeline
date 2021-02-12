@@ -7,6 +7,7 @@
 #include <queue>
 
 #include "bufmgr/buffer_manager.h"
+#include "db/format.h"
 #include "db/memtable.h"
 #include "llsm/db.h"
 #include "model/rs_model.h"
@@ -36,10 +37,10 @@ class DBImpl : public DB {
 
  private:
   // Records writes and deletes in the active `MemTable`. The `value` is ignored
-  // if `entry_type` is `MemTable::EntryType::kDelete`.
+  // if `write_type` is `WriteType::kDelete`.
   // This method is thread safe.
   Status WriteImpl(const WriteOptions& options, const Slice& key,
-                   const Slice& value, MemTable::EntryType entry_type);
+                   const Slice& value, format::WriteType write_type);
 
   // Schedules a flush of the active memtable in the background. The active
   // memtable will be made immutable and a new active memtable will be
@@ -69,7 +70,7 @@ class DBImpl : public DB {
   // `bf`.
   void FlushWorker(
       const std::vector<std::tuple<const Slice, const Slice,
-                                   const MemTable::EntryType>>& records,
+                                   const format::WriteType>>& records,
       std::future<BufferFrame*>& bf_future);
 
   // Code run by a worker thread to fix the page with `page_id`.
@@ -79,7 +80,7 @@ class DBImpl : public DB {
   // memtable if their flush was deferred.
   void ReinsertionWorker(
       const std::vector<std::tuple<const Slice, const Slice,
-                                   const MemTable::EntryType>>& records,
+                                   const format::WriteType>>& records,
       size_t current_page_deferral_count);
 
   // All writing threads must call this method "on entry" to ensure they wait if

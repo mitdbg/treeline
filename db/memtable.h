@@ -1,5 +1,6 @@
 #pragma once
 
+#include "db/format.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
 #include "util/arena.h"
@@ -22,13 +23,11 @@ namespace llsm {
 // `const` methods are called concurrently, no mutual exclusion is needed.
 class MemTable {
  public:
-  enum class EntryType : uint8_t { kWrite = 0, kDelete = 1 };
-
   // Create a new MemTable, optionally with some `reserved_sequence_numbers` for
   // special uses (currently used to handle deferred I/O).
   MemTable(const uint64_t reserved_sequence_numbers = 0);
 
-  // Add an entry to this table. The `EntryType` is used to disambiguate between
+  // Add an entry to this table. The `WriteType` is used to disambiguate between
   // regular writes and deletes. When deleting, `value` is ignored.
   //
   // If true, the `from_deferral` flag indicates that this call is part of our
@@ -36,7 +35,7 @@ class MemTable {
   // value associated with `key` in this memtable, if any. This is achieved by
   // associating this Add() operation with `injected_sequence_num`, which is
   // lower than sequence numbers assigned to genuine inserts.
-  Status Add(const Slice& key, const Slice& value, EntryType entry_type,
+  Status Add(const Slice& key, const Slice& value, format::WriteType entry_type,
              const bool from_deferral = false,
              const uint64_t injected_sequence_num = 0);
 
@@ -51,9 +50,9 @@ class MemTable {
   // Retrieve the entry associated with `key`.
   //
   // If an entry is found, this method will return an OK status;
-  // `entry_type_out` will contain the entry type (write or delete) and
+  // `write_type_out` will contain the write type (write or delete) and
   // `value_out` will contain the value if the entry is a write.
-  Status Get(const Slice& key, EntryType* entry_type_out,
+  Status Get(const Slice& key, format::WriteType* write_type_out,
              std::string* value_out) const;
 
   class Iterator;
@@ -98,7 +97,7 @@ class MemTable {
     // sequence number is the most recent entry.
     //
     // The most significant 7 bytes store the sequence number (max. 2^56 - 1)
-    // and the least significant byte stores the `EntryType`.
+    // and the least significant byte stores the `WriteType`.
     uint64_t sequence_number;
   };
 
@@ -129,7 +128,8 @@ class MemTable {
   Arena arena_;
   Table table_;
   uint64_t next_sequence_num_;
-  uint64_t reserved_sequence_numbers_; // Used to count number of I/O deferrals.
+  uint64_t
+      reserved_sequence_numbers_;  // Used to count number of I/O deferrals.
   bool has_entries_;
 };
 
@@ -151,9 +151,9 @@ class MemTable::Iterator {
   // Returns the value at the current position.
   // REQUIRES: `Valid()`
   Slice value() const;
-  // Returns the entry type at the current position.
+  // Returns the write type at the current position.
   // REQUIRES: `Valid()`
-  MemTable::EntryType type() const;
+  format::WriteType type() const;
   // Returns the sequence number at the current position.
   // REQUIRES: `Valid()`
   uint64_t seq_num() const;

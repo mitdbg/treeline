@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 
+#include "db/format.h"
 #include "db/memtable.h"
 #include "gflags/gflags.h"
 #include "rs/builder.h"
@@ -92,7 +93,7 @@ int main(int argc, char* argv[]) {
 
     // Perform the insert
     memtable->Add(llsm::Slice(reinterpret_cast<const char*>(&req.key), 8),
-                  llsm::Slice(req.value, 8), llsm::MemTable::EntryType::kWrite);
+                  llsm::Slice(req.value, 8), llsm::format::WriteType::kWrite);
     const size_t insert_page_id =
         rs.GetEstimatedPosition(__builtin_bswap64(req.key)) / records_per_page;
     ++memtable_entries_per_page[insert_page_id];

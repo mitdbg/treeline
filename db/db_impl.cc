@@ -113,7 +113,7 @@ DBImpl::~DBImpl() {
   workers_.reset();
 }
 
-// Reading a value consists of up to three steps:
+// Reading a value consists of up to four steps:
 //
 // 1. Make copies of the memtable pointers so that we can search them without
 //     holding the `mutex_`.
@@ -153,10 +153,10 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   }
 
   // 2. Search the active memtable.
-  MemTable::EntryType entry_type;
-  Status status = local_mtable->Get(key, &entry_type, value_out);
+  format::WriteType write_type;
+  Status status = local_mtable->Get(key, &write_type, value_out);
   if (status.ok()) {
-    if (entry_type == MemTable::EntryType::kDelete) {
+    if (write_type == format::WriteType::kDelete) {
       return Status::NotFound("Key not found.");
     }
     return Status::OK();
@@ -164,9 +164,9 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
 
   // 3. Check the immutable memtable, if it exists.
   if (local_im_mtable != nullptr) {
-    status = local_im_mtable->Get(key, &entry_type, value_out);
+    status = local_im_mtable->Get(key, &write_type, value_out);
     if (status.ok()) {
-      if (entry_type == MemTable::EntryType::kDelete) {
+      if (write_type == format::WriteType::kDelete) {
         return Status::NotFound("Key not found.");
       }
       return Status::OK();
@@ -184,11 +184,11 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
 
 Status DBImpl::Put(const WriteOptions& options, const Slice& key,
                    const Slice& value) {
-  return WriteImpl(options, key, value, MemTable::EntryType::kWrite);
+  return WriteImpl(options, key, value, format::WriteType::kWrite);
 }
 
 Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
-  return WriteImpl(options, key, Slice(), MemTable::EntryType::kDelete);
+  return WriteImpl(options, key, Slice(), format::WriteType::kDelete);
 }
 
 Status DBImpl::FlushMemTable(const FlushOptions& options) {
@@ -218,13 +218,13 @@ bool DBImpl::FlushInProgress(const std::unique_lock<std::mutex>& lock) const {
 }
 
 Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
-                         const Slice& value, MemTable::EntryType entry_type) {
+                         const Slice& value, format::WriteType write_type) {
   std::unique_lock<std::mutex> lock(mutex_);
   WriterWaitIfNeeded(lock);
   if (ActiveMemTableFull(lock)) {
     ScheduleMemTableFlush(FlushOptions(), lock);
   }
-  Status write_result = mtable_->Add(key, value, entry_type);
+  Status write_result = mtable_->Add(key, value, write_type);
   NotifyWaitingWriterIfNeeded(lock);
   return write_result;
 }
@@ -262,7 +262,7 @@ void DBImpl::ScheduleMemTableFlush(const FlushOptions& options,
     bool current_page_dispatched_fixer = false;
     std::vector<std::future<void>> page_write_futures;
     std::future<BufferFrame*> bf_future;
-    std::vector<std::tuple<const Slice, const Slice, const MemTable::EntryType>>
+    std::vector<std::tuple<const Slice, const Slice, const format::WriteType>>
         records_for_page;
 
     // Iterate through the immutable memtable, aggregate entries into pages,
@@ -366,7 +366,7 @@ bool DBImpl::ShouldFlush(const FlushOptions& options, size_t num_records,
 
 void DBImpl::FlushWorker(
     const std::vector<std::tuple<const Slice, const Slice,
-                                 const MemTable::EntryType>>& records,
+                                 const format::WriteType>>& records,
     std::future<BufferFrame*>& bf_future) {
   auto bf = bf_future.get();
   // Lock the frame again for use. This does not increment the fix count of
@@ -376,7 +376,7 @@ void DBImpl::FlushWorker(
 
   for (const auto& kv : records) {
     Status s;
-    if (std::get<2>(kv) == MemTable::EntryType::kWrite) {
+    if (std::get<2>(kv) == format::WriteType::kWrite) {
       s = page.Put(WriteOptions(), std::get<0>(kv), std::get<1>(kv));
     } else {
       s = page.Delete(std::get<0>(kv));
@@ -404,10 +404,10 @@ void DBImpl::FixWorker(size_t page_id, std::promise<BufferFrame*>& bf_promise) {
 
 void DBImpl::ReinsertionWorker(
     const std::vector<std::tuple<const Slice, const Slice,
-                                 const MemTable::EntryType>>& records,
+                                 const format::WriteType>>& records,
     size_t current_page_deferral_count) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    for (auto& kv : records) {
+  std::unique_lock<std::mutex> lock(mutex_);
+  for (auto& kv : records) {
     // This add will proceed even if mtable_ appears full to regular writers.
     Status s =
         mtable_->Add(std::get<0>(kv), std::get<1>(kv), std::get<2>(kv),

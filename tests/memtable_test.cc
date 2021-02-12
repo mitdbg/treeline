@@ -9,6 +9,7 @@
 namespace {
 
 using namespace llsm;
+using namespace llsm::format;
 
 TEST(MemTableTest, SimpleReadWrite) {
   MemTable table;
@@ -19,10 +20,10 @@ TEST(MemTableTest, SimpleReadWrite) {
   ASSERT_TRUE(s.ok());
 
   std::string value_out;
-  MemTable::EntryType entry_type_out;
-  s = table.Get(key, &entry_type_out, &value_out);
+  WriteType write_type_out;
+  s = table.Get(key, &write_type_out, &value_out);
   ASSERT_TRUE(s.ok());
-  ASSERT_EQ(entry_type_out, MemTable::EntryType::kWrite);
+  ASSERT_EQ(write_type_out, WriteType::kWrite);
   ASSERT_EQ(value, value_out);
 }
 
@@ -31,14 +32,14 @@ TEST(MemTableTest, NegativeLookup) {
   std::string key = "hello";
 
   std::string value_out;
-  MemTable::EntryType entry_type_out;
-  Status s = table.Get(key, &entry_type_out, &value_out);
+  WriteType write_type_out;
+  Status s = table.Get(key, &write_type_out, &value_out);
   ASSERT_TRUE(s.IsNotFound());
   s = table.Delete(key);
   ASSERT_TRUE(s.ok());
-  s = table.Get(key, &entry_type_out, &value_out);
+  s = table.Get(key, &write_type_out, &value_out);
   ASSERT_TRUE(s.ok());
-  ASSERT_EQ(entry_type_out, MemTable::EntryType::kDelete);
+  ASSERT_EQ(write_type_out, WriteType::kDelete);
 }
 
 TEST(MemTableTest, WriteThenDelete) {
@@ -50,17 +51,17 @@ TEST(MemTableTest, WriteThenDelete) {
   ASSERT_TRUE(s.ok());
 
   std::string value_out;
-  MemTable::EntryType entry_type_out;
-  s = table.Get(key, &entry_type_out, &value_out);
+  WriteType write_type_out;
+  s = table.Get(key, &write_type_out, &value_out);
   ASSERT_TRUE(s.ok());
-  ASSERT_EQ(entry_type_out, MemTable::EntryType::kWrite);
+  ASSERT_EQ(write_type_out, WriteType::kWrite);
   ASSERT_EQ(value, value_out);
 
   s = table.Delete(key);
   ASSERT_TRUE(s.ok());
-  s = table.Get(key, &entry_type_out, &value_out);
+  s = table.Get(key, &write_type_out, &value_out);
   ASSERT_TRUE(s.ok());
-  ASSERT_EQ(entry_type_out, MemTable::EntryType::kDelete);
+  ASSERT_EQ(write_type_out, WriteType::kDelete);
 }
 
 TEST(MemTableTest, DeleteThenWrite) {
@@ -72,16 +73,16 @@ TEST(MemTableTest, DeleteThenWrite) {
   ASSERT_TRUE(s.ok());
 
   std::string value_out;
-  MemTable::EntryType entry_type_out;
-  s = table.Get(key, &entry_type_out, &value_out);
+  WriteType write_type_out;
+  s = table.Get(key, &write_type_out, &value_out);
   ASSERT_TRUE(s.ok());
-  ASSERT_EQ(entry_type_out, MemTable::EntryType::kDelete);
+  ASSERT_EQ(write_type_out, WriteType::kDelete);
 
   s = table.Put(key, value);
   ASSERT_TRUE(s.ok());
-  s = table.Get(key, &entry_type_out, &value_out);
+  s = table.Get(key, &write_type_out, &value_out);
   ASSERT_TRUE(s.ok());
-  ASSERT_EQ(entry_type_out, MemTable::EntryType::kWrite);
+  ASSERT_EQ(write_type_out, WriteType::kWrite);
   ASSERT_EQ(value, value_out);
 }
 
@@ -104,7 +105,7 @@ TEST(MemTableTest, InOrderIterate) {
     ASSERT_TRUE(idx < ordered.size());
     ASSERT_TRUE(it.key().compare(ordered.at(idx)) == 0);
     ASSERT_TRUE(it.value().compare(value) == 0);
-    ASSERT_EQ(it.type(), MemTable::EntryType::kWrite);
+    ASSERT_EQ(it.type(), WriteType::kWrite);
   }
 
   // All strings should have been found
@@ -138,41 +139,41 @@ TEST(MemTableTest, MultiWriteIterate) {
   it.SeekToFirst();
   ASSERT_TRUE(it.Valid());
   ASSERT_TRUE(it.key().compare("abc") == 0);
-  ASSERT_EQ(it.type(), MemTable::EntryType::kDelete);
+  ASSERT_EQ(it.type(), WriteType::kDelete);
 
   // Write: (abcd, test string)
   it.Next();
   ASSERT_TRUE(it.Valid());
   ASSERT_TRUE(it.key().compare("abcd") == 0);
-  ASSERT_EQ(it.type(), MemTable::EntryType::kWrite);
+  ASSERT_EQ(it.type(), WriteType::kWrite);
   ASSERT_TRUE(it.value().compare(final_value) == 0);
 
   // Write: (abcde, test string)
   it.Next();
   ASSERT_TRUE(it.Valid());
   ASSERT_TRUE(it.key().compare("abcde") == 0);
-  ASSERT_EQ(it.type(), MemTable::EntryType::kWrite);
+  ASSERT_EQ(it.type(), WriteType::kWrite);
   ASSERT_TRUE(it.value().compare(final_value) == 0);
 
   // Write: (test key, test string)
   it.Next();
   ASSERT_TRUE(it.Valid());
   ASSERT_TRUE(it.key().compare("test key") == 0);
-  ASSERT_EQ(it.type(), MemTable::EntryType::kWrite);
+  ASSERT_EQ(it.type(), WriteType::kWrite);
   ASSERT_TRUE(it.value().compare(final_value) == 0);
 
   // Write: (xyz123, test string)
   it.Next();
   ASSERT_TRUE(it.Valid());
   ASSERT_TRUE(it.key().compare("xyz123") == 0);
-  ASSERT_EQ(it.type(), MemTable::EntryType::kWrite);
+  ASSERT_EQ(it.type(), WriteType::kWrite);
   ASSERT_TRUE(it.value().compare(final_value) == 0);
 
   // Write: (xyz123abc, test string)
   it.Next();
   ASSERT_TRUE(it.Valid());
   ASSERT_TRUE(it.key().compare("xyz123abc") == 0);
-  ASSERT_EQ(it.type(), MemTable::EntryType::kWrite);
+  ASSERT_EQ(it.type(), WriteType::kWrite);
   ASSERT_TRUE(it.value().compare(final_value) == 0);
 
   // End of table
@@ -183,9 +184,9 @@ TEST(MemTableTest, MultiWriteIterate) {
 TEST(MemTableTest, SimilarGet) {
   MemTable table;
   std::string value_out;
-  MemTable::EntryType entry_type_out;
+  WriteType write_type_out;
   ASSERT_TRUE(table.Put("abcd", "hello").ok());
-  ASSERT_TRUE(table.Get("abc", &entry_type_out, &value_out).IsNotFound());
+  ASSERT_TRUE(table.Get("abc", &write_type_out, &value_out).IsNotFound());
 }
 
 TEST(MemTableTest, AddFromDeferral) {
@@ -193,15 +194,15 @@ TEST(MemTableTest, AddFromDeferral) {
 
   ASSERT_TRUE(table.Put("abcd", "hello1").ok());
   ASSERT_TRUE(table
-                  .Add("abcd", "hello2", MemTable::EntryType::kWrite,
+                  .Add("abcd", "hello2", WriteType::kWrite,
                        /*from_deferral = */ true,
                        /*injected_sequence_number = */ 0)
                   .ok());
 
   // Check that you don't read it out
   std::string value_out;
-  MemTable::EntryType entry_type_out;
-  Status s = table.Get("abcd", &entry_type_out, &value_out);
+  WriteType write_type_out;
+  Status s = table.Get("abcd", &write_type_out, &value_out);
   ASSERT_EQ(value_out, "hello1");
 
   // Check that it's skipped by the iterator

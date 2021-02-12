@@ -7,8 +7,8 @@
 
 namespace {
 
-constexpr uint64_t kEntryTypeMask = 0xFF;
-constexpr uint64_t kEntryTypeBitWidth = 8;
+constexpr uint64_t kWriteTypeMask = 0xFF;
+constexpr uint64_t kWriteTypeBitWidth = 8;
 
 }  // namespace
 
@@ -22,10 +22,10 @@ MemTable::MemTable(const uint64_t reserved_sequence_numbers)
       has_entries_(false) {}
 
 Status MemTable::Put(const Slice& key, const Slice& value) {
-  return Add(key, value, MemTable::EntryType::kWrite);
+  return Add(key, value, format::WriteType::kWrite);
 }
 
-Status MemTable::Get(const Slice& key, EntryType* entry_type_out,
+Status MemTable::Get(const Slice& key, format::WriteType* write_type_out,
                      std::string* value_out) const {
   Iterator it = GetIterator();
   it.Seek(key);
@@ -33,12 +33,12 @@ Status MemTable::Get(const Slice& key, EntryType* entry_type_out,
     return Status::NotFound("Requested key was not found.");
   }
   value_out->assign(it.value().data(), it.value().size());
-  *entry_type_out = it.type();
+  *write_type_out = it.type();
   return Status::OK();
 }
 
 Status MemTable::Delete(const Slice& key) {
-  return Add(key, Slice(), MemTable::EntryType::kDelete);
+  return Add(key, Slice(), format::WriteType::kDelete);
 }
 
 MemTable::Iterator MemTable::GetIterator() const {
@@ -47,8 +47,8 @@ MemTable::Iterator MemTable::GetIterator() const {
 
 size_t MemTable::ApproximateMemoryUsage() const { return arena_.MemoryUsage(); }
 
-Status MemTable::Add(const Slice& key, const Slice& value, EntryType entry_type,
-                     const bool from_deferral,
+Status MemTable::Add(const Slice& key, const Slice& value,
+                     format::WriteType write_type, const bool from_deferral,
                      const uint64_t injected_sequence_num) {
   // This implementation assumes that re-inserts or insert-then-deletes
   // are rare, so we always allocate new space for the key and value.
@@ -59,12 +59,12 @@ Status MemTable::Add(const Slice& key, const Slice& value, EntryType entry_type,
   record->key_length = key.size();
   record->value_length = value.size();
   if (!from_deferral) {
-    record->sequence_number =
-        (next_sequence_num_++ << kEntryTypeBitWidth) | static_cast<uint8_t>(entry_type);
+    record->sequence_number = (next_sequence_num_++ << kWriteTypeBitWidth) |
+                              static_cast<uint8_t>(write_type);
   } else {
     assert(injected_sequence_num < reserved_sequence_numbers_);
-    record->sequence_number =
-        (injected_sequence_num << kEntryTypeBitWidth) | static_cast<uint8_t>(entry_type);
+    record->sequence_number = (injected_sequence_num << kWriteTypeBitWidth) |
+                              static_cast<uint8_t>(write_type);
   }
 
   memcpy(record->key(), key.data(), key.size());
@@ -122,17 +122,16 @@ Slice MemTable::Iterator::value() const {
   return Slice(rec->value(), rec->value_length);
 }
 
-MemTable::EntryType MemTable::Iterator::type() const {
+format::WriteType MemTable::Iterator::type() const {
   assert(Valid());
   const Record* rec = Record::FromRawBytes(it_.key());
-  return static_cast<MemTable::EntryType>(rec->sequence_number &
-                                          kEntryTypeMask);
+  return static_cast<format::WriteType>(rec->sequence_number & kWriteTypeMask);
 }
 
 uint64_t MemTable::Iterator::seq_num() const {
   assert(Valid());
   const Record* rec = Record::FromRawBytes(it_.key());
-  return (rec->sequence_number >> kEntryTypeBitWidth);
+  return (rec->sequence_number >> kWriteTypeBitWidth);
 }
 
 void MemTable::Iterator::Next() {
