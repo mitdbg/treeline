@@ -21,6 +21,7 @@ if (LLSM_BUILD_SHARED)
 else()
   add_library(llsm STATIC)
 endif()
+target_link_libraries(llsm crc32c)
 target_include_directories(llsm
   PUBLIC include
   PRIVATE .)
@@ -40,6 +41,7 @@ add_subdirectory(db)
 add_subdirectory(util)
 add_subdirectory(model)
 add_subdirectory(rs)
+add_subdirectory(wal)
 
 # Build the tests iff requested
 if(LLSM_BUILD_TESTS)

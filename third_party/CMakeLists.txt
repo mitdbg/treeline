@@ -1,5 +1,17 @@
 include(FetchContent)
 
+# CRC32C implemented using CPU-specific instructions
+FetchContent_Declare(
+  crc32c
+  GIT_REPOSITORY https://github.com/google/crc32c
+  GIT_TAG        1.1.1
+)
+set(CRC32C_BUILD_TESTS OFF)
+set(CRC32C_BUILD_BENCHMARKS OFF)
+set(CRC32C_USE_GLOG OFF)
+set(CRC32C_INSTALL OFF)
+FetchContent_MakeAvailable(crc32c)
+
 if(LLSM_BUILD_TESTS)
   # Google Tests: Fetch it iff we need to build the test suite
   FetchContent_Declare(

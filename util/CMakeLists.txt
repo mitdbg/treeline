@@ -2,6 +2,9 @@ target_sources(llsm PRIVATE
   affinity.h
   arena.cc
   arena.h
+  coding.cc
+  coding.h
+  crc32c.h
   gcc_macros.h
   inlineskiplist.h
   key.h

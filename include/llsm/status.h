@@ -13,7 +13,9 @@
 #pragma once
 
 #include <algorithm>
+#include <cstring>
 #include <string>
+#include <errno.h>
 
 #include "llsm/slice.h"
 
@@ -49,6 +51,15 @@ class Status {
   }
   static Status IOError(const Slice& msg, const Slice& msg2 = Slice()) {
     return Status(kIOError, msg, msg2);
+  }
+
+  // Creates an error status (with context) corresponding to a POSIX `errno`.
+  static Status FromPosixError(const Slice& context, int error_number) {
+    if (error_number == ENOENT) {
+      return Status::NotFound(context, std::strerror(error_number));
+    } else {
+      return Status::IOError(context, std::strerror(error_number));
+    }
   }
 
   // Returns true iff the status indicates success.

@@ -70,6 +70,27 @@ struct WriteOptions {
   // be checked to ensure they are indeed sorted. If not, the user is responsible 
   // for ensuring that.
   bool perform_checks = true;
+
+  // If true, the write will not be written to LLSM's write-ahead log.
+  //
+  // If the database process crashes shortly after a write with
+  // `bypass_wal == false` is made, the write may be lost.
+  bool bypass_wal = false;
+
+  // If true, the write will be flushed from the operating system page cache
+  // before the write is considered complete. If this flag is true, writes will
+  // be slower.
+  //
+  // If this flag is false, and the machine crashes, some recent writes may be
+  // lost. Note that if it is just the process that crashes (i.e., the machine
+  // does not reboot), no writes will be lost even if this flag is false.
+  //
+  // In other words, a write with `sync == false` has similar crash semantics as
+  // the `write()` system call. A write with `sync == true` has similar crash
+  // semantics to a `write()` system call followed by `fdatasync()`.
+  //
+  // NOTE: This flag only has an effect when `bypass_wal` is false.
+  bool sync = false;
 };
 
 struct FlushOptions {
