@@ -147,7 +147,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   // 1. Get copies of the memtable pointers so we can search them without
   //    holding the database lock.
   {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> mtable_lock(mtable_mutex_);
     local_mtable = mtable_;
     local_im_mtable = im_mtable_;
   }
@@ -224,6 +224,10 @@ Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
   if (ActiveMemTableFull(lock)) {
     ScheduleMemTableFlush(FlushOptions(), lock);
   }
+  // NOTE: We do not need to acquire `mtable_mutex_` here even though we read
+  // the `mtable_` pointer because only a writing thread can modify `mtable_`.
+  // Since we are currently holding `mutex_`, no other writing thread can
+  // concurrently modify `mtable_`.
   Status write_result = mtable_->Add(key, value, write_type);
   NotifyWaitingWriterIfNeeded(lock);
   return write_result;
@@ -252,8 +256,11 @@ void DBImpl::ScheduleMemTableFlush(const FlushOptions& options,
   }
 
   // Mark the active memtable as immutable and create a new active memtable.
-  im_mtable_ = std::move(mtable_);
-  mtable_ = std::make_shared<MemTable>(options_.deferred_io_max_deferrals);
+  {
+    std::unique_lock<std::mutex> mtable_lock(mtable_mutex_);
+    im_mtable_ = std::move(mtable_);
+    mtable_ = std::make_shared<MemTable>(options_.deferred_io_max_deferrals);
+  }
 
   // Schedule the flush to run in the background.
   last_flush_ = workers_->Submit([this, options]() {
@@ -267,6 +274,11 @@ void DBImpl::ScheduleMemTableFlush(const FlushOptions& options,
 
     // Iterate through the immutable memtable, aggregate entries into pages,
     // and dispatch page updates.
+
+    // NOTE: We do not need to acquire `mtable_mutex_` here even though we read
+    // the `im_mtable_` pointer because only a writing thread modifies
+    // `im_mtable_` above. However no writing threads can run that modification
+    // code above until this flush completes.
     auto it = im_mtable_->GetIterator();
     for (it.SeekToFirst(); it.Valid(); it.Next()) {
       const size_t page_id = model_->KeyToPageId(it.key());
@@ -346,7 +358,7 @@ void DBImpl::ScheduleMemTableFlush(const FlushOptions& options,
 
     // Flush is complete. We no longer need the immutable memtable.
     {
-      std::unique_lock<std::mutex> db_lock(mutex_);
+      std::unique_lock<std::mutex> mtable_lock(mtable_mutex_);
       im_mtable_.reset();
     }
   });
@@ -406,6 +418,10 @@ void DBImpl::ReinsertionWorker(
     const std::vector<std::tuple<const Slice, const Slice,
                                  const format::WriteType>>& records,
     size_t current_page_deferral_count) {
+  // NOTE: We do not need to acquire `mtable_mutex_` here even though we read
+  // the `mtable_` pointer because this code runs as part of the memtable flush.
+  // Until this worker completes, no other threads are able to modify `mtable_`.
+  // Acquiring `mutex_` ensures writes to the memtable do not occur concurrently.
   std::unique_lock<std::mutex> lock(mutex_);
   for (auto& kv : records) {
     // This add will proceed even if mtable_ appears full to regular writers.

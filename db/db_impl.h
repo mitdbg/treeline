@@ -104,15 +104,25 @@ class DBImpl : public DB {
   // Remaining database state protected by `mutex_`.
   std::mutex mutex_;
 
+  // Protects the `mtable_` and `im_mtable_` pointers only.
+  // If this mutex needs to be acquired with `mutex_` above, always acquire
+  // `mutex_` first to prevent circular waits.
+  std::mutex mtable_mutex_;
+
   // Active memtable that may accept writes. After `Initialize()` returns,
   // this pointer will never be null.
-  // REQUIRES: `mutex_` is held (for read/write).
+  // REQUIRES:
+  //  Writing Thread:
+  //   - `mutex_` is held when writing to the memtable itself
+  //   - `mtable_mutex_` is held when writing to the pointer
+  //  Reading Thread:
+  //   - `mtable_mutex_` is held when reading the pointer (making a copy)
   std::shared_ptr<MemTable> mtable_;
 
   // Immutable memtable currently being flushed, if not null. Writes to this
   // table are not allowed. Reads of this table can occur concurrently iff the
   // reading thread has its own copy of the shared pointer.
-  // REQUIRES: `mutex_` is held for read/write/copy of the *pointer* only.
+  // REQUIRES: `mtable_mutex_` is held for read/write/copy of the *pointer* only.
   std::shared_ptr<MemTable> im_mtable_;
 
   // Is set to true when both `mtable_` and `im_mtable_` are full (i.e.,
