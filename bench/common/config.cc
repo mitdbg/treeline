@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <unordered_map>
+
 #include "db/page.h"
 #include "rocksdb/table.h"
 
@@ -83,12 +84,16 @@ DEFINE_uint32(llsm_page_fill_pct, 50,
               "inclusive.");
 DEFINE_validator(llsm_page_fill_pct, &ValidateLLSMPageFillPct);
 
-DEFINE_uint64(io_threshold, 1,
+DEFINE_uint64(
+    io_threshold, 1,
     "The minimum number of operations to a given page that need to be "
     "encoutered while flushing a memtable in order to trigger a flush");
 DEFINE_uint64(max_deferrals, 0,
               "The maximum number of times that a given operation can be "
               "deferred to a future flush.");
+
+DEFINE_bool(bypass_wal, true,
+            "If true, all writes will bypass the write-ahead log.");
 
 namespace llsm {
 namespace bench {
@@ -117,7 +122,8 @@ rocksdb::Options BuildRocksDBOptions() {
   rocksdb::LRUCacheOptions cache_options;
   cache_options.capacity = FLAGS_cache_size_mib * 1024 * 1024;
   rocksdb::BlockBasedTableOptions table_options;
-  table_options.block_size = Page::kSize;  // Use the same block size as LLSM's pages.
+  table_options.block_size =
+      Page::kSize;  // Use the same block size as LLSM's pages.
   table_options.checksum = rocksdb::kNoChecksum;
   table_options.block_cache = rocksdb::NewLRUCache(cache_options);
   options.table_factory.reset(

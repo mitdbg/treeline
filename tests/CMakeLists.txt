@@ -11,6 +11,7 @@ target_sources(tester
     packed_map_test.cc
     db_test.cc
     thread_pool_test.cc
+    wal_manager_test.cc
     wal_rw_test.cc)
 target_link_libraries(tester llsm gtest gtest_main Threads::Threads)
 # Allow tests to also include LLSM internal headers

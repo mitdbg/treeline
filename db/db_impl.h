@@ -12,6 +12,7 @@
 #include "llsm/db.h"
 #include "model/rs_model.h"
 #include "util/thread_pool.h"
+#include "wal/manager.h"
 
 namespace llsm {
 
@@ -142,6 +143,10 @@ class DBImpl : public DB {
   // memtables are full.
   // REQUIRES: `mutex_` is held (for read/write).
   std::queue<WaitingWriter*> waiting_writers_;
+
+  // Handles reading from and writing to the write-ahead log.
+  // REQUIRES: `mutex_` is held when using the manager.
+  wal::Manager wal_;
 };
 
 }  // namespace llsm

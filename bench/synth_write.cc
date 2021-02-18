@@ -41,7 +41,7 @@ std::chrono::nanoseconds RunRocksDBExperiment(
 
   return llsm::bench::MeasureRunTime([db, &dataset]() {
     rocksdb::WriteOptions woptions;
-    woptions.disableWAL = true;
+    woptions.disableWAL = FLAGS_bypass_wal;
     rocksdb::Status status;
     rocksdb::WriteBatch batch;
     for (const auto& record : dataset) {
@@ -100,6 +100,7 @@ std::chrono::nanoseconds RunLLSMExperiment(
       woptions.sorted_load = true;
       woptions.perform_checks = false;
     }
+    woptions.bypass_wal = FLAGS_bypass_wal;
     llsm::Status status;
     for (const auto& record : dataset) {
       status = db->Put(woptions, record.key(), record.value());

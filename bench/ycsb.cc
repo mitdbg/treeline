@@ -60,7 +60,7 @@ class RocksDBInterface {
   // Load the records into the database.
   void BulkLoad(const ycsbr::BulkLoadWorkload& records) {
     rocksdb::WriteOptions options;
-    options.disableWAL = true;
+    options.disableWAL = FLAGS_bypass_wal;
     rocksdb::Status status;
     rocksdb::WriteBatch batch;
     constexpr size_t batch_size = 1024;
@@ -108,7 +108,7 @@ class RocksDBInterface {
   // Insert the specified key value pair. Return true if the insert succeeded.
   bool Insert(ycsbr::Request::Key key, const char* value, size_t value_size) {
     rocksdb::WriteOptions options;
-    options.disableWAL = true;
+    options.disableWAL = FLAGS_bypass_wal;
     auto status = db_->Put(
         options,
         rocksdb::Slice(reinterpret_cast<const char*>(&key), sizeof(key)),
@@ -205,6 +205,7 @@ class LLSMInterface {
   // Insert the specified key value pair. Return true if the insert succeeded.
   bool Insert(ycsbr::Request::Key key, const char* value, size_t value_size) {
     llsm::WriteOptions options;
+    options.bypass_wal = FLAGS_bypass_wal;
     llsm::Status status = db_->Put(
         options, llsm::Slice(reinterpret_cast<const char*>(&key), sizeof(key)),
         llsm::Slice(value, value_size));

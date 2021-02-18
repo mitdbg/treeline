@@ -142,6 +142,13 @@ void BufferManager::UnfixPage(BufferFrame& frame, const bool is_dirty) {
   frame.Unlock();
 }
 
+// Flushes a page to disk and then unfixes it (the page is not necessarily
+// immediately evicted from the cache).
+void BufferManager::FlushAndUnfixPage(BufferFrame& frame) {
+  WritePageOut(&frame);
+  UnfixPage(frame, /*is_dirty=*/false);
+}
+
 // Writes all dirty pages to disk (without unfixing)
 void BufferManager::FlushDirty() {
   LockMapMutex();

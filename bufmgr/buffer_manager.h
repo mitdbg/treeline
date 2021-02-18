@@ -48,6 +48,10 @@ class BufferManager {
   // Unfixes a page updating whether it is dirty or not.
   void UnfixPage(BufferFrame& frame, const bool is_dirty);
 
+  // Flushes a page to disk and then unfixes it (the page is not necessarily
+  // immediately evicted from the cache).
+  void FlushAndUnfixPage(BufferFrame& frame);
+
   // Writes all dirty pages to disk (without unfixing)
   void FlushDirty();
 
