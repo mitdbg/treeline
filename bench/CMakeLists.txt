@@ -39,3 +39,7 @@ target_link_libraries(microbench
 add_executable(deferred_io deferred_io_simulation.cc)
 target_link_libraries(deferred_io bench_common gflags ycsbrunner)
 
+# Write-ahead Log: A microbenchmark used to evaluate the overhead of writing to
+# a write-ahead log.
+add_executable(wal wal_benchmark.cc)
+target_link_libraries(wal bench_common gflags benchmark::benchmark)
