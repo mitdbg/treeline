@@ -101,13 +101,13 @@ static uint64_t ExtractHead64(const Slice& key) {
 }
 
 template <typename T>
-std::vector<T> CreateValues(const Options options) {
+std::vector<T> CreateValues(const KeyDistHints& key_hints) {
   std::vector<T> values;
-  values.reserve(options.num_keys);
+  values.reserve(key_hints.num_keys);
   const size_t max_value =
-      options.min_key + (options.num_keys - 1) * options.key_step_size;
-  for (size_t value = options.min_key; value <= max_value;
-       value += options.key_step_size) {
+      key_hints.min_key + (key_hints.num_keys - 1) * key_hints.key_step_size;
+  for (size_t value = key_hints.min_key; value <= max_value;
+       value += key_hints.key_step_size) {
     values.push_back(__builtin_bswap64(value));
   }
   return values;

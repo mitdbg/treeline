@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 
 #include "llsm/options.h"
 #include "llsm/slice.h"
@@ -22,7 +23,7 @@ namespace wal {
 class Writer {
  public:
   // Create a WAL writer that will append data to a file at `log_path`.
-  explicit Writer(const std::string& log_path);
+  explicit Writer(const std::filesystem::path& log_path);
   ~Writer();
 
   // Check whether the WAL file was created successfully.

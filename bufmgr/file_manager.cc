@@ -5,15 +5,17 @@
 namespace llsm {
 
 // Creates a file manager according to the options specified in `options`.
-FileManager::FileManager(const Options options, std::string db_path)
+FileManager::FileManager(const Options& options, std::filesystem::path db_path)
     : db_path_(std::move(db_path)) {
   // Get number of segments.
   const size_t segments = options.background_threads;
   assert(segments >= 1);
 
   // Compute the number of pages needed.
-  total_pages_ = options.num_keys / options.records_per_page;
-  if (options.num_keys % options.records_per_page != 0) ++total_pages_;
+  total_pages_ =
+      options.key_hints.num_keys / options.key_hints.records_per_page;
+  if (options.key_hints.num_keys % options.key_hints.records_per_page != 0)
+    ++total_pages_;
 
   // Compute the page allocation
   size_t pages_per_segment = total_pages_ / segments;
@@ -24,7 +26,7 @@ FileManager::FileManager(const Options options, std::string db_path)
   // Create the db_files
   for (size_t i = 0; i < segments; ++i) {
     db_files_.push_back(std::make_unique<File>(
-        options, db_path_ + "/segment-" + std::to_string(i)));
+        options, db_path_ / ("segment-" + std::to_string(i))));
   }
 }
 
@@ -60,8 +62,7 @@ FileAddress FileManager::PageIdToAddress(const size_t page_id) const {
                          1 - page_allocation_.begin();
 
   // Find offset
-  const size_t offset =
-      (page_id - page_allocation_.at(file_id)) * Page::kSize;
+  const size_t offset = (page_id - page_allocation_.at(file_id)) * Page::kSize;
   return FileAddress{file_id, offset};
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 
 #include "db/page.h"
@@ -23,7 +24,7 @@ struct FileAddress {
 class FileManager {
  public:
   // Creates a file manager according to the options specified in `options`.
-  FileManager(const Options options, std::string db_path);
+  FileManager(const Options& options, std::filesystem::path db_path);
 
   // Reads the part of the on-disk database file corresponding to `page_id` into
   // the in-memory page-sized block pointed to by `data`.
@@ -50,7 +51,7 @@ class FileManager {
   std::vector<std::unique_ptr<File>> db_files_;
 
   // The path to the database
-  const std::string db_path_;
+  const std::filesystem::path db_path_;
 
   // The page_id of the first page of each segment.
   std::vector<size_t> page_allocation_;

@@ -1,5 +1,10 @@
 #include "db_impl.h"
 
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <cassert>
 #include <condition_variable>
 #include <cstdlib>
@@ -10,9 +15,41 @@
 #include "util/affinity.h"
 #include "util/key.h"
 
+namespace {
+
+using namespace llsm;
+
+const std::string kWALDirName = "wal";
+const std::string kManifestFileName = "MANIFEST";
+
+Status ValidateOptions(const Options& options) {
+  if (options.key_hints.key_step_size == 0) {
+    return Status::InvalidArgument("KeyDistHints::key_step_size cannot be 0.");
+  }
+  if (options.key_hints.page_fill_pct < 1 ||
+      options.key_hints.page_fill_pct > 100) {
+    return Status::InvalidArgument(
+        "KeyDistHints::page_fill_pct must be a value between 1 and 100 inclusive.");
+  }
+  if (options.buffer_pool_size < Page::kSize) {
+    return Status::InvalidArgument(
+        "Options::buffer_pool_size is too small. It must be at least " +
+        std::to_string(Page::kSize) + " bytes.");
+  }
+  if (options.background_threads < 2) {
+    return Status::InvalidArgument(
+        "Options::background_threads must be at least 2.");
+  }
+  return Status::OK();
+}
+
+}  // namespace
+
 namespace llsm {
 
-Status DB::Open(const Options& options, const std::string& path, DB** db_out) {
+namespace fs = std::filesystem;
+
+Status DB::Open(const Options& options, const fs::path& path, DB** db_out) {
   std::unique_ptr<DBImpl> db = std::make_unique<DBImpl>(options, path);
   Status s = db->Initialize();
   if (!s.ok()) {
@@ -22,7 +59,7 @@ Status DB::Open(const Options& options, const std::string& path, DB** db_out) {
   return Status::OK();
 }
 
-DBImpl::DBImpl(Options options, std::string db_path)
+DBImpl::DBImpl(const Options options, const fs::path db_path)
     : options_(std::move(options)),
       db_path_(std::move(db_path)),
       buf_mgr_(nullptr),
@@ -31,60 +68,92 @@ DBImpl::DBImpl(Options options, std::string db_path)
       mtable_(nullptr),
       im_mtable_(nullptr),
       all_memtables_full_(false),
-      wal_(db_path_ + "/wal") {}
+      wal_(db_path_ / kWALDirName) {}
 
 Status DBImpl::Initialize() {
-  if (options_.key_step_size == 0) {
-    return Status::InvalidArgument("Options::key_step_size cannot be 0.");
-  }
-  if (options_.page_fill_pct < 1 || options_.page_fill_pct > 100) {
-    return Status::InvalidArgument(
-        "Options::page_fill_pct must be a value between 1 and 100 inclusive.");
-  }
-  if (options_.buffer_pool_size < Page::kSize) {
-    return Status::InvalidArgument(
-        "Options::buffer_pool_size is too small. It must be at least " +
-        std::to_string(Page::kSize) + " bytes.");
-  }
-  if (options_.background_threads < 2) {
-    return Status::InvalidArgument(
-        "Options::background_threads must be at least 2.");
-  }
-
-  // Create directory and an appropriate number of files (segments), one per
-  // worker thread.
-  if (mkdir(db_path_.c_str(), 0755) != 0) {
-    return Status::IOError("Failed to create new directory:", db_path_);
-  }
-
-  auto values = key_utils::CreateValues<uint64_t>(options_);
-  auto records = key_utils::CreateRecords<uint64_t>(values);
-
-  // Compute the number of records per page.
-  double fill_pct = options_.page_fill_pct / 100.;
-  options_.records_per_page = Page::kSize * fill_pct / options_.record_size;
-
-  RSModel* model = new RSModel(options_, records);
-  buf_mgr_ = std::make_unique<BufferManager>(options_, db_path_);
-
-  model->Preallocate(records, buf_mgr_);
-  model_.reset(model);
-  mtable_ = std::make_shared<MemTable>(options_.deferred_io_max_deferrals);
-
-  if (options_.pin_threads) {
-    std::vector<size_t> core_map;
-    core_map.reserve(options_.background_threads);
-    for (size_t core_id = 0; core_id < options_.background_threads; ++core_id) {
-      core_map.push_back(core_id);
+  const Status validate = ValidateOptions(options_);
+  if (!validate.ok()) return validate;
+  try {
+    // Check if the DB exists and abort if requested by the user's options.
+    const bool db_exists = fs::is_directory(db_path_) &&
+                           fs::is_regular_file(db_path_ / kManifestFileName);
+    if (db_exists && options_.error_if_exists) {
+      return Status::InvalidArgument("DB already exists:", db_path_.string());
     }
-    workers_ =
-        std::make_unique<ThreadPool>(options_.background_threads, core_map);
-  } else {
-    workers_ = std::make_unique<ThreadPool>(options_.background_threads);
-  }
+    if (!db_exists && !options_.create_if_missing) {
+      return Status::InvalidArgument("DB does not exist:", db_path_.string());
+    }
 
-  // TODO: Replay the log when opening an existing LLSM database. (Task #2)
-  return wal_.PrepareForWrite(/*discard_existing_logs=*/true);
+    // Set up the thread pool.
+    if (options_.pin_threads) {
+      std::vector<size_t> core_map;
+      core_map.reserve(options_.background_threads);
+      for (size_t core_id = 0; core_id < options_.background_threads;
+           ++core_id) {
+        core_map.push_back(core_id);
+      }
+      workers_ =
+          std::make_unique<ThreadPool>(options_.background_threads, core_map);
+    } else {
+      workers_ = std::make_unique<ThreadPool>(options_.background_threads);
+    }
+
+    // Set up the active memtable.
+    mtable_ = std::make_shared<MemTable>(options_.deferred_io_max_deferrals);
+
+    // Finish initializing the DB based on whether we are creating a completely
+    // new DB or if we are opening an existing DB.
+    return db_exists ? InitializeExistingDB() : InitializeNewDB();
+
+  } catch (const fs::filesystem_error& ex) {
+    return Status::FromPosixError(db_path_.string(), ex.code().value());
+  }
+}
+
+Status DBImpl::InitializeNewDB() {
+  try {
+    // No error if the directory already exists.
+    fs::create_directory(db_path_);
+
+    const auto values = key_utils::CreateValues<uint64_t>(options_.key_hints);
+    const auto records = key_utils::CreateRecords<uint64_t>(values);
+
+    // Compute the number of records per page.
+    const double fill_pct = options_.key_hints.page_fill_pct / 100.;
+    options_.key_hints.records_per_page =
+        Page::kSize * fill_pct / options_.key_hints.record_size;
+
+    RSModel* const model = new RSModel(options_.key_hints, records);
+    buf_mgr_ = std::make_unique<BufferManager>(options_, db_path_);
+
+    model->Preallocate(records, buf_mgr_);
+    model_.reset(model);
+
+    const Status s = wal_.PrepareForWrite(/*discard_existing_logs=*/true);
+    if (!s.ok()) return s;
+
+    return SerializeDBManifest();
+
+  } catch (const fs::filesystem_error& ex) {
+    return Status::FromPosixError(db_path_.string(), ex.code().value());
+  }
+}
+
+Status DBImpl::InitializeExistingDB() {
+  return Status::NotSupported("Reopening an existing DB is not yet supported.");
+}
+
+Status DBImpl::SerializeDBManifest() {
+  const fs::path path = db_path_ / kManifestFileName;
+  const int fd = open(path.c_str(), O_CREAT | O_TRUNC | O_WRONLY,
+                      S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+  if (fd < 0) {
+    return Status::FromPosixError(path.string(), errno);
+  }
+  // This method currently does not write out any data; it just creates the
+  // manifest file.
+  close(fd);
+  return Status::OK();
 }
 
 DBImpl::~DBImpl() {
@@ -126,11 +195,12 @@ DBImpl::~DBImpl() {
 // Reading a value consists of up to four steps:
 //
 // 1. Make copies of the memtable pointers so that we can search them without
-//     holding the `mutex_`.
+//     holding the `mtable_mutex_`.
 //
 // 2. Search the active memtable (`mtable_`).
-//    - We do not need to hold the `mutex_` because the memtable's underlying
-//      data structure (a skip list) supports concurrent reads during a write.
+//    - We do not need to hold the `mtable_mutex_` because the memtable's
+//      underlying data structure (a skip list) supports concurrent reads during
+//      a write.
 //    - If the memtable contains a `EntryType::kDelete` entry for `key`, we can
 //      safely return `Status::NotFound()` because the key was recently deleted.
 //    - If the memtable contains a `EntryType::kWrite` entry for `key`, we can
@@ -138,14 +208,14 @@ DBImpl::~DBImpl() {
 //    - If no entry was found, we move on to the next step.
 //
 // 3. Search the currently-being-flushed memtable (`im_mtable_`), if it exists.
-//    - We do not need to hold the `mutex_` during the search because the
+//    - We do not need to hold the `mtable_mutex_` during the search because the
 //      currently-being-flushed memtable is immutable.
 //    - We use the same search protocol as specified in step 2.
 //
 // 4. Search the on-disk page that should store the data associated with `key`,
 //    based on the key to page model.
-//    - We do not need to hold the `mutex_` during the search because the buffer
-//      manager manages the mutual exclusion for us.
+//    - We do not need to hold the `mtable_mutex_` during the search because the
+//      buffer manager manages the mutual exclusion for us.
 //
 // We carry out these steps in this order to ensure we always return the latest
 // value associated with a key (i.e., writes always go to the memtable first).

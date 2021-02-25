@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -42,8 +43,8 @@ class Reader {
   //
   // The `Reader` will start reading at the first record located at physical
   // position >= `initial_offset` within the file.
-  Reader(const std::string& log_path, Reporter* reporter, bool checksum,
-         uint64_t initial_offset);
+  Reader(const std::filesystem::path& log_path, Reporter* reporter,
+         bool checksum, uint64_t initial_offset);
 
   // Check whether the WAL file was opened successfully.
   Status GetCreationStatus() const;

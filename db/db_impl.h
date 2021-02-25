@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <future>
 #include <memory>
 #include <mutex>
@@ -18,7 +19,7 @@ namespace llsm {
 
 class DBImpl : public DB {
  public:
-  DBImpl(Options options, std::string db_path);
+  DBImpl(Options options, std::filesystem::path db_path);
   ~DBImpl() override;
 
   DBImpl(const DBImpl&) = delete;
@@ -37,6 +38,11 @@ class DBImpl : public DB {
   Status Initialize();
 
  private:
+  Status InitializeNewDB();
+  Status InitializeExistingDB();
+  // Writes out this database's metadata (to allow for reopening an existing DB).
+  Status SerializeDBManifest();
+
   // Records writes and deletes in the active `MemTable`. The `value` is ignored
   // if `write_type` is `WriteType::kDelete`.
   // This method is thread safe.
@@ -97,7 +103,7 @@ class DBImpl : public DB {
   // Will not be changed after `Initialize()` returns. The objects below are
   // thread safe; no additional mutual exclusion is required.
   Options options_;
-  const std::string db_path_;
+  const std::filesystem::path db_path_;
   std::unique_ptr<BufferManager> buf_mgr_;
   std::unique_ptr<Model> model_;
   std::unique_ptr<ThreadPool> workers_;

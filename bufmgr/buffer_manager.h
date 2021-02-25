@@ -1,6 +1,6 @@
-
 #pragma once
 
+#include <filesystem>
 #include <iostream>
 #include <list>
 #include <mutex>
@@ -35,7 +35,7 @@ namespace llsm {
 class BufferManager {
  public:
   // Initializes a BufferManager with the options specified in `options`.
-  BufferManager(const Options options, std::string db_path);
+  BufferManager(const Options& options, std::filesystem::path db_path);
 
   // Writes all dirty pages back and frees resources.
   ~BufferManager();
@@ -90,9 +90,6 @@ class BufferManager {
 
   // Resets an exisiting frame to hold the page with `new_page_id`.
   void ResetFrame(BufferFrame* frame, const uint64_t new_page_id);
-
-  // Options provided upon creation.
-  const Options options_;
 
   // The number of pages the buffer manager should keep in memory.
   const size_t buffer_manager_size_;

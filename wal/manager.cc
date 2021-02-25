@@ -38,10 +38,10 @@ bool ParseLogVersion(const std::string& filename, uint64_t* version_out) {
 namespace llsm {
 namespace wal {
 
-Manager::Manager(const std::string& log_dir_path)
+Manager::Manager(fs::path log_dir_path)
     : mode_(Mode::kCreated),
       log_dir_fd_(-1),
-      log_dir_path_(log_dir_path),
+      log_dir_path_(std::move(log_dir_path)),
       log_versions_(),
       active_log_version_(0),
       writer_(nullptr),
@@ -264,7 +264,11 @@ Status Manager::DiscardOldest(const uint64_t newest_log_version_to_discard,
 }
 
 Status Manager::DiscardAllForCleanShutdown() {
-  assert(mode_ == Mode::kWrite);
+  assert(mode_ == Mode::kCreated || mode_ == Mode::kWrite);
+  if (mode_ == Mode::kCreated) {
+    // No-op.
+    return Status::OK();
+  }
 
   // Shuts down the current writer.
   writer_.reset();

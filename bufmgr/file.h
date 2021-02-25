@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -13,7 +14,7 @@
     if ((call) < 0) {                                                        \
       const char* error = strerror(errno);                                   \
       std::cerr << __FILE__ << ":" << __LINE__ << " " << error << std::endl; \
-      throw std::runtime_error(std::string(error));                          \
+      exit(1);                                                               \
     }                                                                        \
   } while (0)
 
@@ -24,7 +25,7 @@ class File {
   const size_t kGrowthPages = 256;
 
  public:
-  File(const Options options, const std::string& name)
+  File(const Options options, const std::filesystem::path& name)
       : fd_(-1),
         max_offset_written_(0),
         growth_bytes_(kGrowthPages * Page::kSize) {

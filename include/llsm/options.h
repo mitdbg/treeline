@@ -12,10 +12,25 @@
 
 namespace llsm {
 
+// Options used to inform the database about the key space (the distribution is
+// assumed to be uniform).
+struct KeyDistHints {
+  size_t num_keys = 5000000;
+  uint64_t min_key = 0;
+  uint64_t key_step_size = 1;
+  size_t record_size = 16;
+
+  // How full each database page should be, as a value between 1 and 100
+  // inclusive (representing a percentage).
+  uint32_t page_fill_pct = 50;
+  size_t records_per_page = 0;  // User doesn't need to provide this, filled in
+                                // by our code based on page fill_pct.
+};
+
 // Database options
 struct Options {
   // Create the database directory if it does not exist
-  bool create_if_missing = false;
+  bool create_if_missing = true;
 
   // If set, prevent the database from being opened if it already exists
   bool error_if_exists = false;
@@ -38,18 +53,9 @@ struct Options {
   // a memtable flush.
   uint64_t deferred_io_max_deferrals = 0;
 
-  // Temporary options used to inform the database about the key space (the
-  // distribution is assumed to be uniform).
-  uint64_t num_keys = 5000000;
-  uint64_t min_key = 0;
-  uint64_t key_step_size = 1;
-  size_t record_size = 16;
-
-  // How full each database page should be, as a value between 1 and 100
-  // inclusive (representing a percentage).
-  uint32_t page_fill_pct = 50;
-  size_t records_per_page = 0;  // User doesn't need to provide this, filled in
-                                // by our code based on page fill_pct.
+  // Currently only used when creating a new database. When reopening an
+  // existing database, these values are ignored.
+  KeyDistHints key_hints;
 
   // The number of background threads LLSM should use (must be at least 2).
   // LLSM uses one background thread to coordinate flushing the memtable and

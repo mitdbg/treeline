@@ -43,7 +43,7 @@ class Manager {
   // Creates a `Manager` that will read/write logs from/to `log_dir_path`. Note
   // that `log_dir_path` must be a path to a directory. If the directory does
   // not exist, it will be created.
-  Manager(const std::string& log_dir_path);
+  Manager(std::filesystem::path log_dir_path);
   ~Manager();
 
   Manager(const Manager&) = delete;
@@ -121,6 +121,10 @@ class Manager {
   // shutdown. After this method returns, the manager can no longer be used.
   // This method should only be called after all volatile data has been flushed
   // to persistent storage.
+  //
+  // If this method is called while the manager is in its "Created" mode, it
+  // will be a no-op and will return an OK status. Regardless, the manager
+  // should still not be used after this method returns.
   Status DiscardAllForCleanShutdown();
 
  private:

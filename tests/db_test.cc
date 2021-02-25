@@ -19,7 +19,7 @@ TEST(DBTest, Create) {
   llsm::Options options;
   // The test environment may not have many cores.
   options.pin_threads = false;
-  options.num_keys = 10;
+  options.key_hints.num_keys = 10;
   const std::string dbname = "/tmp/llsm-test";
   std::filesystem::remove_all(dbname);
   auto status = llsm::DB::Open(options, dbname, &db);
@@ -28,11 +28,24 @@ TEST(DBTest, Create) {
   std::filesystem::remove_all(dbname);
 }
 
+TEST(DBTest, CreateIfMissingDisabled) {
+  llsm::DB* db = nullptr;
+  llsm::Options options;
+  options.create_if_missing = false;
+  options.pin_threads = false;
+  const std::string dbname = "/tmp/llsm-test";
+  std::filesystem::remove_all(dbname);
+  auto status = llsm::DB::Open(options, dbname, &db);
+  ASSERT_TRUE(status.IsInvalidArgument());
+  ASSERT_EQ(db, nullptr);
+  std::filesystem::remove_all(dbname);
+}
+
 TEST(DBTest, WriteFlushRead) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.pin_threads = false;
-  options.num_keys = 10;
+  options.key_hints.num_keys = 10;
   const std::string dbname = "/tmp/llsm-test";
   std::filesystem::remove_all(dbname);
   auto status = llsm::DB::Open(options, dbname, &db);
@@ -68,7 +81,7 @@ TEST(DBTest, WriteThenDelete) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.pin_threads = false;
-  options.num_keys = 10;
+  options.key_hints.num_keys = 10;
   const std::string dbname = "/tmp/llsm-test";
   std::filesystem::remove_all(dbname);
   auto status = llsm::DB::Open(options, dbname, &db);
@@ -192,9 +205,9 @@ TEST(DBTest, DeferByEntries) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.pin_threads = false;
-  options.num_keys = 10;
-  options.record_size = 16 * 1024;  // 4 per page
-  options.page_fill_pct = 100;
+  options.key_hints.num_keys = 10;
+  options.key_hints.record_size = 16 * 1024;  // 4 per page
+  options.key_hints.page_fill_pct = 100;
   options.deferred_io_min_entries = 2;
   options.deferred_io_max_deferrals = 4;
   options.buffer_pool_size = llsm::Page::kSize;
@@ -276,9 +289,9 @@ TEST(DBTest, DeferByAttempts) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.pin_threads = false;
-  options.num_keys = 10;
-  options.record_size = 16 * 1024;  // 4 per page
-  options.page_fill_pct = 100;
+  options.key_hints.num_keys = 10;
+  options.key_hints.record_size = 16 * 1024;  // 4 per page
+  options.key_hints.page_fill_pct = 100;
   options.deferred_io_min_entries = 2;
   options.deferred_io_max_deferrals = 1;
   options.buffer_pool_size = llsm::Page::kSize;

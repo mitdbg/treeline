@@ -138,8 +138,8 @@ llsm::Options BuildLLSMOptions() {
   options.memtable_flush_threshold = FLAGS_memtable_size_mib * 1024 * 1024;
   options.use_direct_io = FLAGS_use_direct_io;
   options.background_threads = FLAGS_bg_threads;
-  options.record_size = FLAGS_record_size_bytes;
-  options.page_fill_pct = FLAGS_llsm_page_fill_pct;
+  options.key_hints.record_size = FLAGS_record_size_bytes;
+  options.key_hints.page_fill_pct = FLAGS_llsm_page_fill_pct;
   options.pin_threads = true;
   options.deferred_io_min_entries = FLAGS_io_threshold;
   options.deferred_io_max_deferrals = FLAGS_max_deferrals;

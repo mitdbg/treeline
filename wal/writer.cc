@@ -31,11 +31,12 @@ void InitTypeCrc(uint32_t* type_crc) {
 namespace llsm {
 namespace wal {
 
-Writer::Writer(const std::string& log_path) : fd_(-1), block_offset_(0) {
+Writer::Writer(const std::filesystem::path& log_path)
+    : fd_(-1), block_offset_(0) {
   fd_ = open(log_path.c_str(), O_CREAT | O_WRONLY | O_APPEND,
              S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
   if (fd_ < 0) {
-    creation_status_ = Status::FromPosixError(log_path, errno);
+    creation_status_ = Status::FromPosixError(log_path.string(), errno);
   }
   InitTypeCrc(type_crc_);
 }

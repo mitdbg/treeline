@@ -149,18 +149,18 @@ class LLSMInterface {
   void InitializeDatabase() {
     const std::string dbname = FLAGS_db_path + "/llsm";
     llsm::Options options = llsm::bench::BuildLLSMOptions();
-    options.num_keys = num_keys_;
-    options.min_key = min_key_;
+    options.key_hints.num_keys = num_keys_;
+    options.key_hints.min_key = min_key_;
     if (num_keys_ <= 1) {
       // We set the step size to at least 1 to ensure any code that relies on
       // the step size to generate values does not end up in an infinite loop.
-      options.key_step_size = 1;
+      options.key_hints.key_step_size = 1;
     } else {
       // Set `key_step_size` to the smallest integer where
       // `min_key_ + key_step_size * (num_keys_ - 1) >= max_key_` holds.
       const size_t diff = max_key_ - min_key_;
       const size_t denom = (num_keys_ - 1);
-      options.key_step_size =
+      options.key_hints.key_step_size =
           (diff / denom) + (diff % denom != 0);  // Computes ceil(diff/denom)
     }
 

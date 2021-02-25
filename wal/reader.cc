@@ -20,8 +20,8 @@ namespace wal {
 
 Reader::Reporter::~Reporter() = default;
 
-Reader::Reader(const std::string& log_path, Reporter* reporter, bool checksum,
-               uint64_t initial_offset)
+Reader::Reader(const std::filesystem::path& log_path, Reporter* reporter,
+               bool checksum, uint64_t initial_offset)
     : fd_(-1),
       creation_status_(),
       reporter_(reporter),
@@ -35,7 +35,7 @@ Reader::Reader(const std::string& log_path, Reporter* reporter, bool checksum,
       resyncing_(initial_offset > 0) {
   fd_ = open(log_path.c_str(), O_RDONLY);
   if (fd_ < 0) {
-    creation_status_ = Status::FromPosixError(log_path, errno);
+    creation_status_ = Status::FromPosixError(log_path.string(), errno);
   }
 }
 

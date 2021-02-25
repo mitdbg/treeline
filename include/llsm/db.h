@@ -7,13 +7,15 @@
 
 #pragma once
 
+#include <filesystem>
+
 #include "llsm/options.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
 
 namespace llsm {
 
-// The public Learned LSM database interface, representing an embedded,
+// The public Learned LSM (LLSM) database interface, representing an embedded,
 // persistent, and ordered key-value store.
 //
 // All methods can be called concurrently without requiring external mutual
@@ -27,7 +29,9 @@ class DB {
   // will return an OK status. Otherwise the returned status will indicate the
   // error that occurred and `*db_out` will not be modified. Callers need to
   // delete the DB instance when they are done using it to close the database.
-  static Status Open(const Options& options, const std::string& path,
+  //
+  // NOTE: A database should not be opened by more than one process at any time.
+  static Status Open(const Options& options, const std::filesystem::path& path,
                      DB** db_out);
 
   DB() = default;

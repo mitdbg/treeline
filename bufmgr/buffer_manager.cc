@@ -15,9 +15,8 @@ namespace llsm {
 
 // Initializes a BufferManager to keep up to `buffer_manager_size` frames in
 // main memory. Bypasses file system cache if `use_direct_io` is true.
-BufferManager::BufferManager(const Options options, std::string db_path)
-    : options_(options),
-      buffer_manager_size_(options.buffer_pool_size / Page::kSize) {
+BufferManager::BufferManager(const Options& options, std::filesystem::path db_path)
+    : buffer_manager_size_(options.buffer_pool_size / Page::kSize) {
   size_t alignment = BufferManager::kDefaultAlignment;
   struct statvfs fs_stats;
   if (statvfs(db_path.c_str(), &fs_stats) == 0) {
@@ -26,7 +25,7 @@ BufferManager::BufferManager(const Options options, std::string db_path)
   // Allocate space with alignment because of O_DIRECT requirements.
   // No need to zero out because data brought here will come from the database
   // `File`, which is zeroed out upon expansion.
-  pages_cache_ = aligned_alloc(alignment, options_.buffer_pool_size);
+  pages_cache_ = aligned_alloc(alignment, options.buffer_pool_size);
 
   char* page_ptr = reinterpret_cast<char*>(pages_cache_);
   for (size_t i = 0; i < buffer_manager_size_; ++i, page_ptr += Page::kSize) {
@@ -35,7 +34,7 @@ BufferManager::BufferManager(const Options options, std::string db_path)
   page_to_frame_map_.reserve(buffer_manager_size_);
 
   page_eviction_strategy_ = new TwoQueueEviction(buffer_manager_size_);
-  file_manager_ = new FileManager(options_, db_path);
+  file_manager_ = new FileManager(options, std::move(db_path));
 }
 
 // Writes all dirty pages back and frees resources.

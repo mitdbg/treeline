@@ -18,10 +18,10 @@ using namespace llsm;
 
 TEST(BufferManagerTest, CreateValues) {
   Options options;
-  options.num_keys = 100;
+  options.key_hints.num_keys = 100;
   const std::vector<uint64_t> values =
-      key_utils::CreateValues<uint64_t>(options);
-  ASSERT_EQ(values.size(), options.num_keys);
+      key_utils::CreateValues<uint64_t>(options.key_hints);
+  ASSERT_EQ(values.size(), options.key_hints.num_keys);
 }
 
 TEST(BufferManagerTest, WriteReadSequential) {
@@ -31,16 +31,17 @@ TEST(BufferManagerTest, WriteReadSequential) {
 
   // Create data.
   llsm::Options options;
-  const auto values = key_utils::CreateValues<uint64_t>(options);
+  const auto values = key_utils::CreateValues<uint64_t>(options.key_hints);
   const auto records = key_utils::CreateRecords<uint64_t>(values);
 
   // Compute the number of records per page.
-  const double fill_pct = options.page_fill_pct / 100.;
-  options.records_per_page = Page::kSize * fill_pct / options.record_size;
+  const double fill_pct = options.key_hints.page_fill_pct / 100.;
+  options.key_hints.records_per_page =
+      Page::kSize * fill_pct / options.key_hints.record_size;
 
   // Create buffer manager.
   const std::unique_ptr<RSModel> model =
-      std::make_unique<RSModel>(options, records);
+      std::make_unique<RSModel>(options.key_hints, records);
   const std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(options, dbname);
   model->Preallocate(records, buffer_manager);
@@ -70,16 +71,17 @@ TEST(BufferManagerTest, FlushDirty) {
 
   // Create data.
   llsm::Options options;
-  const auto values = key_utils::CreateValues<uint64_t>(options);
+  const auto values = key_utils::CreateValues<uint64_t>(options.key_hints);
   const auto records = key_utils::CreateRecords<uint64_t>(values);
 
   // Compute the number of records per page.
-  const double fill_pct = options.page_fill_pct / 100.;
-  options.records_per_page = Page::kSize * fill_pct / options.record_size;
+  const double fill_pct = options.key_hints.page_fill_pct / 100.;
+  options.key_hints.records_per_page =
+      Page::kSize * fill_pct / options.key_hints.record_size;
 
   // Create buffer manager.
   const std::unique_ptr<RSModel> model =
-      std::make_unique<RSModel>(options, records);
+      std::make_unique<RSModel>(options.key_hints, records);
   const std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(options, dbname);
   model->Preallocate(records, buffer_manager);

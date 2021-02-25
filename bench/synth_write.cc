@@ -86,7 +86,7 @@ std::chrono::nanoseconds RunLLSMExperiment(
     const llsm::bench::U64Dataset& dataset) {
   llsm::DB* db = nullptr;
   llsm::Options options = llsm::bench::BuildLLSMOptions();
-  options.num_keys = dataset.size();
+  options.key_hints.num_keys = dataset.size();
 
   const std::string dbname = FLAGS_db_path + "/llsm";
   llsm::Status status = llsm::DB::Open(options, dbname, &db);

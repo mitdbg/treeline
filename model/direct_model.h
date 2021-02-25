@@ -13,10 +13,10 @@ namespace llsm {
 // so as to achieve a target page utilization.
 class DirectModel : public Model {
  public:
-  // Creates the model based on the provided `options`.
-  DirectModel(const Options options)
-      : records_per_page_(options.records_per_page),
-        key_step_size_(options.key_step_size) {}
+  // Creates the model based on the provided `key_hints`.
+  DirectModel(const KeyDistHints& key_hints)
+      : records_per_page_(key_hints.records_per_page),
+        key_step_size_(key_hints.key_step_size) {}
 
   // Preallocates the necessary pages.
   void Preallocate(const std::unique_ptr<BufferManager>&);

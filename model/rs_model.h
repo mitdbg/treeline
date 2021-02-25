@@ -15,7 +15,7 @@ namespace llsm {
 class RSModel : public Model {
  public:
   // Initalizes the model based on a vector of records sorted by key.
-  RSModel(const Options options,
+  RSModel(const KeyDistHints& key_hints,
           const std::vector<std::pair<Slice, Slice>>& records);
 
   // Preallocates the number of pages deemed necessary after initialization.
