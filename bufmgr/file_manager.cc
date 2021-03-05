@@ -5,17 +5,12 @@
 namespace llsm {
 
 // Creates a file manager according to the options specified in `options`.
-FileManager::FileManager(const Options& options, std::filesystem::path db_path)
-    : db_path_(std::move(db_path)) {
+FileManager::FileManager(const BufMgrOptions& options,
+                         std::filesystem::path db_path)
+    : db_path_(std::move(db_path)), total_pages_(options.num_pages) {
   // Get number of segments.
-  const size_t segments = options.background_threads;
+  const size_t segments = options.num_segments;
   assert(segments >= 1);
-
-  // Compute the number of pages needed.
-  total_pages_ =
-      options.key_hints.num_keys / options.key_hints.records_per_page;
-  if (options.key_hints.num_keys % options.key_hints.records_per_page != 0)
-    ++total_pages_;
 
   // Compute the page allocation
   size_t pages_per_segment = total_pages_ / segments;
@@ -26,7 +21,7 @@ FileManager::FileManager(const Options& options, std::filesystem::path db_path)
   // Create the db_files
   for (size_t i = 0; i < segments; ++i) {
     db_files_.push_back(std::make_unique<File>(
-        options, db_path_ / ("segment-" + std::to_string(i))));
+        db_path_ / ("segment-" + std::to_string(i)), options.use_direct_io));
   }
 }
 

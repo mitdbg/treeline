@@ -23,8 +23,11 @@ struct KeyDistHints {
   // How full each database page should be, as a value between 1 and 100
   // inclusive (representing a percentage).
   uint32_t page_fill_pct = 50;
-  size_t records_per_page = 0;  // User doesn't need to provide this, filled in
-                                // by our code based on page fill_pct.
+
+  // Returns the number of records that should be placed in a page based on the
+  // values of `page_fill_pct`, `record_size`, and the database's page size
+  // (internally represented by the `Page::kSize` constant).
+  size_t records_per_page() const;
 };
 
 // Database options

@@ -30,20 +30,18 @@ TEST(BufferManagerTest, WriteReadSequential) {
   std::filesystem::create_directory(dbname);
 
   // Create data.
-  llsm::Options options;
-  const auto values = key_utils::CreateValues<uint64_t>(options.key_hints);
+  KeyDistHints key_hints;
+  const auto values = key_utils::CreateValues<uint64_t>(key_hints);
   const auto records = key_utils::CreateRecords<uint64_t>(values);
 
-  // Compute the number of records per page.
-  const double fill_pct = options.key_hints.page_fill_pct / 100.;
-  options.key_hints.records_per_page =
-      Page::kSize * fill_pct / options.key_hints.record_size;
-
   // Create buffer manager.
+  BufMgrOptions bm_options;
+  bm_options.SetNumPagesUsing(key_hints);
+
   const std::unique_ptr<RSModel> model =
-      std::make_unique<RSModel>(options.key_hints, records);
+      std::make_unique<RSModel>(key_hints, records);
   const std::unique_ptr<BufferManager> buffer_manager =
-      std::make_unique<BufferManager>(options, dbname);
+      std::make_unique<BufferManager>(bm_options, dbname);
   model->Preallocate(records, buffer_manager);
 
   // Store `i` to page i
@@ -70,20 +68,18 @@ TEST(BufferManagerTest, FlushDirty) {
   std::filesystem::create_directory(dbname);
 
   // Create data.
-  llsm::Options options;
-  const auto values = key_utils::CreateValues<uint64_t>(options.key_hints);
+  KeyDistHints key_hints;
+  const auto values = key_utils::CreateValues<uint64_t>(key_hints);
   const auto records = key_utils::CreateRecords<uint64_t>(values);
 
-  // Compute the number of records per page.
-  const double fill_pct = options.key_hints.page_fill_pct / 100.;
-  options.key_hints.records_per_page =
-      Page::kSize * fill_pct / options.key_hints.record_size;
-
   // Create buffer manager.
+  BufMgrOptions bm_options;
+  bm_options.SetNumPagesUsing(key_hints);
+
   const std::unique_ptr<RSModel> model =
-      std::make_unique<RSModel>(options.key_hints, records);
+      std::make_unique<RSModel>(key_hints, records);
   const std::unique_ptr<BufferManager> buffer_manager =
-      std::make_unique<BufferManager>(options, dbname);
+      std::make_unique<BufferManager>(bm_options, dbname);
   model->Preallocate(records, buffer_manager);
 
   // Store `i` to page i for the first few pages.

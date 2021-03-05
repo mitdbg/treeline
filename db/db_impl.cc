@@ -118,13 +118,12 @@ Status DBImpl::InitializeNewDB() {
     const auto values = key_utils::CreateValues<uint64_t>(options_.key_hints);
     const auto records = key_utils::CreateRecords<uint64_t>(values);
 
-    // Compute the number of records per page.
-    const double fill_pct = options_.key_hints.page_fill_pct / 100.;
-    options_.key_hints.records_per_page =
-        Page::kSize * fill_pct / options_.key_hints.record_size;
+    BufMgrOptions bm_options(options_);
+    bm_options.num_segments = options_.background_threads;
+    bm_options.SetNumPagesUsing(options_.key_hints);
 
     RSModel* const model = new RSModel(options_.key_hints, records);
-    buf_mgr_ = std::make_unique<BufferManager>(options_, db_path_);
+    buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
 
     model->Preallocate(records, buf_mgr_);
     model_.reset(model);

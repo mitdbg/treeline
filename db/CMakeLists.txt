@@ -6,5 +6,6 @@ target_sources(llsm PRIVATE
   manifest.h
   memtable.cc
   memtable.h
+  options.cc
   page.cc
   page.h)

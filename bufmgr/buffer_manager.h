@@ -8,8 +8,9 @@
 #include <unordered_map>
 
 #include "buffer_frame.h"
+#include "db/page.h"
 #include "file_manager.h"
-#include "llsm/options.h"
+#include "options.h"
 #include "page_eviction_strategy.h"
 
 namespace llsm {
@@ -35,7 +36,7 @@ namespace llsm {
 class BufferManager {
  public:
   // Initializes a BufferManager with the options specified in `options`.
-  BufferManager(const Options& options, std::filesystem::path db_path);
+  BufferManager(const BufMgrOptions& options, std::filesystem::path db_path);
 
   // Writes all dirty pages back and frees resources.
   ~BufferManager();

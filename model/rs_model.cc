@@ -12,7 +12,7 @@ namespace llsm {
 // Initalizes the model based on a vector of records sorted by key.
 RSModel::RSModel(const KeyDistHints& key_hints,
                  const std::vector<std::pair<Slice, Slice>>& records)
-    : records_per_page_(key_hints.records_per_page) {
+    : records_per_page_(key_hints.records_per_page()) {
   // Build RadixSpline.
   const uint64_t min = key_utils::ExtractHead64(records.front().first);
   const uint64_t max = key_utils::ExtractHead64(records.back().first);

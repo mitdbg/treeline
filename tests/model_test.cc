@@ -18,7 +18,6 @@ using namespace llsm;
 TEST(ModelTest, SerializeDirectModel) {
   KeyDistHints key_hints;
   key_hints.num_keys = 1000;
-  key_hints.records_per_page = Page::kSize * 0.5 / key_hints.record_size;
   std::unique_ptr<Model> model1(new DirectModel(key_hints));
 
   // Serialize.
@@ -50,7 +49,6 @@ TEST(ModelTest, SerializeDirectModel) {
 TEST(ModelTest, SerializeRSModel) {
   KeyDistHints key_hints;
   key_hints.num_keys = 1000;
-  key_hints.records_per_page = Page::kSize * 0.5 / key_hints.record_size;
   const auto values = key_utils::CreateValues<uint64_t>(key_hints);
   const auto records = key_utils::CreateRecords<uint64_t>(values);
   std::unique_ptr<Model> model1(new RSModel(key_hints, records));
@@ -79,7 +77,6 @@ TEST(ModelTest, SerializeRSModel) {
 TEST(ModelTest, DeserializeUnknownModel) {
   KeyDistHints key_hints;
   key_hints.num_keys = 1000;
-  key_hints.records_per_page = Page::kSize * 0.5 / key_hints.record_size;
   std::unique_ptr<Model> model1(new DirectModel(key_hints));
 
   // Serialize.

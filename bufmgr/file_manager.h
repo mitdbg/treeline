@@ -3,8 +3,9 @@
 #include <filesystem>
 #include <memory>
 
+#include "bufmgr/file.h"
+#include "bufmgr/options.h"
 #include "db/page.h"
-#include "file.h"
 #include "model/model.h"
 
 namespace llsm {
@@ -24,7 +25,7 @@ struct FileAddress {
 class FileManager {
  public:
   // Creates a file manager according to the options specified in `options`.
-  FileManager(const Options& options, std::filesystem::path db_path);
+  FileManager(const BufMgrOptions& options, std::filesystem::path db_path);
 
   // Reads the part of the on-disk database file corresponding to `page_id` into
   // the in-memory page-sized block pointed to by `data`.
@@ -38,16 +39,16 @@ class FileManager {
   FileAddress PageIdToAddress(size_t page_id) const;
 
   // Provides the total number of pages currently used.
-  size_t GetNumPages() const {return total_pages_;}
+  size_t GetNumPages() const { return total_pages_; }
 
   // Provides the total number of segments currently used.
-  size_t GetNumSegments() const {return db_files_.size();}
+  size_t GetNumSegments() const { return db_files_.size(); }
 
   // Provides the page_id of the first page of each segment.
-  std::vector<size_t> GetPageAllocation() const {return page_allocation_;}
+  std::vector<size_t> GetPageAllocation() const { return page_allocation_; }
 
  private:
-    // The database files
+  // The database files
   std::vector<std::unique_ptr<File>> db_files_;
 
   // The path to the database

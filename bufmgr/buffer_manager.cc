@@ -13,9 +13,11 @@
 
 namespace llsm {
 
-// Initializes a BufferManager to keep up to `buffer_manager_size` frames in
-// main memory. Bypasses file system cache if `use_direct_io` is true.
-BufferManager::BufferManager(const Options& options, std::filesystem::path db_path)
+// Initializes a BufferManager to keep up to `options.buffer_pool_size /
+// Page::kSize` frames in main memory. Bypasses file system cache if
+// `options.use_direct_io` is true.
+BufferManager::BufferManager(const BufMgrOptions& options,
+                             std::filesystem::path db_path)
     : buffer_manager_size_(options.buffer_pool_size / Page::kSize) {
   size_t alignment = BufferManager::kDefaultAlignment;
   struct statvfs fs_stats;

@@ -7,7 +7,6 @@
 #include <string>
 
 #include "db/page.h"
-#include "llsm/options.h"
 
 #define CHECK_ERROR(call)                                                    \
   do {                                                                       \
@@ -25,14 +24,14 @@ class File {
   const size_t kGrowthPages = 256;
 
  public:
-  File(const Options options, const std::filesystem::path& name)
+  File(const std::filesystem::path& name, bool use_direct_io)
       : fd_(-1),
         max_offset_written_(0),
         growth_bytes_(kGrowthPages * Page::kSize) {
-    CHECK_ERROR(fd_ = open(name.c_str(),
-                           O_CREAT | O_RDWR | O_SYNC |
-                               (options.use_direct_io ? O_DIRECT : 0),
-                           S_IRUSR | S_IWUSR));
+    CHECK_ERROR(
+        fd_ = open(name.c_str(),
+                   O_CREAT | O_RDWR | O_SYNC | (use_direct_io ? O_DIRECT : 0),
+                   S_IRUSR | S_IWUSR));
   }
   ~File() { close(fd_); }
   void ReadPage(size_t offset, void* data) const {
