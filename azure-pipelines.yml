@@ -1,52 +1,26 @@
-parameters:
-  - name: buildType
-    displayName: CMake Build Type
-    type: string
-    default: Debug
-    values:
-      - Debug
-      - Release
+# This file defines LLSM's default pipeline, which runs all steps in the
+# azure-ci-job.yml template. The default pipeline runs on each push to master.
 
+# Run this pipeline when we push to master. If the changes are only to non-code
+# files, do not run this pipeline.
 trigger:
-  - master
-
-pool:
-  vmImage: ubuntu-20.04
+  branches:
+    include:
+      - master
+  paths:
+    exclude:
+      - .clang-format
+      - .gitignore
+      - AUTHORS
+      - LICENSE
+      - README.md
 
 jobs:
-  - job: BuildAndTest
-    displayName: Build Project and Run Tests
-
-    steps:
-      - task: CMake@1
-        displayName: Configure Project using CMake
-        name: CMakeConfigure
-        inputs:
-          # We disable the benchmarks because they depend on RocksDB, which
-          # takes a lot of resources to build.
-          cmakeArgs: >
-            -DCMAKE_BUILD_TYPE=${{ parameters.buildType }}
-            -DLLSM_BUILD_TESTS=ON
-            -DLLSM_BUILD_BENCHMARKS=OFF
-            ..
-
-      - bash: make -j
-        displayName: Compile Project
-        name: Compile
-        workingDirectory: build/
-        timeoutInMinutes: 15
-
-      - bash: ctest -T Test
-        displayName: Run Tests using CTest
-        name: RunCTest
-        workingDirectory: build/tests/
-        timeoutInMinutes: 15
-
-      - task: PublishTestResults@2
-        displayName: Publish CTest Results
-        name: PublishCTest
-        inputs:
-          testRunner: cTest
-          testResultsFiles: build/tests/**/Test.xml
-          failTaskOnFailedTests: true
-          configuration: ${{ parameters.buildType }}
+  - template: azure-ci-job.yml
+    parameters:
+      jobName: MasterPushCheck
+      jobDisplayName: Build, Run Tests, Run Checks (All)
+      buildType: Debug
+      skipTests: false
+      skipValgrind: false
+      memcheckTestFilter: '*'

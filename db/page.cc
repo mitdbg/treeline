@@ -1,7 +1,6 @@
 #include "page.h"
 
 #include <cstdint>
-#include <cstring>
 #include <limits>
 
 #include "util/packed_map.h"
@@ -32,10 +31,19 @@ namespace llsm {
 
 Page::Page(void* data, const Slice& lower_key, const Slice& upper_key)
     : Page(data) {
-  ::PackedMap tmp(
+  // This constructs a `PackedMap` in the memory pointed-to by `data_`. This
+  // memory buffer must be large enough to hold a `PackedMap`.
+  //
+  // NOTE: Using "placement new" means that the object's destructor needs to be
+  // manually called. But this is not a problem in our use case because
+  // `PackedMap` does not have any members that use a custom destructor (i.e.,
+  // we can get away with not calling `~PackedMap()` because there is nothing in
+  // the class that needs "cleaning up").
+  //
+  // https://isocpp.org/wiki/faq/dtors#placement-new
+  new(data_) ::PackedMap(
       reinterpret_cast<const uint8_t*>(lower_key.data()), lower_key.size(),
       reinterpret_cast<const uint8_t*>(upper_key.data()), upper_key.size());
-  memcpy(data_, &tmp, sizeof(::PackedMap));
 }
 
 Status Page::Put(const Slice& key, const Slice& value) {

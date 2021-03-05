@@ -12,6 +12,8 @@ class Status;
 // A model to determine the correct page for a database record based on the key.
 class Model {
  public:
+  virtual ~Model() = default;
+
   // Uses the model to derive a page_id given a `key`.
   virtual size_t KeyToPageId(const Slice& key) const = 0;
 

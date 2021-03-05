@@ -41,7 +41,12 @@ Reader::Reader(const std::filesystem::path& log_path, Reporter* reporter,
 
 Status Reader::GetCreationStatus() const { return creation_status_; }
 
-Reader::~Reader() { close(fd_); }
+Reader::~Reader() {
+  if (fd_ < 0) {
+    return;
+  }
+  close(fd_);
+}
 
 bool Reader::SkipToInitialBlock() {
   const size_t offset_in_block = initial_offset_ % kBlockSize;
@@ -173,7 +178,8 @@ bool Reader::ReadEntry(Slice* entry, std::string* scratch) {
 
       default: {
         char buf[40];
-        std::snprintf(buf, sizeof(buf), "unknown record type %u", record_type);
+        std::snprintf(buf, sizeof(buf), "unknown record type %u",
+                      static_cast<uint8_t>(record_type));
         ReportCorruption(
             (fragment.size() + (in_fragmented_record ? scratch->size() : 0)),
             buf);

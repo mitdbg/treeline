@@ -1,0 +1,111 @@
+# This file is an Azure Pipelines template that defines a single job. The job:
+#
+# 1. Verifies that LLSM, its tests, and its benchmarks can be compiled without
+#    errors.
+# 2. Runs LLSM's tests and ensures they all pass.
+# 3. Runs Valgrind Memcheck on the tests to check for memory errors.
+#
+# This file is generally meant to be included as a template in other pipeline
+# files (see azure-pipelines.yml and azure-pr-pipelines.yml).
+
+parameters:
+  # The job's name.
+  - name: jobName
+    displayName: Job Name
+    type: string
+    default: BuildTestCheck
+
+  # The job's name that should be displayed in the UI.
+  - name: jobDisplayName
+    displayName: Job Display Name
+    type: string
+    default: Build, Run Tests, Run Checks
+
+  # The CMake build type to use.
+  - name: buildType
+    displayName: CMake Build Type
+    type: string
+    default: Debug
+    values:
+      - Debug
+      - Release
+
+  # Set to true to skip running the tests.
+  - name: skipTests
+    displayName: Skip Tests?
+    type: boolean
+    default: false
+
+  # Set to true to skip the Valgrind checks.
+  - name: skipValgrind
+    displayName: Skip Valgrind Checks?
+    type: boolean
+    default: false
+
+  # Valgrind Memcheck will run our test suite with the given regex as the
+  # value for the --gtest_filter command line option.
+  - name: memcheckTestFilter
+    displayName: Memcheck Test Name Filter Regex
+    type: string
+    default: '*'
+
+jobs:
+  - job: ${{ parameters.jobName }}
+    displayName: ${{ parameters.jobDisplayName }}
+    pool:
+      vmImage: ubuntu-20.04
+
+    steps:
+      - task: CMake@1
+        displayName: Configure Project using CMake
+        name: CMakeConfigure
+        inputs:
+          # We disable the benchmarks because they depend on RocksDB, which
+          # takes a lot of resources to build.
+          cmakeArgs: >
+            -DCMAKE_BUILD_TYPE=${{ parameters.buildType }}
+            -DLLSM_BUILD_TESTS=ON
+            -DLLSM_BUILD_BENCHMARKS=OFF
+            ..
+
+      - bash: make -j
+        displayName: Compile Project
+        name: Compile
+        workingDirectory: build/
+        timeoutInMinutes: 15
+
+      - bash: ctest -T Test
+        displayName: Run Tests using CTest
+        name: RunCTest
+        workingDirectory: build/tests/
+        timeoutInMinutes: 15
+        enabled: ${{ not(parameters.skipTests) }}
+
+      - task: PublishTestResults@2
+        displayName: Publish CTest Results
+        name: PublishCTest
+        # We want to publish the test results even if some tests fail.
+        condition: succeededOrFailed()
+        inputs:
+          testRunner: cTest
+          testResultsFiles: build/tests/**/Test.xml
+          failTaskOnFailedTests: true
+          configuration: ${{ parameters.buildType }}
+        enabled: ${{ not(parameters.skipTests) }}
+
+      - bash: sudo apt install valgrind
+        displayName: Install Valgrind
+        name: InstallValgrind
+        enabled: ${{ not(parameters.skipValgrind) }}
+
+      - bash: >
+          valgrind \
+            --leak-check=full \
+            --error-exitcode=1 \
+            ./tests/tester \
+            --gtest_filter="${{ parameters.memcheckTestFilter }}"
+        displayName: Run Valgrind Memcheck
+        name: ValgrindMemcheck
+        enabled: ${{ not(parameters.skipValgrind) }}
+        workingDirectory: build/
+        timeoutInMinutes: 15
