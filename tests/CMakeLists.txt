@@ -7,6 +7,7 @@ target_sources(tester
     buffer_manager_test.cc
     coding_test.cc
     file_manager_test.cc
+    manifest_test.cc
     memtable_test.cc
     model_test.cc
     packed_map_test.cc
