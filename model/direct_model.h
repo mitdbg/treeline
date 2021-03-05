@@ -15,8 +15,7 @@ class DirectModel : public Model {
  public:
   // Creates the model based on the provided `key_hints`.
   DirectModel(const KeyDistHints& key_hints)
-      : records_per_page_(key_hints.records_per_page),
-        key_step_size_(key_hints.key_step_size) {}
+      : DirectModel(key_hints.records_per_page, key_hints.key_step_size) {}
 
   // Preallocates the necessary pages.
   void Preallocate(const std::unique_ptr<BufferManager>&);
@@ -26,7 +25,21 @@ class DirectModel : public Model {
   size_t KeyToPageId(const Slice& key) const;
   size_t KeyToPageId(const uint64_t key) const;
 
+  // Serializes the model and appends it to `dest`.
+  void EncodeTo(std::string* dest) const override;
+
+  // Parses a `DirectModel` from `source` and advances `source` past the parsed
+  // bytes.
+  //
+  // If the parse is successful, `status_out` will be OK and the returned
+  // pointer will be non-null. If the parse is unsuccessful, `status_out` will
+  // be non-OK and the returned pointer will be `nullptr`.
+  static std::unique_ptr<Model> LoadFrom(Slice* source, Status* status_out);
+
  private:
+  DirectModel(size_t records_per_page, size_t key_step_size)
+      : records_per_page_(records_per_page), key_step_size_(key_step_size) {}
+
   const size_t records_per_page_;
   const size_t key_step_size_;
 };

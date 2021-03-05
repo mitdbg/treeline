@@ -27,7 +27,22 @@ class RSModel : public Model {
   size_t KeyToPageId(const Slice& key) const;
   size_t KeyToPageId(const uint64_t key) const;
 
+  // Serializes the model and appends it to `dest`.
+  void EncodeTo(std::string* dest) const override;
+
+  // Parses a `RSModel` from `source` and advances `source` past the parsed
+  // bytes.
+  //
+  // If the parse is successful, `status_out` will be OK and the returned
+  // pointer will be non-null. If the parse is unsuccessful, `status_out` will
+  // be non-OK and the returned pointer will be `nullptr`.
+  static std::unique_ptr<Model> LoadFrom(Slice* source, Status* status_out);
+
  private:
+  // Creates the `RSModel` by providing values for its members directly (used
+  // when deserializing the model).
+  RSModel(const rs::RadixSpline<uint64_t> index, const size_t records_per_page);
+
   rs::RadixSpline<uint64_t> index_;
   const size_t records_per_page_;
 };

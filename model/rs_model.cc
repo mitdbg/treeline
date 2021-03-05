@@ -1,6 +1,10 @@
 #include "rs_model.h"
 
+#include <limits>
+
 #include "db/page.h"
+#include "rs/serializer.h"
+#include "util/coding.h"
 #include "util/key.h"
 
 namespace llsm {
@@ -17,6 +21,10 @@ RSModel::RSModel(const KeyDistHints& key_hints,
     rsb.AddKey(key_utils::ExtractHead64(record.first));
   index_ = rsb.Finalize();
 }
+
+RSModel::RSModel(const rs::RadixSpline<uint64_t> index,
+                 const size_t records_per_page)
+    : index_(std::move(index)), records_per_page_(records_per_page) {}
 
 // Preallocates the number of pages deemed necessary after initialization.
 //
@@ -47,6 +55,56 @@ size_t RSModel::KeyToPageId(const uint64_t key) const {
   const size_t estimate = index_.GetEstimatedPosition(key);
 
   return estimate / records_per_page_;
+}
+
+void RSModel::EncodeTo(std::string* dest) const {
+  // Format:
+  // - Model type identifier  (1 byte)
+  // - Records per page       (uint64; 8 bytes)
+  // - RadixSpline index      (length (uint32) prefixed byte array)
+  // TODO: If we support different key types in the future, we should also
+  //       encode the RS model's key type here.
+  dest->push_back(static_cast<uint8_t>(detail::ModelType::kRSModel));
+  assert(records_per_page_ <= std::numeric_limits<uint64_t>::max());
+  PutFixed64(dest, records_per_page_);
+
+  std::string rs_bytes;
+  rs::Serializer<uint64_t>::ToBytes(index_, &rs_bytes);
+  assert(rs_bytes.size() <= std::numeric_limits<uint32_t>::max());
+  PutLengthPrefixedSlice(dest, Slice(rs_bytes));
+}
+
+std::unique_ptr<Model> RSModel::LoadFrom(Slice* source, Status* status_out) {
+  if (source->size() < (1 + 8 + 1)) {
+    *status_out =
+        Status::InvalidArgument("Not enough bytes to deserialize a RSModel.");
+    return nullptr;
+  }
+
+  const uint8_t raw_model_type = (*source)[0];
+  if (raw_model_type != static_cast<uint8_t>(detail::ModelType::kRSModel)) {
+    *status_out =
+        Status::InvalidArgument("Attempted to deserialize a non-RSModel.");
+    return nullptr;
+  }
+  source->remove_prefix(1);
+
+  const uint64_t records_per_page = DecodeFixed64(source->data());
+  source->remove_prefix(8);
+
+  Slice rs_index_slice;
+  if (!GetLengthPrefixedSlice(source, &rs_index_slice)) {
+    *status_out =
+        Status::InvalidArgument("Failed to extract serialized RadixSpline.");
+    return nullptr;
+  }
+  std::string rs_index_bytes(
+      rs_index_slice.ToString());  // NOTE: This makes a copy.
+  rs::RadixSpline<uint64_t> index =
+      rs::Serializer<uint64_t>::FromBytes(rs_index_bytes);
+
+  *status_out = Status::OK();
+  return std::unique_ptr<Model>(new RSModel(index, records_per_page));
 }
 
 }  // namespace llsm
