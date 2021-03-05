@@ -1,16 +1,12 @@
 #include "db_impl.h"
 
-#include <errno.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
 #include <cassert>
 #include <condition_variable>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
 
+#include "db/manifest.h"
 #include "db/page.h"
 #include "util/affinity.h"
 #include "util/key.h"
@@ -29,7 +25,8 @@ Status ValidateOptions(const Options& options) {
   if (options.key_hints.page_fill_pct < 1 ||
       options.key_hints.page_fill_pct > 100) {
     return Status::InvalidArgument(
-        "KeyDistHints::page_fill_pct must be a value between 1 and 100 inclusive.");
+        "KeyDistHints::page_fill_pct must be a value between 1 and 100 "
+        "inclusive.");
   }
   if (options.buffer_pool_size < Page::kSize) {
     return Status::InvalidArgument(
@@ -128,10 +125,16 @@ Status DBImpl::InitializeNewDB() {
     model->Preallocate(records, buf_mgr_);
     model_.reset(model);
 
-    const Status s = wal_.PrepareForWrite(/*discard_existing_logs=*/true);
+    // Write the DB metadata to persistent storage.
+    const Status s = Manifest::Builder()
+                         .WithNumPages(bm_options.num_pages)
+                         .WithNumSegments(bm_options.num_segments)
+                         .WithModel(model_)
+                         .Build()
+                         .WriteTo(db_path_ / kManifestFileName);
     if (!s.ok()) return s;
 
-    return SerializeDBManifest();
+    return wal_.PrepareForWrite(/*discard_existing_logs=*/true);
 
   } catch (const fs::filesystem_error& ex) {
     return Status::FromPosixError(db_path_.string(), ex.code().value());
@@ -139,23 +142,59 @@ Status DBImpl::InitializeNewDB() {
 }
 
 Status DBImpl::InitializeExistingDB() {
-  return Status::NotSupported("Reopening an existing DB is not yet supported.");
-}
+  Status s;
+  const auto manifest = Manifest::LoadFrom(db_path_ / kManifestFileName, &s);
+  if (!s.ok()) return s;
 
-Status DBImpl::SerializeDBManifest() {
-  const fs::path path = db_path_ / kManifestFileName;
-  const int fd = open(path.c_str(), O_CREAT | O_TRUNC | O_WRONLY,
-                      S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-  if (fd < 0) {
-    return Status::FromPosixError(path.string(), errno);
+  BufMgrOptions bm_options(options_);
+  bm_options.num_segments = manifest->num_segments();
+  bm_options.num_pages = manifest->num_pages();
+
+  model_ = manifest->model();
+  buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
+
+  // Before we can accept requests, we need to replay the writes (if any) that
+  // exist in the write-ahead log.
+  s = wal_.PrepareForReplay();
+  if (!s.ok()) return s;
+
+  WriteOptions replay_write_options;
+  replay_write_options.bypass_wal = true;  // The writes are already in the WAL.
+  s = wal_.ReplayLog(
+      [this, &replay_write_options](const Slice& key, const Slice& value,
+                                    format::WriteType write_type) {
+        if (write_type == format::WriteType::kWrite) {
+          return Put(replay_write_options, key, value);
+        } else {
+          return Delete(replay_write_options, key);
+        }
+      });
+  if (!s.ok()) return s;
+
+  // Make sure any "leftover" WAL writes are persisted.
+  if (mtable_->HasEntries()) {
+    FlushOptions replay_flush_options;
+    replay_flush_options.disable_deferred_io = true;
+    s = FlushMemTable(replay_flush_options);
+    if (!s.ok()) return s;
+
+  } else {
+    // Wait for the in-progress background flush to complete if needed.
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (FlushInProgress(lock)) {
+      assert(last_flush_.valid());
+      std::shared_future<void> local_flush = last_flush_;
+      lock.unlock();
+      local_flush.get();
+    }
   }
-  // This method currently does not write out any data; it just creates the
-  // manifest file.
-  close(fd);
-  return Status::OK();
+
+  return wal_.PrepareForWrite(/*discard_existing_logs=*/true);
 }
 
 DBImpl::~DBImpl() {
+  std::shared_future<void> pending_flush;
+
   // Once the destructor is called, no further application threads are allowed
   // to call the `DBImpl`'s public methods.
   {
@@ -168,10 +207,12 @@ DBImpl::~DBImpl() {
     assert(waiting_writers_.empty());
 
     // Any data in the active memtable should be flushed to persistent storage.
-    FlushOptions options;
-    options.disable_deferred_io = true;
     if (mtable_ && mtable_->HasEntries()) {
+      FlushOptions options;
+      options.disable_deferred_io = true;
       ScheduleMemTableFlush(options, lock);
+      pending_flush = last_flush_;
+      assert(pending_flush.valid());
     }
 
     // Not absolutely needed because there should not be any additional writers.
@@ -179,6 +220,15 @@ DBImpl::~DBImpl() {
     // to keep its usage in the code consistent.
     NotifyWaitingWriterIfNeeded(lock);
   }
+
+  // If we dispatched a memtable flush above, we need to wait for the flush to
+  // finish before proceeding. This is because the flush occurs in the
+  // background and will schedule more work on the thread pool; we cannot delete
+  // the thread pool until that work has been scheduled.
+  if (pending_flush.valid()) {
+    pending_flush.get();
+  }
+
   // Deleting the thread pool will block the current thread until the workers
   // have completed all their queued tasks.
   workers_.reset();

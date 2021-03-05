@@ -4,9 +4,11 @@
 #include <unistd.h>
 
 #include <filesystem>
+#include <vector>
 
 #include "db/page.h"
 #include "gtest/gtest.h"
+#include "util/key.h"
 
 namespace {
 
@@ -14,41 +16,64 @@ bool EqualTimespec(const timespec& lhs, const timespec& rhs) {
   return (lhs.tv_sec == rhs.tv_sec) && (lhs.tv_nsec == rhs.tv_nsec);
 }
 
-TEST(DBTest, Create) {
+class DBTest : public testing::Test {
+ public:
+  DBTest() : kDBDir("/tmp/llsm-test") {}
+  void SetUp() override {
+    std::filesystem::remove_all(kDBDir);
+    std::filesystem::create_directory(kDBDir);
+  }
+  void TearDown() override { std::filesystem::remove_all(kDBDir); }
+
+  const std::filesystem::path kDBDir;
+};
+
+TEST_F(DBTest, Create) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   // The test environment may not have many cores.
   options.pin_threads = false;
   options.key_hints.num_keys = 10;
-  const std::string dbname = "/tmp/llsm-test";
-  std::filesystem::remove_all(dbname);
-  auto status = llsm::DB::Open(options, dbname, &db);
+  auto status = llsm::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   delete db;
-  std::filesystem::remove_all(dbname);
 }
 
-TEST(DBTest, CreateIfMissingDisabled) {
+TEST_F(DBTest, CreateIfMissingDisabled) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.create_if_missing = false;
   options.pin_threads = false;
-  const std::string dbname = "/tmp/llsm-test";
-  std::filesystem::remove_all(dbname);
-  auto status = llsm::DB::Open(options, dbname, &db);
+  auto status = llsm::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.IsInvalidArgument());
   ASSERT_EQ(db, nullptr);
-  std::filesystem::remove_all(dbname);
 }
 
-TEST(DBTest, WriteFlushRead) {
+TEST_F(DBTest, ErrorIfExistsEnabled) {
+  llsm::DB* db = nullptr;
+  llsm::Options options;
+  options.error_if_exists = true;
+  options.pin_threads = false;
+  options.key_hints.num_keys = 10;
+
+  // Create the database and then close it.
+  auto status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  delete db;
+  db = nullptr;
+
+  // Attempt to open it again (but with `error_if_exists` set to true).
+  status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.IsInvalidArgument());
+  ASSERT_EQ(db, nullptr);
+}
+
+TEST_F(DBTest, WriteFlushRead) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.pin_threads = false;
   options.key_hints.num_keys = 10;
-  const std::string dbname = "/tmp/llsm-test";
-  std::filesystem::remove_all(dbname);
-  auto status = llsm::DB::Open(options, dbname, &db);
+  auto status = llsm::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
 
   const uint64_t key_as_int = __builtin_bswap64(1ULL);
@@ -74,17 +99,14 @@ TEST(DBTest, WriteFlushRead) {
   ASSERT_EQ(value_out, value);
 
   delete db;
-  std::filesystem::remove_all(dbname);
 }
 
-TEST(DBTest, WriteThenDelete) {
+TEST_F(DBTest, WriteThenDelete) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.pin_threads = false;
   options.key_hints.num_keys = 10;
-  const std::string dbname = "/tmp/llsm-test";
-  std::filesystem::remove_all(dbname);
-  auto status = llsm::DB::Open(options, dbname, &db);
+  auto status = llsm::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
 
   const std::string value = "Hello world!";
@@ -198,10 +220,9 @@ TEST(DBTest, WriteThenDelete) {
   ASSERT_TRUE(status.IsNotFound());
 
   delete db;
-  std::filesystem::remove_all(dbname);
 }
 
-TEST(DBTest, DeferByEntries) {
+TEST_F(DBTest, DeferByEntries) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.pin_threads = false;
@@ -211,9 +232,7 @@ TEST(DBTest, DeferByEntries) {
   options.deferred_io_min_entries = 2;
   options.deferred_io_max_deferrals = 4;
   options.buffer_pool_size = llsm::Page::kSize;
-  const std::string dbname = "/tmp/llsm-test";
-  std::filesystem::remove_all(dbname);
-  auto status = llsm::DB::Open(options, dbname, &db);
+  auto status = llsm::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
 
   const std::string value = "Hello world!";
@@ -227,7 +246,7 @@ TEST(DBTest, DeferByEntries) {
   ASSERT_TRUE(status.ok());
 
   // Get timestamp
-  auto filename = dbname + "/segment-0";
+  auto filename = kDBDir / "segment-0";
   timespec mod_time;
   struct stat result;
   sync();
@@ -282,10 +301,9 @@ TEST(DBTest, DeferByEntries) {
   ASSERT_EQ(value_out, value);
 
   delete db;
-  std::filesystem::remove_all(dbname);
 }
 
-TEST(DBTest, DeferByAttempts) {
+TEST_F(DBTest, DeferByAttempts) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.pin_threads = false;
@@ -295,9 +313,7 @@ TEST(DBTest, DeferByAttempts) {
   options.deferred_io_min_entries = 2;
   options.deferred_io_max_deferrals = 1;
   options.buffer_pool_size = llsm::Page::kSize;
-  const std::string dbname = "/tmp/llsm-test";
-  std::filesystem::remove_all(dbname);
-  auto status = llsm::DB::Open(options, dbname, &db);
+  auto status = llsm::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
 
   const std::string value = "Hello world!";
@@ -311,7 +327,7 @@ TEST(DBTest, DeferByAttempts) {
   ASSERT_TRUE(status.ok());
 
   // Get timestamp
-  auto filename = dbname + "/segment-0";
+  auto filename = kDBDir / "segment-0";
   timespec mod_time;
   struct stat result;
   sync();
@@ -356,6 +372,62 @@ TEST(DBTest, DeferByAttempts) {
   ASSERT_EQ(value_out, value);
 
   delete db;
-  std::filesystem::remove_all(dbname);
 }
+
+TEST_F(DBTest, WriteReopenRead) {
+  const std::string value = "Hello world!";
+
+  // Will write 10 records with keys 0 - 9 and value `value`.
+  llsm::Options options;
+  options.pin_threads = false;
+  options.key_hints.num_keys = 10;
+  options.key_hints.record_size = sizeof(uint64_t) + value.size();
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  llsm::DB* db = nullptr;
+  auto status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int),
+                    sizeof(key_as_int));
+    status = db->Put(llsm::WriteOptions(), key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // Should be able to read all the data (in memory).
+  std::string value_out;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int),
+                    sizeof(key_as_int));
+    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    ASSERT_TRUE(status.ok());
+    ASSERT_EQ(value, value_out);
+  }
+
+  // Close the database.
+  delete db;
+  db = nullptr;
+
+  // Make sure an error occurs if the database does not exist when we try to
+  // reopen it.
+  options.create_if_missing = false;
+  status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Should be able to read all the data back out (should be from disk).
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int),
+                    sizeof(key_as_int));
+    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    ASSERT_TRUE(status.ok());
+    ASSERT_EQ(value, value_out);
+  }
+
+  delete db;
+}
+
 }  // namespace

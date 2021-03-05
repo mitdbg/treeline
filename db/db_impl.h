@@ -40,8 +40,6 @@ class DBImpl : public DB {
  private:
   Status InitializeNewDB();
   Status InitializeExistingDB();
-  // Writes out this database's metadata (to allow for reopening an existing DB).
-  Status SerializeDBManifest();
 
   // Records writes and deletes in the active `MemTable`. The `value` is ignored
   // if `write_type` is `WriteType::kDelete`.

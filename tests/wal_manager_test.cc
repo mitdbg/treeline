@@ -41,9 +41,11 @@ TEST_F(WALManagerTest, ReplayEmpty) {
   ASSERT_TRUE(s.ok());
 
   size_t call_count = 0;
-  s = manager.ReplayLog(
-      [&call_count](const Slice& key, const Slice& value,
-                    format::WriteType type) { ++call_count; });
+  s = manager.ReplayLog([&call_count](const Slice& key, const Slice& value,
+                                      format::WriteType type) {
+    ++call_count;
+    return Status::OK();
+  });
   ASSERT_TRUE(s.ok());
   ASSERT_EQ(call_count, 0);
 }
@@ -76,11 +78,12 @@ TEST_F(WALManagerTest, WriteThenReadOneVersion) {
     const auto rec_end = records.end();
     s = manager.ReplayLog([&it, &rec_end](const Slice& key, const Slice& value,
                                           format::WriteType type) {
-      ASSERT_TRUE(it != rec_end);
-      ASSERT_TRUE(key.compare(it->first) == 0);
-      ASSERT_TRUE(value.compare(it->second) == 0);
-      ASSERT_EQ(type, format::WriteType::kWrite);
+      EXPECT_TRUE(it != rec_end);
+      EXPECT_TRUE(key.compare(it->first) == 0);
+      EXPECT_TRUE(value.compare(it->second) == 0);
+      EXPECT_EQ(type, format::WriteType::kWrite);
       ++it;
+      return Status::OK();
     });
     ASSERT_TRUE(it == rec_end);
   }
@@ -170,9 +173,10 @@ TEST_F(WALManagerTest, WriteReplayMultiple) {
     std::vector<std::pair<std::string, std::string>> records;
     s = manager.ReplayLog([&records](const Slice& key, const Slice& value,
                                      format::WriteType type) {
-      ASSERT_EQ(type, format::WriteType::kWrite);
+      EXPECT_EQ(type, format::WriteType::kWrite);
       records.emplace_back(std::string(key.data(), key.size()),
                            std::string(value.data(), value.size()));
+      return Status::OK();
     });
 
     ASSERT_EQ(records.size(), 2);
@@ -233,9 +237,11 @@ TEST_F(WALManagerTest, ReplayCleanShutdown) {
     ASSERT_EQ(NumFilesInDir(), 0);
 
     size_t call_count = 0;
-    s = manager.ReplayLog(
-        [&call_count](const Slice& key, const Slice& value,
-                      format::WriteType type) { ++call_count; });
+    s = manager.ReplayLog([&call_count](const Slice& key, const Slice& value,
+                                        format::WriteType type) {
+      ++call_count;
+      return Status::OK();
+    });
     ASSERT_TRUE(s.ok());
     ASSERT_EQ(call_count, 0);
   }
@@ -326,9 +332,10 @@ TEST_F(WALManagerTest, HandleUnrelatedFilePresence) {
     std::vector<std::pair<std::string, std::string>> records;
     s = manager.ReplayLog([&records](const Slice& key, const Slice& value,
                                      format::WriteType type) {
-      ASSERT_EQ(type, format::WriteType::kWrite);
+      EXPECT_EQ(type, format::WriteType::kWrite);
       records.emplace_back(std::string(key.data(), key.size()),
                            std::string(value.data(), value.size()));
+      return Status::OK();
     });
 
     ASSERT_EQ(records.size(), 2);
@@ -341,6 +348,52 @@ TEST_F(WALManagerTest, HandleUnrelatedFilePresence) {
     ASSERT_TRUE(s.ok());
     // Only the unrelated file should exist.
     ASSERT_EQ(NumFilesInDir(), 1);
+  }
+}
+
+TEST_F(WALManagerTest, AbortReplayEarly) {
+  const std::vector<std::pair<std::string, std::string>> records = {
+      {"hello", "world"}, {"key", "value"}, {"foo", "bar"}};
+  {
+    wal::Manager manager(kWALDir);
+    Status s = manager.PrepareForWrite();
+    ASSERT_TRUE(s.ok());
+    // Log file is lazily created.
+    ASSERT_EQ(NumFilesInDir(), 0);
+
+    for (const auto& record : records) {
+      s = manager.LogWrite(WriteOptions(), record.first, record.second,
+                           format::WriteType::kWrite);
+      ASSERT_TRUE(s.ok());
+    }
+    ASSERT_EQ(NumFilesInDir(), 1);
+  }
+
+  {
+    wal::Manager manager(kWALDir);
+    Status s = manager.PrepareForReplay();
+    ASSERT_TRUE(s.ok());
+
+    // Ensure we abort early if the callback returns a non-OK status.
+    size_t records_seen = 0;
+    s = manager.ReplayLog([&records_seen](const Slice& key, const Slice& value,
+                                          format::WriteType write_type) {
+      ++records_seen;
+      return Status::NotFound("Expected error.");
+    });
+    ASSERT_TRUE(s.IsNotFound());
+    ASSERT_EQ(records_seen, 1);
+    ASSERT_TRUE(records_seen < records.size());
+
+    // Replaying the log should now go through all the records.
+    records_seen = 0;
+    s = manager.ReplayLog([&records_seen](const Slice& key, const Slice& value,
+                                          format::WriteType write_type) {
+      ++records_seen;
+      return Status::OK();
+    });
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(records_seen, records.size());
   }
 }
 

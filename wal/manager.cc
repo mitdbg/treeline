@@ -104,7 +104,8 @@ Status Manager::ReplayLog(const EntryCallback& callback) const {
       Slice value(entry.data() + key_length, entry.size() - key_length);
 
       // Pass the record to the caller.
-      callback(key, value, type);
+      const Status s = callback(key, value, type);
+      if (!s.ok()) return s;
     }
   }
   return Status::OK();
@@ -264,8 +265,7 @@ Status Manager::DiscardOldest(const uint64_t newest_log_version_to_discard,
 }
 
 Status Manager::DiscardAllForCleanShutdown() {
-  assert(mode_ == Mode::kCreated || mode_ == Mode::kWrite);
-  if (mode_ == Mode::kCreated) {
+  if (mode_ != Mode::kWrite) {
     // No-op.
     return Status::OK();
   }

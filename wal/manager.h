@@ -56,18 +56,26 @@ class Manager {
   Status PrepareForReplay();
 
   using EntryCallback =
-      std::function<void(const Slice&, const Slice&, format::WriteType)>;
+      std::function<Status(const Slice&, const Slice&, format::WriteType)>;
   // Replay the writes stored in the log.
   //
   // The callback will be called **synchronously** for each entry in the log, in
   // the order the entries were logged. The `callback` will run on this method's
   // calling thread and will be called during the execution of this method.
   //
+  // The callback must return a `Status` to indicate whether or not it
+  // succeeded. If the returned status is non-OK, the replay will abort early
+  // and the non-OK status will be returned by this method.
+  //
   // In summary, this method is semantically similar to the following
   // pseudo-code:
   // ```
-  // for (key, value, write_type) in log {
-  //   callback(key, value, write_type);
+  // Status ReplayLog(const EntryCallback& callback) const {
+  //   for (key, value, write_type) in log {
+  //     Status s = callback(key, value, write_type);
+  //     if (!s.ok()) return s;
+  //   }
+  //   return Status::OK();
   // }
   // ```
   //
@@ -122,7 +130,7 @@ class Manager {
   // This method should only be called after all volatile data has been flushed
   // to persistent storage.
   //
-  // If this method is called while the manager is in its "Created" mode, it
+  // If this method is called while the manager is **not** in "Write" mode, it
   // will be a no-op and will return an OK status. Regardless, the manager
   // should still not be used after this method returns.
   Status DiscardAllForCleanShutdown();
