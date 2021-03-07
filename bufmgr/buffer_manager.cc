@@ -174,7 +174,7 @@ void BufferManager::ReadPageIn(BufferFrame* frame) {
 // Returns nullptr if no new frame can be created.
 bool BufferManager::CreateFrame(const uint64_t page_id, size_t* frame_id) {
   size_t frame_id_loc = PostIncFreePtr();
-  if (frame_id_loc == buffer_manager_size_) {
+  if (frame_id_loc >= buffer_manager_size_) {
     return false;
   } else {
     *frame_id = frame_id_loc;
