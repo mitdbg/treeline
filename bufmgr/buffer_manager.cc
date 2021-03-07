@@ -64,16 +64,14 @@ BufferManager::~BufferManager() {
 BufferFrame& BufferManager::FixPage(const uint64_t page_id,
                                     const bool exclusive) {
   BufferFrame* frame;
-  size_t frame_id;
 
   // Check if page is already loaded in some frame.
   LockMapMutex();
   LockEvictionMutex();
-  auto frame_lookup = page_to_frame_map_->UnsafeLookup(page_id, &frame_id);
+  auto frame_lookup = page_to_frame_map_->UnsafeLookup(page_id, &frame);
 
   // If yes, load the corresponding frame
   if (frame_lookup) {
-    frame = &frames_[frame_id];
     if (frame->IncFixCount() == 1) page_eviction_strategy_->Delete(frame);
     UnlockEvictionMutex();
     UnlockMapMutex();
@@ -173,8 +171,8 @@ BufferFrame* BufferManager::CreateFrame(const uint64_t page_id) {
   size_t frame_id = PostIncFreePtr();
   if (frame_id == buffer_manager_size_)
     return nullptr;
-  }
-  return &frames_[frame_id];
+  
+  return &(frames_[frame_id]);
 }
 
 // Resets an exisiting frame to hold the page with `new_page_id`.

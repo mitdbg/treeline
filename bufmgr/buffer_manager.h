@@ -12,6 +12,7 @@
 #include "file_manager.h"
 #include "options.h"
 #include "page_eviction_strategy.h"
+#include "sync_hash_table.h"
 
 namespace llsm {
 
@@ -57,7 +58,7 @@ class BufferManager {
   void FlushDirty();
 
   // Provides access to the underlying FileManager
-  FileManager* GetFileManager() const { return file_manager_; }
+  FileManager* GetFileManager() const { return file_manager_.get(); }
 
  private:
   // To support efficient direct I/O, LLSM needs to align its memory buffers to
@@ -72,10 +73,6 @@ class BufferManager {
 
   // Reads a page from disk into `frame`.
   void ReadPageIn(BufferFrame* frame);
-
-  // Locks/unlocks the mutex for editing free_pages_.
-  void LockFreePagesMutex() { free_pages_mutex_.lock(); }
-  void UnlockFreePagesMutex() { free_pages_mutex_.unlock(); }
 
   // Locks/unlocks the mutex for editing page_to_frame_map_.
   void LockMapMutex() { map_mutex_.lock(); }
@@ -110,7 +107,7 @@ class BufferManager {
 
   // Map from page_id to the buffer frame (if any) that currently holds that
   // page in memory, and a mutex for editing it.
-  std::unique_ptr<SyncHashTable<uint64_t, uint64_t>> page_to_frame_map_;
+  std::unique_ptr<SyncHashTable<uint64_t, BufferFrame*>> page_to_frame_map_;
   std::mutex map_mutex_;
 
   // Pointer to a method for determining which (non-fixed) page to evict, and a
