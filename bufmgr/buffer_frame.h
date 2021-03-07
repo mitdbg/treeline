@@ -18,7 +18,7 @@ class BufferFrame {
   // page eviction strategy.
   static const uint8_t kDirtyFlag = 1;      // 0000 0001
   static const uint8_t kEvictionFlags = 6;  // 0000 0110
-  static const uint8_t kAllFlags = 255;  // 1111 1111
+  static const uint8_t kAllFlags = 255;     // 1111 1111
 
  public:
   // Create an invalid buffer frame.
@@ -50,11 +50,6 @@ class BufferFrame {
   void SetDirty();
   void UnsetDirty();
   bool IsDirty() const;
-
-  // Set/Unset/Query the valid flag of the current frame.
-  void SetValid();
-  void UnsetValid();
-  bool IsValid() const;
 
   // Set/Unset/Query the eviction flags of the current frame.
   void SetEviction(const uint8_t value);
