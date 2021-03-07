@@ -18,8 +18,6 @@ class BufferFrame {
   // page eviction strategy.
   static const uint8_t kDirtyFlag = 1;      // 0000 0001
   static const uint8_t kEvictionFlags = 6;  // 0000 0110
-  static const uint8_t kValidFlag = 8;      // 0000 1000
-
   static const uint8_t kAllFlags = 255;  // 1111 1111
 
  public:
@@ -63,10 +61,6 @@ class BufferFrame {
   void UnsetEviction();
   uint8_t GetEviction() const;
 
-  // Whether fixing the current frame incurred an I/O operation (i.e. whether it
-  // was a buffer manager miss).
-  bool IncurredIO() const;
-
   // Unset all flags of the current frame.
   void UnsetAllFlags();
 
@@ -76,13 +70,6 @@ class BufferFrame {
   size_t DecFixCount();
   size_t GetFixCount() const;
   size_t ClearFixCount();
-
-  // Increment/decrement/get/clear the hotness of the current frame.
-  // IncHotness/DecHotness return the new value of the hotness.
-  size_t IncHotness();
-  size_t DecHotness();
-  size_t GetHotness() const;
-  size_t ClearHotness();
 
  private:
   // Set/Unset the specified flags of the current frame.
@@ -104,9 +91,6 @@ class BufferFrame {
 
   // A count of how many threads have the current frame as fixed.
   std::atomic<size_t> fix_count_;
-
-  // The "hotness" of the curent frame, as determined and managed by the buffer manager.
-  std::atomic<size_t> hotness_;
 };
 
 }  // namespace llsm
