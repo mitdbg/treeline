@@ -84,7 +84,7 @@ class BufferManager {
 
   // Creates a new frame and specifies that it will hold the page with
   // `page_id`.
-  BufferFrame* CreateFrame(const uint64_t page_id);
+  bool CreateFrame(const uint64_t page_id, size_t* frame_id);
 
   // Resets an exisiting frame to hold the page with `new_page_id`.
   void ResetFrame(BufferFrame* frame, const uint64_t new_page_id);

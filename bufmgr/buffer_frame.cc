@@ -4,18 +4,27 @@
 
 namespace llsm {
 
-// Initialize a buffer frame based on the page with the specified `page_id`,
-// which is pointed to by `data`.
-BufferFrame::BufferFrame(const uint64_t page_id, void* data) {
-  data_ = data;
-  SetPageId(page_id);
+BufferFrame::BufferFrame() {
+  data_ = nullptr;
   pthread_rwlock_init(&rwlock_, nullptr);
   UnsetAllFlags();
   fix_count_ = 0;
+  hotness_ = 0;  
 }
 
 // Free all resources.
 BufferFrame::~BufferFrame() { pthread_rwlock_destroy(&rwlock_); }
+
+// Initialize a buffer frame based on the page with the specified `page_id`,
+// which is pointed to by `data`.
+void BufferFrame::Initialize(const uint64_t page_id, void* data) {
+  data_ = data;
+  SetPageId(page_id);
+  UnsetAllFlags();
+  fix_count_ = 0;
+  hotness_ = 0;
+  SetValid();
+}
 
 // Get the page held in the current frame.
 Page BufferFrame::GetPage() const { return Page(data_); }
@@ -39,12 +48,23 @@ void BufferFrame::SetDirty() { SetFlags(kDirtyFlag); }
 void BufferFrame::UnsetDirty() { UnsetFlags(kDirtyFlag); }
 bool BufferFrame::IsDirty() const { return flags_ & kDirtyFlag; }
 
+// Set/Unset/Query the valid flag of the current frame.
+void BufferFrame::SetValid() { SetFlags(kValidFlag); }
+void BufferFrame::UnsetValid() { UnsetFlags(kValidFlag); }
+bool BufferFrame::IsValid() const { return flags_ & kValidFlag; }
+
 // Set/Unset/Query the eviction flags of the current frame.
 void BufferFrame::SetEviction(const uint8_t value) {
   SetFlags(kEvictionFlags & value);
 }
 void BufferFrame::UnsetEviction() { UnsetFlags(kEvictionFlags); }
 uint8_t BufferFrame::GetEviction() const { return flags_ & kEvictionFlags; }
+
+// Whether fixing the current frame incurred an I/O operation (i.e. whether it
+// was a buffer manager miss).
+bool BufferFrame::IncurredIO() const {
+  return (BufferFrame::GetHotness() == 0);
+}
 
 // Unset all flags of the current frame.
 void BufferFrame::UnsetAllFlags() { flags_ = 0; }
@@ -58,5 +78,15 @@ size_t BufferFrame::DecFixCount() {
 }
 size_t BufferFrame::GetFixCount() const { return fix_count_; }
 size_t BufferFrame::ClearFixCount() { return fix_count_ = 0; }
+
+// Increment/decrement/get/clear the hotness of the current frame.
+// IncHotness/DecHotness return the new value of the hotness.
+size_t BufferFrame::IncHotness() { return ++hotness_; }
+size_t BufferFrame::DecHotness() {
+  if (hotness_ == 0) return 0;  // Don't decrement below 0.
+  return --hotness_;
+}
+size_t BufferFrame::GetHotness() const { return hotness_; }
+size_t BufferFrame::ClearHotness() { return hotness_ = 0; }
 
 }  // namespace llsm

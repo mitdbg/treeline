@@ -63,7 +63,9 @@ BufferManager::~BufferManager() {
 // the same name as the page ID (e.g. 1).
 BufferFrame& BufferManager::FixPage(const uint64_t page_id,
                                     const bool exclusive) {
-  BufferFrame* frame;
+  BufferFrame* frame = nullptr;
+  size_t frame_id;
+  bool success;
 
   // Check if page is already loaded in some frame.
   LockMapMutex();
@@ -80,9 +82,9 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
     UnlockEvictionMutex();
     UnlockMapMutex();
 
-    frame = CreateFrame(page_id);
+    success = CreateFrame(page_id, &frame_id);
 
-    if (frame == nullptr) {  // Must evict something to make space.
+    if (!success) {  // Must evict something to make space.
       // Block here until you can evict something
       while (frame == nullptr) {
         LockMapMutex();
@@ -103,9 +105,12 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
 
       // Reset frame to new page_id
       ResetFrame(frame, page_id);
+    } else {
+      frame = &frames_[frame_id];
+      frame->Initialize(page_id, FrameIdToData(frame_id));
     }
 
-    // Read the page from disk into the selected frame.
+        // Read the page from disk into the selected frame.
     frame->IncFixCount();
     ReadPageIn(frame);
 
@@ -167,12 +172,14 @@ void BufferManager::ReadPageIn(BufferFrame* frame) {
 
 // Creates a new frame and specifies that it will hold the page with `page_id`.
 // Returns nullptr if no new frame can be created.
-BufferFrame* BufferManager::CreateFrame(const uint64_t page_id) {
-  size_t frame_id = PostIncFreePtr();
-  if (frame_id == buffer_manager_size_)
-    return nullptr;
-  
-  return &(frames_[frame_id]);
+bool BufferManager::CreateFrame(const uint64_t page_id, size_t* frame_id) {
+  size_t frame_id_loc = PostIncFreePtr();
+  if (frame_id_loc == buffer_manager_size_) {
+    return false;
+  } else {
+    *frame_id = frame_id_loc;
+    return true;
+  }
 }
 
 // Resets an exisiting frame to hold the page with `new_page_id`.
