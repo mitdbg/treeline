@@ -29,14 +29,14 @@ BufferManager::BufferManager(const BufMgrOptions& options,
   // `File`, which is zeroed out upon expansion.
   pages_cache_ = aligned_alloc(alignment, options.buffer_pool_size);
 
-  char* page_ptr = reinterpret_cast<char*>(pages_cache_);
-  for (size_t i = 0; i < buffer_manager_size_; ++i, page_ptr += Page::kSize) {
-    free_pages_.push_back((void*)page_ptr);
-  }
-  page_to_frame_map_.reserve(buffer_manager_size_);
+  page_to_frame_map_ = std::make_unique<SyncHashTable<uint64_t, BufferFrame*>>(
+      buffer_manager_size_, /*num_partitions = */ 1);
+  frames_ = std::vector<BufferFrame>(buffer_manager_size_);
+  free_ptr_ = 0;
 
-  page_eviction_strategy_ = new TwoQueueEviction(buffer_manager_size_);
-  file_manager_ = new FileManager(options, std::move(db_path));
+  page_eviction_strategy_ =
+      std::make_unique<TwoQueueEviction>(buffer_manager_size_);
+  file_manager_ = std::make_unique<FileManager>(options, std::move(db_path));
 }
 
 // Writes all dirty pages back and frees resources.
@@ -52,17 +52,7 @@ BufferManager::~BufferManager() {
     frame->Unlock();
   }
 
-  // Delete space for in-memory frames.
-  for (auto pair : page_to_frame_map_) {
-    if (pair.second != nullptr) {
-      delete (pair.second);
-    }
-  }
-
   free(pages_cache_);
-
-  delete page_eviction_strategy_;
-  delete file_manager_;
 
   UnlockEvictionMutex();
   UnlockMapMutex();
@@ -74,15 +64,16 @@ BufferManager::~BufferManager() {
 BufferFrame& BufferManager::FixPage(const uint64_t page_id,
                                     const bool exclusive) {
   BufferFrame* frame;
+  size_t frame_id;
 
   // Check if page is already loaded in some frame.
   LockMapMutex();
   LockEvictionMutex();
-  auto frame_lookup = page_to_frame_map_.find(page_id);
+  auto frame_lookup = page_to_frame_map_->UnsafeLookup(page_id, &frame_id);
 
   // If yes, load the corresponding frame
-  if (frame_lookup != page_to_frame_map_.end()) {
-    frame = frame_lookup->second;
+  if (frame_lookup) {
+    frame = &frames_[frame_id];
     if (frame->IncFixCount() == 1) page_eviction_strategy_->Delete(frame);
     UnlockEvictionMutex();
     UnlockMapMutex();
@@ -100,7 +91,7 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
         LockEvictionMutex();
         frame = page_eviction_strategy_->Evict();
         if (frame != nullptr) {
-          page_to_frame_map_.erase(frame->GetPageId());
+          page_to_frame_map_->UnsafeErase(frame->GetPageId());
         }
         UnlockEvictionMutex();
         UnlockMapMutex();
@@ -122,7 +113,7 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
 
     // Insert the frame into the map.
     LockMapMutex();
-    page_to_frame_map_.insert({page_id, frame});
+    page_to_frame_map_->UnsafeInsert(page_id, frame);
     UnlockMapMutex();
   }
 
@@ -154,13 +145,12 @@ void BufferManager::FlushAndUnfixPage(BufferFrame& frame) {
 void BufferManager::FlushDirty() {
   LockMapMutex();
 
-  for (const auto& pair : page_to_frame_map_) {
-    auto frame = pair.second;
-    if (frame->IsDirty()) {
-      frame->Lock(/*exclusive=*/false);
-      WritePageOut(frame);
-      frame->UnsetDirty();
-      frame->Unlock();
+  for (auto& frame : frames_) {
+    if (frame.IsDirty()) {
+      frame.Lock(/*exclusive=*/false);
+      WritePageOut(&frame);
+      frame.UnsetDirty();
+      frame.Unlock();
     }
   }
 
@@ -180,18 +170,11 @@ void BufferManager::ReadPageIn(BufferFrame* frame) {
 // Creates a new frame and specifies that it will hold the page with `page_id`.
 // Returns nullptr if no new frame can be created.
 BufferFrame* BufferManager::CreateFrame(const uint64_t page_id) {
-  LockFreePagesMutex();
-  if (free_pages_.empty()) {
-    UnlockFreePagesMutex();
+  size_t frame_id = PostIncFreePtr();
+  if (frame_id == buffer_manager_size_)
     return nullptr;
   }
-  void* data = free_pages_.front();
-  free_pages_.pop_front();
-  UnlockFreePagesMutex();
-
-  BufferFrame* frame = new BufferFrame(page_id, data);
-
-  return frame;
+  return &frames_[frame_id];
 }
 
 // Resets an exisiting frame to hold the page with `new_page_id`.
@@ -200,4 +183,18 @@ void BufferManager::ResetFrame(BufferFrame* frame, const uint64_t new_page_id) {
   frame->SetPageId(new_page_id);
   frame->ClearFixCount();
 }
+
+size_t BufferManager::PostIncFreePtr() {
+  const size_t old_val = free_ptr_++;
+  if (old_val > buffer_manager_size_) free_ptr_ = buffer_manager_size_;
+  return old_val;
+}
+
+void* BufferManager::FrameIdToData(const uint64_t frame_id) const {
+  char* page_ptr = reinterpret_cast<char*>(pages_cache_);
+  page_ptr += (frame_id * Page::kSize);
+
+  return reinterpret_cast<void*>(page_ptr);
+}
+
 }  // namespace llsm

@@ -3,9 +3,9 @@
 #include <filesystem>
 #include <iostream>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <tuple>
-#include <unordered_map>
 
 #include "buffer_frame.h"
 #include "db/page.h"
@@ -92,29 +92,34 @@ class BufferManager {
   // Resets an exisiting frame to hold the page with `new_page_id`.
   void ResetFrame(BufferFrame* frame, const uint64_t new_page_id);
 
+  // Increments the free pointer up to a max value, returning the old value.
+  size_t PostIncFreePtr();
+
+    // Provides a pointer to the right part of the buffer pool, given frame_id.
+  void* FrameIdToData(const uint64_t frame_id) const;
+
   // The number of pages the buffer manager should keep in memory.
   const size_t buffer_manager_size_;
 
   // Space in memory to hold the cached pages.
   void* pages_cache_;
 
-  // Pointers to available page-sized chunks in memory, for fixing pages from
-  // disk.
-  std::list<void*> free_pages_;
-  std::mutex free_pages_mutex_;
+  // Space in memory to hold the metadata for each frame.
+  std::vector<BufferFrame> frames_;
+  std::atomic<uint64_t> free_ptr_;
 
   // Map from page_id to the buffer frame (if any) that currently holds that
   // page in memory, and a mutex for editing it.
-  std::unordered_map<uint64_t, BufferFrame*> page_to_frame_map_;
+  std::unique_ptr<SyncHashTable<uint64_t, uint64_t>> page_to_frame_map_;
   std::mutex map_mutex_;
 
   // Pointer to a method for determining which (non-fixed) page to evict, and a
   // mutex for editing it.
-  PageEvictionStrategy* page_eviction_strategy_;
+  std::unique_ptr<PageEvictionStrategy> page_eviction_strategy_;
   std::mutex eviction_mutex_;
 
   // Pointer to an interface between the BufferManager and pages on disk.
-  FileManager* file_manager_;
+  std::unique_ptr<FileManager> file_manager_;
 };
 
 }  // namespace llsm
