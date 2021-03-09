@@ -1,9 +1,9 @@
 #pragma once
 
 #include <functional>
+#include <iostream>
 #include <shared_mutex>
 #include <vector>
-#include <iostream>
 
 namespace llsm {
 
@@ -46,6 +46,9 @@ class SyncHashTable {
       }
     }
   }
+
+  SyncHashTable(const SyncHashTable&) = delete;
+  SyncHashTable& operator=(const SyncHashTable&) = delete;
 
   // Insert the pair (`key`, `value`) into the container, replacing any previous
   // value associated with `key`, if any, without touching any of the mutexes.

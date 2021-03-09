@@ -110,7 +110,7 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
       frame->Initialize(page_id, FrameIdToData(frame_id));
     }
 
-        // Read the page from disk into the selected frame.
+    // Read the page from disk into the selected frame.
     frame->IncFixCount();
     ReadPageIn(frame);
 
