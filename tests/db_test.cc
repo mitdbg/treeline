@@ -430,4 +430,77 @@ TEST_F(DBTest, WriteReopenRead) {
   delete db;
 }
 
+TEST_F(DBTest, WriteReopenReadReverse) {
+  // Write more than 256 pages of data per segment, close the database, reopen
+  // it, read a record on the first page in each segment, and then read all the
+  // records in reverse order.
+
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 1016;
+
+  // A dummy value used for all records (8 byte key; record is 1 KiB in total).
+  const std::string value(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  // 32,768 records @ 1 KiB each => 32 MiB of data.
+  // Each page is 64 KiB and is filled to 50% => 32 records per page.
+  // 1024 pages in total; 512 per segment (assuming two segments).
+  options.key_hints.num_keys = 32768;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kKeySize + kValueSize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1024;
+
+  // Generate data used for the write (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write all the data.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // Close and then reopen the DB.
+  delete db;
+  db = nullptr;
+  status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // First, read data in the first page in each segment.
+  std::string value_out;
+  const std::vector<uint64_t> relevant_keys = {__builtin_bswap64(0ULL),
+                                               __builtin_bswap64(16384ULL)};
+  for (const auto& key_as_int : relevant_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    ASSERT_TRUE(status.ok());
+    ASSERT_EQ(value, value_out);
+  }
+
+  // Now read all the records, but in reverse order.
+  for (auto it = lexicographic_keys.rbegin(); it != lexicographic_keys.rend();
+       ++it) {
+    llsm::Slice key(reinterpret_cast<const char*>(&(*it)), kKeySize);
+    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    ASSERT_TRUE(status.ok());
+    ASSERT_EQ(value, value_out);
+  }
+
+  delete db;
+  db = nullptr;
+}
+
 }  // namespace

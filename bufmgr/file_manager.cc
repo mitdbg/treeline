@@ -30,7 +30,7 @@ FileManager::FileManager(const BufMgrOptions& options,
 void FileManager::ReadPage(const uint64_t page_id, void* data) {
   const FileAddress address = PageIdToAddress(page_id);
   const auto& file = db_files_[address.file_id];
-  file->ZeroOut(address.offset);
+  file->ExpandToIfNeeded(address.offset);
   file->ReadPage(address.offset, data);
 }
 
@@ -39,7 +39,7 @@ void FileManager::ReadPage(const uint64_t page_id, void* data) {
 void FileManager::WritePage(const uint64_t page_id, void* data) {
   const FileAddress address = PageIdToAddress(page_id);
   const auto& file = db_files_[address.file_id];
-  file->ZeroOut(address.offset);
+  file->ExpandToIfNeeded(address.offset);
   file->WritePage(address.offset, data);
 }
 
