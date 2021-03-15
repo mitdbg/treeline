@@ -21,14 +21,17 @@ class SyncHashTable {
   };
 
  public:
-  SyncHashTable(size_t capacity = 10, size_t num_partitions = 2,
-                double max_load_factor = 1.0) {
-    bucket_count_ = capacity / max_load_factor;
-    num_partitions_ = num_partitions;
+  // Create a new SyncHashTable capable of holding `capacity` elements without
+  // exceeding `max_load_factor`. Split the buckets into at least
+  // `num_partitions` partitions for synchronization.
+  SyncHashTable(size_t capacity = 16, size_t num_partitions = 2,
+                double max_load_factor = 1.0)
+      : bucket_count_mask_(Pow2Ceil(capacity / max_load_factor) - 1),
+        num_partitions_mask_(Pow2Ceil(num_partitions) - 1) {
+    for (size_t i = 0; i <= bucket_count_mask_; ++i)
+      buckets_.push_back(nullptr);
 
-    for (size_t i = 0; i < bucket_count_; ++i) buckets_.push_back(nullptr);
-
-    for (size_t i = 0; i < num_partitions_; ++i)
+    for (size_t i = 0; i <= num_partitions_mask_; ++i)
       mutexes_.emplace_back(new std::shared_mutex);
   }
 
@@ -157,10 +160,11 @@ class SyncHashTable {
   }
 
   // Return the bucket of `key`.
-  size_t Bucket(KeyType key) const { return HashKey(key) % bucket_count_; }
+  size_t Bucket(KeyType key) const { return HashKey(key) & bucket_count_mask_; }
 
-  // Return the id of the mutex of `bucket`.
-  size_t MutexId(size_t bucket) const { return bucket % num_partitions_; }
+  // Return the id of the mutex of `bucket`. Since `num_partitions_` is a power
+  // of 2, we can subtract 1 to create the appropriate bitmask.
+  size_t MutexId(size_t bucket) const { return bucket & num_partitions_mask_; }
 
   // Lock/unlock the mutex associated with the `bucket` of `key`, which is
   // either known explicitly (..ByBucket) or calculated (.. ByKey).
@@ -230,12 +234,26 @@ class SyncHashTable {
   // Return the hash of `key`.
   size_t HashKey(KeyType key) const { return std::hash<KeyType>{}(key); }
 
+  // Find the smallest power of 2 larger than or equal to `num`
+  size_t Pow2Ceil(size_t num) {
+    size_t count = 0;
+
+    if (num && !(num & (num - 1))) return num;
+
+    while (num > 0) {
+      num >>= 1;
+      ++count;
+    }
+
+    return 1 << count;
+  }
+
   std::vector<Node*> buckets_;
 
   std::vector<std::shared_mutex*> mutexes_;
 
-  size_t bucket_count_;
-  size_t num_partitions_;
+  const size_t bucket_count_mask_;
+  const size_t num_partitions_mask_;
 };
 
 }  // namespace llsm
