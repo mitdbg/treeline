@@ -1,0 +1,136 @@
+# Preloads databases with 100 million 16 byte records (for YCSB).
+run_command(
+  name="preload_16-100M",
+  run="./preload.sh 16-100M ycsb-100M-load "
+    "--record_size_bytes=16 ",
+  deps=[
+    "//scripts/e2e_perf:build_benchmarks",
+  ],
+)
+
+# Preloads databases with 20 million 512 byte records (for YCSB).
+run_command(
+  name="preload_512-20M",
+  run="./preload.sh 512-20M ycsb-20M-load "
+    "--record_size_bytes=512 ",
+  deps=[
+    "//scripts/e2e_perf:build_benchmarks",
+  ],
+)
+
+WORKLOADS = ["a", "c"]
+YCSB_OPTIONS = {
+  "bg_threads": 16,
+  "threads": 4,
+  "bypass_wal": True,
+  "llsm_page_fill_pct": 50,
+  "memtable_size_mib": 64,
+  "use_direct_io": True,
+}
+
+# Runs YCSB workloads on a database that was preloaded with 100 million 16 byte
+# records.
+run_experiment_group(
+  name="ycsb_16",
+  run="./run_ycsb.sh 16-100M",
+  experiments=[
+    ExperimentInstance(
+      name="ycsb_{}_16".format(workload),
+      options={
+        **YCSB_OPTIONS,
+        "record_size_bytes": 16,
+        "workload_path": "'$YCSB_TRACE_PATH/ycsb-100M-10Mop-w{}'".format(workload),
+      },
+    )
+    for workload in WORKLOADS
+  ],
+  deps=[
+    ":preload_16-100M",
+  ],
+)
+
+# Runs YCSB workloads on a database that was preloaded with 20 million 512 byte
+# records.
+run_experiment_group(
+  name="ycsb_512",
+  run="./run_ycsb.sh 512-20M",
+  experiments=[
+    ExperimentInstance(
+      name="ycsb_{}_512".format(workload),
+      options={
+        **YCSB_OPTIONS,
+        "record_size_bytes": 512,
+        "workload_path": "'$YCSB_TRACE_PATH/ycsb-20M-10Mop-w{}'".format(workload),
+      },
+    )
+    for workload in WORKLOADS
+  ],
+  deps=[
+    ":preload_512-20M",
+  ],
+)
+
+# Runs YCSB A on a database that was preloaded with 100 million 16 byte
+# records. Deferred I/O is turned on with a threshold of 400 with at most 2
+# deferrals per record.
+run_experiment(
+  name="ycsb_a_16_defer",
+  run="./run_ycsb.sh 16-100M",
+  options={
+    **YCSB_OPTIONS,
+    "record_size_bytes": 16,
+    "io_threshold": 400,
+    "max_deferrals": 2,
+    "workload_path": "'$YCSB_TRACE_PATH/ycsb-100M-10Mop-wa'",
+  },
+  deps=[
+    ":preload_16-100M",
+  ],
+)
+
+# Runs YCSB A on a database that was preloaded with 20 million 512 byte
+# records. Deferred I/O is turned on with a threshold of 100 with at most 1
+# deferral per record.
+run_experiment(
+  name="ycsb_a_512_defer",
+  run="./run_ycsb.sh 512-20M",
+  options={
+    **YCSB_OPTIONS,
+    "record_size_bytes": 512,
+    "io_threshold": 100,
+    "max_deferrals": 1,
+    "workload_path": "'$YCSB_TRACE_PATH/ycsb-20M-10Mop-wa'",
+  },
+  deps=[
+    ":preload_512-20M",
+  ],
+)
+
+# Groups all the YCSB deferral experiments into one task (mainly used to help
+# simplify the `summarize_overall` task below).
+combine(
+  name="ycsb_defer",
+  deps=[
+    ":ycsb_a_16_defer",
+    ":ycsb_a_512_defer",
+  ],
+)
+
+# Runs all the YCSB workloads (above).
+combine(
+  name="overall",
+  deps=[
+    ":ycsb_16",
+    ":ycsb_512",
+    ":ycsb_defer",
+  ],
+)
+
+# Aggregates the results from `:overall` into one csv file.
+run_command(
+  name="summarize_overall",
+  run="python3 summarize.py",
+  deps=[
+    ":overall",
+  ],
+)

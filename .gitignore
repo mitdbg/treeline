@@ -3,6 +3,9 @@ bench/workloads/
 build/
 cmake-build-debug/
 cmake-build-release/
+cond-out/
+scripts/e2e_perf/experiment_config.sh
+scripts/e2e_perf/results
 
 .idea/
 .vscode/

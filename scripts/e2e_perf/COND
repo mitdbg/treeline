@@ -1,0 +1,15 @@
+# Ensures the benchmark executables have been compiled.
+run_command(
+  name="build_benchmarks",
+  run="./build_benchmarks.sh",
+)
+
+# Combines all the results into one csv file.
+run_command(
+  name="summarize_overall",
+  run="python3 combine.py",
+  deps=[
+    "//scripts/e2e_perf/synth_write:summarize_overall",
+    "//scripts/e2e_perf/ycsb:summarize_overall",
+  ],
+)

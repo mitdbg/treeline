@@ -243,7 +243,7 @@ class LLSMInterface {
 template <class DatabaseInterface>
 ycsbr::BenchmarkResult Run(DatabaseInterface& db,
                            const std::optional<ycsbr::BulkLoadWorkload>& load,
-                           const ycsbr::Workload& workload) {
+                           const std::optional<ycsbr::Workload>& workload) {
   ycsbr::BenchmarkOptions boptions;
   boptions.num_threads = FLAGS_threads;
   if (FLAGS_verbose) {
@@ -251,10 +251,21 @@ ycsbr::BenchmarkResult Run(DatabaseInterface& db,
               << " application thread(s)." << std::endl;
   }
 
-  if (load.has_value()) {
-    return ycsbr::RunTimedWorkload(db, *load, workload, boptions);
+  if (load.has_value() && workload.has_value()) {
+    // Load then run the workload.
+    return ycsbr::RunTimedWorkload(db, *load, *workload, boptions);
+
+  } else if (workload.has_value()) {
+    // Workload only (database assumed to be preloaded).
+    return ycsbr::RunTimedWorkload(db, *workload, boptions);
+
+  } else if (load.has_value()) {
+    // Bulk load only.
+    return ycsbr::RunTimedWorkload(db, *load);
+
   } else {
-    return ycsbr::RunTimedWorkload(db, workload, boptions);
+    // Nothing to run.
+    return ycsbr::BenchmarkResult(std::chrono::nanoseconds(0));
   }
 }
 
@@ -269,12 +280,8 @@ void PrintExperimentResult(const std::string& db,
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Run YCSB workloads on LLSM and RocksDB.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
-  if (FLAGS_workload_path.empty()) {
-    std::cerr << "ERROR: Please provide a workload." << std::endl;
-    return 1;
-  }
-  DBType db = llsm::bench::ParseDBType(FLAGS_db).value();
 
+  DBType db = llsm::bench::ParseDBType(FLAGS_db).value();
   RocksDBInterface rocksdb;
   LLSMInterface llsm;
 
@@ -293,10 +300,12 @@ int main(int argc, char* argv[]) {
                          /*num_keys=*/load->size());
   }
 
-  ycsbr::Workload::Options options;
-  options.value_size = FLAGS_record_size_bytes - 8;
-  ycsbr::Workload workload =
-      ycsbr::Workload::LoadFromFile(FLAGS_workload_path, options);
+  std::optional<ycsbr::Workload> workload;
+  if (!FLAGS_workload_path.empty()) {
+    ycsbr::Workload::Options options;
+    options.value_size = FLAGS_record_size_bytes - 8;
+    workload = ycsbr::Workload::LoadFromFile(FLAGS_workload_path, options);
+  }
 
   if (!fs::exists(FLAGS_db_path)) {
     fs::create_directory(FLAGS_db_path);

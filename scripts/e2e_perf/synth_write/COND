@@ -1,0 +1,84 @@
+from itertools import product
+
+ORDERING = ["order", "shuffle"]
+RECORD_SIZES = [16, 512]
+COMMON_OPTIONS = {
+  "db": "llsm",
+  "bg_threads": 16,
+  "data_mib": 1024,
+  "bypass_wal": True,
+  "memtable_size_mib": 64,
+  "cache_size_mib": 64,
+  "llsm_page_fill_pct": 50,
+}
+DEFER_OPTIONS = [
+  {
+    "record_size_bytes": 16,
+    "io_threshold": 400,
+    "max_deferrals": 2,
+  },
+  {
+    "record_size_bytes": 512,
+    "io_threshold": 100,
+    "max_deferrals": 1,
+  },
+]
+
+# These experiments are used to evaluate the performance of LLSM on a few
+# preset "overall" configurations without deferred I/O.
+run_experiment_group(
+  name="overall_no_deferral",
+  run="./run_synth_write.sh",
+  experiments=[
+    ExperimentInstance(
+      name="sw_{order}_{record_size}".format(
+        order=order,
+        record_size=record_size,
+      ),
+      options={
+        **COMMON_OPTIONS,
+        "record_size_bytes": record_size,
+        "shuffle": True if order == "shuffle" else False,
+      },
+    )
+    for order, record_size in product(ORDERING, RECORD_SIZES)
+  ],
+  deps=[
+    "//scripts/e2e_perf:build_benchmarks",
+  ],
+)
+
+# These experiments are used to evaluate the performance of LLSM on a few
+# preset configurations when deferred I/O is used. We only use shuffled
+# data in this experiment group.
+run_experiment_group(
+  name="overall_deferral",
+  run="./run_synth_write.sh",
+  experiments=[
+    ExperimentInstance(
+      name="sw_shuffle_{record_size}_defer".format(
+        record_size=instance_options["record_size_bytes"],
+      ),
+      options={
+        **COMMON_OPTIONS,
+        **instance_options,
+        "shuffle": True,
+      },
+    )
+    for instance_options in DEFER_OPTIONS
+  ],
+  deps=[
+    "//scripts/e2e_perf:build_benchmarks",
+  ],
+)
+
+# Aggregates the results from `:overall_no_deferral` and `:overall_deferral`
+# into one csv file.
+run_command(
+  name="summarize_overall",
+  run="python3 summarize.py",
+  deps=[
+    ":overall_no_deferral",
+    ":overall_deferral",
+  ],
+)
