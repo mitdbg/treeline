@@ -9,6 +9,9 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <memory>
+
+#include "llsm/statistics.h"
 
 namespace llsm {
 
@@ -52,8 +55,8 @@ struct Options {
   // necessary to actually copy the entries out during a memtable flush.
   size_t deferred_io_min_entries = 1;
 
-  // The maximum number of times that we are allowed to not copy some page out during
-  // a memtable flush.
+  // The maximum number of times that we are allowed to not copy some page out
+  // during a memtable flush.
   uint64_t deferred_io_max_deferrals = 0;
 
   // Currently only used when creating a new database. When reopening an
@@ -68,6 +71,10 @@ struct Options {
   // If true, LLSM will pin the background threads to cores `0` to
   // `background_threads - 1`.
   bool pin_threads = true;
+
+  // If provided with a pointer to a Statistics object, LLSM will keep track of
+  // the relevant statistics and output them in the destructor.
+  std::shared_ptr<Statistics> stats = nullptr;
 };
 
 struct ReadOptions {};
@@ -76,8 +83,8 @@ struct WriteOptions {
   // If true, LLSM will optimize inserts for bulk loading sorted keys.
   bool sorted_load = false;
   // Only checked when `sorted_load` is true. If true, the inserted values will
-  // be checked to ensure they are indeed sorted. If not, the user is responsible 
-  // for ensuring that.
+  // be checked to ensure they are indeed sorted. If not, the user is
+  // responsible for ensuring that.
   bool perform_checks = true;
 
   // If true, the write will not be written to LLSM's write-ahead log.

@@ -404,6 +404,7 @@ void DBImpl::ScheduleMemTableFlush(const FlushOptions& options,
 
   // Schedule the flush to run in the background.
   last_flush_ = workers_->Submit([this, options, flush_log_version]() {
+    if (options_.stats != nullptr) ++options_.stats->flush_count_;
     size_t current_page = std::numeric_limits<size_t>::max();
     size_t current_page_deferral_count = 0;
     bool current_page_dispatched_fixer = false;
@@ -426,6 +427,8 @@ void DBImpl::ScheduleMemTableFlush(const FlushOptions& options,
       // return to it.
       if (page_id != current_page) {
         if (current_page != std::numeric_limits<size_t>::max()) {
+          if (options_.stats != nullptr)
+            options_.stats->flush_records_ += records_for_page.size();
           if (ShouldFlush(options, records_for_page.size(),
                           current_page_deferral_count)) {
             // Submit flush job to workers - this is not the "first" page.
@@ -473,6 +476,8 @@ void DBImpl::ScheduleMemTableFlush(const FlushOptions& options,
     }
 
     // Flush entries in the last page.
+    if (options_.stats != nullptr)
+      options_.stats->flush_records_ += records_for_page.size();
     if (ShouldFlush(options, records_for_page.size(),
                     current_page_deferral_count)) {
       assert(current_page != std::numeric_limits<size_t>::max());
@@ -535,6 +540,16 @@ void DBImpl::FlushWorker(
         std::tuple<const Slice, const Slice, const format::WriteType>>& records,
     std::future<BufferFrame*>& bf_future) {
   auto bf = bf_future.get();
+  if (options_.stats != nullptr) {
+    if (bf->IsNewlyFixed()) {
+      ++options_.stats->page_io_count_;
+      options_.stats->page_io_records_ += records.size();
+    } else {
+      ++options_.stats->page_cached_count_;
+      options_.stats->page_cached_records_ += records.size();
+    }
+  }
+
   // Lock the frame again for use. This does not increment the fix count of
   // the frame, i.e. there is no danger of "double-fixing".
   bf->Lock(/*exclusive = */ true);
@@ -577,6 +592,10 @@ void DBImpl::ReinsertionWorker(
   // Until this worker completes, no other threads are able to modify `mtable_`.
   // Acquiring `mutex_` ensures writes to the memtable do not occur
   // concurrently.
+  if (options_.stats != nullptr) {
+    ++options_.stats->deferred_count_;
+    options_.stats->deferred_records_ += records.size();
+  }
   std::unique_lock<std::mutex> lock(mutex_);
   for (auto& kv : records) {
     // This add will proceed even if mtable_ appears full to regular writers.

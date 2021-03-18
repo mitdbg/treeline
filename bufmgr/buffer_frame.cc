@@ -51,6 +51,7 @@ void BufferFrame::SetEviction(const uint8_t value) {
 }
 void BufferFrame::UnsetEviction() { UnsetFlags(kEvictionFlags); }
 uint8_t BufferFrame::GetEviction() const { return flags_ & kEvictionFlags; }
+bool BufferFrame::IsNewlyFixed() const { return (GetEviction() == 0); }
 
 // Unset all flags of the current frame.
 void BufferFrame::UnsetAllFlags() { flags_ = 0; }

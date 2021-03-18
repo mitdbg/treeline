@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <future>
@@ -127,7 +128,8 @@ class DBImpl : public DB {
   // Immutable memtable currently being flushed, if not null. Writes to this
   // table are not allowed. Reads of this table can occur concurrently iff the
   // reading thread has its own copy of the shared pointer.
-  // REQUIRES: `mtable_mutex_` is held for read/write/copy of the *pointer* only.
+  // REQUIRES: `mtable_mutex_` is held for read/write/copy of the *pointer*
+  // only.
   std::shared_ptr<MemTable> im_mtable_;
 
   // Is set to true when both `mtable_` and `im_mtable_` are full (i.e.,

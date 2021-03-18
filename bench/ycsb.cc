@@ -24,6 +24,9 @@ DEFINE_string(workload_path, "", "Path to the workload file.");
 DEFINE_uint32(threads, 1, "The number of threads to use to run the workload.");
 DEFINE_bool(verbose, false,
             "If set, benchmark information will be printed to stderr.");
+DEFINE_bool(
+    print_llsm_stats, false,
+    "If set, statistics about LLSM will be collected and printed to stderr.");
 
 class RocksDBInterface {
  public:
@@ -136,7 +139,8 @@ class RocksDBInterface {
 
 class LLSMInterface {
  public:
-  LLSMInterface() : db_(nullptr), min_key_(0), max_key_(0), num_keys_(1) {}
+  LLSMInterface()
+      : db_(nullptr), stats_(nullptr), min_key_(0), max_key_(0), num_keys_(1) {}
 
   // Set the key distribution hints needed by LLSM to start up.
   void SetKeyDistHints(uint64_t min_key, uint64_t max_key, uint64_t num_keys) {
@@ -172,6 +176,11 @@ class LLSMInterface {
       std::cerr << "> Opening LLSM DB at " << dbname << std::endl;
     }
 
+    if (FLAGS_print_llsm_stats) {
+      stats_ = std::make_shared<llsm::Statistics>();
+      options.stats = stats_;
+    }
+
     llsm::Status status = llsm::DB::Open(options, dbname, &db_);
     if (!status.ok()) {
       throw std::runtime_error("Failed to start LLSM: " + status.ToString());
@@ -182,6 +191,14 @@ class LLSMInterface {
   void DeleteDatabase() {
     if (db_ == nullptr) {
       return;
+    }
+    if (FLAGS_print_llsm_stats) {
+      std::cerr << "--------------------" << std::endl;
+      std::cerr << "Printing stats for deferral parameters "
+                << FLAGS_io_threshold << ","
+                << FLAGS_max_deferrals << std::endl;
+      std::cerr << *(stats_);
+      std::cerr << "--------------------" << std::endl;
     }
     delete db_;
     db_ = nullptr;
@@ -194,7 +211,10 @@ class LLSMInterface {
         throw std::runtime_error("Failed to bulk load a record!");
       }
     }
-    db_->FlushMemTable(llsm::FlushOptions());
+    llsm::FlushOptions options;
+    options.disable_deferred_io = true;
+    db_->FlushMemTable(options);
+    if (FLAGS_print_llsm_stats) { stats_->Clear(); }
   }
 
   // Update the value at the specified key. Return true if the update succeeded.
@@ -232,6 +252,7 @@ class LLSMInterface {
 
  private:
   llsm::DB* db_;
+  std::shared_ptr<llsm::Statistics> stats_;
 
   // These variables are used to provide hints about the key distribution to
   // LLSM when creating a new database. We need these hints because LLSM

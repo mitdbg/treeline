@@ -55,6 +55,7 @@ class BufferFrame {
   void SetEviction(const uint8_t value);
   void UnsetEviction();
   uint8_t GetEviction() const;
+  bool IsNewlyFixed() const;
 
   // Unset all flags of the current frame.
   void UnsetAllFlags();
