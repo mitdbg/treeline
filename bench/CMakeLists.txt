@@ -25,6 +25,10 @@ target_link_libraries(synth_write bench_common_config)
 add_executable(ycsb ycsb.cc)
 target_link_libraries(ycsb bench_common_config ycsbrunner)
 
+# Hash Table YCSB: Run extracted YCSB workloads against different hash table implementations.
+add_executable(hashtable_ycsb hashtable_ycsb.cc)
+target_link_libraries(hashtable_ycsb Threads::Threads gflags ycsbrunner)
+
 # Microbench: An executable containing all of LLSM's microbenchmarks.
 add_executable(microbench
   memtable_benchmark.cc

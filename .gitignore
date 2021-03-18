@@ -1,3 +1,4 @@
+bench/hash_tables/libcuckoo/build
 bench/results/
 bench/workloads/
 build/
