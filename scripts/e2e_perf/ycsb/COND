@@ -27,6 +27,8 @@ YCSB_OPTIONS = {
   "memtable_size_mib": 64,
   "use_direct_io": True,
 }
+CACHE_SIZE_MIB_16 = 512
+CACHE_SIZE_MIB_512 = 3200
 
 # Runs YCSB workloads on a database that was preloaded with 100 million 16 byte
 # records.
@@ -39,6 +41,7 @@ run_experiment_group(
       options={
         **YCSB_OPTIONS,
         "record_size_bytes": 16,
+        "cache_size_mib": CACHE_SIZE_MIB_16,
         "workload_path": "'$YCSB_TRACE_PATH/ycsb-100M-10Mop-w{}'".format(workload),
       },
     )
@@ -60,6 +63,7 @@ run_experiment_group(
       options={
         **YCSB_OPTIONS,
         "record_size_bytes": 512,
+        "cache_size_mib": CACHE_SIZE_MIB_512,
         "workload_path": "'$YCSB_TRACE_PATH/ycsb-20M-10Mop-w{}'".format(workload),
       },
     )
@@ -79,6 +83,7 @@ run_experiment(
   options={
     **YCSB_OPTIONS,
     "record_size_bytes": 16,
+    "cache_size_mib": CACHE_SIZE_MIB_16,
     "io_threshold": 400,
     "max_deferrals": 2,
     "workload_path": "'$YCSB_TRACE_PATH/ycsb-100M-10Mop-wa'",
@@ -97,6 +102,7 @@ run_experiment(
   options={
     **YCSB_OPTIONS,
     "record_size_bytes": 512,
+    "cache_size_mib": CACHE_SIZE_MIB_512,
     "io_threshold": 100,
     "max_deferrals": 1,
     "workload_path": "'$YCSB_TRACE_PATH/ycsb-20M-10Mop-wa'",
