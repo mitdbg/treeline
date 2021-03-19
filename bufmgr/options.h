@@ -39,6 +39,10 @@ struct BufMgrOptions {
 
   // Whether or not the buffer manager should use direct I/O.
   bool use_direct_io = false;
+
+  // Whether the buffer manager should be run without an underlying file manager, 
+  // for performance benchmarking purposes.
+  bool simulation_mode = false;
 };
 
 }  // namespace llsm

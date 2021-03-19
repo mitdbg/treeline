@@ -57,6 +57,10 @@ class BufferManager {
   // Writes all dirty pages to disk (without unfixing)
   void FlushDirty();
 
+  // Indicates whether the page given by `page_id` is currently in the buffer
+  // manager.
+  bool Contains(const uint64_t page_id);
+
   // Provides access to the underlying FileManager
   FileManager* GetFileManager() const { return file_manager_.get(); }
 
@@ -82,18 +86,11 @@ class BufferManager {
   void LockEvictionMutex() { eviction_mutex_.lock(); }
   void UnlockEvictionMutex() { eviction_mutex_.unlock(); }
 
-  // Creates a new frame and specifies that it will hold the page with
-  // `page_id`.
-  bool CreateFrame(const uint64_t page_id, size_t* frame_id);
+  // If there are free frames left, returns one of them. Else, returns nullptr.
+  BufferFrame* GetFreeFrame();
 
-  // Resets an exisiting frame to hold the page with `new_page_id`.
-  void ResetFrame(BufferFrame* frame, const uint64_t new_page_id);
-
-  // Increments the free pointer up to a max value, returning the old value.
-  size_t PostIncFreePtr();
-
-    // Provides a pointer to the right part of the buffer pool, given frame_id.
-  void* FrameIdToData(const uint64_t frame_id) const;
+  // Sets the `data_` field of each frame in frames_.
+  void SetFrameDataPointers();
 
   // The number of pages the buffer manager should keep in memory.
   const size_t buffer_manager_size_;
@@ -104,6 +101,7 @@ class BufferManager {
   // Space in memory to hold the metadata for each frame.
   std::vector<BufferFrame> frames_;
   std::atomic<uint64_t> free_ptr_;
+  std::atomic<bool> no_free_left_;
 
   // Map from page_id to the buffer frame (if any) that currently holds that
   // page in memory, and a mutex for editing it.

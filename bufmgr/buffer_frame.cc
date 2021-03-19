@@ -5,28 +5,27 @@
 namespace llsm {
 
 BufferFrame::BufferFrame() {
-  data_ = nullptr;
+  SetData(nullptr);
   pthread_rwlock_init(&rwlock_, nullptr);
   UnsetAllFlags();
-  fix_count_ = 0;
+  ClearFixCount();
 }
 
 // Free all resources.
 BufferFrame::~BufferFrame() { pthread_rwlock_destroy(&rwlock_); }
 
-// Initialize a buffer frame based on the page with the specified `page_id`,
-// which is pointed to by `data`.
-void BufferFrame::Initialize(const uint64_t page_id, void* data) {
-  data_ = data;
+// Initialize a buffer frame based on the page with the specified `page_id`.
+void BufferFrame::Initialize(const uint64_t page_id) {
   SetPageId(page_id);
   UnsetAllFlags();
-  fix_count_ = 0;
+  ClearFixCount();
 }
 
 // Get the page held in the current frame.
 Page BufferFrame::GetPage() const { return Page(data_); }
 
-// Get a pointer to the data of the page held in the current frame.
+// Set/get a pointer to the data of the page held in the current frame.
+void BufferFrame::SetData(void* data) { data_ = data; }
 void* BufferFrame::GetData() const { return data_; }
 
 // Set/get the page ID of the page held in the current frame.

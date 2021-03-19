@@ -47,3 +47,8 @@ target_link_libraries(deferred_io bench_common gflags ycsbrunner)
 # a write-ahead log.
 add_executable(wal wal_benchmark.cc)
 target_link_libraries(wal bench_common gflags benchmark::benchmark)
+
+# Buffer manager simulation: A microbenchmark for the added latency of the 
+# buffer manager, excluding the underlying I/O operations.
+add_executable(bufmgr_benchmark buffer_manager_benchmark.cc)
+target_link_libraries(bufmgr_benchmark bench_common_config gflags ycsbrunner benchmark::benchmark)

@@ -106,4 +106,48 @@ TEST(BufferManagerTest, FlushDirty) {
   std::filesystem::remove_all(dbname);
 }
 
+TEST(BufferManagerTest, Contains) {
+  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  std::filesystem::remove_all(dbname);
+  std::filesystem::create_directory(dbname);
+
+  // Create data.
+  KeyDistHints key_hints;
+  const auto values = key_utils::CreateValues<uint64_t>(key_hints);
+  const auto records = key_utils::CreateRecords<uint64_t>(values);
+
+  // Create buffer manager.
+  BufMgrOptions bm_options;
+  bm_options.SetNumPagesUsing(key_hints);
+
+  const std::unique_ptr<RSModel> model =
+      std::make_unique<RSModel>(key_hints, records);
+  const std::unique_ptr<BufferManager> buffer_manager =
+      std::make_unique<BufferManager>(bm_options, dbname);
+  model->Preallocate(records, buffer_manager);
+
+  // Check that first few pages are contained upon being fixed.
+  const size_t few_pages = std::min(
+      static_cast<size_t>(3), buffer_manager->GetFileManager()->GetNumPages());
+
+  for (size_t i = 0; i < few_pages; ++i) {
+    ASSERT_FALSE(buffer_manager->Contains(i));
+    llsm::BufferFrame& bf = buffer_manager->FixPage(i, true);
+    ASSERT_TRUE(buffer_manager->Contains(i));
+    buffer_manager->UnfixPage(bf, true);
+    ASSERT_TRUE(buffer_manager->Contains(i));
+  }
+
+  // Check that the following few pages are not contained, having never been
+  // fixed.
+  const size_t some_more_pages = std::min(
+      static_cast<size_t>(6), buffer_manager->GetFileManager()->GetNumPages());
+
+  for (size_t i = few_pages; i < some_more_pages; ++i) {
+    ASSERT_FALSE(buffer_manager->Contains(i));
+  }
+
+  std::filesystem::remove_all(dbname);
+}
+
 }  // namespace

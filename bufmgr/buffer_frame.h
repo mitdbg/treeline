@@ -27,14 +27,14 @@ class BufferFrame {
   // Free all resources.
   ~BufferFrame();
 
-  // Initialize a buffer frame based on the page with the specified `page_id`,
-  // which is pointed to by `data`.
-  void Initialize(const uint64_t page_id, void* data);
+  // Initialize a buffer frame based on the page with the specified `page_id`.
+  void Initialize(const uint64_t page_id);
 
   // Return the page held in the current frame.
   Page GetPage() const;
 
-  // Get a pointer to the data of the page held in the current frame.
+  // Set/get a pointer to the data of the page held in the current frame.
+  void SetData(void* data);
   void* GetData() const;
 
   // Set/get the page ID of the page held in the current frame.

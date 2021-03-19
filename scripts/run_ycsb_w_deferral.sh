@@ -38,8 +38,11 @@ declare -a DIRECT_IO=(
 NOW=$(date "+%F_%H_%M")
 
 LOG_FILE=~/LearnedLSM/learnedlsm/bench/results/experiment_$NOW
+STATS_FILE=${LOG_FILE}_stats
 touch $LOG_FILE
+touch $STATS_FILE
 echo "${LOG_FILE}" > $LOG_FILE
+echo "${STATS_FILE}" > $STATS_FILE
 
 for workload in "${WORKLOAD_PAIRS[@]}"; do
   for threads in "${THREADS[@]}"; do
@@ -49,7 +52,7 @@ for workload in "${WORKLOAD_PAIRS[@]}"; do
           name="${workload} -threads=${threads} -use_direct_io=${direct} -io_threshold=${threshold} -max_deferrals=${deferrals}"
           echo "[$(date +"%D %T")] Running $name"
           rm -rf test
-          ~/LearnedLSM/learnedlsm/build/release/bench/ycsb --db_path=test -db=llsm -cache_size_mib=256 -bg_threads=16 $name >> $LOG_FILE 		
+          ~/LearnedLSM/learnedlsm/build/release/bench/ycsb --db_path=test -db=llsm -cache_size_mib=256 -bg_threads=16 $name -print_llsm_stats=true >> $LOG_FILE 2>> $STATS_FILE		
         done 
       done
     done

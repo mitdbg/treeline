@@ -32,30 +32,23 @@ BufferManager::BufferManager(const BufMgrOptions& options,
   page_to_frame_map_ = std::make_unique<SyncHashTable<uint64_t, BufferFrame*>>(
       buffer_manager_size_, /*num_partitions = */ 1);
   frames_ = std::vector<BufferFrame>(buffer_manager_size_);
+  SetFrameDataPointers();
   free_ptr_ = 0;
+  no_free_left_ = false;
 
   page_eviction_strategy_ =
       std::make_unique<TwoQueueEviction>(buffer_manager_size_);
-  file_manager_ = std::make_unique<FileManager>(options, std::move(db_path));
+  if (!options.simulation_mode) {
+    file_manager_ = std::make_unique<FileManager>(options, std::move(db_path));
+  } else {
+    file_manager_ = nullptr;
+  }
 }
 
 // Writes all dirty pages back and frees resources.
 BufferManager::~BufferManager() {
-  LockMapMutex();
-  LockEvictionMutex();
-
-  // Write all the dirty pages back.
-  BufferFrame* frame;
-  while ((frame = page_eviction_strategy_->Evict()) != nullptr) {
-    frame->Lock(/*exclusive=*/false);
-    if (frame->IsDirty()) WritePageOut(frame);
-    frame->Unlock();
-  }
-
+  FlushDirty();
   free(pages_cache_);
-
-  UnlockEvictionMutex();
-  UnlockMapMutex();
 }
 
 // Retrieves the page given by `page_id`, to be held exclusively or not
@@ -64,7 +57,6 @@ BufferManager::~BufferManager() {
 BufferFrame& BufferManager::FixPage(const uint64_t page_id,
                                     const bool exclusive) {
   BufferFrame* frame = nullptr;
-  size_t frame_id;
   bool success;
 
   // Check if page is already loaded in some frame.
@@ -82,9 +74,9 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
     UnlockEvictionMutex();
     UnlockMapMutex();
 
-    success = CreateFrame(page_id, &frame_id);
+    frame = GetFreeFrame();
 
-    if (!success) {  // Must evict something to make space.
+    if (frame == nullptr) {  // Must evict something to make space.
       // Block here until you can evict something
       while (frame == nullptr) {
         LockMapMutex();
@@ -102,15 +94,10 @@ BufferFrame& BufferManager::FixPage(const uint64_t page_id,
         WritePageOut(frame);
         frame->UnsetDirty();
       }
-
-      // Reset frame to new page_id
-      ResetFrame(frame, page_id);
-    } else {
-      frame = &frames_[frame_id];
-      frame->Initialize(page_id, FrameIdToData(frame_id));
     }
 
-    // Read the page from disk into the selected frame.
+    // Initialize and populate the frame
+    frame->Initialize(page_id);
     frame->IncFixCount();
     ReadPageIn(frame);
 
@@ -160,46 +147,50 @@ void BufferManager::FlushDirty() {
   UnlockMapMutex();
 }
 
+// Indicates whether the page given by `page_id` is currently in the buffer
+// manager.
+bool BufferManager::Contains(const uint64_t page_id) {
+  BufferFrame* value_out;
+
+  LockMapMutex();
+  bool return_val = page_to_frame_map_->UnsafeLookup(page_id, &value_out);
+  UnlockMapMutex();
+
+  return return_val;
+}
+
 // Writes the page held by `frame` to disk.
 void BufferManager::WritePageOut(BufferFrame* frame) const {
-  file_manager_->WritePage(frame->GetPageId(), frame->GetData());
+  if (file_manager_ != nullptr)
+    file_manager_->WritePage(frame->GetPageId(), frame->GetData());
 }
 
 // Reads a page from disk into `frame`.
 void BufferManager::ReadPageIn(BufferFrame* frame) {
-  file_manager_->ReadPage(frame->GetPageId(), frame->GetData());
+  if (file_manager_ != nullptr)
+    file_manager_->ReadPage(frame->GetPageId(), frame->GetData());
 }
 
-// Creates a new frame and specifies that it will hold the page with `page_id`.
-// Returns nullptr if no new frame can be created.
-bool BufferManager::CreateFrame(const uint64_t page_id, size_t* frame_id) {
-  size_t frame_id_loc = PostIncFreePtr();
+// If there are free frames left, returns one of them. Else, returns nullptr.
+BufferFrame* BufferManager::GetFreeFrame() {
+  if (no_free_left_) return nullptr;
+
+  size_t frame_id_loc = free_ptr_++;
   if (frame_id_loc >= buffer_manager_size_) {
-    return false;
+    no_free_left_ = true;
+    return nullptr;
   } else {
-    *frame_id = frame_id_loc;
-    return true;
+    return &frames_[frame_id_loc];
   }
 }
 
-// Resets an exisiting frame to hold the page with `new_page_id`.
-void BufferManager::ResetFrame(BufferFrame* frame, const uint64_t new_page_id) {
-  frame->UnsetAllFlags();
-  frame->SetPageId(new_page_id);
-  frame->ClearFixCount();
-}
-
-size_t BufferManager::PostIncFreePtr() {
-  const size_t old_val = free_ptr_++;
-  if (old_val > buffer_manager_size_) free_ptr_ = buffer_manager_size_;
-  return old_val;
-}
-
-void* BufferManager::FrameIdToData(const uint64_t frame_id) const {
+void BufferManager::SetFrameDataPointers() {
   char* page_ptr = reinterpret_cast<char*>(pages_cache_);
-  page_ptr += (frame_id * Page::kSize);
 
-  return reinterpret_cast<void*>(page_ptr);
+  for (uint64_t frame_id = 0; frame_id < frames_.size(); ++frame_id) {
+    frames_[frame_id].SetData(reinterpret_cast<void*>(page_ptr));
+    page_ptr += Page::kSize;
+  }
 }
 
 }  // namespace llsm
