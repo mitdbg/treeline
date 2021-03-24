@@ -94,6 +94,38 @@ class PackedMap {
   // managed by the map user).
   void SetOverflow(uint64_t overflow);
 
+  // Returns the number of records currently stored in this map.
+  uint16_t GetNumRecords() const;
+
+  // Retrieves the common prefix among all keys stored in this map.
+  void GetKeyPrefix(const uint8_t** key_prefix_out,
+                    unsigned* key_prefix_length_out) const;
+
+  // Retrieve the key suffix stored in the given `slot_id`, returning true if
+  // successful. Note that the full key is the prefix given by `GetKeyPrefix()`
+  // concatenated with the suffix retrieved by this method.
+  //
+  // If there is no record at the provided `slot_id` (e.g., if `slot_id >=
+  // GetNumRecords()`), this method will return false.
+  bool GetKeySuffixInSlot(uint16_t slot_id, const uint8_t** key_suffix_out,
+                          unsigned* key_suffix_length_out) const;
+
+  // Retrieve the payload stored in the given `slot_id`, returning true if
+  // successful.
+  //
+  // If there is no record at the provided `slot_id` (e.g., if `slot_id >=
+  // GetNumRecords()`), this method will return false.
+  bool GetPayloadInSlot(uint16_t slot_id, const uint8_t** payload_out,
+                        unsigned* payload_length_out) const;
+
+  // Finds the `slot_id` containing the first record with a key that is greater
+  // than or equal to `key`.
+  //
+  // If no such record exists (e.g., if this map is empty or all record keys are
+  // less than `key`), the returned `slot_id` will be greater than or equal to
+  // the return value of `GetNumRecords()`.
+  uint16_t LowerBoundSlot(const uint8_t* key, unsigned key_length) const;
+
  private:
   static constexpr unsigned kHintCount = 16;
   struct Header {
@@ -189,6 +221,8 @@ class PackedMap {
  public:
   static constexpr size_t kMaxKeySizeBytes =
       (MapSizeBytes - kTotalMetadataBytes - (2 * sizeof(Slot))) / 4;
+  static constexpr size_t kUsableSize = MapSizeBytes - kTotalMetadataBytes;
+  static constexpr size_t kSlotSize = sizeof(Slot);
 };
 
 }  // namespace llsm

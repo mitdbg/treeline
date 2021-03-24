@@ -233,7 +233,7 @@ template <uint16_t MapSizeBytes>
 bool PackedMap<MapSizeBytes>::Remove(const uint8_t* key, unsigned key_length) {
   bool found;
   const unsigned slot_id = LowerBound(key, key_length, found);
-  if (!found) return false; 
+  if (!found) return false;
   return RemoveSlot(slot_id);
 }
 
@@ -409,6 +409,53 @@ uint64_t PackedMap<MapSizeBytes>::GetOverflow() const {
 template <uint16_t MapSizeBytes>
 void PackedMap<MapSizeBytes>::SetOverflow(uint64_t overflow) {
   header_.overflow = overflow;
+}
+
+template <uint16_t MapSizeBytes>
+uint16_t PackedMap<MapSizeBytes>::GetNumRecords() const {
+  return header_.count;
+}
+
+template <uint16_t MapSizeBytes>
+void PackedMap<MapSizeBytes>::GetKeyPrefix(
+    const uint8_t** key_prefix_out, unsigned* key_prefix_length_out) const {
+  *key_prefix_out = Ptr() + header_.lower_fence.offset;
+  *key_prefix_length_out = header_.prefix_length;
+}
+
+template <uint16_t MapSizeBytes>
+bool PackedMap<MapSizeBytes>::GetKeySuffixInSlot(
+    const uint16_t slot_id, const uint8_t** key_suffix_out,
+    unsigned* key_suffix_length_out) const {
+  if (slot_id >= GetNumRecords()) {
+    *key_suffix_out = nullptr;
+    *key_suffix_length_out = 0;
+    return false;
+  }
+  *key_suffix_out = GetKey(slot_id);
+  *key_suffix_length_out = slot_[slot_id].key_length;
+  return true;
+}
+
+template <uint16_t MapSizeBytes>
+bool PackedMap<MapSizeBytes>::GetPayloadInSlot(
+    const uint16_t slot_id, const uint8_t** payload_out,
+    unsigned* payload_length_out) const {
+  if (slot_id >= GetNumRecords()) {
+    *payload_out = nullptr;
+    *payload_length_out = 0;
+    return false;
+  }
+  *payload_out = GetPayload(slot_id);
+  *payload_length_out = slot_[slot_id].payload_length;
+  return true;
+}
+
+template <uint16_t MapSizeBytes>
+uint16_t PackedMap<MapSizeBytes>::LowerBoundSlot(const uint8_t* key,
+                                                 unsigned key_length) const {
+  bool found = false;
+  return LowerBound(key, key_length, found);
 }
 
 template <uint16_t MapSizeBytes>

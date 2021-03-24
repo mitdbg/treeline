@@ -1,6 +1,7 @@
 #include "util/packed_map.h"
 
 #include <algorithm>
+#include <optional>
 #include <random>
 #include <string>
 #include <utility>
@@ -57,6 +58,38 @@ class PackedMapShim {
     return true;
   }
 
+  uint16_t GetNumRecords() const { return m_.GetNumRecords(); }
+
+  Slice GetKeyPrefix() const {
+    const uint8_t* prefix = nullptr;
+    unsigned length = 0;
+    m_.GetKeyPrefix(&prefix, &length);
+    return Slice(reinterpret_cast<const char*>(prefix), length);
+  }
+
+  std::optional<Slice> GetKeySuffixInSlot(uint16_t slot_id) const {
+    const uint8_t* suffix = nullptr;
+    unsigned length = 0;
+    if (!m_.GetKeySuffixInSlot(slot_id, &suffix, &length)) {
+      return std::optional<Slice>();
+    }
+    return Slice(reinterpret_cast<const char*>(suffix), length);
+  }
+
+  std::optional<Slice> GetPayloadInSlot(uint16_t slot_id) const {
+    const uint8_t* payload = nullptr;
+    unsigned length = 0;
+    if (!m_.GetPayloadInSlot(slot_id, &payload, &length)) {
+      return std::optional<Slice>();
+    }
+    return Slice(reinterpret_cast<const char*>(payload), length);
+  }
+
+  uint16_t LowerBoundSlot(const Slice& key) const {
+    return m_.LowerBoundSlot(reinterpret_cast<const uint8_t*>(key.data()),
+                             key.size());
+  }
+
  private:
   PackedMap<Size> m_;
 };
@@ -78,7 +111,7 @@ TEST(PackedMapTest, SimpleRemove) {
   const std::string value = "world";
   ASSERT_TRUE(map.Insert(key, value));
   ASSERT_TRUE(map.Remove(key));
-  ASSERT_FALSE(map.Remove(key)); // Will be no-op
+  ASSERT_FALSE(map.Remove(key));  // Will be no-op
   std::string read_value;
   ASSERT_FALSE(map.Get(key, &read_value));
 }
@@ -246,6 +279,83 @@ TEST(PackedMapTest, CanAppend) {
 
   // Can update largest
   ASSERT_EQ(map.CanAppend("ad"), (int8_t)0);
+}
+
+TEST(PackedMapTest, GetNumRecords) {
+  PackedMapShim<4096> map("aa", "az");
+  ASSERT_EQ(map.GetNumRecords(), 0);
+
+  ASSERT_TRUE(map.Insert("ab", "hello"));
+  ASSERT_EQ(map.GetNumRecords(), 1);
+
+  // Same key - the existing record should be replaced.
+  ASSERT_TRUE(map.Insert("ab", "hello123"));
+  ASSERT_EQ(map.GetNumRecords(), 1);
+
+  ASSERT_TRUE(map.Insert("ar", "hello world!"));
+  ASSERT_EQ(map.GetNumRecords(), 2);
+}
+
+TEST(PackedMapTest, GetKeyPrefix) {
+  PackedMapShim<4096> empty_prefix;
+  ASSERT_TRUE(empty_prefix.GetKeyPrefix().compare("") == 0);
+
+  PackedMapShim<4096> hello_prefix("helloabc", "helloworld");
+  ASSERT_TRUE(hello_prefix.GetKeyPrefix().compare("hello") == 0);
+
+  PackedMapShim<65528> char_prefix("abcdefg", "az");
+  ASSERT_TRUE(char_prefix.GetKeyPrefix().compare("a") == 0);
+}
+
+TEST(PackedMapTest, GetKeySuffixInSlot) {
+  PackedMapShim<4096> empty_prefix;
+  ASSERT_TRUE(empty_prefix.Insert("hello", "world"));
+  ASSERT_TRUE(empty_prefix.GetKeySuffixInSlot(0)->compare("hello") == 0);
+  ASSERT_FALSE(empty_prefix.GetKeySuffixInSlot(1).has_value());
+
+  PackedMapShim<4096> hello_prefix("helloabc", "helloworld");
+  ASSERT_TRUE(hello_prefix.Insert("helloaaa", "world"));
+  ASSERT_TRUE(hello_prefix.Insert("helloccc", "world"));
+  ASSERT_TRUE(hello_prefix.GetKeySuffixInSlot(0)->compare("aaa") == 0);
+  ASSERT_TRUE(hello_prefix.GetKeySuffixInSlot(1)->compare("ccc") == 0);
+  ASSERT_FALSE(hello_prefix.GetKeySuffixInSlot(2).has_value());
+}
+
+TEST(PackedMapTest, GetPayloadInSlot) {
+  PackedMapShim<4096> empty_prefix;
+  ASSERT_TRUE(empty_prefix.Insert("hello", "world"));
+  ASSERT_TRUE(empty_prefix.GetPayloadInSlot(0)->compare("world") == 0);
+  ASSERT_FALSE(empty_prefix.GetPayloadInSlot(1).has_value());
+
+  PackedMapShim<4096> hello_prefix("helloabc", "helloworld");
+  ASSERT_TRUE(hello_prefix.Insert("helloaaa", "world"));
+  ASSERT_TRUE(hello_prefix.Insert("helloccc", "worldccc"));
+  ASSERT_TRUE(hello_prefix.GetPayloadInSlot(0)->compare("world") == 0);
+  ASSERT_TRUE(hello_prefix.GetPayloadInSlot(1)->compare("worldccc") == 0);
+  ASSERT_FALSE(hello_prefix.GetPayloadInSlot(2).has_value());
+}
+
+TEST(PackedMapTest, LowerBoundSlot) {
+  PackedMapShim<4096> empty_prefix;
+  ASSERT_EQ(empty_prefix.LowerBoundSlot("hello"), 0);
+
+  ASSERT_TRUE(empty_prefix.Insert("hello", "world"));
+  ASSERT_EQ(empty_prefix.LowerBoundSlot("hello"), 0);
+  ASSERT_EQ(empty_prefix.LowerBoundSlot("hellozzz"), 1);
+
+  ASSERT_TRUE(empty_prefix.Insert("zzz", "123"));
+  ASSERT_EQ(empty_prefix.LowerBoundSlot("abc"), 0);
+  ASSERT_EQ(empty_prefix.LowerBoundSlot("zzz123"), 2);
+  ASSERT_EQ(empty_prefix.LowerBoundSlot("helloa"), 1);
+
+  PackedMapShim<4096> hello_prefix("helloabc", "helloworld");
+  ASSERT_TRUE(hello_prefix.Insert("helloaaa", "world"));
+  ASSERT_TRUE(hello_prefix.Insert("helloccc", "worldccc"));
+
+  ASSERT_EQ(hello_prefix.LowerBoundSlot("helloa"), 0);
+  ASSERT_EQ(hello_prefix.LowerBoundSlot("helloaaabbb"), 1);
+  ASSERT_EQ(hello_prefix.LowerBoundSlot("helloccc"), 1);
+  ASSERT_EQ(hello_prefix.LowerBoundSlot("hellocccd"), 2);
 }
 
 }  // namespace
