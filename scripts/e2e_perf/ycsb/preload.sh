@@ -30,6 +30,6 @@ cd ../../build
   --bg_threads=16 \
   --bypass_wal=true \
   --llsm_page_fill_pct=50 \
-  --memtable_size_mib=512 \
+  --memtable_size_mib=64 \
   --load_path=$YCSB_TRACE_PATH/$trace_name \
   $@

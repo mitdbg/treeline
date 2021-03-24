@@ -33,11 +33,11 @@ CACHE_SIZE_MIB_512 = 3200
 # Runs YCSB workloads on a database that was preloaded with 100 million 16 byte
 # records.
 run_experiment_group(
-  name="ycsb_16",
-  run="./run_ycsb.sh 16-100M",
+  name="llsm_16",
+  run="./run_ycsb.sh llsm 16-100M",
   experiments=[
     ExperimentInstance(
-      name="ycsb_{}_16".format(workload),
+      name="ycsb_{}_16-llsm".format(workload),
       options={
         **YCSB_OPTIONS,
         "record_size_bytes": 16,
@@ -55,11 +55,11 @@ run_experiment_group(
 # Runs YCSB workloads on a database that was preloaded with 20 million 512 byte
 # records.
 run_experiment_group(
-  name="ycsb_512",
-  run="./run_ycsb.sh 512-20M",
+  name="llsm_512",
+  run="./run_ycsb.sh llsm 512-20M",
   experiments=[
     ExperimentInstance(
-      name="ycsb_{}_512".format(workload),
+      name="ycsb_{}_512-llsm".format(workload),
       options={
         **YCSB_OPTIONS,
         "record_size_bytes": 512,
@@ -78,8 +78,8 @@ run_experiment_group(
 # records. Deferred I/O is turned on with a threshold of 400 with at most 2
 # deferrals per record.
 run_experiment(
-  name="ycsb_a_16_defer",
-  run="./run_ycsb.sh 16-100M",
+  name="ycsb_a_16_defer-llsm",
+  run="./run_ycsb.sh llsm 16-100M",
   options={
     **YCSB_OPTIONS,
     "record_size_bytes": 16,
@@ -97,8 +97,8 @@ run_experiment(
 # records. Deferred I/O is turned on with a threshold of 100 with at most 1
 # deferral per record.
 run_experiment(
-  name="ycsb_a_512_defer",
-  run="./run_ycsb.sh 512-20M",
+  name="ycsb_a_512_defer-llsm",
+  run="./run_ycsb.sh llsm 512-20M",
   options={
     **YCSB_OPTIONS,
     "record_size_bytes": 512,
@@ -112,23 +112,76 @@ run_experiment(
   ],
 )
 
-# Groups all the YCSB deferral experiments into one task (mainly used to help
-# simplify the `summarize_overall` task below).
+# Groups all the LLSM YCSB deferral experiments into one task (mainly used to
+# help simplify the `summarize_overall` task below).
 combine(
-  name="ycsb_defer",
+  name="llsm_defer",
   deps=[
-    ":ycsb_a_16_defer",
-    ":ycsb_a_512_defer",
+    ":ycsb_a_16_defer-llsm",
+    ":ycsb_a_512_defer-llsm",
   ],
 )
 
-# Runs all the YCSB workloads (above).
-combine(
-  name="overall",
+# Runs YCSB workloads on a RocksDB instance that was preloaded with 100 million
+# 16 byte records.
+run_experiment_group(
+  name="rocksdb_16",
+  run="./run_ycsb.sh rocksdb 16-100M",
+  experiments=[
+    ExperimentInstance(
+      name="ycsb_{}_16-rocksdb".format(workload),
+      options={
+        **YCSB_OPTIONS,
+        "record_size_bytes": 16,
+        "cache_size_mib": CACHE_SIZE_MIB_16,
+        "workload_path": "'$YCSB_TRACE_PATH/ycsb-100M-10Mop-w{}'".format(workload),
+      },
+    )
+    for workload in WORKLOADS
+  ],
   deps=[
-    ":ycsb_16",
-    ":ycsb_512",
-    ":ycsb_defer",
+    ":preload_16-100M",
+  ],
+)
+
+# Runs YCSB workloads on a RocksDB instance that was preloaded with 20 million
+# 512 byte records.
+run_experiment_group(
+  name="rocksdb_512",
+  run="./run_ycsb.sh rocksdb 512-20M",
+  experiments=[
+    ExperimentInstance(
+      name="ycsb_{}_512-rocksdb".format(workload),
+      options={
+        **YCSB_OPTIONS,
+        "record_size_bytes": 512,
+        "cache_size_mib": CACHE_SIZE_MIB_512,
+        "workload_path": "'$YCSB_TRACE_PATH/ycsb-20M-10Mop-w{}'".format(workload),
+      },
+    )
+    for workload in WORKLOADS
+  ],
+  deps=[
+    ":preload_512-20M",
+  ],
+)
+
+# An alias that runs all the LLSM-related YCSB experiments.
+group(
+  name="llsm",
+  deps=[
+    ":llsm_16",
+    ":llsm_512",
+    ":llsm_defer",
+  ],
+)
+
+# An alias that runs all the RocksDB-related YCSB experiments.
+group(
+  name="rocksdb",
+  deps=[
+    ":rocksdb_16",
+    ":rocksdb_512",
   ],
 )
 
@@ -137,6 +190,10 @@ run_command(
   name="summarize_overall",
   run="python3 summarize.py",
   deps=[
-    ":overall",
+    ":llsm_16",
+    ":llsm_512",
+    ":llsm_defer",
+    ":rocksdb_16",
+    ":rocksdb_512",
   ],
 )

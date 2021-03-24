@@ -27,8 +27,10 @@ RESULTS_DIR="results"
 # determine whether to run the experiments again.
 LAST_COMMIT_HASH_FILE="last_run_hash"
 
-# The top-level Conductor task to run.
-COND_TASK_IDENTIFIER="//scripts/e2e_perf:summarize_overall"
+# The top-level Conductor tasks to run.
+COND_LLSM_TASKS="//scripts/e2e_perf:llsm"
+COND_ROCKSDB_TASKS="//scripts/e2e_perf:rocksdb"
+COND_SUMMARIZE_TASK="//scripts/e2e_perf:summarize_overall"
 
 # The path to the combined results file, relative to `cond-out`.
 COND_RESULTS_FILE="scripts/e2e_perf/summarize_overall.task/results.csv"
@@ -53,8 +55,16 @@ function git_is_ancestor() {
 }
 
 function run_experiments() {
-  # Run the experiments using Conductor.
-  cond run $COND_TASK_IDENTIFIER --again
+  # Run the RocksDB experiments first. If the experiment results already exist,
+  # Conductor will not run them again.
+  cond run $COND_ROCKSDB_TASKS
+
+  # Run the LLSM experiments next. Using --again will force Conductor to re-run
+  # the experiments, even if older results exist.
+  cond run $COND_LLSM_TASKS --again
+
+  # Group the results together into one CSV file.
+  cond run $COND_SUMMARIZE_TASK
 
   local short_hash=$(git_short_hash)
   local timestamp=$(date +%s)

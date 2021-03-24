@@ -4,6 +4,24 @@ run_command(
   run="./build_benchmarks.sh",
 )
 
+# An alias that runs all LLSM-related experiments.
+group(
+  name="llsm",
+  deps=[
+    "//scripts/e2e_perf/synth_write:llsm",
+    "//scripts/e2e_perf/ycsb:llsm",
+  ],
+)
+
+# An alias that runs all RocksDB-related experiments.
+group(
+  name="rocksdb",
+  deps=[
+    "//scripts/e2e_perf/synth_write:rocksdb",
+    "//scripts/e2e_perf/ycsb:rocksdb",
+  ],
+)
+
 # Combines all the results into one csv file.
 run_command(
   name="summarize_overall",

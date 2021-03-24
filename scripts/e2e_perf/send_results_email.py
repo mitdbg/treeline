@@ -29,6 +29,11 @@ The experiments ran and completed on {date} at {time} (server time).
 <p>{comparison_message}</p>
 
 <p>
+The "speedup_over_rocksdb" column is LLSM's speedup relative to the same
+benchmark executed against RocksDB for the "mops_per_s" column.
+</p>
+
+<p>
 For an explanation of the benchmarks in this email, please see the wiki page here:
 https://dev.azure.com/msr-dsail/LearnedLSM/_wiki/wikis/LearnedLSM.wiki/3/Benchmarks
 </p>
@@ -38,13 +43,20 @@ https://dev.azure.com/msr-dsail/LearnedLSM/_wiki/wikis/LearnedLSM.wiki/3/Benchma
 </html>"""
 
 COMPARISON_TEMPLATE = """\
-The "change" column is the "mops_per_s" speedup relative to results from
+The "change_over_prev" column is the "mops_per_s" speedup relative to results from
 commit {relative_hash} (experiments completed on {date} at {time}). A value
 greater than 1 means that the performance improved."""
 
-NO_COMPARSION_TEMPLATE = (
-    "The experiment runner did not find any prior results to compare against."
-)
+NO_COMPARSION_TEMPLATE = """\
+The "change_over_prev" column is empty because the experiment runner did not
+find any earlier LLSM results to compare against."""
+
+RESULT_TABLE_STYLES = [
+    # Spacing between table cells
+    {"selector": "td, th", "props": [("padding", "5px 15px 0 0"), ("text-align", "left")]},
+    # Adds a border under the table's header
+    {"selector": "thead th", "props": [("border-bottom", "1px solid black")]},
+]
 
 ResultMetadata = namedtuple("ResultMetadata", ["commit_hash", "timestamp"])
 
@@ -94,16 +106,33 @@ def compute_changes(
     """
     if old_results is None:
         old_results = pd.DataFrame(columns=new_results.columns)
-    joined = new_results.merge(
-        old_results, on=["benchmark_name", "db"], how="left", suffixes=["_new", "_old"]
+    joined = pd.merge(
+        new_results,
+        old_results[["benchmark_name", "mops_per_s"]],
+        on="benchmark_name",
+        how="left",
+        suffixes=["_new", "_old"],
     )
-    joined["change"] = joined["mops_per_s_new"] / joined["mops_per_s_old"]
-    relevant = joined[
-        ["benchmark_name", "db", "mops_per_s_new", "mib_per_s_new", "change"]
-    ]
+    joined["change_over_prev"] = joined["mops_per_s_new"] / joined["mops_per_s_old"]
+    relevant = joined[[
+        "benchmark_name",
+        "mops_per_s_new",
+        "mib_per_s",
+        "change_over_prev",
+        "speedup_over_rocksdb",
+    ]]
     return relevant.rename(
-        columns={"mops_per_s_new": "mops_per_s", "mib_per_s_new": "mib_per_s"}
+        columns={"mops_per_s_new": "mops_per_s"}
     )
+
+
+def format_speedups(value):
+    if value < 0.95:
+        return "color: red"
+    elif value > 1.05:
+        return "color: green"
+    else:
+        return "color: black"
 
 
 def construct_message(
@@ -125,15 +154,27 @@ def construct_message(
 
     completion_time = datetime.fromtimestamp(result_meta.timestamp)
 
+    results_table_html = (
+        final_results.style
+            .applymap(
+                format_speedups,
+                subset=pd.IndexSlice[
+                    :,
+                    ["change_over_prev", "speedup_over_rocksdb"],
+                ],
+            )
+            .set_na_rep("--")
+            .set_precision(3)
+            .set_table_styles(RESULT_TABLE_STYLES)
+            .hide_index()
+            .render()
+    )
+
     return MESSAGE_TEMPLATE.format(
         machine_name=machine_name,
         hash=result_meta.commit_hash,
         comparison_message=comparison_message,
-        results_table_html=final_results.to_html(
-            index=False,
-            na_rep="--",
-            justify="left",
-        ),
+        results_table_html=results_table_html,
         date=completion_time.strftime("%B %d, %Y"),
         time=completion_time.strftime("%H:%M:%S"),
     )

@@ -26,7 +26,12 @@ def main():
     for results_dir in results_dirs:
         for experiment_path in results_dir.iterdir():
             df = pd.read_csv(experiment_path / "results.csv")
-            df["benchmark_name"] = experiment_path.name
+            # We append a "-llsm" or "-rocksdb" suffix to the benchmark name to
+            # keep the experiments for LLSM and RocksDB separate (for
+            # Conductor). Since we record the DB type in the outputted CSV
+            # file, we do not need it as a part of the benchmark name in the
+            # summarized results.
+            df["benchmark_name"] = experiment_path.name.split("-")[0]
             results = df[
                 [
                     "benchmark_name",

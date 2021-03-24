@@ -13,8 +13,8 @@ def main():
 
     This script is meant to be executed by Conductor.
     """
-    results_dir = pathlib.Path(os.environ["COND_DEPS"])
-    if not results_dir.is_dir():
+    results_dirs = list(map(pathlib.Path, os.environ["COND_DEPS"].split(":")))
+    if any(map(lambda path: not path.is_dir(), results_dirs)):
         raise RuntimeError("Cannot find results!")
 
     output_dir = pathlib.Path(os.environ["COND_OUT"])
@@ -23,10 +23,15 @@ def main():
 
     all_results = []
 
-    for record_size_path in results_dir.iterdir():
-        for experiment_path in record_size_path.iterdir():
+    for combined_experiment_path in results_dirs:
+        for experiment_path in combined_experiment_path.iterdir():
             df = pd.read_csv(experiment_path / "ycsb.csv")
-            df["benchmark_name"] = experiment_path.name
+            # We append a "-llsm" or "-rocksdb" suffix to the benchmark name to
+            # keep the experiments for LLSM and RocksDB separate (for
+            # Conductor). Since we record the DB type in the outputted CSV
+            # file, we do not need it as a part of the benchmark name in the
+            # summarized results.
+            df["benchmark_name"] = experiment_path.name.split("-")[0]
             df["mib_per_s"] = df["read_mib_per_s"] + df["write_mib_per_s"]
             results = df[["benchmark_name", "db", "mops_per_s", "mib_per_s"]]
             all_results.append(results)
