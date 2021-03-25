@@ -1,5 +1,7 @@
 #include "db/page.h"
 
+#include <cstring>
+
 #include "gtest/gtest.h"
 
 namespace {
@@ -8,7 +10,9 @@ using namespace llsm;
 
 class PageTest : public testing::Test {
  public:
-  PageTest() : buffer(new char[Page::kSize]) {}
+  PageTest() : buffer(new char[Page::kSize]) {
+    memset(buffer.get(), 0, Page::kSize);
+  }
   const std::unique_ptr<char[]> buffer;
 };
 
