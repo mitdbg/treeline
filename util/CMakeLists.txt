@@ -2,6 +2,7 @@ target_sources(llsm PRIVATE
   affinity.h
   arena.cc
   arena.h
+  calc.h
   coding.cc
   coding.h
   crc32c.h

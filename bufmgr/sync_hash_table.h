@@ -4,6 +4,7 @@
 #include <iostream>
 #include <shared_mutex>
 #include <vector>
+#include "../util/calc.h"
 
 namespace llsm {
 
@@ -233,20 +234,6 @@ class SyncHashTable {
 
   // Return the hash of `key`.
   size_t HashKey(KeyType key) const { return std::hash<KeyType>{}(key); }
-
-  // Find the smallest power of 2 larger than or equal to `num`
-  size_t Pow2Ceil(size_t num) {
-    size_t count = 0;
-
-    if (num && !(num & (num - 1))) return num;
-
-    while (num > 0) {
-      num >>= 1;
-      ++count;
-    }
-
-    return 1 << count;
-  }
 
   std::vector<Node*> buckets_;
 

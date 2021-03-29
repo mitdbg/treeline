@@ -7,58 +7,49 @@ namespace llsm {
 // Creates a file manager according to the options specified in `options`.
 FileManager::FileManager(const BufMgrOptions& options,
                          std::filesystem::path db_path)
-    : db_path_(std::move(db_path)), total_pages_(options.num_pages) {
+    : db_path_(std::move(db_path)),
+      total_pages_(options.num_pages),
+      total_segments_(options.num_segments) {
   // Get number of segments.
-  const size_t segments = options.num_segments;
-  assert(segments >= 1);
+  assert(total_segments_ >= 1);
 
-  // Compute the page allocation
-  size_t pages_per_segment = total_pages_ / segments;
-  if (total_pages_ % segments != 0) ++pages_per_segment;
-  for (size_t i = 0, j = 0; i < segments; ++i, j += pages_per_segment)
-    page_allocation_.push_back(j);
+  // Calculate the page-to-segment ratio
+  size_t pages_per_segment = total_pages_ / total_segments_;
+  if (total_pages_ % total_segments_ != 0) ++pages_per_segment;
 
   // Create the db_files
-  for (size_t i = 0; i < segments; ++i) {
+  for (size_t i = 0; i < total_segments_; ++i) {
     db_files_.push_back(std::make_unique<File>(
         db_path_ / ("segment-" + std::to_string(i)), options.use_direct_io));
+  }
+
+  // Initialize the page table
+  FileAddress::SetBitWidths(total_segments_);
+  for (size_t i = 0; i < total_pages_; ++i) {
+    page_table_.emplace_back(i / pages_per_segment, i % pages_per_segment);
   }
 }
 
 // Reads the part of the on-disk database file corresponding to `page_id` into
 // the in-memory page-sized block pointed to by `data`.
 void FileManager::ReadPage(const uint64_t page_id, void* data) {
-  const FileAddress address = PageIdToAddress(page_id);
-  const auto& file = db_files_[address.file_id];
-  file->ExpandToIfNeeded(address.offset);
-  file->ReadPage(address.offset, data);
+  assert(page_id < GetNumPages());
+  const FileAddress& address = page_table_[page_id];
+  const auto& file = db_files_[address.GetFileId()];
+  const size_t byte_offset = address.GetOffset() * Page::kSize;
+  file->ExpandToIfNeeded(byte_offset);
+  file->ReadPage(byte_offset, data);
 }
 
 // Writes from the in-memory page-sized block pointed to by `data` to the part
 // of the on-disk database file corresponding to `page_id`.
 void FileManager::WritePage(const uint64_t page_id, void* data) {
-  const FileAddress address = PageIdToAddress(page_id);
-  const auto& file = db_files_[address.file_id];
-  file->ExpandToIfNeeded(address.offset);
-  file->WritePage(address.offset, data);
-}
-
-// Uses the model to derive a FileAddress given a `page_id`.
-//
-// Deriving the right segment currently takes time logarithmic in the number of
-// segments, which is probably efficient enough for a small number of
-// segments.
-FileAddress FileManager::PageIdToAddress(const size_t page_id) const {
   assert(page_id < GetNumPages());
-
-  // Find file_id
-  const size_t file_id = std::upper_bound(page_allocation_.begin(),
-                                          page_allocation_.end(), page_id) -
-                         1 - page_allocation_.begin();
-
-  // Find offset
-  const size_t offset = (page_id - page_allocation_.at(file_id)) * Page::kSize;
-  return FileAddress{file_id, offset};
+  const FileAddress& address = page_table_[page_id];
+  const auto& file = db_files_[address.GetFileId()];
+  const size_t byte_offset = address.GetOffset() * Page::kSize;
+  file->ExpandToIfNeeded(byte_offset);
+  file->WritePage(byte_offset, data);
 }
 
 }  // namespace llsm
