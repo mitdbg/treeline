@@ -10,6 +10,7 @@
 #include <filesystem>
 
 #include "llsm/options.h"
+#include "llsm/record_batch.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
 
@@ -53,6 +54,11 @@ class DB {
   // will be returned where `Status::IsNotFound()` evaluates to true.
   virtual Status Get(const ReadOptions& options, const Slice& key,
                      std::string* value_out) = 0;
+
+  // Retrieve an ascending range of at most `num_records` records, starting from
+  // the smallest record whose key is greater than or equal to `start_key`.
+  virtual Status GetRange(const ReadOptions& options, const Slice& start_key,
+                          size_t num_records, RecordBatch* results_out) = 0;
 
   // Remove the database entry (if any) for `key`.
   //

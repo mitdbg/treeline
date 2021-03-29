@@ -503,4 +503,112 @@ TEST_F(DBTest, WriteReopenReadReverse) {
   db = nullptr;
 }
 
+TEST_F(DBTest, RangeScan) {
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 1016;
+
+  // Dummy values used for the records (8 byte key; record is 1 KiB in total).
+  const std::string value_old(kValueSize, 0xFF);
+  const std::string value_new(kValueSize, 0x00);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  // 4096 records @ 1 KiB each => 4 MiB of data.
+  // Each page is 64 KiB and is filled to 50% => 32 records per page.
+  // 128 pages in total; 2 per segment (assuming two segments).
+  options.key_hints.num_keys = 4096;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kKeySize + kValueSize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1024;
+
+  // Generate data used for the write (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write dummy data to the DB.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value_old);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // Scan in memory.
+  const size_t start_index = 10;
+  const size_t num_records = 1024;
+  std::vector<llsm::Record> results;
+  status = db->GetRange(
+      llsm::ReadOptions(),
+      llsm::Slice(reinterpret_cast<const char*>(&lexicographic_keys[start_index]), 8),
+      num_records, &results);
+  ASSERT_TRUE(status.ok());
+  ASSERT_EQ(results.size(), num_records);
+
+  for (size_t i = 0; i < num_records; ++i) {
+    const uint64_t key = *reinterpret_cast<const uint64_t*>(results[i].key().data());
+    ASSERT_EQ(key, lexicographic_keys[start_index + i]);
+    ASSERT_EQ(results[i].value(), value_old);
+  }
+
+  // Flush the writes to the pages.
+  llsm::FlushOptions foptions;
+  foptions.disable_deferred_io = true;
+  db->FlushMemTable(foptions);
+
+  // Scan from the pages.
+  results.clear();
+  status = db->GetRange(
+      llsm::ReadOptions(),
+      llsm::Slice(reinterpret_cast<const char*>(&lexicographic_keys[start_index]), 8),
+      num_records, &results);
+  ASSERT_TRUE(status.ok());
+  ASSERT_EQ(results.size(), num_records);
+
+  for (size_t i = 0; i < num_records; ++i) {
+    const uint64_t key = *reinterpret_cast<const uint64_t*>(results[i].key().data());
+    ASSERT_EQ(key, lexicographic_keys[start_index + i]);
+    ASSERT_EQ(results[i].value(), value_old);
+  }
+
+  // Overwrite half of the existing records (but the writes will be in memory).
+  for (size_t i = 0; i < lexicographic_keys.size(); ++i) {
+    if (i % 2 != 0) continue;
+    llsm::Slice key(reinterpret_cast<const char*>(&lexicographic_keys[i]), kKeySize);
+    status = db->Put(woptions, key, value_new);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // Scan again (some records should be in the memtable, some will be in the pages).
+  results.clear();
+  status = db->GetRange(
+      llsm::ReadOptions(),
+      llsm::Slice(reinterpret_cast<const char*>(&lexicographic_keys[start_index]), 8),
+      num_records, &results);
+  ASSERT_TRUE(status.ok());
+  ASSERT_EQ(results.size(), num_records);
+
+  for (size_t i = 0; i < num_records; ++i) {
+    const uint64_t key = *reinterpret_cast<const uint64_t*>(results[i].key().data());
+    const size_t key_index = i + start_index;
+    ASSERT_EQ(key, lexicographic_keys[key_index]);
+    if (key_index % 2 == 0) {
+      ASSERT_EQ(results[i].value(), value_new);
+    } else {
+      ASSERT_EQ(results[i].value(), value_old);
+    }
+  }
+
+  delete db;
+  db = nullptr;
+}
+
 }  // namespace

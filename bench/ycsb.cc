@@ -127,10 +127,21 @@ class RocksDBInterface {
   // Scan the key range starting from `key` for `amount` records. Return true if
   // the scan succeeded.
   bool Scan(
-      ycsbr::Request::Key key, size_t amount,
+      const ycsbr::Request::Key key, const size_t amount,
       std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {
-    // Unimplemented.
-    return false;
+    scan_out->clear();
+    scan_out->reserve(amount);
+    const rocksdb::ReadOptions options;
+    rocksdb::Iterator* it = db_->NewIterator(options);
+    it->Seek(rocksdb::Slice(reinterpret_cast<const char*>(&key), sizeof(key)));
+    while (it->Valid() && scan_out->size() < amount) {
+      scan_out->emplace_back(
+          *reinterpret_cast<const ycsbr::Request::Key*>(it->key().data()),
+          it->value().ToString());
+      it->Next();
+    }
+    delete it;
+    return true;
   }
 
  private:
@@ -195,8 +206,8 @@ class LLSMInterface {
     if (FLAGS_print_llsm_stats) {
       std::cerr << "--------------------" << std::endl;
       std::cerr << "Printing stats for deferral parameters "
-                << FLAGS_io_threshold << ","
-                << FLAGS_max_deferrals << std::endl;
+                << FLAGS_io_threshold << "," << FLAGS_max_deferrals
+                << std::endl;
       std::cerr << *(stats_);
       std::cerr << "--------------------" << std::endl;
     }
@@ -214,7 +225,9 @@ class LLSMInterface {
     llsm::FlushOptions options;
     options.disable_deferred_io = true;
     db_->FlushMemTable(options);
-    if (FLAGS_print_llsm_stats) { stats_->Clear(); }
+    if (FLAGS_print_llsm_stats) {
+      stats_->Clear();
+    }
   }
 
   // Update the value at the specified key. Return true if the update succeeded.
@@ -244,10 +257,21 @@ class LLSMInterface {
   // Scan the key range starting from `key` for `amount` records. Return true if
   // the scan succeeded.
   bool Scan(
-      ycsbr::Request::Key key, size_t amount,
+      const ycsbr::Request::Key key, const size_t amount,
       std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {
-    // Unimplemented.
-    return false;
+    scan_out->clear();
+    scan_out->reserve(amount);
+    const llsm::ReadOptions options;
+    llsm::RecordBatch results;
+    llsm::Status status = db_->GetRange(
+        options, llsm::Slice(reinterpret_cast<const char*>(&key), sizeof(key)),
+        amount, &results);
+    for (auto& record : results) {
+      scan_out->emplace_back(
+          *reinterpret_cast<const ycsbr::Request::Key*>(record.key().data()),
+          std::move(record).ExtractValue());
+    }
+    return status.ok();
   }
 
  private:

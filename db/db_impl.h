@@ -30,6 +30,8 @@ class DBImpl : public DB {
              const Slice& value) override;
   Status Get(const ReadOptions& options, const Slice& key,
              std::string* value_out) override;
+  Status GetRange(const ReadOptions& options, const Slice& start_key,
+                  size_t num_records, RecordBatch* results_out) override;
   Status Delete(const WriteOptions& options, const Slice& key) override;
   Status FlushMemTable(const FlushOptions& options) override;
 
