@@ -302,11 +302,21 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     }
   }
 
-  // 4. Check the on-disk page.
+  // 4. Check the on-disk page(s) by following the relevant overflow chain.
+  bool next_link_exists = true;
   size_t page_id = model_->KeyToPageId(key);
-  auto& bf = buf_mgr_->FixPage(page_id, /*exclusive=*/false);
-  status = bf.GetPage().Get(key, value_out);
-  buf_mgr_->UnfixPage(bf, /*is_dirty=*/false);
+
+  while (next_link_exists) {
+    next_link_exists = false;
+    auto& bf = buf_mgr_->FixPage(page_id, /*exclusive=*/false);
+    Page page = bf.GetPage();
+    status = page.Get(key, value_out);
+    if (status.IsNotFound() && page.HasOverflow()) {
+       page_id = page.GetOverflow();
+       next_link_exists = true;
+    }
+    buf_mgr_->UnfixPage(bf, /*is_dirty=*/false);
+  }
 
   return status;
 }

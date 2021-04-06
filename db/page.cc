@@ -103,6 +103,18 @@ Status Page::Delete(const Slice& key) {
   return Status::OK();
 }
 
+// Retrieve the stored `overflow` page id for this page.
+uint64_t Page::GetOverflow() const { return AsMapPtr(data_)->GetOverflow(); }
+
+// Set the stored overflow page id for this page to `overflow`.
+void Page::SetOverflow(uint64_t overflow) {
+  AsMapPtr(data_)->SetOverflow(overflow);
+}
+
+// Determine whether this page has an overflow page. Only page id's with 1 as
+// the most significant bit are valid overflow page id's.
+bool Page::HasOverflow() { return GetOverflow() >> 63; }
+
 Page::Iterator Page::GetIterator() const { return Iterator(*this); }
 
 Page::Iterator::Iterator(const Page& page)

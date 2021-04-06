@@ -53,6 +53,16 @@ class Page {
   Status Get(const Slice& key, std::string* value_out);
   Status Delete(const Slice& key);
 
+  // Retrieve the stored `overflow` page id for this page.
+  uint64_t GetOverflow() const;
+
+  // Set the stored overflow page id for this page to `overflow`.
+  void SetOverflow(uint64_t overflow);
+
+  // Determine whether this page has an overflow page. Only page id's with 1 as
+  // the most significant bit are valid overflow page id's.
+  bool HasOverflow();
+
   class Iterator;
   friend class Iterator;
 
