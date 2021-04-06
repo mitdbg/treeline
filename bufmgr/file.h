@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -24,8 +25,12 @@ class File {
   const size_t kGrowthPages = 256;
 
  public:
-  File(const std::filesystem::path& name, bool use_direct_io)
-      : fd_(-1), file_size_(0), growth_bytes_(kGrowthPages * Page::kSize) {
+  File(const std::filesystem::path& name, bool use_direct_io,
+       size_t initial_num_pages)
+      : fd_(-1),
+        file_size_(0),
+        growth_bytes_(kGrowthPages * Page::kSize),
+        next_page_allocation_offset_(initial_num_pages * Page::kSize) {
     CHECK_ERROR(
         fd_ = open(name.c_str(),
                    O_CREAT | O_RDWR | O_SYNC | (use_direct_io ? O_DIRECT : 0),
@@ -39,12 +44,28 @@ class File {
   }
   ~File() { close(fd_); }
   void ReadPage(size_t offset, void* data) const {
+    assert(offset < next_page_allocation_offset_);
     CHECK_ERROR(pread(fd_, data, Page::kSize, offset));
   }
   void WritePage(size_t offset, const void* data) const {
+    assert(offset < next_page_allocation_offset_);
     CHECK_ERROR(pwrite(fd_, data, Page::kSize, offset));
   }
   void Sync() const { CHECK_ERROR(fsync(fd_)); }
+
+  // Reserves space for an additional page on the file. This might involve
+  // growing the file if needed, otherwise it just updates the bookkeeping.
+  //
+  // Returns the offset of the newly allocated page.
+  size_t AllocatePage() {
+    size_t allocated_offset = next_page_allocation_offset_;
+    next_page_allocation_offset_ += Page::kSize;
+
+    ExpandToIfNeeded(allocated_offset);
+    return allocated_offset;
+  }
+
+ private:
 
   // Ensures that the underlying file is large enough to be able to read/write
   // `Page::kSize` bytes starting at the given `offset`.
@@ -65,11 +86,10 @@ class File {
                           /*len=*/bytes_to_add));
     file_size_ += bytes_to_add;
   }
-
- private:
   int fd_;
   size_t file_size_;
   const size_t growth_bytes_;
+  size_t next_page_allocation_offset_;
 };
 
 }  // namespace llsm

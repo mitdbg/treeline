@@ -15,10 +15,10 @@ void DirectModel::Preallocate(const std::unique_ptr<BufferManager>& buf_mgr) {
   const uint64_t total_pages = buf_mgr->GetFileManager()->GetNumPages();
   uint64_t lower_key = 0;
   uint64_t upper_key = page_key_range;
-  for (unsigned page_id = 0; page_id < total_pages; ++page_id) {
+  for (unsigned raw_page_id = 0; raw_page_id < total_pages; ++raw_page_id) {
     const uint64_t swapped_lower = __builtin_bswap64(lower_key);
     const uint64_t swapped_upper = __builtin_bswap64(upper_key);
-    auto& bf = buf_mgr->FixPage(page_id, /*exclusive = */ true);
+    auto& bf = buf_mgr->FixPage(LogicalPageId(raw_page_id), /*exclusive = */ true);
     Page page(bf.GetData(),
               Slice(reinterpret_cast<const char*>(&swapped_lower), 8),
               Slice(reinterpret_cast<const char*>(&swapped_upper), 8));
@@ -32,13 +32,13 @@ void DirectModel::Preallocate(const std::unique_ptr<BufferManager>& buf_mgr) {
 
 // Uses the model to derive a page_id given a `key` that is within the correct
 // range.
-size_t DirectModel::KeyToPageId(const Slice& key) const {
+LogicalPageId DirectModel::KeyToPageId(const Slice& key) const {
   return KeyToPageId(key_utils::ExtractHead64(key));
 }
 
-size_t DirectModel::KeyToPageId(const uint64_t key) const {
+LogicalPageId DirectModel::KeyToPageId(const uint64_t key) const {
   const uint64_t unit_step_key = key / key_step_size_;
-  return unit_step_key / records_per_page_;
+  return LogicalPageId(unit_step_key / records_per_page_);
 }
 
 void DirectModel::EncodeTo(std::string* dest) const {

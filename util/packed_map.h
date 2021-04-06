@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include "bufmgr/logical_page_id.h"
 
 namespace llsm {
 
@@ -44,9 +45,15 @@ class PackedMap {
             const uint8_t* upper_key, unsigned upper_key_length);
 
   // Insert `key` and `payload` and return true iff the insert succeeded.
-  // Duplicate key insertions will just override the payload.
+  // Duplicate key insertions will just overwrite the payload.
   bool Insert(const uint8_t* key, unsigned key_length, const uint8_t* payload,
               unsigned payload_length);
+
+  // Update `key`, which must already be in the map, with a new `payload` and
+  // return true. If there is not enough space, then simply remove the pair
+  // (`key`, old_payload) if it exists and return false.
+  bool UpdateOrRemove(const uint8_t* key, unsigned key_length,
+                      const uint8_t* payload, unsigned payload_length);
 
   // Insert `key` and `payload` and return true iff the insert succeeded. `key`
   // must be lexicographically greater than the largest key currently in the
@@ -86,13 +93,13 @@ class PackedMap {
   bool Get(const uint8_t* key, unsigned key_length, const uint8_t** payload_out,
            unsigned* payload_length_out) const;
 
-  // Retrieve the stored `overflow` (an arbitrary 8 byte value managed by
+  // Retrieve the stored `overflow` (an arbitrary logical page id managed by
   // the map user).
-  uint64_t GetOverflow() const;
+  LogicalPageId GetOverflow() const;
 
-  // Set the stored overflow value to `overflow` (an arbitrary 8 byte value
+  // Set the stored overflow value to `overflow` (an arbitrary logical page id
   // managed by the map user).
-  void SetOverflow(uint64_t overflow);
+  void SetOverflow(LogicalPageId overflow);
 
   // Returns the number of records currently stored in this map.
   uint16_t GetNumRecords() const;
@@ -126,6 +133,13 @@ class PackedMap {
   // the return value of `GetNumRecords()`.
   uint16_t LowerBoundSlot(const uint8_t* key, unsigned key_length) const;
 
+  // Access the fences and their lengths - useful for creating a new PackedMap with
+  // the same key range.
+  const uint8_t* GetLowerFence() const;
+  const uint8_t* GetUpperFence() const;
+  const uint16_t GetLowerFenceLength() const;
+  const uint16_t GetUpperFenceLength() const;
+
  private:
   static constexpr unsigned kHintCount = 16;
   struct Header {
@@ -145,7 +159,7 @@ class PackedMap {
     uint16_t prefix_length = 0;
 
     uint32_t hint[kHintCount];
-    uint64_t overflow = 0;
+    LogicalPageId overflow;
   };
   struct Slot {
     uint16_t offset;
@@ -215,8 +229,6 @@ class PackedMap {
   uint8_t* GetPayload(unsigned slot_id);
   const uint8_t* GetKey(unsigned slot_id) const;
   const uint8_t* GetPayload(unsigned slot_id) const;
-  const uint8_t* GetLowerFence() const;
-  const uint8_t* GetUpperFence() const;
 
  public:
   static constexpr size_t kMaxKeySizeBytes =

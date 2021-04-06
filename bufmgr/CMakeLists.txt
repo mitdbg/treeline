@@ -6,8 +6,10 @@ target_sources(llsm PRIVATE
   file_manager.cc
   file_manager.h
   file.h
-  file_address.cc
-  file_address.h
+  logical_page_id.cc
+  logical_page_id.h
+  physical_page_id.cc
+  physical_page_id.h
   hash_queue.h
   options.h
   page_eviction_strategy.h

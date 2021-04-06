@@ -29,6 +29,12 @@ class PackedMapShim {
                      value.size());
   }
 
+  bool UpdateOrRemove(const Slice& key, const Slice& value) {
+    return m_.UpdateOrRemove(reinterpret_cast<const uint8_t*>(key.data()), key.size(),
+                     reinterpret_cast<const uint8_t*>(value.data()),
+                     value.size());
+  }
+
   bool Append(const Slice& key, const Slice& value, const bool perform_checks) {
     return m_.Append(reinterpret_cast<const uint8_t*>(key.data()), key.size(),
                      reinterpret_cast<const uint8_t*>(value.data()),
@@ -356,6 +362,43 @@ TEST(PackedMapTest, LowerBoundSlot) {
   ASSERT_EQ(hello_prefix.LowerBoundSlot("helloaaabbb"), 1);
   ASSERT_EQ(hello_prefix.LowerBoundSlot("helloccc"), 1);
   ASSERT_EQ(hello_prefix.LowerBoundSlot("hellocccd"), 2);
+}
+
+TEST(PackedMapTest, UpdateOrRemove) {
+  PackedMapShim<4096> map("aa", "az");
+  std::string aa_out, ab_out, ac_out;
+
+  // Simple case
+  ASSERT_TRUE(map.Insert("aa", "hello111"));
+  ASSERT_TRUE(map.Get("aa", &aa_out));
+  ASSERT_EQ(aa_out, "hello111");
+
+  // Fail - insert - succeed
+  ASSERT_FALSE(map.UpdateOrRemove("ab", "hello222"));
+
+  ASSERT_TRUE(map.Insert("ab", "hello222"));
+  ASSERT_TRUE(map.Get("ab", &ab_out));
+  ASSERT_EQ(ab_out, "hello222");
+
+  ASSERT_TRUE(map.UpdateOrRemove("ab", "hello22222"));
+  ASSERT_TRUE(map.Get("ab", &ab_out));
+  ASSERT_EQ(ab_out, "hello22222");
+
+  // Fail - append - succeed
+  ASSERT_FALSE(map.UpdateOrRemove("ac", "hello333"));
+
+  ASSERT_TRUE(map.Append("ac", "hello333", true));
+  ASSERT_TRUE(map.Get("ac", &ac_out));
+  ASSERT_EQ(ac_out, "hello333");
+
+  ASSERT_TRUE(map.UpdateOrRemove("ac", "hello33333"));
+  ASSERT_TRUE(map.Get("ac", &ac_out));
+  ASSERT_EQ(ac_out, "hello33333");
+
+  // Fail because of payload length
+  std::string s(4096, 'a');
+  ASSERT_FALSE(map.UpdateOrRemove("ac", s));
+  ASSERT_FALSE(map.Get("ac", &ac_out));
 }
 
 }  // namespace

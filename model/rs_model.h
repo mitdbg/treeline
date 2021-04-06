@@ -24,8 +24,8 @@ class RSModel : public Model {
 
   // Uses the model to predict a page_id given a `key` that is within the
   // correct range.
-  size_t KeyToPageId(const Slice& key) const;
-  size_t KeyToPageId(const uint64_t key) const;
+  LogicalPageId KeyToPageId(const Slice& key) const;
+  LogicalPageId KeyToPageId(const uint64_t key) const;
 
   // Serializes the model and appends it to `dest`.
   void EncodeTo(std::string* dest) const override;

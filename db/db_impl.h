@@ -74,15 +74,17 @@ class DBImpl : public DB {
   bool ShouldFlush(const FlushOptions& options, size_t num_records,
                    size_t num_deferrals) const;
 
+  using OverflowChain = std::shared_ptr<std::vector<BufferFrame*>>;
+
   // Code run by a worker thread to write out `records` to the page held by
   // `bf`.
   void FlushWorker(
       const std::vector<std::tuple<const Slice, const Slice,
                                    const format::WriteType>>& records,
-      std::future<BufferFrame*>& bf_future);
+      std::future<OverflowChain>& bf_future);
 
   // Code run by a worker thread to fix the page with `page_id`.
-  void FixWorker(size_t page_id, std::promise<BufferFrame*>& bf_promise);
+  void FixWorker(LogicalPageId page_id, std::promise<OverflowChain>& bf_promise);
 
   // Code run by a worker thread to reinsert `records` into the now-active
   // memtable if their flush was deferred.

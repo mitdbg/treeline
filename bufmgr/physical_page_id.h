@@ -9,17 +9,17 @@ namespace llsm {
 // Stores the file and PAGE-offset within the file where a specific page can
 // be found.
 //
-// Calling `SetBitWidths()` may make any FileAddress objects already created
+// Calling `SetBitWidths()` may make any PhysicalPageId objects already created
 // invalid, so it should only be called exactly once, before creating any
 // objects.
-class FileAddress {
+class PhysicalPageId {
  public:
   static void SetBitWidths(size_t total_segments) {
     segment_bits_ = Pow2Ceil(total_segments);
     offset_bits_ = (sizeof(size_t) << 3) - segment_bits_;
   }
 
-  FileAddress(const size_t file_id, const size_t offset) {
+  PhysicalPageId(const size_t file_id, const size_t offset) {
     Update(file_id, offset);
   }
 
@@ -35,7 +35,7 @@ class FileAddress {
 
  private:
   // The number of bits of `value_` allocated to each component of a
-  // FileAddress.
+  // PhysicalPageId.
   static size_t segment_bits_;
   static size_t offset_bits_;
 

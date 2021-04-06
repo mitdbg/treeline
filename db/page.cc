@@ -36,20 +36,31 @@ constexpr size_t Page::PerRecordMetadataSize() {
 }
 
 Page::Page(void* data, const Slice& lower_key, const Slice& upper_key)
+    : Page(data, reinterpret_cast<const uint8_t*>(lower_key.data()),
+           lower_key.size(), reinterpret_cast<const uint8_t*>(upper_key.data()),
+           upper_key.size()) {}
+
+Page::Page(void* data, const Page& old_page)
+    : Page(data, AsMapPtr(old_page.data_)->GetLowerFence(),
+           AsMapPtr(old_page.data_)->GetLowerFenceLength(),
+           AsMapPtr(old_page.data_)->GetUpperFence(),
+           AsMapPtr(old_page.data_)->GetUpperFenceLength()) {}
+
+Page::Page(void* data, const uint8_t* lower_key, unsigned lower_key_length,
+           const uint8_t* upper_key, unsigned upper_key_length)
     : Page(data) {
   // This constructs a `PackedMap` in the memory pointed-to by `data_`. This
   // memory buffer must be large enough to hold a `PackedMap`.
   //
-  // NOTE: Using "placement new" means that the object's destructor needs to be
-  // manually called. But this is not a problem in our use case because
+  // NOTE: Using "placement new" means that the object's destructor needs to
+  // be manually called. But this is not a problem in our use case because
   // `PackedMap` does not have any members that use a custom destructor (i.e.,
-  // we can get away with not calling `~PackedMap()` because there is nothing in
-  // the class that needs "cleaning up").
+  // we can get away with not calling `~PackedMap()` because there is nothing
+  // in the class that needs "cleaning up").
   //
   // https://isocpp.org/wiki/faq/dtors#placement-new
-  new (data_)::PackedMap(
-      reinterpret_cast<const uint8_t*>(lower_key.data()), lower_key.size(),
-      reinterpret_cast<const uint8_t*>(upper_key.data()), upper_key.size());
+  new (data_)::PackedMap(lower_key, lower_key_length, upper_key,
+                         upper_key_length);
 }
 
 Slice Page::GetKeyPrefix() const {
@@ -82,6 +93,16 @@ Status Page::Put(const WriteOptions& options, const Slice& key,
   return Status::OK();
 }
 
+Status Page::UpdateOrRemove(const Slice& key, const Slice& value) {
+  if (!AsMapPtr(data_)->UpdateOrRemove(
+          reinterpret_cast<const uint8_t*>(key.data()), key.size(),
+          reinterpret_cast<const uint8_t*>(value.data()), value.size())) {
+    return Status::NotFound("Key not on page or successfully deleted.");
+  }
+
+  return Status::OK();
+}
+
 Status Page::Get(const Slice& key, std::string* value_out) {
   const uint8_t* payload = nullptr;
   unsigned payload_length = 0;
@@ -104,16 +125,16 @@ Status Page::Delete(const Slice& key) {
 }
 
 // Retrieve the stored `overflow` page id for this page.
-uint64_t Page::GetOverflow() const { return AsMapPtr(data_)->GetOverflow(); }
+LogicalPageId Page::GetOverflow() const { return AsMapPtr(data_)->GetOverflow(); }
 
 // Set the stored overflow page id for this page to `overflow`.
-void Page::SetOverflow(uint64_t overflow) {
+void Page::SetOverflow(LogicalPageId overflow) {
   AsMapPtr(data_)->SetOverflow(overflow);
 }
 
-// Determine whether this page has an overflow page. Only page id's with 1 as
-// the most significant bit are valid overflow page id's.
-bool Page::HasOverflow() { return GetOverflow() >> 63; }
+// Determine whether this page has an overflow page. Only page ids with 1 as
+// the most significant bit are valid overflow page ids.
+bool Page::HasOverflow() { return GetOverflow().IsOverflow(); }
 
 Page::Iterator Page::GetIterator() const { return Iterator(*this); }
 

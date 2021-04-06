@@ -304,7 +304,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
 
   // 4. Check the on-disk page(s) by following the relevant overflow chain.
   bool next_link_exists = true;
-  size_t page_id = model_->KeyToPageId(key);
+  LogicalPageId page_id = model_->KeyToPageId(key);
 
   while (next_link_exists) {
     next_link_exists = false;
@@ -312,8 +312,8 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     Page page = bf.GetPage();
     status = page.Get(key, value_out);
     if (status.IsNotFound() && page.HasOverflow()) {
-       page_id = page.GetOverflow();
-       next_link_exists = true;
+      page_id = page.GetOverflow();
+      next_link_exists = true;
     }
     buf_mgr_->UnfixPage(bf, /*is_dirty=*/false);
   }
@@ -415,11 +415,11 @@ void DBImpl::ScheduleMemTableFlush(const FlushOptions& options,
   // Schedule the flush to run in the background.
   last_flush_ = workers_->Submit([this, options, flush_log_version]() {
     if (options_.stats != nullptr) ++options_.stats->flush_count_;
-    size_t current_page = std::numeric_limits<size_t>::max();
+    LogicalPageId current_page = LogicalPageId(std::numeric_limits<size_t>::max());
     size_t current_page_deferral_count = 0;
     bool current_page_dispatched_fixer = false;
     std::vector<std::future<void>> page_write_futures;
-    std::future<BufferFrame*> bf_future;
+    std::future<OverflowChain> bf_future;
     std::vector<std::tuple<const Slice, const Slice, const format::WriteType>>
         records_for_page;
 
@@ -432,7 +432,7 @@ void DBImpl::ScheduleMemTableFlush(const FlushOptions& options,
     // code above until this flush completes.
     auto it = im_mtable_->GetIterator();
     for (it.SeekToFirst(); it.Valid(); it.Next()) {
-      const size_t page_id = model_->KeyToPageId(it.key());
+      const LogicalPageId page_id = model_->KeyToPageId(it.key());
       // The memtable is in sorted order - once we "pass" a page, we won't
       // return to it.
       if (page_id != current_page) {
@@ -475,7 +475,7 @@ void DBImpl::ScheduleMemTableFlush(const FlushOptions& options,
       if (ShouldFlush(options, records_for_page.size(),
                       current_page_deferral_count) &&
           !current_page_dispatched_fixer) {
-        std::promise<BufferFrame*> bf_promise;
+        std::promise<OverflowChain> bf_promise;
         bf_future = bf_promise.get_future();
         workers_->SubmitNoWait(
             [this, current_page, bf_promise = std::move(bf_promise)]() mutable {
@@ -548,49 +548,90 @@ bool DBImpl::ShouldFlush(const FlushOptions& options, size_t num_records,
 void DBImpl::FlushWorker(
     const std::vector<
         std::tuple<const Slice, const Slice, const format::WriteType>>& records,
-    std::future<BufferFrame*>& bf_future) {
-  auto bf = bf_future.get();
-  if (options_.stats != nullptr) {
-    if (bf->IsNewlyFixed()) {
-      ++options_.stats->page_io_count_;
-      options_.stats->page_io_records_ += records.size();
-    } else {
-      ++options_.stats->page_cached_count_;
-      options_.stats->page_cached_records_ += records.size();
-    }
-  }
+    std::future<OverflowChain>& bf_future) {
+  auto frames = bf_future.get();
 
-  // Lock the frame again for use. This does not increment the fix count of
-  // the frame, i.e. there is no danger of "double-fixing".
-  bf->Lock(/*exclusive = */ true);
-  Page page(bf->GetPage());
+  // Traverse overflow chain, update statistics if requested and lock frames
+  // again.
+  for (auto& bf : *frames) {
+    if (options_.stats != nullptr) {
+      if (bf->IsNewlyFixed()) {
+        ++options_.stats->page_io_count_;
+        options_.stats->page_io_records_ += records.size();
+      } else {
+        ++options_.stats->page_cached_count_;
+        options_.stats->page_cached_records_ += records.size();
+      }
+    }
+
+    // Lock the frame again for use. This does not increment the fix count of
+    // the frame, i.e. there is no danger of "double-fixing".
+    bf->Lock(/*exclusive = */ true);
+  }
 
   for (const auto& kv : records) {
     Status s;
-    if (std::get<2>(kv) == format::WriteType::kWrite) {
-      s = page.Put(WriteOptions(), std::get<0>(kv), std::get<1>(kv));
-    } else {
-      s = page.Delete(std::get<0>(kv));
-    }
-    if (s.IsInvalidArgument()) {
-      // TODO: Handle full pages. For now we should force an exit here to
-      // prevent a silent write failure in our benchmarks (assertions are
-      // disabled in release builds).
-      std::cerr << "ERROR: Attempted to write to a full page. Aborting."
-                << std::endl;
-      exit(1);
+    if (std::get<2>(kv) == format::WriteType::kWrite) {  // INSERTION
+      // Try to update/insert into existing page in chain
+      for (auto& bf : *frames) {
+        if (bf->GetPage().HasOverflow()) {
+          // Not the last page in the chain; only update or remove.
+          s = bf->GetPage().UpdateOrRemove(std::get<0>(kv), std::get<1>(kv));
+          if (s.ok()) break;
+        } else {
+          // Last page in the chain; try inserting.
+          s = bf->GetPage().Put(std::get<0>(kv), std::get<1>(kv));
+          if (s.ok()) break;
+
+          // Must allocate a new page
+          LogicalPageId new_page_id = buf_mgr_->GetFileManager()->AllocatePage();
+          auto new_bf =
+              &(buf_mgr_->FixPage(new_page_id, /*exclusive = */ true));
+          Page new_page(new_bf->GetData(), bf->GetPage());
+          bf->GetPage().SetOverflow(new_page_id);
+          frames->push_back(new_bf);
+
+          // Insert into the new page
+          s = new_page.Put(std::get<0>(kv), std::get<1>(kv));
+          if (!s.ok()) {  // Should never get here.
+            std::cerr << "ERROR: Failed to insert into overflow page. Aborting."
+                      << std::endl;
+            exit(1);
+          }
+        }
+      }
+
+    } else {  // DELETION
+      for (auto& bf : *frames) {
+        s = bf->GetPage().Delete(std::get<0>(kv));
+        if (s.ok()) break;
+      }
     }
   }
-  buf_mgr_->FlushAndUnfixPage(*bf);
+
+  // Flush and unfix all
+  for (auto& bf : *frames) {
+    buf_mgr_->FlushAndUnfixPage(*bf);
+  }
 }
 
-void DBImpl::FixWorker(size_t page_id, std::promise<BufferFrame*>& bf_promise) {
-  BufferFrame& bf = buf_mgr_->FixPage(page_id, /*exclusive = */ true);
-  // Unlock the frame so that it can be "handed over" to a FlushWorker thread.
-  // This does not decrement the fix count of the frame, i.e. there's no danger
-  // of eviction before we can use it.
-  bf.Unlock();
-  bf_promise.set_value(&bf);
+void DBImpl::FixWorker(LogicalPageId page_id,
+                       std::promise<OverflowChain>& bf_promise) {
+  OverflowChain frames = std::make_shared<std::vector<BufferFrame*>>();
+  BufferFrame* bf;
+  LogicalPageId local_page_id = page_id;
+  do {
+    bf = &(buf_mgr_->FixPage(local_page_id, /*exclusive = */ true));
+
+    // Unlock the frame so that it can be "handed over" to a FlushWorker thread.
+    // This does not decrement the fix count of the frame, i.e. there's no
+    // danger of eviction before we can use it.
+    bf->Unlock();
+    frames->push_back(bf);
+    local_page_id = bf->GetPage().GetOverflow();
+  } while (bf->GetPage().HasOverflow());
+
+  bf_promise.set_value(frames);
 }
 
 void DBImpl::ReinsertionWorker(

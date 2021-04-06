@@ -25,11 +25,10 @@ BufferManager::BufferManager(const BufMgrOptions& options,
     alignment = fs_stats.f_bsize;
   }
   // Allocate space with alignment because of O_DIRECT requirements.
-  // No need to zero out because data brought here will come from the database
-  // `File`, which is zeroed out upon expansion.
   pages_cache_ = aligned_alloc(alignment, options.buffer_pool_size);
+  memset(pages_cache_, 0, options.buffer_pool_size);
 
-  page_to_frame_map_ = std::make_unique<SyncHashTable<uint64_t, BufferFrame*>>(
+  page_to_frame_map_ = std::make_unique<SyncHashTable<LogicalPageId, BufferFrame*>>(
       buffer_manager_size_, /*num_partitions = */ 1);
   frames_ = std::vector<BufferFrame>(buffer_manager_size_);
   SetFrameDataPointers();
@@ -54,7 +53,7 @@ BufferManager::~BufferManager() {
 // Retrieves the page given by `page_id`, to be held exclusively or not
 // based on the value of `exclusive`. Pages are stored on disk in files with
 // the same name as the page ID (e.g. 1).
-BufferFrame& BufferManager::FixPage(const uint64_t page_id,
+BufferFrame& BufferManager::FixPage(const LogicalPageId page_id,
                                     const bool exclusive) {
   BufferFrame* frame = nullptr;
   bool success;
@@ -149,7 +148,7 @@ void BufferManager::FlushDirty() {
 
 // Indicates whether the page given by `page_id` is currently in the buffer
 // manager.
-bool BufferManager::Contains(const uint64_t page_id) {
+bool BufferManager::Contains(const LogicalPageId page_id) {
   BufferFrame* value_out;
 
   LockMapMutex();

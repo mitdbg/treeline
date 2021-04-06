@@ -47,14 +47,14 @@ void RSModel::Preallocate(const std::vector<std::pair<Slice, Slice>>& records,
 
 // Uses the model to predict a page_id given a `key` that is within the correct
 // range.
-size_t RSModel::KeyToPageId(const Slice& key) const {
+LogicalPageId RSModel::KeyToPageId(const Slice& key) const {
   return RSModel::KeyToPageId(key_utils::ExtractHead64(key));
 }
 
-size_t RSModel::KeyToPageId(const uint64_t key) const {
+LogicalPageId RSModel::KeyToPageId(const uint64_t key) const {
   const size_t estimate = index_.GetEstimatedPosition(key);
 
-  return estimate / records_per_page_;
+  return LogicalPageId(estimate / records_per_page_);
 }
 
 void RSModel::EncodeTo(std::string* dest) const {

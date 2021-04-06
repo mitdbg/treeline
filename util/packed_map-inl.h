@@ -54,6 +54,26 @@ bool PackedMap<MapSizeBytes>::Insert(const uint8_t* key, unsigned key_length,
 }
 
 template <uint16_t MapSizeBytes>
+bool PackedMap<MapSizeBytes>::UpdateOrRemove(const uint8_t* key,
+                                             unsigned key_length,
+                                             const uint8_t* payload,
+                                             unsigned payload_length) {
+  bool found;
+  const unsigned slot_id = LowerBound(key, key_length, found);
+
+  if (!found) return false;  // Key not in the map.
+
+  // If new payload doesn't fit, just delete the old one.
+  if (HandleDuplicateInsertion(slot_id, key, key_length, payload,
+                               payload_length)) {
+    return true;
+  } else {
+    RemoveSlot(slot_id);
+    return false;
+  }
+}
+
+template <uint16_t MapSizeBytes>
 bool PackedMap<MapSizeBytes>::HandleDuplicateInsertion(
     uint16_t slot_id, const uint8_t* key, unsigned key_length,
     const uint8_t* payload, unsigned payload_length) {
@@ -386,6 +406,16 @@ const uint8_t* PackedMap<MapSizeBytes>::GetUpperFence() const {
 }
 
 template <uint16_t MapSizeBytes>
+const uint16_t PackedMap<MapSizeBytes>::GetLowerFenceLength() const {
+  return header_.lower_fence.length;
+}
+
+template <uint16_t MapSizeBytes>
+const uint16_t PackedMap<MapSizeBytes>::GetUpperFenceLength() const {
+  return header_.upper_fence.length;
+}
+
+template <uint16_t MapSizeBytes>
 void PackedMap<MapSizeBytes>::SearchHint(const uint32_t key_head,
                                          unsigned& lower_out,
                                          unsigned& upper_out) const {
@@ -402,12 +432,12 @@ void PackedMap<MapSizeBytes>::SearchHint(const uint32_t key_head,
 }
 
 template <uint16_t MapSizeBytes>
-uint64_t PackedMap<MapSizeBytes>::GetOverflow() const {
+LogicalPageId PackedMap<MapSizeBytes>::GetOverflow() const {
   return header_.overflow;
 }
 
 template <uint16_t MapSizeBytes>
-void PackedMap<MapSizeBytes>::SetOverflow(uint64_t overflow) {
+void PackedMap<MapSizeBytes>::SetOverflow(LogicalPageId overflow) {
   header_.overflow = overflow;
 }
 

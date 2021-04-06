@@ -5,6 +5,7 @@
 #include "llsm/options.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
+#include "bufmgr/logical_page_id.h"
 
 namespace llsm {
 
@@ -44,23 +45,27 @@ class Page {
   // The `Page`'s contents will be stored in the `data` buffer.
   Page(void* data, const Slice& lower_key, const Slice& upper_key);
 
+  // Construct a `Page` with the same key boundaries as `old_page`.
+  // The `Page`'s contents will be stored in the `data` buffer.
+  Page(void* data, const Page& old_page);
+
   // All keys stored in this page have this prefix. Note that the returned
   // `Slice` shares the same lifetime as this page's `data` buffer.
   Slice GetKeyPrefix() const;
 
   Status Put(const Slice& key, const Slice& value);
   Status Put(const WriteOptions& options, const Slice& key, const Slice& value);
+  Status UpdateOrRemove(const Slice& key, const Slice& value);
   Status Get(const Slice& key, std::string* value_out);
   Status Delete(const Slice& key);
 
   // Retrieve the stored `overflow` page id for this page.
-  uint64_t GetOverflow() const;
+  LogicalPageId GetOverflow() const;
 
   // Set the stored overflow page id for this page to `overflow`.
-  void SetOverflow(uint64_t overflow);
+  void SetOverflow(LogicalPageId overflow);
 
-  // Determine whether this page has an overflow page. Only page id's with 1 as
-  // the most significant bit are valid overflow page id's.
+  // Determine whether this page has an overflow page.
   bool HasOverflow();
 
   class Iterator;
@@ -78,6 +83,12 @@ class Page {
   }
 
  private:
+  // Construct an empty `Page` where all keys will satisfy
+  // `lower_key <= key <= upper_key` (used for efficient encoding of the keys).
+  // The `Page`'s contents will be stored in the `data` buffer.
+  Page(void* data, const uint8_t* lower_key, unsigned lower_key_length,
+       const uint8_t* upper_key, unsigned upper_key_length);
+
   void* data_;
 };
 

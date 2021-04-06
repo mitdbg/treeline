@@ -118,4 +118,30 @@ TEST_F(PageTest, GetKeyPrefix) {
   ASSERT_TRUE(long_prefix.GetKeyPrefix().compare("hello") == 0);
 }
 
+TEST_F(PageTest, UpdateOrRemove) {
+ Page page(buffer.get(), "aa", "zz");
+  std::string aa_out, ab_out, ac_out;
+
+  // Simple case
+  ASSERT_TRUE(page.Put("aa", "hello111").ok());
+  ASSERT_TRUE(page.Get("aa", &aa_out).ok());
+  ASSERT_EQ(aa_out, "hello111");
+
+  // Fail - insert - succeed
+  ASSERT_FALSE(page.UpdateOrRemove("ab", "hello222").ok());
+
+  ASSERT_TRUE(page.Put("ab", "hello222").ok());
+  ASSERT_TRUE(page.Get("ab", &ab_out).ok());
+  ASSERT_EQ(ab_out, "hello222");
+
+  ASSERT_TRUE(page.UpdateOrRemove("ab", "hello22222").ok());
+  ASSERT_TRUE(page.Get("ab", &ab_out).ok());
+  ASSERT_EQ(ab_out, "hello22222");
+
+  // Fail because of payload length
+  std::string s(4096, 'a');
+  ASSERT_TRUE(page.UpdateOrRemove("ac", s).IsNotFound());
+  ASSERT_FALSE(page.Get("ac", &ac_out).ok());
+}
+
 }  // namespace

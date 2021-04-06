@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include "bufmgr/logical_page_id.h"
 
 namespace llsm {
 
@@ -14,8 +15,8 @@ class Model {
  public:
   virtual ~Model() = default;
 
-  // Uses the model to derive a page_id given a `key`.
-  virtual size_t KeyToPageId(const Slice& key) const = 0;
+  // Uses the model to derive a logical page_id given a `key`.
+  virtual LogicalPageId KeyToPageId(const Slice& key) const = 0;
 
   // Serializes the model and appends it to `dest`.
   virtual void EncodeTo(std::string* dest) const = 0;

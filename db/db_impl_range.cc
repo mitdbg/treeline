@@ -130,7 +130,7 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
 
   assert(buf_mgr_->GetFileManager() != nullptr);
   const size_t total_db_pages = buf_mgr_->GetFileManager()->GetNumPages();
-  size_t curr_page_id = model_->KeyToPageId(start_key);
+  LogicalPageId curr_page_id = model_->KeyToPageId(start_key);
   bool is_first_page = true;
 
   while (results_out->size() < num_records && curr_page_id < total_db_pages) {
