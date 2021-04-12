@@ -12,6 +12,7 @@
 #include "db/format.h"
 #include "db/memtable.h"
 #include "llsm/db.h"
+#include "llsm/statistics.h"
 #include "model/rs_model.h"
 #include "util/thread_pool.h"
 #include "wal/manager.h"
@@ -33,7 +34,7 @@ class DBImpl : public DB {
   Status GetRange(const ReadOptions& options, const Slice& start_key,
                   size_t num_records, RecordBatch* results_out) override;
   Status Delete(const WriteOptions& options, const Slice& key) override;
-  Status FlushMemTable(const FlushOptions& options) override;
+  Status FlushMemTable(const bool disable_deferred_io) override;
 
   // Must be called exactly once after `DBImpl` is constructed to initialize the
   // database's internal state. Other public `DBImpl` methods can be called
@@ -60,8 +61,8 @@ class DBImpl : public DB {
   //
   // REQUIRES: `mutex_` is held.
   // REQUIRES: The thread has already called `WriterWaitIfNeeded()`.
-  void ScheduleMemTableFlush(const FlushOptions& options,
-                             std::unique_lock<std::mutex>& lock);
+  void ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
+                             const bool disable_deferred_io);
 
   // Returns true iff `mtable_` is "full".
   // REQUIRES: `mutex_` is held.
@@ -71,7 +72,7 @@ class DBImpl : public DB {
   // REQUIRES: `mutex_` is held.
   bool FlushInProgress(const std::unique_lock<std::mutex>& lock) const;
 
-  bool ShouldFlush(const FlushOptions& options, size_t num_records,
+  bool ShouldFlush(const FlushOptions& foptions, size_t num_records,
                    size_t num_deferrals) const;
 
   using OverflowChain = std::shared_ptr<std::vector<BufferFrame*>>;
@@ -84,7 +85,8 @@ class DBImpl : public DB {
       std::future<OverflowChain>& bf_future);
 
   // Code run by a worker thread to fix the page with `page_id`.
-  void FixWorker(LogicalPageId page_id, std::promise<OverflowChain>& bf_promise);
+  void FixWorker(LogicalPageId page_id,
+                 std::promise<OverflowChain>& bf_promise);
 
   // Code run by a worker thread to reinsert `records` into the now-active
   // memtable if their flush was deferred.
@@ -106,6 +108,7 @@ class DBImpl : public DB {
   // Will not be changed after `Initialize()` returns. The objects below are
   // thread safe; no additional mutual exclusion is required.
   Options options_;
+  Statistics stats_;
   const std::filesystem::path db_path_;
   std::unique_ptr<BufferManager> buf_mgr_;
   std::unique_ptr<Model> model_;

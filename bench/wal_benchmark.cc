@@ -9,12 +9,13 @@
 //   make -j
 //   ./bench/wal --log_path=<path where the log file should be written>
 //
+// clang-format off
+//
 // Example run (log is written to a 1 TB Intel NVMe SSD (SSDPE2KX010T8)):
 //
 // 2021-02-17T21:39:07-05:00
-// Running ./bench/wal --log_path=/flash1/geoffxy/test.wal --benchmark_filter="Fdatasync_KiB"
-// Run on (40 X 3900 MHz CPU s)
-// CPU Caches:
+// Running ./bench/wal --log_path=/flash1/geoffxy/test.wal
+// --benchmark_filter="Fdatasync_KiB" Run on (40 X 3900 MHz CPU s) CPU Caches:
 //   L1 Data 32 KiB (x20)
 //   L1 Instruction 32 KiB (x20)
 //   L2 Unified 1024 KiB (x20)
@@ -34,6 +35,8 @@
 // Fdatasync_KiB/256/real_time         289 us          115 us         2477 bytes_per_second=864.932M/s
 // Fdatasync_KiB/512/real_time         509 us          216 us         1383 bytes_per_second=981.596M/s
 // Fdatasync_KiB/1024/real_time       1011 us          413 us          710 bytes_per_second=989.121M/s
+//
+// clang-format on
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -49,6 +52,7 @@
 #include "benchmark/benchmark.h"
 #include "db/format.h"
 #include "db/memtable.h"
+#include "db/options.h"
 #include "gflags/gflags.h"
 #include "llsm/options.h"
 #include "util/coding.h"
@@ -240,7 +244,7 @@ void MemTableSingle_64MiB(benchmark::State& state, bool use_log, bool sync) {
   WriteOptions write_options;
   write_options.sync = sync;
   for (auto _ : state) {
-    MemTable mtable;
+    MemTable mtable(llsm::MemTableOptions{});
     for (const auto& record : dataset) {
       if (use_log) {
         s = writer.AddEntry(
@@ -283,7 +287,7 @@ void MemTableBatch_64MiB(benchmark::State& state, bool use_log, bool sync) {
   WriteOptions write_options;
   write_options.sync = sync;
   for (auto _ : state) {
-    MemTable mtable;
+    MemTable mtable(llsm::MemTableOptions{});
     WriteBatch batch;
     for (const auto& record : dataset) {
       batch.Put(record.key(), record.value());

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "db/format.h"
+#include "db/options.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
 #include "util/arena.h"
@@ -23,9 +24,8 @@ namespace llsm {
 // `const` methods are called concurrently, no mutual exclusion is needed.
 class MemTable {
  public:
-  // Create a new MemTable, optionally with some `reserved_sequence_numbers` for
-  // special uses (currently used to handle deferred I/O).
-  MemTable(const uint64_t reserved_sequence_numbers = 0);
+  // Create a new MemTable based on the given MemTableOptions.
+  MemTable(const MemTableOptions& moptions);
 
   // Add an entry to this table. The `WriteType` is used to disambiguate between
   // regular writes and deletes. When deleting, `value` is ignored.
@@ -65,6 +65,9 @@ class MemTable {
   // Returns true iff there is at least one entry (added through `Add()`) in
   // this table.
   bool HasEntries() const { return has_entries_; }
+
+  // Returns the options of this memtable.
+  const MemTableOptions& GetOptions() const { return options_; }
 
  private:
   // Represents a key-value entry in this `MemTable`. Records stored in this
@@ -128,9 +131,8 @@ class MemTable {
   Arena arena_;
   Table table_;
   uint64_t next_sequence_num_;
-  uint64_t
-      reserved_sequence_numbers_;  // Used to count number of I/O deferrals.
   bool has_entries_;
+  MemTableOptions options_;
 };
 
 // An iterator for the MemTable.

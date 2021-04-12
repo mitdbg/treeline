@@ -12,7 +12,8 @@ using namespace llsm;
 using namespace llsm::format;
 
 TEST(MemTableTest, SimpleReadWrite) {
-  MemTable table;
+  MemTableOptions moptions;
+  MemTable table(moptions);
   std::string key = "hello";
   std::string value = "world";
 
@@ -28,7 +29,8 @@ TEST(MemTableTest, SimpleReadWrite) {
 }
 
 TEST(MemTableTest, NegativeLookup) {
-  MemTable table;
+  MemTableOptions moptions;
+  MemTable table(moptions);
   std::string key = "hello";
 
   std::string value_out;
@@ -43,7 +45,8 @@ TEST(MemTableTest, NegativeLookup) {
 }
 
 TEST(MemTableTest, WriteThenDelete) {
-  MemTable table;
+  MemTableOptions moptions;
+  MemTable table(moptions);
   std::string key = "hello";
   std::string value = "world";
 
@@ -65,7 +68,8 @@ TEST(MemTableTest, WriteThenDelete) {
 }
 
 TEST(MemTableTest, DeleteThenWrite) {
-  MemTable table;
+  MemTableOptions moptions;
+  MemTable table(moptions);
   std::string key = "hello";
   std::string value = "world";
 
@@ -92,7 +96,8 @@ TEST(MemTableTest, InOrderIterate) {
   std::sort(ordered.begin(), ordered.end());
 
   std::string value = "test string";
-  MemTable table;
+  MemTableOptions moptions;
+  MemTable table(moptions);
   for (const auto& s : strs) {
     ASSERT_TRUE(table.Put(s, value).ok());
   }
@@ -113,7 +118,8 @@ TEST(MemTableTest, InOrderIterate) {
 }
 
 TEST(MemTableTest, MultiWriteIterate) {
-  MemTable table;
+  MemTableOptions moptions;
+  MemTable table(moptions);
   const std::string final_value = "test string";
   ASSERT_TRUE(table.Put("abc", "hello").ok());
   ASSERT_TRUE(table.Put("xyz123", "world").ok());
@@ -182,7 +188,8 @@ TEST(MemTableTest, MultiWriteIterate) {
 }
 
 TEST(MemTableTest, SimilarGet) {
-  MemTable table;
+  MemTableOptions moptions;
+  MemTable table(moptions);
   std::string value_out;
   WriteType write_type_out;
   ASSERT_TRUE(table.Put("abcd", "hello").ok());
@@ -190,7 +197,8 @@ TEST(MemTableTest, SimilarGet) {
 }
 
 TEST(MemTableTest, AddFromDeferral) {
-  MemTable table(/*reserved_sequence_numbers = */ 1);
+  MemTableOptions moptions;
+  MemTable table(moptions);
 
   ASSERT_TRUE(table.Put("abcd", "hello1").ok());
   ASSERT_TRUE(table

@@ -1,7 +1,7 @@
 #include <stdexcept>
 
-#include "benchmark/benchmark.h"
 #include "bench/common/data.h"
+#include "benchmark/benchmark.h"
 #include "db/memtable.h"
 
 namespace {
@@ -16,10 +16,11 @@ void MemTableInsert_64MiB(benchmark::State& state, bool shuffle) {
   bench::U64Dataset dataset =
       bench::U64Dataset::Generate(kDatasetSizeMiB, options);
   Status s;
+  MemTableOptions moptions;
   for (auto _ : state) {
-    MemTable mtable;
+    MemTable table(moptions);
     for (const auto& record : dataset) {
-      s = mtable.Put(record.key(), record.value());
+      s = table.Put(record.key(), record.value());
       if (!s.ok()) {
         throw std::runtime_error("Failed to insert record into the memtable!");
       }

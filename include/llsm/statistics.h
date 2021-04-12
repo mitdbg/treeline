@@ -14,39 +14,47 @@ class Statistics {
   Statistics& operator=(const Statistics&) = delete;
 
   void Clear() {
-    flush_count_ = 0;
-    page_cached_count_ = 0;
-    page_io_count_ = 0;
-    deferred_count_ = 0;
+    flush_bufmgr_hits_pages_ = 0;
+    flush_bufmgr_misses_pages_ = 0;
+    flush_deferred_pages_ = 0;
+    flush_deferred_records_ = 0;
 
-    flush_records_ = 0;
-    page_cached_records_ = 0;
-    page_io_records_ = 0;
-    deferred_records_ = 0;
+    user_writes_records_ = 0;
+    user_reads_memtable_hits_records_ = 0;
+    user_reads_bufmgr_hits_records_ = 0;
+    user_reads_single_bufmgr_misses_records_ = 0;
+    user_reads_multi_bufmgr_misses_records_ = 0;
   }
 
   friend std::ostream& operator<<(std::ostream& output,
                                   const Statistics& stats) {
-    output << "flushes, fl records, bufmgr hits, bufmgr hits records, "
-              "IOs, IOs records, deferrals, deferrals records"
+    output << "flush bufmgr hits (pgs), flush bufmgr misses (pgs), flush "
+              "deferrals (pgs), flush deferrals (recs), user writes (recs), "
+              "user reads memtable hits (recs), user reads bufmgr hits (recs), "
+              "user reads single bufmgr miss (recs), user reads multiple "
+              "bufmgr misses (recs)"
            << std::endl;
-    output << stats.flush_count_ << "," << stats.flush_records_ << ","
-           << stats.page_cached_count_ << "," << stats.page_cached_records_
-           << "," << stats.page_io_count_ << "," << stats.page_io_records_
-           << "," << stats.deferred_count_ << "," << stats.deferred_records_
-           << std::endl;
+    output << stats.flush_bufmgr_hits_pages_ << ","
+           << stats.flush_bufmgr_misses_pages_ << ","
+           << stats.flush_deferred_pages_ << ","
+           << stats.flush_deferred_records_ << "," << stats.user_writes_records_
+           << "," << stats.user_reads_memtable_hits_records_ << ","
+           << stats.user_reads_bufmgr_hits_records_ << ","
+           << stats.user_reads_single_bufmgr_misses_records_ << ","
+           << stats.user_reads_multi_bufmgr_misses_records_ << "," << std::endl;
     return output;
   }
 
-  std::atomic<size_t> flush_count_;
-  std::atomic<size_t> page_cached_count_;
-  std::atomic<size_t> page_io_count_;
-  std::atomic<size_t> deferred_count_;
+  std::atomic<size_t> flush_bufmgr_hits_pages_;
+  std::atomic<size_t> flush_bufmgr_misses_pages_;
+  std::atomic<size_t> flush_deferred_pages_;
+  std::atomic<size_t> flush_deferred_records_;
 
-  std::atomic<size_t> flush_records_;
-  std::atomic<size_t> page_cached_records_;
-  std::atomic<size_t> page_io_records_;
-  std::atomic<size_t> deferred_records_;
+  std::atomic<size_t> user_writes_records_;
+  std::atomic<size_t> user_reads_memtable_hits_records_;
+  std::atomic<size_t> user_reads_bufmgr_hits_records_;
+  std::atomic<size_t> user_reads_single_bufmgr_misses_records_;
+  std::atomic<size_t> user_reads_multi_bufmgr_misses_records_;
 };
 
 }  // namespace llsm

@@ -3,6 +3,7 @@
 
 #include "db/format.h"
 #include "db/memtable.h"
+#include "db/options.h"
 #include "gflags/gflags.h"
 #include "rs/builder.h"
 #include "util/inlineskiplist.h"
@@ -76,8 +77,8 @@ int main(int argc, char* argv[]) {
   std::vector<size_t> memtable_entries_per_page(num_pages, 0);
   std::vector<uint64_t> page_deferral_count(num_pages, 0);
   std::vector<bool> flushed_this_time(num_pages, false);
-  llsm::MemTable* memtable = new llsm::MemTable();
-  llsm::MemTable* backup_memtable = new llsm::MemTable();
+  llsm::MemTable* memtable = new llsm::MemTable(llsm::MemTableOptions());
+  llsm::MemTable* backup_memtable = new llsm::MemTable(llsm::MemTableOptions());
   size_t num_flushes = 0;
   size_t num_ios = 0;
   size_t num_reqs = 0;
@@ -130,7 +131,7 @@ int main(int argc, char* argv[]) {
       // Swap memtables
       delete memtable;
       memtable = backup_memtable;
-      backup_memtable = new llsm::MemTable();
+      backup_memtable = new llsm::MemTable(llsm::MemTableOptions());
     }
   }
 

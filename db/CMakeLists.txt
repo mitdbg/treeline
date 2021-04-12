@@ -8,5 +8,6 @@ target_sources(llsm PRIVATE
   memtable.cc
   memtable.h
   options.cc
+  options.h
   page.cc
   page.h)

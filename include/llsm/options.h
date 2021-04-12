@@ -11,8 +11,6 @@
 #include <cstdlib>
 #include <memory>
 
-#include "llsm/statistics.h"
-
 namespace llsm {
 
 // Options used to inform the database about the key space (the distribution is
@@ -72,9 +70,9 @@ struct Options {
   // `background_threads - 1`.
   bool pin_threads = true;
 
-  // If provided with a pointer to a Statistics object, LLSM will keep track of
-  // the relevant statistics and output them in the destructor.
-  std::shared_ptr<Statistics> stats = nullptr;
+  // If true, LLSM will try to optimize the MemTableOptions each time it
+  // allocates a new memtable, as well as the FlushOptions for every flush.
+  bool adaptive_memtables = false;
 };
 
 struct ReadOptions {};
@@ -107,11 +105,6 @@ struct WriteOptions {
   //
   // NOTE: This flag only has an effect when `bypass_wal` is false.
   bool sync = false;
-};
-
-struct FlushOptions {
-  // Disable I/O deferral during a MemTable flush.
-  bool disable_deferred_io = false;
 };
 
 }  // namespace llsm

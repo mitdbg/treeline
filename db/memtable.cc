@@ -14,11 +14,11 @@ constexpr uint64_t kWriteTypeBitWidth = 8;
 
 namespace llsm {
 
-MemTable::MemTable(const uint64_t reserved_sequence_numbers)
-    : arena_(),
+MemTable::MemTable(const MemTableOptions& moptions)
+    : options_(moptions),
+      arena_(),
       table_(MemTable::Comparator(), &arena_),
-      next_sequence_num_(reserved_sequence_numbers),
-      reserved_sequence_numbers_(reserved_sequence_numbers),
+      next_sequence_num_(moptions.deferral_granularity + 1),
       has_entries_(false) {}
 
 Status MemTable::Put(const Slice& key, const Slice& value) {
@@ -55,17 +55,23 @@ Status MemTable::Add(const Slice& key, const Slice& value,
   const size_t user_data_bytes = key.size() + value.size();
   char* buf = table_.AllocateKey(sizeof(Record) + user_data_bytes);
 
+  uint64_t seq_num = 0;
+  if (!from_deferral) {
+    seq_num = next_sequence_num_++;
+  } else {
+    // Previous memtables might have had a higher granularity.
+    if (injected_sequence_num > options_.deferral_granularity) {
+      seq_num = options_.deferral_granularity;
+    } else {
+      seq_num = injected_sequence_num;
+    }
+  }
+
   Record* record = Record::FromRawBytes(buf);
   record->key_length = key.size();
   record->value_length = value.size();
-  if (!from_deferral) {
-    record->sequence_number = (next_sequence_num_++ << kWriteTypeBitWidth) |
-                              static_cast<uint8_t>(write_type);
-  } else {
-    assert(injected_sequence_num < reserved_sequence_numbers_);
-    record->sequence_number = (injected_sequence_num << kWriteTypeBitWidth) |
-                              static_cast<uint8_t>(write_type);
-  }
+  record->sequence_number =
+      (seq_num << kWriteTypeBitWidth) | static_cast<uint8_t>(write_type);
 
   memcpy(record->key(), key.data(), key.size());
   memcpy(record->value(), value.data(), value.size());

@@ -89,8 +89,7 @@ TEST_F(DBTest, WriteFlushRead) {
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value_out, value);
 
-  llsm::FlushOptions flush_options = {/*disable_deferred_io = */ true};
-  status = db->FlushMemTable(flush_options);
+  status = db->FlushMemTable(/*disable_deferred_io = */ true);
   ASSERT_TRUE(status.ok());
 
   // Should be a page read (but will be cached in the buffer pool).
@@ -149,8 +148,7 @@ TEST_F(DBTest, WriteThenDelete) {
   ASSERT_EQ(value_out, value);
 
   // Flush
-  llsm::FlushOptions flush_options = {/*disable_deferred_io = */ true};
-  status = db->FlushMemTable(flush_options);
+  status = db->FlushMemTable(/*disable_deferred_io = */ true);
   ASSERT_TRUE(status.ok());
 
   // Delete
@@ -177,7 +175,7 @@ TEST_F(DBTest, WriteThenDelete) {
   ASSERT_EQ(value_out, value);
 
   // Flush
-  status = db->FlushMemTable(flush_options);
+  status = db->FlushMemTable(/*disable_deferred_io = */ true);
   ASSERT_TRUE(status.ok());
 
   // Delete
@@ -185,7 +183,7 @@ TEST_F(DBTest, WriteThenDelete) {
   ASSERT_TRUE(status.ok());
 
   // Flush
-  status = db->FlushMemTable(flush_options);
+  status = db->FlushMemTable(/*disable_deferred_io = */ true);
   ASSERT_TRUE(status.ok());
 
   // Should not find it.
@@ -212,7 +210,7 @@ TEST_F(DBTest, WriteThenDelete) {
   ASSERT_TRUE(status.ok());
 
   // Flush
-  status = db->FlushMemTable(flush_options);
+  status = db->FlushMemTable(/*disable_deferred_io = */ true);
   ASSERT_TRUE(status.ok());
 
   // Should not find it.
@@ -255,7 +253,7 @@ TEST_F(DBTest, DeferByEntries) {
   }
 
   // Flush - shouldn't flush anything
-  status = db->FlushMemTable(llsm::FlushOptions());
+  status = db->FlushMemTable(/*disable_deferred_io = */ false);
   ASSERT_TRUE(status.ok());
 
   // Make sure page is evicted by looking up sth else.
@@ -279,7 +277,7 @@ TEST_F(DBTest, DeferByEntries) {
   ASSERT_TRUE(status.ok());
 
   // Flush - should work now
-  status = db->FlushMemTable(llsm::FlushOptions());
+  status = db->FlushMemTable(/*disable_deferred_io = */ false);
   ASSERT_TRUE(status.ok());
 
   // Make sure page is evicted by looking up sth else.
@@ -336,7 +334,7 @@ TEST_F(DBTest, DeferByAttempts) {
   }
 
   // Flush - shouldn't flush anything
-  status = db->FlushMemTable(llsm::FlushOptions());
+  status = db->FlushMemTable(/*disable_deferred_io = */ false);
   ASSERT_TRUE(status.ok());
 
   // Make sure page is evicted by looking up sth else.
@@ -353,7 +351,7 @@ TEST_F(DBTest, DeferByAttempts) {
   }
 
   // Flush - should work now
-  status = db->FlushMemTable(llsm::FlushOptions());
+  status = db->FlushMemTable(/*disable_deferred_io = */ false);
   ASSERT_TRUE(status.ok());
 
   // Make sure page is evicted by looking up sth else.
@@ -562,9 +560,7 @@ TEST_F(DBTest, RangeScan) {
   }
 
   // Flush the writes to the pages.
-  llsm::FlushOptions foptions;
-  foptions.disable_deferred_io = true;
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Scan from the pages.
   results.clear();
@@ -657,9 +653,7 @@ TEST_F(DBTest, OverflowByRecordNumber) {
   }
 
   // Flush the writes to the pages.
-  llsm::FlushOptions foptions;
-  foptions.disable_deferred_io = true;
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Generate data for enough additional writes to definitely overflow (64 KiB)
   llsm::KeyDistHints extra_key_hints;
@@ -678,7 +672,7 @@ TEST_F(DBTest, OverflowByRecordNumber) {
   }
 
   // Flush the writes to the pages (should cause overflow).
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Read all original keys
   std::string value_out;
@@ -744,9 +738,7 @@ TEST_F(DBTest, OverflowByLargeValue) {
   }
 
   // Flush the writes to the pages.
-  llsm::FlushOptions foptions;
-  foptions.disable_deferred_io = true;
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Write extra data to the DB.
   llsm::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[0])),
@@ -755,7 +747,7 @@ TEST_F(DBTest, OverflowByLargeValue) {
   ASSERT_TRUE(status.ok());
 
   // Flush the write to the pages(shuld cause overflow)
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Read updated value
   std::string value_out;
@@ -822,24 +814,24 @@ TEST_F(DBTest, OverflowWithUpdates) {
   }
 
   // Flush the writes to the pages(shuld cause overflow)
-  llsm::FlushOptions foptions;
-  foptions.disable_deferred_io = true;
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Update some old keys.
   for (size_t i = 0; i < 2; ++i) {
-    llsm::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])), kKeySize);
+    llsm::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])),
+                    kKeySize);
     status = db->Put(woptions, key, value_new);
     ASSERT_TRUE(status.ok());
   }
 
   // Flush the writes to the pages.
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Read all old keys
   std::string value_out;
   for (size_t i = 0; i < lexicographic_keys.size(); ++i) {
-    llsm::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])), kKeySize);
+    llsm::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])),
+                    kKeySize);
     status = db->Get(llsm::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     if (i < 2) {
@@ -850,18 +842,23 @@ TEST_F(DBTest, OverflowWithUpdates) {
   }
 
   // Update some extra keys.
-  for (size_t i = extra_lexicographic_keys.size() - 2; i < extra_lexicographic_keys.size(); ++i) {
-    llsm::Slice key(reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])), kKeySize);
+  for (size_t i = extra_lexicographic_keys.size() - 2;
+       i < extra_lexicographic_keys.size(); ++i) {
+    llsm::Slice key(
+        reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])),
+        kKeySize);
     status = db->Put(woptions, key, value_new);
     ASSERT_TRUE(status.ok());
   }
 
   // Flush the writes to the pages.
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Read all extra keys
   for (size_t i = 0; i < extra_lexicographic_keys.size(); ++i) {
-    llsm::Slice key(reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])), kKeySize);
+    llsm::Slice key(
+        reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])),
+        kKeySize);
     status = db->Get(llsm::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     if (i < extra_lexicographic_keys.size() - 2) {
@@ -914,9 +911,7 @@ TEST_F(DBTest, OverflowWithDeletes) {
   }
 
   // Flush the writes to the pages.
-  llsm::FlushOptions foptions;
-  foptions.disable_deferred_io = true;
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Generate data for enough additional writes to definitely overflow (64 KiB)
   llsm::KeyDistHints extra_key_hints;
@@ -935,7 +930,7 @@ TEST_F(DBTest, OverflowWithDeletes) {
   }
 
   // Flush the writes to the pages (should cause overflow).
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Delete all original keys
   for (const auto& key_as_int : lexicographic_keys) {
@@ -945,7 +940,7 @@ TEST_F(DBTest, OverflowWithDeletes) {
   }
 
   // Flush the deletes to the pages.
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Read all extra keys
   std::string value_out;
@@ -964,7 +959,7 @@ TEST_F(DBTest, OverflowWithDeletes) {
   }
 
   // Flush the writes to the pages (should cause overflow).
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Read all reinserted keys
   for (const auto& key_as_int : lexicographic_keys) {
@@ -1016,11 +1011,10 @@ TEST_F(DBTest, OverflowChain) {
   }
 
   // Flush the writes to the pages.
-  llsm::FlushOptions foptions;
-  foptions.disable_deferred_io = true;
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
-  // Generate data for enough additional writes to overflow multiple times (256 KiB)
+  // Generate data for enough additional writes to overflow multiple times (256
+  // KiB)
   llsm::KeyDistHints extra_key_hints;
   extra_key_hints.num_keys = 4096 * 4;
   extra_key_hints.record_size = kKeySize + kValueSize;
@@ -1037,12 +1031,15 @@ TEST_F(DBTest, OverflowChain) {
   }
 
   // Flush the writes to the pages (should cause overflow).
-  db->FlushMemTable(foptions);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Read some keys from end of chain
   std::string value_out;
-  for (size_t i = extra_lexicographic_keys.size() - 5; i < extra_lexicographic_keys.size(); ++i) {
-    llsm::Slice key(reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])), kKeySize);
+  for (size_t i = extra_lexicographic_keys.size() - 5;
+       i < extra_lexicographic_keys.size(); ++i) {
+    llsm::Slice key(
+        reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])),
+        kKeySize);
     status = db->Get(llsm::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_old, value_out);
