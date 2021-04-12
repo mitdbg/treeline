@@ -25,6 +25,10 @@ inline PackedMap* AsMapPtr(void* data) {
   return reinterpret_cast<PackedMap*>(data);
 }
 
+inline const PackedMap* AsMapPtr(const void* data) {
+  return reinterpret_cast<const PackedMap*>(data);
+}
+
 }  // namespace
 
 namespace llsm {
@@ -125,7 +129,9 @@ Status Page::Delete(const Slice& key) {
 }
 
 // Retrieve the stored `overflow` page id for this page.
-LogicalPageId Page::GetOverflow() const { return AsMapPtr(data_)->GetOverflow(); }
+LogicalPageId Page::GetOverflow() const {
+  return AsMapPtr(data_)->GetOverflow();
+}
 
 // Set the stored overflow page id for this page to `overflow`.
 void Page::SetOverflow(LogicalPageId overflow) {
@@ -139,21 +145,19 @@ bool Page::HasOverflow() { return GetOverflow().IsOverflow(); }
 Page::Iterator Page::GetIterator() const { return Iterator(*this); }
 
 Page::Iterator::Iterator(const Page& page)
-    : page_(page),
+    : data_(page.data_),
       current_slot_(0),
       prefix_length_(0),
       key_buffer_valid_(false) {
-  const Slice prefix = page_.GetKeyPrefix();
+  const Slice prefix = page.GetKeyPrefix();
   key_buffer_.append(prefix.data(), prefix.size());
   prefix_length_ = prefix.size();
   assert(prefix_length_ == key_buffer_.size());
 }
 
 void Page::Iterator::Seek(const Slice& key) {
-  current_slot_ =
-      AsMapPtr(page_.data_)
-          ->LowerBoundSlot(reinterpret_cast<const uint8_t*>(key.data()),
-                           key.size());
+  current_slot_ = AsMapPtr(data_)->LowerBoundSlot(
+      reinterpret_cast<const uint8_t*>(key.data()), key.size());
   key_buffer_valid_ = false;
 }
 
@@ -163,11 +167,11 @@ void Page::Iterator::Next() {
 }
 
 bool Page::Iterator::Valid() const {
-  return current_slot_ < AsMapPtr(page_.data_)->GetNumRecords();
+  return current_slot_ < AsMapPtr(data_)->GetNumRecords();
 }
 
 size_t Page::Iterator::RecordsLeft() const {
-  const size_t num_records = AsMapPtr(page_.data_)->GetNumRecords();
+  const size_t num_records = AsMapPtr(data_)->GetNumRecords();
   if (current_slot_ > num_records) return 0;
   return num_records - current_slot_;
 }
@@ -178,8 +182,7 @@ Slice Page::Iterator::key() const {
     const uint8_t* suffix = nullptr;
     unsigned length = 0;
     const bool found =
-        AsMapPtr(page_.data_)
-            ->GetKeySuffixInSlot(current_slot_, &suffix, &length);
+        AsMapPtr(data_)->GetKeySuffixInSlot(current_slot_, &suffix, &length);
     assert(found);
     key_buffer_.append(reinterpret_cast<const char*>(suffix), length);
     key_buffer_valid_ = true;
@@ -192,7 +195,7 @@ Slice Page::Iterator::value() const {
   const uint8_t* value = nullptr;
   unsigned length = 0;
   const bool found =
-      AsMapPtr(page_.data_)->GetPayloadInSlot(current_slot_, &value, &length);
+      AsMapPtr(data_)->GetPayloadInSlot(current_slot_, &value, &length);
   assert(found);
   return Slice(reinterpret_cast<const char*>(value), length);
 }

@@ -75,7 +75,7 @@ class DBImpl : public DB {
   bool ShouldFlush(const FlushOptions& foptions, size_t num_records,
                    size_t num_deferrals) const;
 
-  using OverflowChain = std::shared_ptr<std::vector<BufferFrame*>>;
+  using OverflowChain = std::unique_ptr<std::vector<BufferFrame*>>;
 
   // Code run by a worker thread to write out `records` to the page held by
   // `bf`.
@@ -84,9 +84,10 @@ class DBImpl : public DB {
                                    const format::WriteType>>& records,
       std::future<OverflowChain>& bf_future);
 
-  // Code run by a worker thread to fix the page with `page_id`.
-  void FixWorker(LogicalPageId page_id,
-                 std::promise<OverflowChain>& bf_promise);
+  // Fixes the page chain at `page_id`. The returned page frames need to be
+  // locked before use.
+  OverflowChain FixOverflowChain(LogicalPageId page_id, bool exclusive,
+                                 bool unlock_before_returning);
 
   // Code run by a worker thread to reinsert `records` into the now-active
   // memtable if their flush was deferred.

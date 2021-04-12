@@ -2,7 +2,9 @@
 #include <mutex>
 #include <optional>
 #include <queue>
+#include <vector>
 
+#include "bufmgr/buffer_frame.h"
 #include "db/db_impl.h"
 #include "db/format.h"
 #include "db/page.h"
@@ -102,6 +104,71 @@ class MemTableMergeIterator {
   std::optional<MemTable::Iterator> flushing_;
 };
 
+// A k-way merging iterator for `Page` iterators. This iterator is different
+// from the `MemTableMergeIterator` because there is no prioritization among the
+// iterators; all records will be returned (in ascending order).
+class PageMergeIterator {
+ public:
+  explicit PageMergeIterator(
+      const std::unique_ptr<std::vector<BufferFrame*>>& page_chain,
+      const Slice* start_key = nullptr)
+      : merged_iterators_(&PageMergeIterator::Compare) {
+    page_iterators_.reserve(page_chain->size());
+    for (auto& bf : *page_chain) {
+      page_iterators_.emplace_back(bf->GetPage().GetIterator());
+    }
+    for (auto& it : page_iterators_) {
+      if (start_key != nullptr) it.Seek(*start_key);
+      if (!it.Valid()) continue;
+      merged_iterators_.push(&it);
+    }
+  }
+
+  bool Valid() const { return !merged_iterators_.empty(); }
+
+  // REQUIRES: `Valid()` is true.
+  void Next() {
+    assert(Valid());
+    Page::Iterator* const it = merged_iterators_.top();
+    merged_iterators_.pop();
+
+    assert(it->Valid());
+    it->Next();
+    if (!it->Valid()) return;
+    merged_iterators_.push(it);
+  }
+
+  // REQUIRES: `Valid()` is true.
+  Slice key() const {
+    assert(Valid() && merged_iterators_.top()->Valid());
+    return merged_iterators_.top()->key();
+  }
+
+  // REQUIRES: `Valid()` is true.
+  Slice value() const {
+    assert(Valid() && merged_iterators_.top()->Valid());
+    return merged_iterators_.top()->value();
+  }
+
+ private:
+  // This is a comparison function for the priority queue. This function is
+  // supposed to return true if `left` is strictly smaller than `right`.
+  // However, `std::priority_queue` returns the *largest* items first, whereas
+  // we want to return the smallest items first. So we return true here if
+  // `left` is strictly larger than `right` to ensure the smallest records are
+  // returned first.
+  static bool Compare(const Page::Iterator* left, const Page::Iterator* right) {
+    assert(left->Valid() && right->Valid());
+    // Evaluates to true iff `left->key()` is greater than `right->key()`.
+    return left->key().compare(right->key()) > 0;
+  }
+
+  std::vector<Page::Iterator> page_iterators_;
+  std::priority_queue<Page::Iterator*, std::vector<Page::Iterator*>,
+                      decltype(&PageMergeIterator::Compare)>
+      merged_iterators_;
+};
+
 }  // namespace
 
 namespace llsm {
@@ -134,13 +201,14 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
   bool is_first_page = true;
 
   while (results_out->size() < num_records && curr_page_id < total_db_pages) {
-    // We need to retrieve the page first because it may have a smaller key than
-    // the key at the current position of the memtable iterator.
-    BufferFrame& frame = buf_mgr_->FixPage(curr_page_id, /*exclusive=*/false);
-    Page page(frame.GetPage());
-    Page::Iterator page_it = page.GetIterator();
+    // We need to retrieve the page chain first because it may have a smaller
+    // key than the key at the current position of the memtable iterator.
+    const std::unique_ptr<std::vector<BufferFrame*>> page_chain =
+        FixOverflowChain(curr_page_id, /*exclusive=*/false,
+                         /*unlock_before_returning=*/false);
+
+    PageMergeIterator page_it(page_chain, is_first_page ? &start_key : nullptr);
     if (is_first_page) {
-      page_it.Seek(start_key);
       is_first_page = false;
     }
 
@@ -175,7 +243,10 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
       page_it.Next();
     }
 
-    buf_mgr_->UnfixPage(frame, /*is_dirty=*/false);
+    // We're finished reading this page chain.
+    for (auto& bf : *page_chain) {
+      buf_mgr_->UnfixPage(*bf, /*is_dirty=*/false);
+    }
     ++curr_page_id;
   }
 

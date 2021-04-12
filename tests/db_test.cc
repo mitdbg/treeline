@@ -3,7 +3,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <filesystem>
+#include <random>
 #include <vector>
 
 #include "db/page.h"
@@ -1043,6 +1045,117 @@ TEST_F(DBTest, OverflowChain) {
     status = db->Get(llsm::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_old, value_out);
+  }
+
+  delete db;
+  db = nullptr;
+}
+
+TEST_F(DBTest, RangeScanOverflow) {
+  std::mt19937 rng(42);
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 1016;
+
+  // Dummy value used for the records (8 byte key; record is 1024 B in total).
+  const std::string value(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  // 64 records @ 1024 B each => 64 KiB of data.
+  // Each page is 64 KiB and is filled to 50% => all records fit into 2 pages.
+  options.key_hints.num_keys = 64;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kKeySize + kValueSize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1000;
+
+  // Generate the keys used in the initial write.
+  std::vector<uint64_t> initial_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+  std::shuffle(initial_keys.begin(), initial_keys.end(), rng);
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write dummy data to the DB.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  for (const auto& key_as_int : initial_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // Flush the writes to the pages.
+  db->FlushMemTable(/*disable_deferred_io=*/true);
+
+  // Generate data to overflow the first page.
+  llsm::KeyDistHints extra_key_hints;
+  extra_key_hints.num_keys = 200;
+  extra_key_hints.record_size = kKeySize + kValueSize;
+  extra_key_hints.min_key = 1;
+  extra_key_hints.key_step_size = 1;
+  std::vector<uint64_t> extra_keys =
+      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+  std::shuffle(extra_keys.begin(), extra_keys.end(), rng);
+
+  // Write dummy data to the DB.
+  for (const auto& key_as_int : extra_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // Flush the writes to the pages (should cause overflow).
+  db->FlushMemTable(/*disable_deferred_io=*/true);
+
+  // Extra inserts that we keep in the memtable.
+  const uint64_t page0_key = __builtin_bswap64(250ULL);
+  const uint64_t page1_key = __builtin_bswap64(68000ULL);
+  status = db->Put(
+      woptions,
+      llsm::Slice(reinterpret_cast<const char*>(&page0_key), sizeof(page0_key)),
+      value);
+  ASSERT_TRUE(status.ok());
+  status = db->Put(
+      woptions,
+      llsm::Slice(reinterpret_cast<const char*>(&page1_key), sizeof(page1_key)),
+      value);
+  ASSERT_TRUE(status.ok());
+
+  // Assemble all the keys and sort them.
+  std::vector<uint64_t> all_keys;
+  all_keys.reserve(initial_keys.size() + extra_keys.size() + 2);
+  all_keys.insert(all_keys.end(), initial_keys.begin(), initial_keys.end());
+  all_keys.insert(all_keys.end(), extra_keys.begin(), extra_keys.end());
+  all_keys.push_back(page0_key);
+  all_keys.push_back(page1_key);
+  std::sort(all_keys.begin(), all_keys.end(),
+            [](uint64_t left, uint64_t right) {
+              return __builtin_bswap64(left) < __builtin_bswap64(right);
+            });
+
+  // Read all the records using a single range scan. This scan will include
+  // records in the memtable as well as in page chains.
+  std::vector<llsm::Record> results;
+  status = db->GetRange(
+      llsm::ReadOptions(),
+      llsm::Slice(reinterpret_cast<const char*>(&(all_keys.front())),
+                  sizeof(uint64_t)),
+      all_keys.size(), &results);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(results.size() == all_keys.size());
+
+  // Ensure all the records were returned in the correct order.
+  for (size_t i = 0; i < results.size(); ++i) {
+    llsm::Slice key(reinterpret_cast<const char*>(&(all_keys[i])),
+                    sizeof(uint64_t));
+    ASSERT_TRUE(key.compare(results[i].key()) == 0);
+    ASSERT_EQ(results[i].value(), value);
   }
 
   delete db;

@@ -433,7 +433,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
   if (options_.adaptive_memtables) {
     // TODO
   }
-  
+
   stats_.Clear();
 
   // Mark the active memtable as immutable and create a new active memtable.
@@ -508,12 +508,10 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
       if (ShouldFlush(foptions, records_for_page.size(),
                       current_page_deferral_count) &&
           !current_page_dispatched_fixer) {
-        std::promise<OverflowChain> bf_promise;
-        bf_future = bf_promise.get_future();
-        workers_->SubmitNoWait(
-            [this, current_page, bf_promise = std::move(bf_promise)]() mutable {
-              FixWorker(current_page, bf_promise);
-            });
+        bf_future = workers_->Submit([this, current_page]() mutable {
+          return FixOverflowChain(current_page, /*exclusive=*/true,
+                                  /*unlock_before_returning=*/true);
+        });
         current_page_dispatched_fixer = true;
       }
     }
@@ -645,23 +643,26 @@ void DBImpl::FlushWorker(
   }
 }
 
-void DBImpl::FixWorker(LogicalPageId page_id,
-                       std::promise<OverflowChain>& bf_promise) {
-  OverflowChain frames = std::make_shared<std::vector<BufferFrame*>>();
+DBImpl::OverflowChain DBImpl::FixOverflowChain(
+    const LogicalPageId page_id, const bool exclusive,
+    const bool unlock_before_returning) {
+  OverflowChain frames = std::make_unique<std::vector<BufferFrame*>>();
   BufferFrame* bf;
   LogicalPageId local_page_id = page_id;
   do {
-    bf = &(buf_mgr_->FixPage(local_page_id, /*exclusive = */ true));
+    bf = &(buf_mgr_->FixPage(local_page_id, exclusive));
 
-    // Unlock the frame so that it can be "handed over" to a FlushWorker thread.
-    // This does not decrement the fix count of the frame, i.e. there's no
-    // danger of eviction before we can use it.
-    bf->Unlock();
+    if (unlock_before_returning) {
+      // Unlock the frame so that it can be "handed over" to the caller. This
+      // does not decrement the fix count of the frame, i.e. there's no danger
+      // of eviction before we can use it.
+      bf->Unlock();
+    }
     frames->push_back(bf);
     local_page_id = bf->GetPage().GetOverflow();
   } while (bf->GetPage().HasOverflow());
 
-  bf_promise.set_value(frames);
+  return frames;
 }
 
 void DBImpl::ReinsertionWorker(

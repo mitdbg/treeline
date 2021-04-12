@@ -94,6 +94,11 @@ class Page {
 
 // An iterator used to iterate over the records stored in this page. Use
 // `Page::GetIterator()` to get an instance.
+//
+// NOTE: The underlying memory buffer that backs the `Page` that created this
+// iterator must remain valid for the lifetime of this iterator. Usually this
+// just means that the page must remain fixed by the buffer manager for the
+// lifetime of this iterator.
 class Page::Iterator {
  public:
   // Move the iterator to the first record with a key that is greater than or
@@ -121,18 +126,12 @@ class Page::Iterator {
   // REQUIRES: `Valid()` is true.
   Slice value() const;
 
-  // Copying is disallowed.
-  Iterator(const Iterator&) = delete;
-  Iterator& operator=(const Iterator&) = delete;
-
-  // Move construction is allowed.
-  Iterator(Iterator&&) = default;
-
  private:
   friend class Page;
-  Iterator(const Page& page);
+  explicit Iterator(const Page& page);
 
-  const Page& page_;
+  // Points to the this iterator's page's underlying memory buffer.
+  const void* data_;
   size_t current_slot_;
 
   // Keys in the page are stored using a prefix (shared by all keys) and a
