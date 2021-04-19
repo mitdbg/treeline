@@ -7,7 +7,7 @@
 #include "db/page.h"
 #include "gtest/gtest.h"
 #include "llsm/options.h"
-#include "model/rs_model.h"
+#include "model/alex_model.h"
 #include "util/key.h"
 
 namespace {
@@ -39,24 +39,27 @@ TEST(BufferManagerTest, WriteReadSequential) {
   BufMgrOptions bm_options;
   bm_options.SetNumPagesUsing(key_hints);
 
-  const std::unique_ptr<RSModel> model =
-      std::make_unique<RSModel>(key_hints, records);
+  const std::unique_ptr<ALEXModel> model =
+      std::make_unique<ALEXModel>(key_hints, records);
   const std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(bm_options, dbname);
   model->Preallocate(records, buffer_manager);
 
-  // Store `i` to page i
-  const size_t num_pages = buffer_manager->GetFileManager()->GetNumPages();
-  for (size_t i = 0; i < num_pages; ++i) {
-    llsm::BufferFrame& bf = buffer_manager->FixPage(i, true);
-    *reinterpret_cast<size_t*>(bf.GetData()) = i;
+  // Store `page_id` to page_id
+  for (size_t record_id = 0; record_id < records.size();
+       record_id += key_hints.records_per_page()) {
+    PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
+    llsm::BufferFrame& bf = buffer_manager->FixPage(page_id, true);
+    *reinterpret_cast<PhysicalPageId*>(bf.GetData()) = page_id;
     buffer_manager->UnfixPage(bf, true);
   }
 
   // Read all pages.
-  for (size_t i = 0; i < num_pages; ++i) {
-    llsm::BufferFrame& bf = buffer_manager->FixPage(i, false);
-    ASSERT_EQ(*reinterpret_cast<size_t*>(bf.GetData()), i);
+  for (size_t record_id = 0; record_id < records.size();
+       record_id += key_hints.records_per_page()) {
+    PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
+    llsm::BufferFrame& bf = buffer_manager->FixPage(page_id, false);
+    ASSERT_EQ(*reinterpret_cast<PhysicalPageId*>(bf.GetData()), page_id);
     buffer_manager->UnfixPage(bf, false);
   }
 
@@ -78,31 +81,37 @@ TEST(BufferManagerTest, FlushDirty) {
   BufMgrOptions bm_options;
   bm_options.SetNumPagesUsing(key_hints);
 
-  const std::unique_ptr<RSModel> model =
-      std::make_unique<RSModel>(key_hints, records);
+  const std::unique_ptr<ALEXModel> model =
+      std::make_unique<ALEXModel>(key_hints, records);
   const std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(bm_options, dbname);
   model->Preallocate(records, buffer_manager);
 
-  // Store `i` to page i for the first few pages.
+  // Store `page_id` to page_id for the first few pages.
   const size_t few_pages = std::min(
       static_cast<size_t>(3), buffer_manager->GetFileManager()->GetNumPages());
 
-  for (size_t i = 0; i < few_pages; ++i) {
-    llsm::BufferFrame& bf = buffer_manager->FixPage(i, true);
-    *reinterpret_cast<size_t*>(bf.GetData()) = i;
+  for (size_t record_id = 0;
+       record_id < few_pages * key_hints.records_per_page();
+       record_id += key_hints.records_per_page()) {
+    PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
+    llsm::BufferFrame& bf = buffer_manager->FixPage(page_id, true);
+    *reinterpret_cast<PhysicalPageId*>(bf.GetData()) = page_id;
     buffer_manager->UnfixPage(bf, true);
   }
 
   buffer_manager->FlushDirty();
 
   // Read all pages bypassing buffer manager.
-  size_t j;
+  PhysicalPageId j;
   void* data = calloc(1, Page::kSize);
-  for (size_t i = 0; i < few_pages; ++i) {
-    buffer_manager->GetFileManager()->ReadPage(i, data);
-    j = *reinterpret_cast<size_t*>(data);
-    ASSERT_EQ(i, j);
+  for (size_t record_id = 0;
+       record_id < few_pages * key_hints.records_per_page();
+       record_id += key_hints.records_per_page()) {
+    PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
+    buffer_manager->GetFileManager()->ReadPage(page_id, data);
+    j = *reinterpret_cast<PhysicalPageId*>(data);
+    ASSERT_EQ(page_id, j);
   }
   free(data);
   std::filesystem::remove_all(dbname);
@@ -122,8 +131,8 @@ TEST(BufferManagerTest, Contains) {
   BufMgrOptions bm_options;
   bm_options.SetNumPagesUsing(key_hints);
 
-  const std::unique_ptr<RSModel> model =
-      std::make_unique<RSModel>(key_hints, records);
+  const std::unique_ptr<ALEXModel> model =
+      std::make_unique<ALEXModel>(key_hints, records);
   const std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(bm_options, dbname);
   model->Preallocate(records, buffer_manager);
@@ -132,12 +141,15 @@ TEST(BufferManagerTest, Contains) {
   const size_t few_pages = std::min(
       static_cast<size_t>(3), buffer_manager->GetFileManager()->GetNumPages());
 
-  for (size_t i = 0; i < few_pages; ++i) {
-    ASSERT_FALSE(buffer_manager->Contains(i));
-    llsm::BufferFrame& bf = buffer_manager->FixPage(i, true);
-    ASSERT_TRUE(buffer_manager->Contains(i));
+  for (size_t record_id = 0;
+       record_id < few_pages * key_hints.records_per_page();
+       record_id += key_hints.records_per_page()) {
+    PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
+    ASSERT_FALSE(buffer_manager->Contains(page_id));
+    llsm::BufferFrame& bf = buffer_manager->FixPage(page_id, true);
+    ASSERT_TRUE(buffer_manager->Contains(page_id));
     buffer_manager->UnfixPage(bf, true);
-    ASSERT_TRUE(buffer_manager->Contains(i));
+    ASSERT_TRUE(buffer_manager->Contains(page_id));
   }
 
   // Check that the following few pages are not contained, having never been
@@ -145,8 +157,11 @@ TEST(BufferManagerTest, Contains) {
   const size_t some_more_pages = std::min(
       static_cast<size_t>(6), buffer_manager->GetFileManager()->GetNumPages());
 
-  for (size_t i = few_pages; i < some_more_pages; ++i) {
-    ASSERT_FALSE(buffer_manager->Contains(i));
+  for (size_t record_id = few_pages * key_hints.records_per_page();
+       record_id < some_more_pages * key_hints.records_per_page();
+       record_id += key_hints.records_per_page()) {
+    PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
+    ASSERT_FALSE(buffer_manager->Contains(page_id));
   }
 
   std::filesystem::remove_all(dbname);

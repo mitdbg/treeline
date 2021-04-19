@@ -7,7 +7,7 @@
 #include "db/page.h"
 #include "gtest/gtest.h"
 #include "llsm/options.h"
-#include "model/rs_model.h"
+#include "model/alex_model.h"
 #include "util/key.h"
 
 namespace {
@@ -31,8 +31,8 @@ TEST(FileManagerTest, FileConstruction) {
   bm_options.num_segments = 8;
   bm_options.SetNumPagesUsing(key_hints);
 
-  const std::unique_ptr<RSModel> model =
-      std::make_unique<RSModel>(key_hints, records);
+  const std::unique_ptr<ALEXModel> model =
+      std::make_unique<ALEXModel>(key_hints, records);
   const llsm::FileManager file_manager(bm_options, dbpath);
 
   // Check created files.
@@ -59,31 +59,33 @@ TEST(FileManagerTest, WriteReadSequential) {
   BufMgrOptions bm_options;
   bm_options.SetNumPagesUsing(key_hints);
 
-  const std::unique_ptr<RSModel> model =
-      std::make_unique<RSModel>(key_hints, records);
+  const std::unique_ptr<ALEXModel> model =
+      std::make_unique<ALEXModel>(key_hints, records);
   const std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(bm_options, dbpath);
-  llsm::FileManager file_manager(bm_options, dbpath);
   model->Preallocate(records, buffer_manager);
 
   // Set up a page buffer in memory.
   uint8_t page[Page::kSize];
   memset(page, 0, Page::kSize);
 
-  // Store `i` to page i
-  const size_t num_pages = file_manager.GetNumPages();
-  for (size_t i = 0; i < num_pages; ++i) {
-    *reinterpret_cast<size_t*>(page) = i;
-    file_manager.WritePage(i, page);
+  // Store `page_id` to page_id
+  for (size_t record_id = 0; record_id < records.size();
+       record_id += key_hints.records_per_page()) {
+    PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
+    *reinterpret_cast<PhysicalPageId*>(page) = page_id;
+    buffer_manager->GetFileManager()->WritePage(page_id, page);
   }
 
-  // Read pages.
-  size_t j;
+  // Read all pages.
+  PhysicalPageId j;
   void* data = calloc(1, Page::kSize);
-  for (size_t i = 0; i < num_pages; ++i) {
-    file_manager.ReadPage(i, data);
-    j = *reinterpret_cast<size_t*>(data);
-    ASSERT_EQ(i, j);
+  for (size_t record_id = 0; record_id < records.size();
+       record_id += key_hints.records_per_page()) {
+    PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
+    buffer_manager->GetFileManager()->ReadPage(page_id, data);
+    j = *reinterpret_cast<PhysicalPageId*>(data);
+    ASSERT_EQ(page_id, j);
   }
   free(data);
   std::filesystem::remove_all(dbpath);

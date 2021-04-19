@@ -45,7 +45,7 @@ class BufferManager {
   // Retrieves the page given by `page_id`, to be held exclusively or not
   // based on the value of `exclusive`. Pages are stored on disk in files with
   // the same name as the page ID (e.g. 1).
-  BufferFrame& FixPage(const LogicalPageId page_id, const bool exclusive);
+  BufferFrame& FixPage(const PhysicalPageId page_id, const bool exclusive);
 
   // Unfixes a page updating whether it is dirty or not.
   void UnfixPage(BufferFrame& frame, const bool is_dirty);
@@ -59,7 +59,7 @@ class BufferManager {
 
   // Indicates whether the page given by `page_id` is currently in the buffer
   // manager.
-  bool Contains(const LogicalPageId page_id);
+  bool Contains(const PhysicalPageId page_id);
 
   // Provides access to the underlying FileManager
   FileManager* GetFileManager() const { return file_manager_.get(); }
@@ -105,7 +105,7 @@ class BufferManager {
 
   // Map from page_id to the buffer frame (if any) that currently holds that
   // page in memory, and a mutex for editing it.
-  std::unique_ptr<SyncHashTable<LogicalPageId, BufferFrame*>> page_to_frame_map_;
+  std::unique_ptr<SyncHashTable<PhysicalPageId, BufferFrame*>> page_to_frame_map_;
   std::mutex map_mutex_;
 
   // Pointer to a method for determining which (non-fixed) page to evict, and a

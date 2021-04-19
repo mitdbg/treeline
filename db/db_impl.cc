@@ -8,6 +8,7 @@
 
 #include "db/manifest.h"
 #include "db/page.h"
+#include "model/alex_model.h"
 #include "util/affinity.h"
 #include "util/key.h"
 
@@ -125,7 +126,7 @@ Status DBImpl::InitializeNewDB() {
     bm_options.num_segments = options_.background_threads;
     bm_options.SetNumPagesUsing(options_.key_hints);
 
-    RSModel* const model = new RSModel(options_.key_hints, records);
+    ALEXModel* const model = new ALEXModel(options_.key_hints, records);
     buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
 
     model->Preallocate(records, buf_mgr_);
@@ -135,7 +136,6 @@ Status DBImpl::InitializeNewDB() {
     const Status s = Manifest::Builder()
                          .WithNumPages(bm_options.num_pages)
                          .WithNumSegments(bm_options.num_segments)
-                         .WithModel(model_)
                          .Build()
                          .WriteTo(db_path_ / kManifestFileName);
     if (!s.ok()) return s;
@@ -156,8 +156,8 @@ Status DBImpl::InitializeExistingDB() {
   bm_options.num_segments = manifest->num_segments();
   bm_options.num_pages = manifest->num_pages();
 
-  model_ = manifest->model();
   buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
+  model_ = std::make_unique<ALEXModel>(buf_mgr_);
 
   // Before we can accept requests, we need to replay the writes (if any) that
   // exist in the write-ahead log.
@@ -309,7 +309,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
 
   // 4. Check the on-disk page(s) by following the relevant overflow chain.
   bool next_link_exists = true;
-  LogicalPageId page_id = model_->KeyToPageId(key);
+  PhysicalPageId page_id = model_->KeyToPageId(key);
   bool incurred_io = false;
   bool incurred_multi_io = false;
 
@@ -449,8 +449,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
 
   // Schedule the flush to run in the background.
   last_flush_ = workers_->Submit([this, foptions, flush_log_version]() {
-    LogicalPageId current_page =
-        LogicalPageId(std::numeric_limits<size_t>::max());
+    PhysicalPageId current_page;
     size_t current_page_deferral_count = 0;
     bool current_page_dispatched_fixer = false;
     std::vector<std::future<void>> page_write_futures;
@@ -467,11 +466,11 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
     // code above until this flush completes.
     auto it = im_mtable_->GetIterator();
     for (it.SeekToFirst(); it.Valid(); it.Next()) {
-      const LogicalPageId page_id = model_->KeyToPageId(it.key());
+      const PhysicalPageId page_id = model_->KeyToPageId(it.key());
       // The memtable is in sorted order - once we "pass" a page, we won't
       // return to it.
       if (page_id != current_page) {
-        if (current_page != std::numeric_limits<size_t>::max()) {
+        if (current_page.IsValid()) {
           if (ShouldFlush(foptions, records_for_page.size(),
                           current_page_deferral_count)) {
             // Submit flush job to workers - this is not the "first" page.
@@ -519,7 +518,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
     // Flush entries in the last page.
     if (ShouldFlush(foptions, records_for_page.size(),
                     current_page_deferral_count)) {
-      assert(current_page != std::numeric_limits<size_t>::max());
+      assert(current_page.IsValid());
       page_write_futures.emplace_back(workers_->Submit(
           [this, records_for_page = std::move(records_for_page),
            bf_future = std::move(bf_future)]() mutable {
@@ -611,11 +610,12 @@ void DBImpl::FlushWorker(
           if (s.ok()) break;
 
           // Must allocate a new page
-          LogicalPageId new_page_id =
+          PhysicalPageId new_page_id =
               buf_mgr_->GetFileManager()->AllocatePage();
           auto new_bf =
               &(buf_mgr_->FixPage(new_page_id, /*exclusive = */ true));
           Page new_page(new_bf->GetData(), bf->GetPage());
+          new_page.MakeOverflow();
           bf->GetPage().SetOverflow(new_page_id);
           frames->push_back(new_bf);
 
@@ -644,11 +644,11 @@ void DBImpl::FlushWorker(
 }
 
 DBImpl::OverflowChain DBImpl::FixOverflowChain(
-    const LogicalPageId page_id, const bool exclusive,
+    const PhysicalPageId page_id, const bool exclusive,
     const bool unlock_before_returning) {
   OverflowChain frames = std::make_unique<std::vector<BufferFrame*>>();
   BufferFrame* bf;
-  LogicalPageId local_page_id = page_id;
+  PhysicalPageId local_page_id = page_id;
   do {
     bf = &(buf_mgr_->FixPage(local_page_id, exclusive));
 

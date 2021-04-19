@@ -2,10 +2,10 @@
 
 #include <string>
 
+#include "bufmgr/physical_page_id.h"
 #include "llsm/options.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
-#include "bufmgr/logical_page_id.h"
 
 namespace llsm {
 
@@ -45,13 +45,17 @@ class Page {
   // The `Page`'s contents will be stored in the `data` buffer.
   Page(void* data, const Slice& lower_key, const Slice& upper_key);
 
-  // Construct a `Page` with the same key boundaries as `old_page`.
+  // Construct an overflow `Page` with the same key boundaries as `old_page`.
   // The `Page`'s contents will be stored in the `data` buffer.
   Page(void* data, const Page& old_page);
 
   // All keys stored in this page have this prefix. Note that the returned
   // `Slice` shares the same lifetime as this page's `data` buffer.
   Slice GetKeyPrefix() const;
+
+  // Get the key boundaries for this page
+  Slice GetLowerBoundary() const;
+  Slice GetUpperBoundary() const;
 
   Status Put(const Slice& key, const Slice& value);
   Status Put(const WriteOptions& options, const Slice& key, const Slice& value);
@@ -60,13 +64,22 @@ class Page {
   Status Delete(const Slice& key);
 
   // Retrieve the stored `overflow` page id for this page.
-  LogicalPageId GetOverflow() const;
+  PhysicalPageId GetOverflow() const;
 
   // Set the stored overflow page id for this page to `overflow`.
-  void SetOverflow(LogicalPageId overflow);
+  void SetOverflow(PhysicalPageId overflow);
 
   // Determine whether this page has an overflow page.
   bool HasOverflow();
+
+  // Check whether this is a valid Page (as opposed to a Page-sized
+  // block of 0s).
+  const bool IsValid() const;
+
+  // Check whether this is an overflow page & make/unmake it one.
+  const bool IsOverflow() const;
+  void MakeOverflow();
+  void UnmakeOverflow();
 
   class Iterator;
   friend class Iterator;

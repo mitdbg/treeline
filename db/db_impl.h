@@ -13,7 +13,6 @@
 #include "db/memtable.h"
 #include "llsm/db.h"
 #include "llsm/statistics.h"
-#include "model/rs_model.h"
 #include "util/thread_pool.h"
 #include "wal/manager.h"
 
@@ -84,9 +83,9 @@ class DBImpl : public DB {
                                    const format::WriteType>>& records,
       std::future<OverflowChain>& bf_future);
 
-  // Fixes the page chain at `page_id`. The returned page frames need to be
-  // locked before use.
-  OverflowChain FixOverflowChain(LogicalPageId page_id, bool exclusive,
+  // Fixes the page chain starting with the page at `page_id`. The returned page
+  // frames can optionally be unlocked before returning.
+  OverflowChain FixOverflowChain(PhysicalPageId page_id, bool exclusive,
                                  bool unlock_before_returning);
 
   // Code run by a worker thread to reinsert `records` into the now-active

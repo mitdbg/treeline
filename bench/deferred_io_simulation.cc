@@ -1,11 +1,12 @@
 #include <iostream>
 #include <vector>
 
+#include "alex/alex.h"
+#include "bufmgr/physical_page_id.h"
 #include "db/format.h"
 #include "db/memtable.h"
-#include "db/options.h"
 #include "gflags/gflags.h"
-#include "rs/builder.h"
+#include "llsm/options.h"
 #include "util/inlineskiplist.h"
 #include "ycsbr/ycsbr.h"
 
@@ -54,16 +55,24 @@ int main(int argc, char* argv[]) {
   auto minmax = load.GetKeyRange();
   const size_t num_keys = load.size();
 
-  // Initialize a RadixSpline.
-  rs::Builder<uint64_t> rsb(__builtin_bswap64(minmax.min),
-                            __builtin_bswap64(minmax.max));
-  for (const auto& req : load) rsb.AddKey(__builtin_bswap64(req.key));
-  const rs::RadixSpline<uint64_t> rs = rsb.Finalize();
+  // Create key hints.
+  llsm::KeyDistHints key_hints;
+  key_hints.num_keys = load.size();
+  key_hints.page_fill_pct = FLAGS_page_fill_pct;
+  key_hints.record_size = FLAGS_record_size_bytes;
+
+  // Initialize an alex instance.
+  alex::Alex<uint64_t, size_t> model;
+  size_t records_per_page = key_hints.records_per_page();
+  size_t i = 0;
+  for (const auto& req : load) {
+    if (i % records_per_page == 0) {
+      model.insert(__builtin_bswap64(req.key), i / records_per_page);
+    }
+    ++i;
+  }
 
   // Calculate records per page and number of pages.
-  const double fill_pct = FLAGS_page_fill_pct / 100.;
-  const size_t records_per_page =
-      FLAGS_page_size * fill_pct / (FLAGS_record_size_bytes + 10);
   size_t num_pages = num_keys / records_per_page;
   if (num_keys % records_per_page != 0) ++num_pages;
 
@@ -96,7 +105,7 @@ int main(int argc, char* argv[]) {
     memtable->Add(llsm::Slice(reinterpret_cast<const char*>(&req.key), 8),
                   llsm::Slice(req.value, 8), llsm::format::WriteType::kWrite);
     const size_t insert_page_id =
-        rs.GetEstimatedPosition(__builtin_bswap64(req.key)) / records_per_page;
+        *model.get_payload_last_no_greater_than(__builtin_bswap64(req.key));
     ++memtable_entries_per_page[insert_page_id];
 
     // Check if the memtable is large enough to flush.
@@ -106,9 +115,8 @@ int main(int argc, char* argv[]) {
       auto it = memtable->GetIterator();
       for (it.SeekToFirst(); it.Valid(); it.Next()) {
         const size_t page_id =
-            rs.GetEstimatedPosition(__builtin_bswap64(
-                *reinterpret_cast<const uint64_t*>(it.key().data()))) /
-            records_per_page;
+            *model.get_payload_last_no_greater_than(__builtin_bswap64(
+                *reinterpret_cast<const uint64_t*>(it.key().data())));
         if (memtable_entries_per_page[page_id] >= FLAGS_io_threshold ||
             page_deferral_count[page_id] >= FLAGS_max_deferrals) {
           flushed_this_time[page_id] = true;

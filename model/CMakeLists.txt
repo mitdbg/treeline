@@ -1,7 +1,4 @@
 target_sources(llsm PRIVATE
-  model.cc
-  model.h 
-  direct_model.h 
-  direct_model.cc
-  rs_model.h 
-  rs_model.cc)
+  alex_model.cc
+  alex_model.h
+  model.h)

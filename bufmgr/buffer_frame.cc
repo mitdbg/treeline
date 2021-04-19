@@ -15,7 +15,7 @@ BufferFrame::BufferFrame() {
 BufferFrame::~BufferFrame() { pthread_rwlock_destroy(&rwlock_); }
 
 // Initialize a buffer frame based on the page with the specified `page_id`.
-void BufferFrame::Initialize(const LogicalPageId page_id) {
+void BufferFrame::Initialize(const PhysicalPageId page_id) {
   SetPageId(page_id);
   UnsetAllFlags();
   ClearFixCount();
@@ -29,8 +29,8 @@ void BufferFrame::SetData(void* data) { data_ = data; }
 void* BufferFrame::GetData() const { return data_; }
 
 // Set/get the page ID of the page held in the current frame.
-void BufferFrame::SetPageId(LogicalPageId page_id) { page_id_ = page_id; }
-LogicalPageId BufferFrame::GetPageId() const { return page_id_; }
+void BufferFrame::SetPageId(PhysicalPageId page_id) { page_id_ = page_id; }
+PhysicalPageId BufferFrame::GetPageId() const { return page_id_; }
 
 // Lock/unlock the current frame, possibly for exclusive access if `exclusive`
 // is true.

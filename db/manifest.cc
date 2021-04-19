@@ -18,7 +18,7 @@ const std::string kSignature = u8"LLSM";
 
 // The current manifest file format version. This value should be incremented
 // when a breaking change is made to the file format.
-constexpr uint32_t kFormatVersion = 1;
+constexpr uint32_t kFormatVersion = 2;
 
 // Manifest file format
 // ====================
@@ -31,7 +31,6 @@ constexpr uint32_t kFormatVersion = 1;
 // [Payload]
 // Number of pages (uint64; 8 bytes)
 // Number of segments (uint64; 8 bytes)
-// Model encoding (variable length; model defined)
 
 constexpr size_t kHeaderSize = 16;
 constexpr size_t kFormatVersionOffset = 4;
@@ -106,12 +105,8 @@ std::optional<Manifest> Manifest::LoadFrom(
   const uint64_t num_segments = DecodeFixed64(payload.data());
   payload.remove_prefix(8);
 
-  // The rest of the payload is the encoded model.
-  std::string encoded_model(payload.data(), payload.size());
-
   *status_out = Status::OK();
-  return std::optional<Manifest>(
-      Manifest(num_pages, num_segments, std::move(encoded_model)));
+  return std::optional<Manifest>(Manifest(num_pages, num_segments));
 }
 
 Status Manifest::WriteTo(const std::filesystem::path& manifest_file) const {
@@ -124,7 +119,6 @@ Status Manifest::WriteTo(const std::filesystem::path& manifest_file) const {
 
   PutFixed64(&buffer, num_pages_);
   PutFixed64(&buffer, num_segments_);
-  buffer.append(encoded_model_);
 
   const size_t payload_size = buffer.size() - kHeaderSize;
   assert(payload_size <= std::numeric_limits<uint32_t>::max());
@@ -173,22 +167,6 @@ Status Manifest::WriteTo(const std::filesystem::path& manifest_file) const {
   close(db_dir_fd);
 
   return Status::OK();
-}
-
-std::unique_ptr<Model> Manifest::model() const {
-  Status s;
-  Slice raw_model(encoded_model_);
-  std::unique_ptr<Model> model = Model::LoadFrom(&raw_model, &s);
-  assert(s.ok());
-  assert(model != nullptr);
-  return model;
-}
-
-Manifest::Builder&& Manifest::Builder::WithModel(
-    const std::unique_ptr<Model>& model) {
-  encoded_model_.clear();
-  model->EncodeTo(&encoded_model_);
-  return std::move(*this);
 }
 
 }  // namespace llsm

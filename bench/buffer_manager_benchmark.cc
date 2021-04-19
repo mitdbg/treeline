@@ -1,11 +1,10 @@
+#include "alex/alex.h"
 #include "benchmark/benchmark.h"
 #include "bufmgr/buffer_manager.h"
 #include "common/config.h"
 #include "db/page.h"
 #include "gflags/gflags.h"
 #include "llsm/options.h"
-#include "model/direct_model.h"
-#include "rs/builder.h"
 #include "ycsbr/ycsbr.h"
 
 namespace {
@@ -28,8 +27,7 @@ DEFINE_validator(load_path, &ValidateLoad);
 DEFINE_string(workload_path, "", "Path to the workload file.");
 DEFINE_validator(workload_path, &ValidateWorkload);
 
-void SimulateBM(benchmark::State& state, bool large_buffer,
-                bool use_rs_not_direct) {
+void SimulateBM(benchmark::State& state, bool large_buffer) {
   // Obtain and process the bulk load workload.
   size_t record_size = state.range(0);
   ycsbr::Workload::Options loptions;
@@ -45,18 +43,17 @@ void SimulateBM(benchmark::State& state, bool large_buffer,
   key_hints.page_fill_pct = FLAGS_llsm_page_fill_pct;
   key_hints.record_size = record_size;
 
-  // Initialize a RadixSpline.
-  auto minmax = load.GetKeyRange();
-  rs::Builder<uint64_t> rsb(__builtin_bswap64(minmax.min),
-                            __builtin_bswap64(minmax.max));
-  for (const auto& req : load) rsb.AddKey(__builtin_bswap64(req.key));
-  const rs::RadixSpline<uint64_t> rs = rsb.Finalize();
-
-  // Initialize a direct model.
-  std::unordered_map<uint64_t, uint64_t> rank_map;
+  // Initialize an alex instance.
+  alex::Alex<uint64_t, llsm::PhysicalPageId> model;
+  size_t records_per_page = key_hints.records_per_page();
   size_t i = 0;
-  for (const auto& req : load) rank_map.insert({req.key, i++});
-  llsm::DirectModel dm(key_hints);
+  for (const auto& req : load) {
+    if (i % records_per_page == 0) {
+      llsm::PhysicalPageId page_id(0, i / records_per_page);
+      model.insert(__builtin_bswap64(req.key), page_id);
+    }
+    ++i;
+  }
 
   // Open workload.
   ycsbr::Workload::Options woptions;
@@ -66,20 +63,10 @@ void SimulateBM(benchmark::State& state, bool large_buffer,
       ycsbr::Workload::LoadFromFile(FLAGS_workload_path, woptions);
 
   // Pre-calculate page numbers appropriately
-  std::vector<llsm::LogicalPageId> page_ids;
+  std::vector<llsm::PhysicalPageId> page_ids;
   for (const auto& req : workload) {
-    llsm::LogicalPageId page_id(0);
-
-    if (use_rs_not_direct) {
-      const size_t estimate =
-          rs.GetEstimatedPosition(__builtin_bswap64(req.key));
-      page_id = llsm::LogicalPageId(estimate / key_hints.records_per_page());
-    } else {
-      const size_t normalized_key = rank_map.at(req.key);
-      page_id = llsm::LogicalPageId(dm.KeyToPageId(normalized_key));
-    }
-
-    page_ids.push_back(page_id);
+    page_ids.push_back(
+        *model.get_payload_last_no_greater_than(__builtin_bswap64(req.key)));
   }
 
   // Create buffer manager options.
@@ -107,26 +94,12 @@ void SimulateBM(benchmark::State& state, bool large_buffer,
   state.counters["IOs"] = numIOs / state.iterations();
 }
 
-BENCHMARK_CAPTURE(SimulateBM, no_large_buffer_direct, /*large_buffer = */ false,
-                  /*use_rs_not_direct = */ false)
+BENCHMARK_CAPTURE(SimulateBM, no_large_buffer, /*large_buffer = */ false)
     ->Arg(16)  // Record size in bytes
     ->Arg(512)
     ->Unit(benchmark::kMillisecond);
 
-BENCHMARK_CAPTURE(SimulateBM, large_buffer_direct, /*large_buffer = */ true,
-                  /*use_rs_not_direct = */ false)
-    ->Arg(16)  // Record size in bytes
-    ->Arg(512)
-    ->Unit(benchmark::kMillisecond);
-
-BENCHMARK_CAPTURE(SimulateBM, no_large_buffer_rs, /*large_buffer = */ false,
-                  /*use_rs_not_direct = */ true)
-    ->Arg(16)  // Record size in bytes
-    ->Arg(512)
-    ->Unit(benchmark::kMillisecond);
-
-BENCHMARK_CAPTURE(SimulateBM, large_buffer_rs, /*large_buffer = */ true,
-                  /*use_rs_not_direct = */ true)
+BENCHMARK_CAPTURE(SimulateBM, large_buffer, /*large_buffer = */ true)
     ->Arg(16)  // Record size in bytes
     ->Arg(512)
     ->Unit(benchmark::kMillisecond);

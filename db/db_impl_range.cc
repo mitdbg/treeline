@@ -197,10 +197,10 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
 
   assert(buf_mgr_->GetFileManager() != nullptr);
   const size_t total_db_pages = buf_mgr_->GetFileManager()->GetNumPages();
-  LogicalPageId curr_page_id = model_->KeyToPageId(start_key);
+  PhysicalPageId curr_page_id = model_->KeyToPageId(start_key);
   bool is_first_page = true;
 
-  while (results_out->size() < num_records && curr_page_id < total_db_pages) {
+  while (results_out->size() < num_records && curr_page_id.IsValid()) {
     // We need to retrieve the page chain first because it may have a smaller
     // key than the key at the current position of the memtable iterator.
     const std::unique_ptr<std::vector<BufferFrame*>> page_chain =
@@ -247,7 +247,9 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
     for (auto& bf : *page_chain) {
       buf_mgr_->UnfixPage(*bf, /*is_dirty=*/false);
     }
-    ++curr_page_id;
+
+    curr_page_id = model_->KeyToNextPageId(
+        page_chain->at(0)->GetPage().GetLowerBoundary());
   }
 
   // No more pages to check. If we still need to read more records, read the

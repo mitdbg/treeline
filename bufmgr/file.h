@@ -8,6 +8,7 @@
 #include <string>
 
 #include "db/page.h"
+#include "llsm/status.h"
 
 #define CHECK_ERROR(call)                                                    \
   do {                                                                       \
@@ -41,15 +42,35 @@ class File {
     CHECK_ERROR(fstat(fd_, &file_status));
     assert(file_status.st_size >= 0);
     file_size_ = file_status.st_size;
+
+    // If file already existed, retrieve next_page_allocation_offset_.
+    if (file_size_ > 0) {
+      char page_data[Page::kSize];
+      Page temp_page(reinterpret_cast<void*>(page_data));
+      next_page_allocation_offset_ = file_size_;
+      for (size_t offset = 0; offset < file_size_; offset += Page::kSize) {
+        ReadPage(offset, reinterpret_cast<void*>(page_data));
+        if (!temp_page.IsValid()) {
+          next_page_allocation_offset_ = offset;
+          break;
+        }
+      }
+    }
   }
   ~File() { close(fd_); }
-  void ReadPage(size_t offset, void* data) const {
-    assert(offset < next_page_allocation_offset_);
+  Status ReadPage(size_t offset, void* data) const {
+    if (offset >= next_page_allocation_offset_) {
+      return Status::InvalidArgument("Tried to read from unallocated page.");
+    }
     CHECK_ERROR(pread(fd_, data, Page::kSize, offset));
+    return Status::OK();
   }
-  void WritePage(size_t offset, const void* data) const {
-    assert(offset < next_page_allocation_offset_);
+  Status WritePage(size_t offset, const void* data) const {
+    if (offset >= next_page_allocation_offset_) {
+      return Status::InvalidArgument("Tried to write to unallocated page.");
+    }
     CHECK_ERROR(pwrite(fd_, data, Page::kSize, offset));
+    return Status::OK();
   }
   void Sync() const { CHECK_ERROR(fsync(fd_)); }
 
@@ -66,7 +87,6 @@ class File {
   }
 
  private:
-
   // Ensures that the underlying file is large enough to be able to read/write
   // `Page::kSize` bytes starting at the given `offset`.
   //

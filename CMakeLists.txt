@@ -6,6 +6,8 @@ option(LLSM_BUILD_TESTS "Set to build the Learned LSM test suite." OFF)
 option(LLSM_BUILD_BENCHMARKS "Set to build the Learned LSM benchmarks." OFF)
 option(LLSM_BUILD_SHARED "Set to build the Learned LSM database as a shared library." OFF)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")  # Needed for ALEX
+
 # Allows us to set CMake project options for subprojects that we include.
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
@@ -36,11 +38,11 @@ set(llsm_api
 target_sources(llsm PUBLIC ${llsm_api})
 
 # Add our sources by traversing the repository
+add_subdirectory(alex)
 add_subdirectory(bufmgr)
 add_subdirectory(db)
 add_subdirectory(util)
 add_subdirectory(model)
-add_subdirectory(rs)
 add_subdirectory(wal)
 
 # Build the tests iff requested

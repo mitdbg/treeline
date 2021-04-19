@@ -5,7 +5,8 @@
 
 #include <cstddef>
 #include <cstdint>
-#include "bufmgr/logical_page_id.h"
+
+#include "bufmgr/physical_page_id.h"
 
 namespace llsm {
 
@@ -93,13 +94,13 @@ class PackedMap {
   bool Get(const uint8_t* key, unsigned key_length, const uint8_t** payload_out,
            unsigned* payload_length_out) const;
 
-  // Retrieve the stored `overflow` (an arbitrary logical page id managed by
+  // Retrieve the stored `overflow` (an arbitrary page id managed by
   // the map user).
-  LogicalPageId GetOverflow() const;
+  PhysicalPageId GetOverflow() const;
 
-  // Set the stored overflow value to `overflow` (an arbitrary logical page id
+  // Set the stored overflow value to `overflow` (an arbitrary page id
   // managed by the map user).
-  void SetOverflow(LogicalPageId overflow);
+  void SetOverflow(PhysicalPageId overflow);
 
   // Returns the number of records currently stored in this map.
   uint16_t GetNumRecords() const;
@@ -133,15 +134,28 @@ class PackedMap {
   // the return value of `GetNumRecords()`.
   uint16_t LowerBoundSlot(const uint8_t* key, unsigned key_length) const;
 
-  // Access the fences and their lengths - useful for creating a new PackedMap with
-  // the same key range.
+  // Access the fences and their lengths - useful for creating a new PackedMap
+  // with the same key range.
   const uint8_t* GetLowerFence() const;
   const uint8_t* GetUpperFence() const;
   const uint16_t GetLowerFenceLength() const;
   const uint16_t GetUpperFenceLength() const;
 
+  // Check whether this is a valid PackedMap (as opposed to a PackedMap-sized
+  // block of 0s).
+  const bool IsValid() const;
+
+  // Check whether this is an overflow page & make/unmake it one.
+  const bool IsOverflow() const;
+  void MakeOverflow();
+  void UnmakeOverflow();
+
  private:
   static constexpr unsigned kHintCount = 16;
+
+  static constexpr uint8_t kValidFlag = 1;
+  static constexpr uint8_t kOverflowFlag = 2;
+
   struct Header {
     struct FenceKeySlot {
       uint16_t offset;
@@ -159,7 +173,9 @@ class PackedMap {
     uint16_t prefix_length = 0;
 
     uint32_t hint[kHintCount];
-    LogicalPageId overflow;
+    PhysicalPageId overflow;
+
+    uint8_t flags = kValidFlag & ~kOverflowFlag;
   };
   struct Slot {
     uint16_t offset;

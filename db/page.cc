@@ -74,6 +74,19 @@ Slice Page::GetKeyPrefix() const {
   return Slice(reinterpret_cast<const char*>(prefix), length);
 }
 
+// Get the key bounds for this page
+Slice Page::GetLowerBoundary() const {
+  const uint8_t* lower_bound = AsMapPtr(data_)->GetLowerFence();
+  const uint16_t length = AsMapPtr(data_)->GetLowerFenceLength();
+  return Slice(reinterpret_cast<const char*>(lower_bound), length);
+}
+
+Slice Page::GetUpperBoundary() const {
+  const uint8_t* upper_bound = AsMapPtr(data_)->GetUpperFence();
+  const uint16_t length = AsMapPtr(data_)->GetUpperFenceLength();
+  return Slice(reinterpret_cast<const char*>(upper_bound), length);
+}
+
 Status Page::Put(const Slice& key, const Slice& value) {
   return Put(WriteOptions(), key, value);
 }
@@ -129,18 +142,27 @@ Status Page::Delete(const Slice& key) {
 }
 
 // Retrieve the stored `overflow` page id for this page.
-LogicalPageId Page::GetOverflow() const {
-  return AsMapPtr(data_)->GetOverflow();
-}
+PhysicalPageId Page::GetOverflow() const { return AsMapPtr(data_)->GetOverflow(); }
 
 // Set the stored overflow page id for this page to `overflow`.
-void Page::SetOverflow(LogicalPageId overflow) {
+void Page::SetOverflow(PhysicalPageId overflow) {
   AsMapPtr(data_)->SetOverflow(overflow);
 }
 
-// Determine whether this page has an overflow page. Only page ids with 1 as
-// the most significant bit are valid overflow page ids.
-bool Page::HasOverflow() { return GetOverflow().IsOverflow(); }
+// Determine whether this page has an overflow page.
+bool Page::HasOverflow() {
+  return GetOverflow().IsValid();
+}
+
+// Check whether this is a valid Page (as opposed to a Page-sized
+// block of 0s).
+const bool Page::IsValid() const { return AsMapPtr(data_)->IsValid(); };
+
+const bool Page::IsOverflow() const { return AsMapPtr(data_)->IsOverflow(); }
+
+void Page::MakeOverflow() { return AsMapPtr(data_)->MakeOverflow(); }
+
+void Page::UnmakeOverflow() { return AsMapPtr(data_)->UnmakeOverflow(); }
 
 Page::Iterator Page::GetIterator() const { return Iterator(*this); }
 

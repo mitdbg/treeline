@@ -28,7 +28,7 @@ class BufferFrame {
   ~BufferFrame();
 
   // Initialize a buffer frame based on the page with the specified `page_id`.
-  void Initialize(const LogicalPageId page_id);
+  void Initialize(const PhysicalPageId page_id);
 
   // Return the page held in the current frame.
   Page GetPage() const;
@@ -38,8 +38,8 @@ class BufferFrame {
   void* GetData() const;
 
   // Set/get the page ID of the page held in the current frame.
-  void SetPageId(const LogicalPageId page_id);
-  LogicalPageId GetPageId() const;
+  void SetPageId(const PhysicalPageId page_id);
+  PhysicalPageId GetPageId() const;
 
   // Lock/unlock the current frame, possibly for exclusive access if `exclusive`
   // is true.
@@ -75,8 +75,8 @@ class BufferFrame {
   // The data of the page held by the frame.
   void* data_;
 
-  // The logical id of the page held by the frame.
-  LogicalPageId page_id_;
+  // The id of the page held by the frame.
+  PhysicalPageId page_id_;
 
   // A read/write lock to be acquired by a thread accessing the page in the
   // frame.

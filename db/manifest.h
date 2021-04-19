@@ -4,10 +4,8 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
-#include <string>
 
 #include "llsm/status.h"
-#include "model/model.h"
 
 namespace llsm {
 
@@ -30,24 +28,22 @@ class Manifest {
 
   uint64_t num_pages() const { return num_pages_; }
   uint64_t num_segments() const { return num_segments_; }
-  std::unique_ptr<Model> model() const;
 
  private:
   friend class Builder;
-  Manifest(uint64_t num_pages, uint64_t num_segments, std::string encoded_model)
+  Manifest(uint64_t num_pages, uint64_t num_segments)
       : num_pages_(num_pages),
-        num_segments_(num_segments),
-        encoded_model_(std::move(encoded_model)) {}
+        num_segments_(num_segments)
+       {}
 
   const uint64_t num_pages_;
   const uint64_t num_segments_;
-  const std::string encoded_model_;
 };
 
 // A helper class for constructing a `Manifest`.
 class Manifest::Builder {
  public:
-  Builder() : num_pages_(0), num_segments_(0), encoded_model_() {}
+  Builder() : num_pages_(0), num_segments_(0) {}
   Builder&& WithNumPages(uint64_t num_pages) {
     num_pages_ = num_pages;
     return std::move(*this);
@@ -56,15 +52,13 @@ class Manifest::Builder {
     num_segments_ = num_segments;
     return std::move(*this);
   }
-  Builder&& WithModel(const std::unique_ptr<Model>& model);
   Manifest Build() && {
-    return Manifest(num_pages_, num_segments_, std::move(encoded_model_));
+    return Manifest(num_pages_, num_segments_);
   }
 
  private:
   uint64_t num_pages_;
   uint64_t num_segments_;
-  std::string encoded_model_;
 };
 
 }  // namespace llsm

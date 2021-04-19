@@ -416,6 +416,26 @@ const uint16_t PackedMap<MapSizeBytes>::GetUpperFenceLength() const {
 }
 
 template <uint16_t MapSizeBytes>
+const bool PackedMap<MapSizeBytes>::IsValid() const {
+  return header_.flags & kValidFlag;
+}
+
+template <uint16_t MapSizeBytes>
+const bool PackedMap<MapSizeBytes>::IsOverflow() const {
+  return header_.flags & kOverflowFlag;
+}
+
+template <uint16_t MapSizeBytes>
+void PackedMap<MapSizeBytes>::MakeOverflow() {
+  header_.flags |= kOverflowFlag;
+}
+
+template <uint16_t MapSizeBytes>
+void PackedMap<MapSizeBytes>::UnmakeOverflow() {
+  header_.flags &= ~kOverflowFlag;
+}
+
+template <uint16_t MapSizeBytes>
 void PackedMap<MapSizeBytes>::SearchHint(const uint32_t key_head,
                                          unsigned& lower_out,
                                          unsigned& upper_out) const {
@@ -432,12 +452,12 @@ void PackedMap<MapSizeBytes>::SearchHint(const uint32_t key_head,
 }
 
 template <uint16_t MapSizeBytes>
-LogicalPageId PackedMap<MapSizeBytes>::GetOverflow() const {
+PhysicalPageId PackedMap<MapSizeBytes>::GetOverflow() const {
   return header_.overflow;
 }
 
 template <uint16_t MapSizeBytes>
-void PackedMap<MapSizeBytes>::SetOverflow(LogicalPageId overflow) {
+void PackedMap<MapSizeBytes>::SetOverflow(PhysicalPageId overflow) {
   header_.overflow = overflow;
 }
 

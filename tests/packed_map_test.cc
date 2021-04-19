@@ -176,16 +176,16 @@ TEST(PackedMapTest, BoundedOverwrite) {
 TEST(PackedMapTest, OverwriteCompact) {
   PackedMapShim<128> map("aa", "az");
   static_assert(sizeof(map) == 128);
-  ASSERT_TRUE(map.Insert("ac", "hello"));
-  ASSERT_TRUE(map.Insert("ab", "hello"));
   ASSERT_TRUE(map.Insert("ac", "he"));
-  ASSERT_TRUE(map.Insert("ac", "hello123"));
+  ASSERT_TRUE(map.Insert("ab", "he"));
+  ASSERT_TRUE(map.Insert("ac", "h"));
+  ASSERT_TRUE(map.Insert("ac", "he"));
 
   std::string ac_out, ab_out;
   ASSERT_TRUE(map.Get("ab", &ab_out));
   ASSERT_TRUE(map.Get("ac", &ac_out));
-  ASSERT_EQ(ac_out, "hello123");
-  ASSERT_EQ(ab_out, "hello");
+  ASSERT_EQ(ac_out, "he");
+  ASSERT_EQ(ab_out, "he");
 }
 
 TEST(PackedMapTest, VariableSizeInsertAndRead) {

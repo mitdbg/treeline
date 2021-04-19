@@ -28,8 +28,9 @@ BufferManager::BufferManager(const BufMgrOptions& options,
   pages_cache_ = aligned_alloc(alignment, options.buffer_pool_size);
   memset(pages_cache_, 0, options.buffer_pool_size);
 
-  page_to_frame_map_ = std::make_unique<SyncHashTable<LogicalPageId, BufferFrame*>>(
-      buffer_manager_size_, /*num_partitions = */ 1);
+  page_to_frame_map_ =
+      std::make_unique<SyncHashTable<PhysicalPageId, BufferFrame*>>(
+          buffer_manager_size_, /*num_partitions = */ 1);
   frames_ = std::vector<BufferFrame>(buffer_manager_size_);
   SetFrameDataPointers();
   free_ptr_ = 0;
@@ -53,7 +54,7 @@ BufferManager::~BufferManager() {
 // Retrieves the page given by `page_id`, to be held exclusively or not
 // based on the value of `exclusive`. Pages are stored on disk in files with
 // the same name as the page ID (e.g. 1).
-BufferFrame& BufferManager::FixPage(const LogicalPageId page_id,
+BufferFrame& BufferManager::FixPage(const PhysicalPageId page_id,
                                     const bool exclusive) {
   BufferFrame* frame = nullptr;
   bool success;
@@ -148,7 +149,7 @@ void BufferManager::FlushDirty() {
 
 // Indicates whether the page given by `page_id` is currently in the buffer
 // manager.
-bool BufferManager::Contains(const LogicalPageId page_id) {
+bool BufferManager::Contains(const PhysicalPageId page_id) {
   BufferFrame* value_out;
 
   LockMapMutex();
@@ -160,14 +161,16 @@ bool BufferManager::Contains(const LogicalPageId page_id) {
 
 // Writes the page held by `frame` to disk.
 void BufferManager::WritePageOut(BufferFrame* frame) const {
-  if (file_manager_ != nullptr)
-    file_manager_->WritePage(frame->GetPageId(), frame->GetData());
+  if (file_manager_ == nullptr) return;
+  Status s = file_manager_->WritePage(frame->GetPageId(), frame->GetData());
+  if (!s.ok()) throw std::runtime_error("Tried to write to unallocated page.");
 }
 
 // Reads a page from disk into `frame`.
 void BufferManager::ReadPageIn(BufferFrame* frame) {
-  if (file_manager_ != nullptr)
-    file_manager_->ReadPage(frame->GetPageId(), frame->GetData());
+  if (file_manager_ == nullptr) return;
+  Status s = file_manager_->ReadPage(frame->GetPageId(), frame->GetData());
+  if (!s.ok()) throw std::runtime_error("Tried to read from unallocated page.");
 }
 
 // If there are free frames left, returns one of them. Else, returns nullptr.
