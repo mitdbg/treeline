@@ -2,6 +2,7 @@
 
 #include <limits>
 
+#include "bufmgr/page_memory_allocator.h"
 #include "db/page.h"
 #include "util/coding.h"
 #include "util/key.h"
@@ -17,16 +18,14 @@ ALEXModel::ALEXModel(const KeyDistHints& key_hints,
 ALEXModel::ALEXModel(const std::unique_ptr<BufferManager>& buf_mgr)
     : records_per_page_(0) {
   size_t num_segments = buf_mgr->GetFileManager()->GetNumSegments();
-  char page_data[Page::kSize];
-  Page temp_page(reinterpret_cast<void*>(page_data));
+  PageBuffer page_data = PageMemoryAllocator::Allocate(/*num_pages=*/1);
+  Page temp_page(page_data.get());
 
   // Loop through files and read each valid page of each file
   for (size_t file_id = 0; file_id < num_segments; ++file_id) {
     for (size_t offset = 0; true; ++offset) {
       PhysicalPageId page_id(file_id, offset);
-      if (!buf_mgr->GetFileManager()
-               ->ReadPage(page_id, reinterpret_cast<void*>(page_data))
-               .ok())
+      if (!buf_mgr->GetFileManager()->ReadPage(page_id, page_data.get()).ok())
         break;
 
       // Get the first key from the page

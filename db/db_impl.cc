@@ -6,6 +6,7 @@
 #include <iostream>
 #include <limits>
 
+#include "bufmgr/page_memory_allocator.h"
 #include "db/manifest.h"
 #include "db/page.h"
 #include "model/alex_model.h"
@@ -118,6 +119,7 @@ Status DBImpl::InitializeNewDB() {
   try {
     // No error if the directory already exists.
     fs::create_directory(db_path_);
+    PageMemoryAllocator::SetAlignmentFor(db_path_);
 
     const auto values = key_utils::CreateValues<uint64_t>(options_.key_hints);
     const auto records = key_utils::CreateRecords<uint64_t>(values);
@@ -148,6 +150,8 @@ Status DBImpl::InitializeNewDB() {
 }
 
 Status DBImpl::InitializeExistingDB() {
+  PageMemoryAllocator::SetAlignmentFor(db_path_);
+
   Status s;
   const auto manifest = Manifest::LoadFrom(db_path_ / kManifestFileName, &s);
   if (!s.ok()) return s;

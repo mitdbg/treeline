@@ -22,6 +22,8 @@ namespace llsm {
 // All methods can be called concurrently without requiring external mutual
 // exclusion. All methods return an OK status on success, and a non-OK status
 // if an error occurs.
+//
+// At most one `DB` instance should be used at any time in a single process.
 class DB {
  public:
   // Open a database instance stored at `path`.

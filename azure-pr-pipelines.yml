@@ -13,5 +13,6 @@ jobs:
       jobDisplayName: Build, Run Tests, Run Checks (on DBTest Only)
       buildType: Debug
       skipTests: false
-      skipValgrind: false
+      # Valgrind does not support some instructions that LLSM uses.
+      skipValgrind: true
       memcheckTestFilter: 'DBTest.*'

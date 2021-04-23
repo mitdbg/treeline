@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 
+#include "bufmgr/page_memory_allocator.h"
 #include "db/page.h"
 #include "llsm/status.h"
 
@@ -45,11 +46,11 @@ class File {
 
     // If file already existed, retrieve next_page_allocation_offset_.
     if (file_size_ > 0) {
-      char page_data[Page::kSize];
-      Page temp_page(reinterpret_cast<void*>(page_data));
+      PageBuffer page_data = PageMemoryAllocator::Allocate(/*num_pages=*/1);
+      Page temp_page(page_data.get());
       next_page_allocation_offset_ = file_size_;
       for (size_t offset = 0; offset < file_size_; offset += Page::kSize) {
-        ReadPage(offset, reinterpret_cast<void*>(page_data));
+        ReadPage(offset, page_data.get());
         if (!temp_page.IsValid()) {
           next_page_allocation_offset_ = offset;
           break;

@@ -8,10 +8,11 @@
 #include <tuple>
 
 #include "buffer_frame.h"
-#include "db/page.h"
 #include "file_manager.h"
 #include "options.h"
 #include "page_eviction_strategy.h"
+#include "page_memory_allocator.h"
+#include "physical_page_id.h"
 #include "sync_hash_table.h"
 
 namespace llsm {
@@ -65,13 +66,6 @@ class BufferManager {
   FileManager* GetFileManager() const { return file_manager_.get(); }
 
  private:
-  // To support efficient direct I/O, LLSM needs to align its memory buffers to
-  // the block size of the underlying file system. On start up, LLSM will
-  // attempt to automatically determine the file system's block size. In the
-  // unlikely event that LLSM is unable to find the block size, it will fall
-  // back to using this default alignment.
-  static constexpr size_t kDefaultAlignment = 4096;
-
   // Writes the page held by `frame` to disk.
   void WritePageOut(BufferFrame* frame) const;
 
@@ -96,7 +90,7 @@ class BufferManager {
   const size_t buffer_manager_size_;
 
   // Space in memory to hold the cached pages.
-  void* pages_cache_;
+  PageBuffer pages_cache_;
 
   // Space in memory to hold the metadata for each frame.
   std::vector<BufferFrame> frames_;
@@ -105,7 +99,8 @@ class BufferManager {
 
   // Map from page_id to the buffer frame (if any) that currently holds that
   // page in memory, and a mutex for editing it.
-  std::unique_ptr<SyncHashTable<PhysicalPageId, BufferFrame*>> page_to_frame_map_;
+  std::unique_ptr<SyncHashTable<PhysicalPageId, BufferFrame*>>
+      page_to_frame_map_;
   std::mutex map_mutex_;
 
   // Pointer to a method for determining which (non-fixed) page to evict, and a

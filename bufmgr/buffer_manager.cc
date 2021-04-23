@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/statvfs.h>
 
 #include <mutex>
 
@@ -19,14 +18,7 @@ namespace llsm {
 BufferManager::BufferManager(const BufMgrOptions& options,
                              std::filesystem::path db_path)
     : buffer_manager_size_(options.buffer_pool_size / Page::kSize) {
-  size_t alignment = BufferManager::kDefaultAlignment;
-  struct statvfs fs_stats;
-  if (statvfs(db_path.c_str(), &fs_stats) == 0) {
-    alignment = fs_stats.f_bsize;
-  }
-  // Allocate space with alignment because of O_DIRECT requirements.
-  pages_cache_ = aligned_alloc(alignment, options.buffer_pool_size);
-  memset(pages_cache_, 0, options.buffer_pool_size);
+  pages_cache_ = PageMemoryAllocator::Allocate(buffer_manager_size_);
 
   page_to_frame_map_ =
       std::make_unique<SyncHashTable<PhysicalPageId, BufferFrame*>>(
@@ -48,7 +40,6 @@ BufferManager::BufferManager(const BufMgrOptions& options,
 // Writes all dirty pages back and frees resources.
 BufferManager::~BufferManager() {
   FlushDirty();
-  free(pages_cache_);
 }
 
 // Retrieves the page given by `page_id`, to be held exclusively or not
@@ -187,7 +178,7 @@ BufferFrame* BufferManager::GetFreeFrame() {
 }
 
 void BufferManager::SetFrameDataPointers() {
-  char* page_ptr = reinterpret_cast<char*>(pages_cache_);
+  char* page_ptr = pages_cache_.get();
 
   for (uint64_t frame_id = 0; frame_id < frames_.size(); ++frame_id) {
     frames_[frame_id].SetData(reinterpret_cast<void*>(page_ptr));
