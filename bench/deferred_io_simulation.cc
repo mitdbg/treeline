@@ -46,12 +46,13 @@ int main(int argc, char* argv[]) {
   }
 
   // Obtain and process the bulk load workload.
-  ycsbr::Workload::Options loptions;
+  ycsbr::Trace::Options loptions;
+  loptions.use_v1_semantics = true;
   loptions.value_size = FLAGS_record_size_bytes - 8;
   loptions.sort_requests = true;
   loptions.swap_key_bytes = false;
-  ycsbr::BulkLoadWorkload load =
-      ycsbr::BulkLoadWorkload::LoadFromFile(FLAGS_load_path, loptions);
+  ycsbr::BulkLoadTrace load =
+      ycsbr::BulkLoadTrace::LoadFromFile(FLAGS_load_path, loptions);
   auto minmax = load.GetKeyRange();
   const size_t num_keys = load.size();
 
@@ -77,10 +78,11 @@ int main(int argc, char* argv[]) {
   if (num_keys % records_per_page != 0) ++num_pages;
 
   // Open workload.
-  ycsbr::Workload::Options options;
+  ycsbr::Trace::Options options;
+  options.use_v1_semantics = true;
   options.value_size = FLAGS_record_size_bytes - 8;
-  ycsbr::Workload workload =
-      ycsbr::Workload::LoadFromFile(FLAGS_workload_path, options);
+  ycsbr::Trace workload =
+      ycsbr::Trace::LoadFromFile(FLAGS_workload_path, options);
 
   // Bookkeeping.
   std::vector<size_t> memtable_entries_per_page(num_pages, 0);

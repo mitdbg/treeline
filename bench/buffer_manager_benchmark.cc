@@ -30,12 +30,13 @@ DEFINE_validator(workload_path, &ValidateWorkload);
 void SimulateBM(benchmark::State& state, bool large_buffer) {
   // Obtain and process the bulk load workload.
   size_t record_size = state.range(0);
-  ycsbr::Workload::Options loptions;
+  ycsbr::Trace::Options loptions;
+  loptions.use_v1_semantics = true;
   loptions.value_size = record_size - 8;
   loptions.sort_requests = true;
   loptions.swap_key_bytes = false;
-  ycsbr::BulkLoadWorkload load =
-      ycsbr::BulkLoadWorkload::LoadFromFile(FLAGS_load_path, loptions);
+  ycsbr::BulkLoadTrace load =
+      ycsbr::BulkLoadTrace::LoadFromFile(FLAGS_load_path, loptions);
 
   // Create key hints.
   llsm::KeyDistHints key_hints;
@@ -56,11 +57,12 @@ void SimulateBM(benchmark::State& state, bool large_buffer) {
   }
 
   // Open workload.
-  ycsbr::Workload::Options woptions;
+  ycsbr::Trace::Options woptions;
+  woptions.use_v1_semantics = true;
   woptions.value_size = record_size - 8;
   woptions.swap_key_bytes = false;
-  ycsbr::Workload workload =
-      ycsbr::Workload::LoadFromFile(FLAGS_workload_path, woptions);
+  ycsbr::Trace workload =
+      ycsbr::Trace::LoadFromFile(FLAGS_workload_path, woptions);
 
   // Pre-calculate page numbers appropriately
   std::vector<llsm::PhysicalPageId> page_ids;

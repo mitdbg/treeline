@@ -54,7 +54,8 @@ static uint32_t ExtractHead(const uint8_t* key, unsigned key_length) {
 // This function assumes that keys are ordered lexicographically and that the
 // system is little endian. Its purpose is to extract a prefix that can be used
 // for fast comparisons.
-static uint64_t ExtractHead64(const Slice& key) {
+template <class SliceKind>
+static uint64_t ExtractHead64(const SliceKind& key) {
   switch (key.size()) {
     case 0:
       return 0;
@@ -125,6 +126,24 @@ std::vector<std::pair<Slice, Slice>> CreateRecords(
 
   return records;
 }
+
+// Converts 64-bit unsigned integer keys to a byte representation that can be
+// compared lexicographically while still maintaining the same sort order. In
+// practice, this means the bytes in the key need to be swapped (assuming we're
+// running on a little endian machine).
+class IntKeyAsSlice {
+ public:
+  IntKeyAsSlice(uint64_t key) : swapped_(__builtin_bswap64(key)) {}
+
+  template <class SliceKind>
+  SliceKind as() const {
+    return SliceKind(reinterpret_cast<const char*>(&swapped_),
+                     sizeof(swapped_));
+  }
+
+ private:
+  uint64_t swapped_;
+};
 
 }  // namespace key_utils
 }  // namespace llsm

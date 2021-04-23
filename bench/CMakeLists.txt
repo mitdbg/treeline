@@ -13,7 +13,11 @@ target_include_directories(bench_common PUBLIC ${PROJECT_SOURCE_DIR})
 #
 # We use this additional library target because not all benchmark executables
 # need to link to RocksDB and gflags (e.g., `microbench`).
-add_library(bench_common_config common/config.cc common/config.h)
+add_library(bench_common_config
+  common/config.cc
+  common/config.h
+  common/llsm_interface.h
+  common/rocksdb_interface.h)
 target_link_libraries(bench_common_config PUBLIC bench_common gflags rocksdb)
 
 # Synthetic Write: Measure the write throughput when writing synthetic data.
@@ -23,11 +27,11 @@ target_link_libraries(synth_write bench_common_config)
 
 # YCSB: Run extracted YCSB workloads against LLSM and RocksDB.
 add_executable(ycsb ycsb.cc)
-target_link_libraries(ycsb bench_common_config ycsbrunner)
+target_link_libraries(ycsb bench_common_config ycsbr)
 
 # Hash Table YCSB: Run extracted YCSB workloads against different hash table implementations.
 add_executable(hashtable_ycsb hashtable_ycsb.cc)
-target_link_libraries(hashtable_ycsb Threads::Threads gflags ycsbrunner)
+target_link_libraries(hashtable_ycsb Threads::Threads gflags ycsbr)
 
 # Microbench: An executable containing all of LLSM's microbenchmarks.
 add_executable(microbench
@@ -41,7 +45,7 @@ target_link_libraries(microbench
 
 # Deferred I/O: A test microbenchmark for deferring certain I/O operations.
 add_executable(deferred_io deferred_io_simulation.cc)
-target_link_libraries(deferred_io bench_common gflags ycsbrunner)
+target_link_libraries(deferred_io bench_common gflags ycsbr)
 
 # Write-ahead Log: A microbenchmark used to evaluate the overhead of writing to
 # a write-ahead log.
@@ -51,4 +55,9 @@ target_link_libraries(wal bench_common gflags benchmark::benchmark)
 # Buffer manager simulation: A microbenchmark for the added latency of the 
 # buffer manager, excluding the underlying I/O operations.
 add_executable(bufmgr_benchmark buffer_manager_benchmark.cc)
-target_link_libraries(bufmgr_benchmark bench_common_config gflags ycsbrunner benchmark::benchmark)
+target_link_libraries(bufmgr_benchmark bench_common_config gflags ycsbr benchmark::benchmark)
+
+# Run Custom: An executable that runs YSCBR-generated workloads against LLSM
+# and RocksDB.
+add_executable(run_custom run_custom.cc)
+target_link_libraries(run_custom bench_common_config ycsbr-gen)

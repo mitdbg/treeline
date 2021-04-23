@@ -95,6 +95,14 @@ DEFINE_uint64(max_deferrals, 0,
 DEFINE_bool(bypass_wal, true,
             "If true, all writes will bypass the write-ahead log.");
 
+DEFINE_bool(verbose, false,
+            "If set, benchmark information will be printed to stderr.");
+
+DEFINE_uint32(latency_sample_period, 1,
+              "The number of requests between latency measurements (i.e., "
+              "measure latency every N-th request).");
+DEFINE_validator(latency_sample_period, &EnsureNonZero);
+
 namespace llsm {
 namespace bench {
 

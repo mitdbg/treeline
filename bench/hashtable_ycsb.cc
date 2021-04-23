@@ -63,24 +63,28 @@ DEFINE_string(workload_path, "", "Path to the workload file.");
 DEFINE_uint32(threads, 1, "The number of threads to use to run the workload.");
 DEFINE_bool(verbose, false,
             "If set, benchmark information will be printed to stderr.");
-DEFINE_uint32(sht_partitions, 16, "The number of partitions to use in the sync hash table");
+DEFINE_uint32(sht_partitions, 16,
+              "The number of partitions to use in the sync hash table");
 
 class UnorderedMapInterface {
  public:
   UnorderedMapInterface() {}
+  void InitializeWorker(const std::thread::id& id) {}
+  void ShutdownWorker(const std::thread::id& id) {}
 
   // Called once before the benchmark.
   void InitializeDatabase() {}
 
   // Called once after the workload if `InitializeDatabase()` has been called.
-  void DeleteDatabase() {}
+  void ShutdownDatabase() {}
 
   // Load the records into the database.
-  void BulkLoad(const ycsbr::BulkLoadWorkload& records) {
+  void BulkLoad(const ycsbr::BulkLoadTrace& records) {
     map_.reserve(records.size());
     mutex_.lock();
     for (const auto& rec : records) {
-      std::string key_string(reinterpret_cast<const char*>(&rec.key), sizeof(rec.key));
+      std::string key_string(reinterpret_cast<const char*>(&rec.key),
+                             sizeof(rec.key));
       std::string value_string(rec.value, rec.value_size);
       map_.insert({key_string, value_string});
     }
@@ -133,15 +137,17 @@ class UnorderedMapInterface {
 class SyncHashTableInterface {
  public:
   SyncHashTableInterface() : map_(nullptr) {}
+  void InitializeWorker(const std::thread::id& id) {}
+  void ShutdownWorker(const std::thread::id& id) {}
 
   // Called once before the benchmark.
   void InitializeDatabase() {}
 
   // Called once after the workload if `InitializeDatabase()` has been called.
-  void DeleteDatabase() {}
+  void ShutdownDatabase() {}
 
   // Load the records into the database.
-  void BulkLoad(const ycsbr::BulkLoadWorkload& records) {
+  void BulkLoad(const ycsbr::BulkLoadTrace& records) {
     map_ = std::make_unique<llsm::SyncHashTable<std::string, std::string>>(
         records.size(), FLAGS_sht_partitions);
     for (const auto& rec : records) Insert(rec.key, rec.value, rec.value_size);
@@ -182,15 +188,17 @@ class SyncHashTableInterface {
 class CuckooHashMapInterface {
  public:
   CuckooHashMapInterface() : map_(nullptr) {}
+  void InitializeWorker(const std::thread::id& id) {}
+  void ShutdownWorker(const std::thread::id& id) {}
 
   // Called once before the benchmark.
   void InitializeDatabase() {}
 
   // Called once after the workload if `InitializeDatabase()` has been called.
-  void DeleteDatabase() {}
+  void ShutdownDatabase() {}
 
   // Load the records into the database.
-  void BulkLoad(const ycsbr::BulkLoadWorkload& records) {
+  void BulkLoad(const ycsbr::BulkLoadTrace& records) {
     map_ =
         std::make_unique<libcuckoo::cuckoohash_map<std::string, std::string>>(
             records.size());
@@ -231,10 +239,9 @@ class CuckooHashMapInterface {
 };
 
 template <class DatabaseInterface>
-ycsbr::BenchmarkResult Run(DatabaseInterface& ht,
-                           const std::optional<ycsbr::BulkLoadWorkload>& load,
-                           const ycsbr::Workload& workload) {
-  ycsbr::BenchmarkOptions boptions;
+ycsbr::BenchmarkResult Run(const std::optional<ycsbr::BulkLoadTrace>& load,
+                           const ycsbr::Trace& workload) {
+  ycsbr::BenchmarkOptions<DatabaseInterface> boptions;
   boptions.num_threads = FLAGS_threads;
   if (FLAGS_verbose) {
     std::cerr << "> Running workload using " << boptions.num_threads
@@ -242,9 +249,9 @@ ycsbr::BenchmarkResult Run(DatabaseInterface& ht,
   }
 
   if (load.has_value()) {
-    return ycsbr::RunTimedWorkload(ht, *load, workload, boptions);
+    return ycsbr::ReplayTrace(workload, &(*load), boptions);
   } else {
-    return ycsbr::RunTimedWorkload(ht, workload, boptions);
+    return ycsbr::ReplayTrace(workload, nullptr, boptions);
   }
 }
 
@@ -265,35 +272,34 @@ int main(int argc, char* argv[]) {
   }
   HTType ht = ParseHTType(FLAGS_ht).value();
 
-  UnorderedMapInterface unordered_map_iface;
-  SyncHashTableInterface sync_hash_table_iface;
-  CuckooHashMapInterface cuckoo_iface;
-
-  std::optional<ycsbr::BulkLoadWorkload> load;
+  std::optional<ycsbr::BulkLoadTrace> load;
   if (!FLAGS_load_path.empty()) {
-    ycsbr::Workload::Options loptions;
+    ycsbr::Trace::Options loptions;
+    loptions.use_v1_semantics = true;
     loptions.value_size = FLAGS_record_size_bytes - 8;
-    load = ycsbr::BulkLoadWorkload::LoadFromFile(FLAGS_load_path, loptions);
+    load = ycsbr::BulkLoadTrace::LoadFromFile(FLAGS_load_path, loptions);
   }
 
-  ycsbr::Workload::Options options;
+  ycsbr::Trace::Options options;
+  options.use_v1_semantics = true;
   options.value_size = FLAGS_record_size_bytes - 8;
-  ycsbr::Workload workload =
-      ycsbr::Workload::LoadFromFile(FLAGS_workload_path, options);
+  ycsbr::Trace workload =
+      ycsbr::Trace::LoadFromFile(FLAGS_workload_path, options);
 
   std::cout << "db,";
   ycsbr::BenchmarkResult::PrintCSVHeader(std::cout);
 
   if (ht == HTType::kAll || ht == HTType::kUnorderedMap) {
     PrintExperimentResult("unordered_map",
-                          Run(unordered_map_iface, load, workload));
+                          Run<UnorderedMapInterface>(load, workload));
   }
   if (ht == HTType::kAll || ht == HTType::kSyncHashTable) {
     PrintExperimentResult("sync_hash_table",
-                          Run(sync_hash_table_iface, load, workload));
+                          Run<SyncHashTableInterface>(load, workload));
   }
   if (ht == HTType::kAll || ht == HTType::kCuckooHashMap) {
-    PrintExperimentResult("cuckoohash_map", Run(cuckoo_iface, load, workload));
+    PrintExperimentResult("cuckoohash_map",
+                          Run<CuckooHashMapInterface>(load, workload));
   }
 
   return 0;

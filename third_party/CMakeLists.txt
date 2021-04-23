@@ -61,9 +61,9 @@ if(LLSM_BUILD_BENCHMARKS)
     PUBLIC $<BUILD_INTERFACE:${rocksdb_SOURCE_DIR}/include>)
 
   FetchContent_Declare(
-    ycsbrunner
+    ycsbr
     GIT_REPOSITORY git@ssh.dev.azure.com:v3/msr-dsail/LearnedLSM/ycsb-runner
-    GIT_TAG        76253d9868d0b3d00196e8922321e3b8bf7b4941
+    GIT_TAG        v3.0.0
   )
-  FetchContent_MakeAvailable(ycsbrunner)
+  FetchContent_MakeAvailable(ycsbr)
 endif()

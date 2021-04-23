@@ -56,6 +56,13 @@ DECLARE_uint64(max_deferrals);
 // If true, all writes will bypass the write-ahead log.
 DECLARE_bool(bypass_wal);
 
+// If true, benchmark information will be printed to stderr.
+DECLARE_bool(verbose);
+
+// The number of requests between latency measurements (i.e., measure latency
+// every N-th request).
+DECLARE_uint32(latency_sample_period);
+
 namespace llsm {
 namespace bench {
 
