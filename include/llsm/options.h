@@ -73,6 +73,9 @@ struct Options {
   // If true, LLSM will try to optimize the MemTableOptions each time it
   // allocates a new memtable, as well as the FlushOptions for every flush.
   bool adaptive_memtables = false;
+
+  // If false, LLSM will use a BTreeModel instead of an ALEXModel.
+  bool use_alex = true;
 };
 
 struct ReadOptions {};

@@ -103,6 +103,10 @@ DEFINE_uint32(latency_sample_period, 1,
               "measure latency every N-th request).");
 DEFINE_validator(latency_sample_period, &EnsureNonZero);
 
+DEFINE_bool(use_alex, true,
+            "If true, LLSM will use an ALEXModel. Otherwise, it will use a "
+            "BTreeModel.");
+
 namespace llsm {
 namespace bench {
 
@@ -151,6 +155,7 @@ llsm::Options BuildLLSMOptions() {
   options.pin_threads = true;
   options.deferred_io_min_entries = FLAGS_io_threshold;
   options.deferred_io_max_deferrals = FLAGS_max_deferrals;
+  options.use_alex = FLAGS_use_alex;
   return options;
 }
 
