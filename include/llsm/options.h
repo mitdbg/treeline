@@ -29,6 +29,10 @@ struct KeyDistHints {
   // values of `page_fill_pct`, `record_size`, and the database's page size
   // (internally represented by the `Page::kSize` constant).
   size_t records_per_page() const;
+
+  // Returns the number of required pages based on the values of `num_keys` and
+  // using records_per_page().
+  size_t num_pages() const;
 };
 
 // Database options
@@ -76,6 +80,10 @@ struct Options {
 
   // If false, LLSM will use a BTreeModel instead of an ALEXModel.
   bool use_alex = true;
+
+  // The minimum length of an overflow chain for which reorganization is
+  // triggered.
+  size_t reorg_length = 5;
 };
 
 struct ReadOptions {};

@@ -36,10 +36,24 @@ class ALEXModel : public Model {
   // page_id if no next page exists.
   PhysicalPageId KeyToNextPageId(const Slice& key);
   PhysicalPageId KeyToNextPageId(const uint64_t key);
+  
+  // Inserts a new mapping into the model (updates the page_id if the key
+  // already exists).
+  void Insert(const Slice& key, const PhysicalPageId& page_id);
+
+  // Removes a mapping from the model, if the key exists.
+  void Remove(const Slice& key);
+
+  // Gets the number of pages indexed by the model
+  size_t GetNumPages() const;
 
  private:
-  alex::Alex<uint64_t, PhysicalPageId> index_;
+  alex::Alex<uint64_t, PhysicalPageId, alex::AlexCompare,
+             std::allocator<std::pair<uint64_t, PhysicalPageId>>,
+             /* allow_duplicates = */ false>
+      index_;
   const size_t records_per_page_;
+  std::shared_mutex mutex_;
 };
 
 }  // namespace llsm

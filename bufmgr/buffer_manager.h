@@ -44,8 +44,7 @@ class BufferManager {
   ~BufferManager();
 
   // Retrieves the page given by `page_id`, to be held exclusively or not
-  // based on the value of `exclusive`. Pages are stored on disk in files with
-  // the same name as the page ID (e.g. 1).
+  // based on the value of `exclusive`.
   BufferFrame& FixPage(const PhysicalPageId page_id, const bool exclusive);
 
   // Unfixes a page updating whether it is dirty or not.

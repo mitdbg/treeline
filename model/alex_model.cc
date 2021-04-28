@@ -41,8 +41,6 @@ ALEXModel::ALEXModel(const std::unique_ptr<BufferManager>& buf_mgr)
 }
 
 // Preallocates the number of pages deemed necessary after initialization.
-//
-// TODO: Add a PageManager to handle this?
 void ALEXModel::Preallocate(const std::vector<std::pair<Slice, Slice>>& records,
                             const std::unique_ptr<BufferManager>& buf_mgr) {
   // Loop over records in records_per_page-sized increments.
@@ -51,9 +49,13 @@ void ALEXModel::Preallocate(const std::vector<std::pair<Slice, Slice>>& records,
     const PhysicalPageId page_id = buf_mgr->GetFileManager()->AllocatePage();
     auto& bf = buf_mgr->FixPage(page_id, /*exclusive = */ true);
     const Page page(
-        bf.GetData(), records.at(record_id).first,
-        records.at(std::min(record_id + records_per_page_, records.size() - 1))
-            .first);
+        bf.GetData(),
+        (record_id == 0)
+            ? Slice(std::string(records.at(record_id).first.size(), 0x00))
+            : records.at(record_id).first,
+        (record_id + records_per_page_ < records.size())
+            ? records.at(record_id + records_per_page_).first
+            : Slice(std::string(records.at(record_id).first.size(), 0xFF)));
     buf_mgr->UnfixPage(bf, /*is_dirty = */ true);
     index_.insert(key_utils::ExtractHead64(records.at(record_id).first),
                   page_id);
@@ -68,8 +70,14 @@ PhysicalPageId ALEXModel::KeyToPageId(const Slice& key) {
 }
 
 PhysicalPageId ALEXModel::KeyToPageId(const uint64_t key) {
-  PhysicalPageId* page_id = index_.get_payload_last_no_greater_than(key);
-  return *page_id;
+  mutex_.lock_shared();
+  PhysicalPageId* page_id_ptr = index_.get_payload_last_no_greater_than(key);
+  PhysicalPageId page_id;
+  if (page_id_ptr != nullptr) {
+    page_id = *page_id_ptr;
+  }
+  mutex_.unlock_shared();
+  return page_id;
 }
 
 // Uses the model to predict the page_id of the NEXT page given a `key` that
@@ -80,12 +88,32 @@ PhysicalPageId ALEXModel::KeyToNextPageId(const Slice& key) {
 }
 
 PhysicalPageId ALEXModel::KeyToNextPageId(const uint64_t key) {
-  PhysicalPageId* page_id = index_.get_payload_upper_bound(key);
-  if (page_id != nullptr) {
-    return *page_id;
-  } else {
-    return PhysicalPageId();
+  mutex_.lock_shared();
+  PhysicalPageId* page_id_ptr = index_.get_payload_upper_bound(key);
+  PhysicalPageId page_id;
+  if (page_id_ptr != nullptr) {
+    page_id = *page_id_ptr;
   }
+  mutex_.unlock_shared();
+  return page_id;
 }
+
+// Inserts a new mapping into the model (updates the page_id if the key
+// already exists).
+void ALEXModel::Insert(const Slice& key, const PhysicalPageId& page_id) {
+  mutex_.lock();
+  index_.insert(key_utils::ExtractHead64(key), page_id);
+  mutex_.unlock();
+}
+
+// Removes a mapping from the model, if the key exists.
+void ALEXModel::Remove(const Slice& key) {
+  mutex_.lock();
+  index_.erase(key_utils::ExtractHead64(key));
+  mutex_.unlock();
+}
+
+// Gets the number of pages indexed by the model
+size_t ALEXModel::GetNumPages() const { return index_.size(); }
 
 }  // namespace llsm

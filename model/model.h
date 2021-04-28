@@ -22,6 +22,16 @@ class Model {
   // is within the correct range (upper bounds `key`). Returns an invalid
   // page_id if no next page exists.
   virtual PhysicalPageId KeyToNextPageId(const Slice& key) = 0;
+
+  // Inserts a new mapping into the model (updates the page_id if the key
+  // already exists).
+  virtual void Insert(const Slice& key, const PhysicalPageId& page_id) = 0;
+
+  // Removes a mapping from the model, if the key exists.
+  virtual void Remove(const Slice& key) = 0;
+
+  // Gets the number of pages indexed by the model
+  virtual size_t GetNumPages() const = 0;
 };
 
 }  // namespace llsm

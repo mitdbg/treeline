@@ -10,7 +10,7 @@ namespace llsm {
 
 // Initalizes the model based on a vector of records sorted by key.
 BTreeModel::BTreeModel(const KeyDistHints& key_hints,
-                     const std::vector<std::pair<Slice, Slice>>& records)
+                       const std::vector<std::pair<Slice, Slice>>& records)
     : records_per_page_(key_hints.records_per_page()) {}
 
 // Initalizes the model based on existing files, accessed through the `buf_mgr`.
@@ -42,22 +42,25 @@ BTreeModel::BTreeModel(const std::unique_ptr<BufferManager>& buf_mgr)
 }
 
 // Preallocates the number of pages deemed necessary after initialization.
-//
-// TODO: Add a PageManager to handle this?
-void BTreeModel::Preallocate(const std::vector<std::pair<Slice, Slice>>& records,
-                            const std::unique_ptr<BufferManager>& buf_mgr) {
+void BTreeModel::Preallocate(
+    const std::vector<std::pair<Slice, Slice>>& records,
+    const std::unique_ptr<BufferManager>& buf_mgr) {
   // Loop over records in records_per_page-sized increments.
   for (size_t record_id = 0; record_id < records.size();
        record_id += records_per_page_) {
     const PhysicalPageId page_id = buf_mgr->GetFileManager()->AllocatePage();
     auto& bf = buf_mgr->FixPage(page_id, /*exclusive = */ true);
     const Page page(
-        bf.GetData(), records.at(record_id).first,
-        records.at(std::min(record_id + records_per_page_, records.size() - 1))
-            .first);
+        bf.GetData(),
+        (record_id == 0)
+            ? Slice(std::string(records.at(record_id).first.size(), 0x00))
+            : records.at(record_id).first,
+        (record_id + records_per_page_ < records.size())
+            ? records.at(record_id + records_per_page_).first
+            : Slice(std::string(records.at(record_id).first.size(), 0xFF)));
     buf_mgr->UnfixPage(bf, /*is_dirty = */ true);
     index_.insert2(key_utils::ExtractHead64(records.at(record_id).first),
-                  page_id);
+                   page_id);
   }
   buf_mgr->FlushDirty();
 }
@@ -69,9 +72,12 @@ PhysicalPageId BTreeModel::KeyToPageId(const Slice& key) {
 }
 
 PhysicalPageId BTreeModel::KeyToPageId(const uint64_t key) {
+  mutex_.lock_shared();
   auto it = index_.upper_bound(key);
   --it;
-  return it->second;
+  auto page_id = it->second;
+  mutex_.unlock_shared();
+  return page_id;
 }
 
 // Uses the model to predict the page_id of the NEXT page given a `key` that
@@ -82,12 +88,32 @@ PhysicalPageId BTreeModel::KeyToNextPageId(const Slice& key) {
 }
 
 PhysicalPageId BTreeModel::KeyToNextPageId(const uint64_t key) {
+  mutex_.lock_shared();
   auto it = index_.upper_bound(key);
+  PhysicalPageId page_id;
   if (it != index_.end()) {
-    return it->second;
-  } else {
-    return PhysicalPageId();
-  }
+    page_id = it->second;
+  } 
+  mutex_.unlock_shared();
+  return page_id;
 }
+
+// Inserts a new mapping into the model (updates the page_id if the key
+// already exists).
+void BTreeModel::Insert(const Slice& key, const PhysicalPageId& page_id) {
+  mutex_.lock();
+  index_.insert2(key_utils::ExtractHead64(key), page_id);
+  mutex_.unlock();
+}
+
+// Removes a mapping from the model, if the key exists.
+void BTreeModel::Remove(const Slice& key) {
+  mutex_.lock();
+  index_.erase(key_utils::ExtractHead64(key));
+  mutex_.unlock();
+}
+
+// Gets the number of pages indexed by the model
+size_t BTreeModel::GetNumPages() const { return index_.size(); }
 
 }  // namespace llsm

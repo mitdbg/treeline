@@ -40,6 +40,11 @@ class DBImpl : public DB {
   // after and only if this method returns `Status::OK()`.
   Status Initialize();
 
+  // Gets the number of pages indexed by the model (for debugging).
+  size_t GetNumIndexedPages() const;
+
+  using OverflowChain = std::unique_ptr<std::vector<BufferFrame*>>;
+
  private:
   Status InitializeNewDB();
   Status InitializeExistingDB();
@@ -74,19 +79,24 @@ class DBImpl : public DB {
   bool ShouldFlush(const FlushOptions& foptions, size_t num_records,
                    size_t num_deferrals) const;
 
-  using OverflowChain = std::unique_ptr<std::vector<BufferFrame*>>;
-
   // Code run by a worker thread to write out `records` to the page held by
   // `bf`.
   void FlushWorker(
       const std::vector<std::tuple<const Slice, const Slice,
                                    const format::WriteType>>& records,
-      std::future<OverflowChain>& bf_future);
+      std::future<OverflowChain>& bf_future,
+      size_t current_page_deferral_count);
 
   // Fixes the page chain starting with the page at `page_id`. The returned page
-  // frames can optionally be unlocked before returning.
+  // frames can optionally be unlocked before returning. Returns `nullptr` if it
+  // detected a reorganization while fixing the first chain link.
   OverflowChain FixOverflowChain(PhysicalPageId page_id, bool exclusive,
                                  bool unlock_before_returning);
+
+  // Reorganizes the page chain starting with the page at `page_id` by promoting
+  // overflow pages.
+  Status ReorganizeOverflowChain(PhysicalPageId page_id,
+                                 uint32_t page_fill_pct);
 
   // Code run by a worker thread to reinsert `records` into the now-active
   // memtable if their flush was deferred.

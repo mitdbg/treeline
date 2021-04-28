@@ -71,6 +71,9 @@ class DB {
   // Manually request LLSM to flush the data stored in its MemTable to
   // persistent storage. This method will block until the flush completes.
   virtual Status FlushMemTable(const bool disable_deferred_io) = 0;
+
+  // Gets the number of pages indexed by the model (for debugging).
+  virtual size_t GetNumIndexedPages() const = 0;
 };
 
 }  // namespace llsm
