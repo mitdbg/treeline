@@ -3,12 +3,12 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include "bufmgr/physical_page_id.h"
+#include <vector>
+
+#include "bufmgr/buffer_manager.h"
+#include "llsm/slice.h"
 
 namespace llsm {
-
-class Slice;
-class Status;
 
 // A model to determine the correct page for a database record based on the key.
 class Model {
@@ -30,8 +30,21 @@ class Model {
   // Removes a mapping from the model, if the key exists.
   virtual void Remove(const Slice& key) = 0;
 
-  // Gets the number of pages indexed by the model
-  virtual size_t GetNumPages() const = 0;
+  // Gets the number of pages indexed by the model.
+  virtual size_t GetNumPages() = 0;
+
+  // Gets the total memory footprint of the model in bytes.
+  virtual size_t GetSizeBytes() = 0;
+
+  // Initializes the model based on new files, allocated according to `records`
+  // and `records_per_page` and accessed through `buf_mgr`.
+  void PreallocateAndInitialize(
+      const std::unique_ptr<BufferManager>& buf_mgr,
+      const std::vector<std::pair<Slice, Slice>>& records,
+      const size_t records_per_page);
+
+  // Initalizes the model based on existing files, accessed through `buf_mgr`.
+  void ScanFilesAndInitialize(const std::unique_ptr<BufferManager>& buf_mgr);
 };
 
 }  // namespace llsm

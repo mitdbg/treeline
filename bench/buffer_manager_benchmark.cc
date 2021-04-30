@@ -73,10 +73,9 @@ void SimulateBM(benchmark::State& state, bool large_buffer) {
 
   // Create buffer manager options.
   llsm::BufMgrOptions bm_options;
-  bm_options.SetNumPagesUsing(key_hints);
   bm_options.simulation_mode = true;
   bm_options.buffer_pool_size = large_buffer
-                                    ? bm_options.num_pages * llsm::Page::kSize
+                                    ? model.size() * llsm::Page::kSize
                                     : 64 * 1024 * 1024;
 
   // Bookkeeping

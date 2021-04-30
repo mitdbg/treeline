@@ -104,6 +104,7 @@ static uint64_t ExtractHead64(const SliceKind& key) {
 template <typename T>
 std::vector<T> CreateValues(const KeyDistHints& key_hints) {
   std::vector<T> values;
+  if (key_hints.num_keys == 0) return values;
   values.reserve(key_hints.num_keys);
   const size_t max_value =
       key_hints.min_key + (key_hints.num_keys - 1) * key_hints.key_step_size;

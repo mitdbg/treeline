@@ -130,17 +130,16 @@ Status DBImpl::InitializeNewDB() {
 
     BufMgrOptions bm_options(options_);
     bm_options.num_segments = options_.background_threads;
-    bm_options.SetNumPagesUsing(options_.key_hints);
 
-    ALEXModel* const model = new ALEXModel(options_.key_hints, records);
+    model_ = std::make_unique<ALEXModel>();
     buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
 
-    model->Preallocate(records, buf_mgr_);
-    model_.reset(model);
+    model_->PreallocateAndInitialize(buf_mgr_, records,
+                                     options_.key_hints.records_per_page());
 
     // Write the DB metadata to persistent storage.
     const Status s = Manifest::Builder()
-                         .WithNumPages(bm_options.num_pages)
+                         .WithNumPages(0)  // Include to not break format
                          .WithNumSegments(bm_options.num_segments)
                          .Build()
                          .WriteTo(db_path_ / kManifestFileName);
@@ -162,10 +161,11 @@ Status DBImpl::InitializeExistingDB() {
 
   BufMgrOptions bm_options(options_);
   bm_options.num_segments = manifest->num_segments();
-  bm_options.num_pages = manifest->num_pages();
 
   buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
-  model_ = std::make_unique<ALEXModel>(buf_mgr_);
+  model_ = std::make_unique<ALEXModel>();
+
+  model_->ScanFilesAndInitialize(buf_mgr_);
 
   // Before we can accept requests, we need to replay the writes (if any) that
   // exist in the write-ahead log.
@@ -642,8 +642,8 @@ void DBImpl::FlushWorker(
           // Must allocate a new page
           PhysicalPageId new_page_id =
               buf_mgr_->GetFileManager()->AllocatePage();
-          auto new_bf =
-              &(buf_mgr_->FixPage(new_page_id, /*exclusive = */ true));
+          auto new_bf = &(buf_mgr_->FixPage(new_page_id, /* exclusive = */ true,
+                                            /*is_newly_allocated = */ true));
           Page new_page(new_bf->GetData(), bf->GetPage());
           new_page.MakeOverflow();
           bf->GetPage().SetOverflow(new_page_id);

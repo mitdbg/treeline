@@ -38,14 +38,13 @@ BufferManager::BufferManager(const BufMgrOptions& options,
 }
 
 // Writes all dirty pages back and frees resources.
-BufferManager::~BufferManager() {
-  FlushDirty();
-}
+BufferManager::~BufferManager() { FlushDirty(); }
 
 // Retrieves the page given by `page_id`, to be held exclusively or not
-// based on the value of `exclusive`. 
+// based on the value of `exclusive`.
 BufferFrame& BufferManager::FixPage(const PhysicalPageId page_id,
-                                    const bool exclusive) {
+                                    const bool exclusive,
+                                    const bool is_newly_allocated) {
   BufferFrame* frame = nullptr;
   bool success;
 
@@ -89,7 +88,7 @@ BufferFrame& BufferManager::FixPage(const PhysicalPageId page_id,
     // Initialize and populate the frame
     frame->Initialize(page_id);
     frame->IncFixCount();
-    ReadPageIn(frame);
+    if (!is_newly_allocated) ReadPageIn(frame);
 
     // Insert the frame into the map.
     LockMapMutex();

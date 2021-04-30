@@ -13,6 +13,7 @@
 #include "db/memtable.h"
 #include "llsm/db.h"
 #include "llsm/statistics.h"
+#include "model/model.h"
 #include "util/thread_pool.h"
 #include "wal/manager.h"
 

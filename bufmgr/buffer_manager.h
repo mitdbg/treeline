@@ -45,7 +45,14 @@ class BufferManager {
 
   // Retrieves the page given by `page_id`, to be held exclusively or not
   // based on the value of `exclusive`.
-  BufferFrame& FixPage(const PhysicalPageId page_id, const bool exclusive);
+  //
+  // WARNING: Setting `is_newly_allocated` to true will skip reading the page
+  // from disk. This means that there is NO GUARANTEE about the data contained
+  // in the returned frame. This flag should ONLY be set when the caller will
+  // overwrite the frame data immediately after fixing the page (usually when
+  // allocating a new page).
+  BufferFrame& FixPage(const PhysicalPageId page_id, const bool exclusive,
+                       const bool is_newly_allocated = false);
 
   // Unfixes a page updating whether it is dirty or not.
   void UnfixPage(BufferFrame& frame, const bool is_dirty);

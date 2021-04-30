@@ -24,7 +24,8 @@ PackedMap<MapSizeBytes>::PackedMap(const uint8_t* lower_key,
   const int cmp =
       memcmp(lower_key, upper_key,
              packed_map_detail::Min(lower_key_length, upper_key_length));
-  assert(cmp < 0 || (cmp == 0 && lower_key_length < upper_key_length));
+  assert(cmp < 0 || (cmp == 0 && lower_key_length < upper_key_length) ||
+         upper_key_length == 0);
 
   SetFences(lower_key, lower_key_length, upper_key, upper_key_length);
 }

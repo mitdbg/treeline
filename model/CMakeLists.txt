@@ -3,4 +3,5 @@ target_sources(llsm PRIVATE
   alex_model.h
   btree_model.h
   btree_model.cc
-  model.h)
+  model.h
+  model.cc)

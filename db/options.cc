@@ -13,6 +13,7 @@ size_t KeyDistHints::records_per_page() const {
 }
 
 size_t KeyDistHints::num_pages() const {
+  if (num_keys == 0) return 1;
   size_t num_pages = num_keys / records_per_page();
   if (num_keys % records_per_page() != 0) ++num_pages;
   return num_pages;

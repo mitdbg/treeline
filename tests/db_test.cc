@@ -102,6 +102,38 @@ TEST_F(DBTest, WriteFlushRead) {
   delete db;
 }
 
+TEST_F(DBTest, WriteFlushReadNoHint) {
+  llsm::DB* db = nullptr;
+  llsm::Options options;
+  options.pin_threads = false;
+  options.key_hints.num_keys = 0;
+  auto status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+
+  const uint64_t key_as_int = __builtin_bswap64(1ULL);
+  const std::string value = "Hello world!";
+  llsm::Slice key(reinterpret_cast<const char*>(&key_as_int),
+                  sizeof(key_as_int));
+  status = db->Put(llsm::WriteOptions(), key, value);
+  ASSERT_TRUE(status.ok());
+
+  // Should be a memtable read.
+  std::string value_out;
+  status = db->Get(llsm::ReadOptions(), key, &value_out);
+  ASSERT_TRUE(status.ok());
+  ASSERT_EQ(value_out, value);
+
+  status = db->FlushMemTable(/*disable_deferred_io = */ true);
+  ASSERT_TRUE(status.ok());
+
+  // Should be a page read (but will be cached in the buffer pool).
+  status = db->Get(llsm::ReadOptions(), key, &value_out);
+  ASSERT_TRUE(status.ok());
+  ASSERT_EQ(value_out, value);
+
+  delete db;
+}
+
 TEST_F(DBTest, WriteThenDelete) {
   llsm::DB* db = nullptr;
   llsm::Options options;
@@ -1186,6 +1218,96 @@ TEST_F(DBTest, ReorgOverflowChain) {
 
   // Open the DB.
   llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write dummy data to the DB.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value_old);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // Flush the writes to the pages.
+  db->FlushMemTable(/*disable_deferred_io = */ true);
+
+  // Generate data for enough additional writes to overflow multiple times (256
+  // KiB)
+  llsm::KeyDistHints extra_key_hints;
+  extra_key_hints.num_keys = 4096 * 4;
+  extra_key_hints.record_size = kKeySize + kValueSize;
+  extra_key_hints.min_key = 1024;
+  extra_key_hints.key_step_size = 1;
+  const std::vector<uint64_t> extra_lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+
+  // Write dummy data to the DB.
+  for (const auto& key_as_int : extra_lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value_old);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // Flush the writes to the pages (should cause overflow).
+  ASSERT_EQ(db->GetNumIndexedPages(), 1);
+  db->FlushMemTable(/*disable_deferred_io = */ true);
+
+  // Read some keys from new pages
+  std::string value_out;
+  for (size_t i = 0; i < lexicographic_keys.size(); i += 256) {
+    llsm::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])),
+                    kKeySize);
+    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    ASSERT_TRUE(status.ok());
+    ASSERT_EQ(value_old, value_out);
+  }
+  for (size_t i = 0; i < extra_lexicographic_keys.size(); i += 256) {
+    llsm::Slice key(
+        reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])),
+        kKeySize);
+    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    ASSERT_TRUE(status.ok());
+    ASSERT_EQ(value_old, value_out);
+  }
+
+  // For reads to have happened, the reorganization must have been completed.
+  // This is because reads will block for as long as a reorganization on the
+  // page they want to access (the only "old" non-overflow page in this context)
+  // is going on.
+  ASSERT_EQ(db->GetNumIndexedPages(), 9);
+
+  delete db;
+  db = nullptr;
+}
+
+TEST_F(DBTest, ReorgOverflowChainNoHint) {
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 8;
+
+  // Dummy value used for the records (8 byte key; record is 16B in total).
+  const std::string value_old(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  // 1024 records @ 16B each => 16KiB of data.
+  // Each page is 64 KiB and is filled to 50% => all records fit into 1 page.
+  options.key_hints.num_keys = 1024;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kKeySize + kValueSize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1;
+
+  // Generate data used for the write (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  options.key_hints.num_keys = 0;
   llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);

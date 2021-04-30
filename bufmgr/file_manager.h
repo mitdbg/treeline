@@ -7,7 +7,6 @@
 #include "bufmgr/file.h"
 #include "bufmgr/options.h"
 #include "db/page.h"
-#include "model/model.h"
 
 namespace llsm {
 

@@ -37,13 +37,12 @@ TEST(BufferManagerTest, WriteReadSequential) {
 
   // Create buffer manager.
   BufMgrOptions bm_options;
-  bm_options.SetNumPagesUsing(key_hints);
 
-  const std::unique_ptr<ALEXModel> model =
-      std::make_unique<ALEXModel>(key_hints, records);
+  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
   const std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(bm_options, dbname);
-  model->Preallocate(records, buffer_manager);
+  model->PreallocateAndInitialize(buffer_manager, records,
+                                  key_hints.records_per_page());
 
   // Store `page_id` to page_id
   for (size_t record_id = 0; record_id < records.size();
@@ -79,13 +78,12 @@ TEST(BufferManagerTest, FlushDirty) {
 
   // Create buffer manager.
   BufMgrOptions bm_options;
-  bm_options.SetNumPagesUsing(key_hints);
 
-  const std::unique_ptr<ALEXModel> model =
-      std::make_unique<ALEXModel>(key_hints, records);
+  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
   const std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(bm_options, dbname);
-  model->Preallocate(records, buffer_manager);
+  model->PreallocateAndInitialize(buffer_manager, records,
+                                  key_hints.records_per_page());
 
   // Store `page_id` to page_id for the first few pages.
   const size_t few_pages = std::min(
@@ -129,13 +127,12 @@ TEST(BufferManagerTest, Contains) {
 
   // Create buffer manager.
   BufMgrOptions bm_options;
-  bm_options.SetNumPagesUsing(key_hints);
 
-  const std::unique_ptr<ALEXModel> model =
-      std::make_unique<ALEXModel>(key_hints, records);
+  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
   const std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(bm_options, dbname);
-  model->Preallocate(records, buffer_manager);
+  model->PreallocateAndInitialize(buffer_manager, records,
+                                  key_hints.records_per_page());
 
   // Check that first few pages are contained upon being fixed.
   const size_t few_pages = std::min(

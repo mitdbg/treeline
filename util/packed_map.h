@@ -42,6 +42,8 @@ class PackedMap {
   // of later inserted keys, but requires that all inserted keys satisfy:
   // `lower_key` <= key <= `upper_key`. Using this constructor and then
   // violating this ordering constraint results in undefined behavior.
+  // Can set upper_key_length = 0 to indicate an unknown upper key, forgoing
+  // the more efficient encoding.
   PackedMap(const uint8_t* lower_key, unsigned lower_key_length,
             const uint8_t* upper_key, unsigned upper_key_length);
 

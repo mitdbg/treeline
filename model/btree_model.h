@@ -1,11 +1,7 @@
 #pragma once
 
-#include <memory>
-#include <vector>
-
-#include "bufmgr/buffer_manager.h"
-#include "llsm/options.h"
 #include "model.h"
+#include "sosd/tracking_allocator.h"
 #include "tlx/btree_map.h"
 
 namespace llsm {
@@ -14,17 +10,8 @@ namespace llsm {
 // database.
 class BTreeModel : public Model {
  public:
-  // Initalizes the model based on a vector of records sorted by key.
-  BTreeModel(const KeyDistHints& key_hints,
-             const std::vector<std::pair<Slice, Slice>>& records);
 
-  // Initalizes the model based on existing files, accessed through the
-  // `buf_mgr`.
-  BTreeModel(const std::unique_ptr<BufferManager>& buf_mgr);
-
-  // Preallocates the number of pages deemed necessary after initialization.
-  void Preallocate(const std::vector<std::pair<Slice, Slice>>& records,
-                   const std::unique_ptr<BufferManager>& buf_mgr);
+  BTreeModel();
 
   // Uses the model to predict a page_id given a `key` that is within the
   // correct range (lower bounds `key`).
@@ -45,11 +32,18 @@ class BTreeModel : public Model {
   void Remove(const Slice& key);
 
   // Gets the number of pages indexed by the model
-  size_t GetNumPages() const;
+  size_t GetNumPages();
+
+  // Gets the total memory footprint of the model in bytes.
+  size_t GetSizeBytes();
 
  private:
-  tlx::btree_map<uint64_t, PhysicalPageId> index_;
-  const size_t records_per_page_;
+  tlx::btree_map<
+      uint64_t, PhysicalPageId, std::less<uint64_t>,
+      tlx::btree_default_traits<uint64_t, std::pair<uint64_t, PhysicalPageId>>,
+      TrackingAllocator<std::pair<uint64_t, PhysicalPageId>>>
+      index_;
+  uint64_t total_allocation_size_ = 0;
   std::shared_mutex mutex_;
 };
 

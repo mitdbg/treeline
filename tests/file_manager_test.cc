@@ -29,10 +29,7 @@ TEST(FileManagerTest, FileConstruction) {
   // Create file manager.
   BufMgrOptions bm_options;
   bm_options.num_segments = 8;
-  bm_options.SetNumPagesUsing(key_hints);
 
-  const std::unique_ptr<ALEXModel> model =
-      std::make_unique<ALEXModel>(key_hints, records);
   const llsm::FileManager file_manager(bm_options, dbpath);
 
   // Check created files.
@@ -57,13 +54,12 @@ TEST(FileManagerTest, WriteReadSequential) {
 
   // Create file manager.
   BufMgrOptions bm_options;
-  bm_options.SetNumPagesUsing(key_hints);
 
-  const std::unique_ptr<ALEXModel> model =
-      std::make_unique<ALEXModel>(key_hints, records);
+  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
   const std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(bm_options, dbpath);
-  model->Preallocate(records, buffer_manager);
+  model->PreallocateAndInitialize(buffer_manager, records,
+                                  key_hints.records_per_page());
 
   // Set up a page buffer in memory.
   uint8_t page[Page::kSize];

@@ -100,7 +100,8 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
       frame = chain->at(i);
     } else {
       PhysicalPageId new_page_id = buf_mgr_->GetFileManager()->AllocatePage();
-      frame = &(buf_mgr_->FixPage(new_page_id, /* exclusive = */ true));
+      frame = &(buf_mgr_->FixPage(new_page_id, /* exclusive = */ true,
+                                  /* is_newly_allocated = */ true));
     }
 
     memcpy(frame->GetData(), page_data.get() + i * Page::kSize, Page::kSize);
