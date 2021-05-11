@@ -3,6 +3,7 @@
 
 #include "bench/common/config.h"
 #include "bench/common/llsm_interface.h"
+#include "bench/common/load_data.h"
 #include "bench/common/rocksdb_interface.h"
 #include "gflags/gflags.h"
 #include "ycsbr/gen.h"
@@ -18,6 +19,7 @@ DEFINE_string(workload_config, "",
 DEFINE_bool(
     skip_load, false,
     "If set to true, this workload runner will skip the initial data load.");
+DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
 
 template <class DatabaseInterface>
 ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
@@ -47,9 +49,6 @@ ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
 
   ycsbr::RunOptions options;
   options.latency_sample_period = FLAGS_latency_sample_period;
-  // Currently there are no negative lookups - all requests should succeed
-  // (otherwise something is wrong in the implementation).
-  options.expect_request_success = true;
   return session.RunWorkload(workload, options);
 }
 
@@ -73,6 +72,28 @@ int main(int argc, char* argv[]) {
   DBType db = llsm::bench::ParseDBType(FLAGS_db).value();
   std::unique_ptr<ycsbr::gen::PhasedWorkload> workload =
       ycsbr::gen::PhasedWorkload::LoadFrom(FLAGS_workload_config, FLAGS_seed);
+
+  if (!FLAGS_custom_dataset.empty()) {
+    std::vector<ycsbr::Request::Key> keys = LoadDatasetFromTextFile(
+        FLAGS_custom_dataset, /*warn_on_duplicates=*/FLAGS_verbose);
+    if (FLAGS_verbose) {
+      std::cerr << "> Loaded a custom dataset with " << keys.size() << " keys."
+                << std::endl;
+    }
+    workload->SetCustomLoadDataset(std::move(keys));
+  }
+
+  if (!gflags::GetCommandLineFlagInfoOrDie("record_size_bytes").is_default) {
+    std::cerr
+        << "WARNING: The --record_size_bytes command line option is ignored in "
+           "run_custom. Please set the record size in the workload "
+           "configuration file instead."
+        << std::endl;
+  }
+  // The record size is specified in the workload configuration file. We need
+  // to keep this command line option to support the other benchmark drivers
+  // which use this option.
+  FLAGS_record_size_bytes = workload->GetRecordSizeBytes();
 
   if (!fs::exists(FLAGS_db_path)) {
     fs::create_directory(FLAGS_db_path);
