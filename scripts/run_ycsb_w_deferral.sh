@@ -1,7 +1,7 @@
 #! /bin/bash
 
 ########## Experiment Configuration ##########
-WORKLOAD_PATH="/home/markakis/LearnedLSM/learnedlsm/bench/workloads"
+WORKLOAD_PATH="/home/markakis/LearnedLSM/workloads"
 
 declare -a WORKLOAD_PAIRS=(
   "-load_path=${WORKLOAD_PATH}/ycsb-20M-load -workload_path=${WORKLOAD_PATH}/ycsb-20M-20Mop-wa"
@@ -9,27 +9,28 @@ declare -a WORKLOAD_PAIRS=(
 )
 declare -a THRES=(
   "1"
-  "100"
-  "200"
-  "400"
-  "800"
   "1600"
   "3200"
   "6400"
+  "12800"
+  "25600"
+  "1 -deferral_autotuning=true"
+ # "3200"
+ # "6400"
 )
 
 declare -a DEFERS=(
   "1"
-  "2"
+ # "2"
 )
 
 declare -a THREADS=(
-  "1"
+  #"1"
   "4"
 )
 
 declare -a DIRECT_IO=(
-  "false"
+ # "false"
   "true"
 )
 
@@ -49,10 +50,10 @@ for workload in "${WORKLOAD_PAIRS[@]}"; do
     for direct in "${DIRECT_IO[@]}"; do
       for threshold in "${THRES[@]}"; do
         for deferrals in "${DEFERS[@]}"; do
-          name="${workload} -threads=${threads} -use_direct_io=${direct} -io_threshold=${threshold} -max_deferrals=${deferrals}"
+          name="${workload} -threads=${threads} -use_direct_io=${direct} -io_min_batch_size=${threshold} -max_deferrals=${deferrals}"
           echo "[$(date +"%D %T")] Running $name"
           rm -rf test
-          ~/LearnedLSM/learnedlsm/build/release/bench/ycsb --db_path=test -db=llsm -cache_size_mib=256 -bg_threads=16 $name -print_llsm_stats=true >> $LOG_FILE 2>> $STATS_FILE		
+          ~/LearnedLSM/learnedlsm/build/release/bench/ycsb --db_path=test -db=llsm -cache_size_mib=256 -bg_threads=16 $name >> $LOG_FILE 2>> $STATS_FILE		
         done 
       done
     done

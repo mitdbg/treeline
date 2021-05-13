@@ -17,7 +17,9 @@ namespace llsm {
 // `options.use_direct_io` is true.
 BufferManager::BufferManager(const BufMgrOptions& options,
                              std::filesystem::path db_path)
-    : buffer_manager_size_(options.buffer_pool_size / Page::kSize) {
+    : buffer_manager_size_(options.buffer_pool_size / Page::kSize),
+      num_misses_(0),
+      cumulative_misses_time_ns_(0) {
   pages_cache_ = PageMemoryAllocator::Allocate(buffer_manager_size_);
 
   page_to_frame_map_ =
@@ -63,6 +65,8 @@ BufferFrame& BufferManager::FixPage(const PhysicalPageId page_id,
     UnlockEvictionMutex();
     UnlockMapMutex();
 
+    auto start = std::chrono::steady_clock::now();
+
     frame = GetFreeFrame();
 
     if (frame == nullptr) {  // Must evict something to make space.
@@ -94,6 +98,10 @@ BufferFrame& BufferManager::FixPage(const PhysicalPageId page_id,
     LockMapMutex();
     page_to_frame_map_->UnsafeInsert(page_id, frame);
     UnlockMapMutex();
+
+    cumulative_misses_time_ns_ +=
+        (std::chrono::steady_clock::now() - start).count();
+    ++num_misses_;
   }
 
   frame->Lock(exclusive);
@@ -146,6 +154,15 @@ bool BufferManager::Contains(const PhysicalPageId page_id) {
   UnlockMapMutex();
 
   return return_val;
+}
+
+// Provides the average latency of a buffer manager miss, in nanoseconds.
+std::chrono::nanoseconds BufferManager::BufMgrMissLatency() const {
+  if (num_misses_ == 0) {
+    return std::chrono::nanoseconds(0);
+  } else {
+    return std::chrono::nanoseconds(cumulative_misses_time_ns_ / num_misses_);
+  }
 }
 
 // Writes the page held by `frame` to disk.

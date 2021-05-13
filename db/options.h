@@ -25,9 +25,9 @@ struct FlushOptions {
   // Disable I/O deferral during a MemTable flush.
   bool disable_deferred_io = false;
 
-  // The minimum number of memtable entries associated with a certain page
-  // necessary to actually move the entries to disk in this flush.
-  size_t deferred_io_min_entries = 1;
+  // The minimum size in bytes of a memtable batch associated with a certain page
+  // necessary to actually copy the entries out during this memtable flush.
+  size_t deferred_io_batch_size = 1;
 
   // The maximum number of prior deferrals that this flush will accomodate (i.e.
   // all pages deferred at least that many times will not be deferred again in

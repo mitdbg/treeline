@@ -85,12 +85,14 @@ DEFINE_uint32(llsm_page_fill_pct, 50,
 DEFINE_validator(llsm_page_fill_pct, &ValidateLLSMPageFillPct);
 
 DEFINE_uint64(
-    io_threshold, 1,
-    "The minimum number of operations to a given page that need to be "
+    io_min_batch_size, 1,
+    "The minimum size of a batch for a given page (in bytes) that must be"
     "encoutered while flushing a memtable in order to trigger a flush");
 DEFINE_uint64(max_deferrals, 0,
               "The maximum number of times that a given operation can be "
               "deferred to a future flush.");
+DEFINE_bool(deferral_autotuning, false,
+             "Whether or not to auto-tune deferral parameters");
 
 DEFINE_bool(bypass_wal, true,
             "If true, all writes will bypass the write-ahead log.");
@@ -153,9 +155,10 @@ llsm::Options BuildLLSMOptions() {
   options.key_hints.record_size = FLAGS_record_size_bytes;
   options.key_hints.page_fill_pct = FLAGS_llsm_page_fill_pct;
   options.pin_threads = true;
-  options.deferred_io_min_entries = FLAGS_io_threshold;
+  options.deferred_io_batch_size = FLAGS_io_min_batch_size;
   options.deferred_io_max_deferrals = FLAGS_max_deferrals;
   options.use_alex = FLAGS_use_alex;
+  options.deferral_autotuning = FLAGS_deferral_autotuning;
   return options;
 }
 

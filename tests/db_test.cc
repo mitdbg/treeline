@@ -261,7 +261,7 @@ TEST_F(DBTest, DeferByEntries) {
   options.key_hints.num_keys = 10;
   options.key_hints.record_size = 16 * 1024;  // 4 per page
   options.key_hints.page_fill_pct = 100;
-  options.deferred_io_min_entries = 2;
+  options.deferred_io_batch_size = 40;
   options.deferred_io_max_deferrals = 4;
   options.buffer_pool_size = llsm::Page::kSize;
   auto status = llsm::DB::Open(options, kDBDir, &db);
@@ -342,7 +342,7 @@ TEST_F(DBTest, DeferByAttempts) {
   options.key_hints.num_keys = 10;
   options.key_hints.record_size = 16 * 1024;  // 4 per page
   options.key_hints.page_fill_pct = 100;
-  options.deferred_io_min_entries = 2;
+  options.deferred_io_batch_size = 2 * options.key_hints.record_size;
   options.deferred_io_max_deferrals = 1;
   options.buffer_pool_size = llsm::Page::kSize;
   auto status = llsm::DB::Open(options, kDBDir, &db);

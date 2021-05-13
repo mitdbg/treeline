@@ -109,6 +109,7 @@ Status DBImpl::Initialize() {
             ? 0
             : options_.deferred_io_max_deferrals - 1;
     mtable_ = std::make_shared<MemTable>(moptions);
+    stats_.last_memtable_creation_ = std::chrono::steady_clock::now();
 
     // Finish initializing the DB based on whether we are creating a completely
     // new DB or if we are opening an existing DB.
@@ -447,15 +448,55 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
   FlushOptions foptions;
   foptions.disable_deferred_io = disable_deferred_io;
   foptions.deferred_io_max_deferrals = options_.deferred_io_max_deferrals;
-  foptions.deferred_io_min_entries = options_.deferred_io_min_entries;
+  foptions.deferred_io_batch_size = options_.deferred_io_batch_size;
   const MemTableOptions moptions = mtable_->GetOptions();
 
   // Modify options based on statistics
-  if (options_.adaptive_memtables) {
-    // TODO
-  }
+  if (options_.deferral_autotuning) {
+    const auto memtable_fill_duration_ns =
+        std::chrono::steady_clock::now() - stats_.last_memtable_creation_;
+    const auto bufmgr_miss_latency_ns = buf_mgr_->BufMgrMissLatency();
 
-  stats_.Clear();
+    // clang-format off
+    //
+    // The cost model here is based on the observation that the optimal batch
+    // size threshold is that, for which we are indifferent between the cost of
+    // incurring a buffer manager miss and the cost of deferring.
+    //
+    // The cost of a buffer manager miss (measured in ns) is taken to be the
+    // `bufmgr_miss_latency_ns`, multiplied by the write amplification between
+    // the batch size we are actually writing and the size of the page we need
+    // to bring in (since, to bring it in, we must evict another page):
+    //
+    //                                               Page::kSize
+    //     cost_of_miss = bufmgr_miss_latency_ns * ---------------
+    //                                               batch_size
+    //
+    // The cost of deferring (measured in ns) is taken to be the "lifetime" of
+    // the active memtable that we are expending by re-inserting the deferred
+    // batch, i.e. how much longer the active memtable would go before filling
+    // up if we don't re-insert the deferred batch:
+    //
+    //                                                             batch_size
+    //     cost_of_deferral = memtable_fill_duration_ns * ---------------------------- 
+    //                                                      memtable_flush_threshold
+    //
+    // Therefore, at the point where we become indifferent between the two costs
+    // we have:
+    //                    _____________________________________________________________________
+    //                   /  bufmgr_miss_latency_ns * Page::kSize * memtable_flush_threshold 
+    //     batch_size = / -------------------------------------------------------------------
+    //                 V                       memtable_fill_duration_ns
+    //
+    //
+    // clang-format on
+
+    foptions.deferred_io_batch_size =
+        options_.batch_scaling_factor *
+        sqrt(Page::kSize * options_.memtable_flush_threshold *
+             bufmgr_miss_latency_ns.count() /
+             memtable_fill_duration_ns.count());
+  }
 
   // Mark the active memtable as immutable and create a new active memtable.
   {
@@ -463,6 +504,8 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
     im_mtable_ = std::move(mtable_);
     mtable_ = std::make_shared<MemTable>(moptions);
   }
+
+  stats_.Clear();
 
   // Increment the log version and get the log version associated with the
   // to-be-flushed memtable.
@@ -477,6 +520,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
     std::future<OverflowChain> bf_future;
     std::vector<std::tuple<const Slice, const Slice, const format::WriteType>>
         records_for_page;
+    size_t bytes_for_page = 0;
 
     // Iterate through the immutable memtable, aggregate entries into pages,
     // and dispatch page updates.
@@ -492,7 +536,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
       // return to it.
       if (page_id != current_page) {
         if (current_page.IsValid()) {
-          if (ShouldFlush(foptions, records_for_page.size(),
+          if (ShouldFlush(foptions, bytes_for_page,
                           current_page_deferral_count)) {
             // Submit flush job to workers - this is not the "first" page.
             page_write_futures.emplace_back(workers_->Submit(
@@ -503,6 +547,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
                               current_page_deferral_count);
                 }));
             records_for_page.clear();
+            bytes_for_page = 0;
           } else {
             // Submit re-insertion job to workers.
             page_write_futures.emplace_back(workers_->Submit(
@@ -512,6 +557,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
                                     current_page_deferral_count);
                 }));
             records_for_page.clear();
+            bytes_for_page = 0;
           }
         }
         current_page = page_id;
@@ -520,6 +566,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
       }
       records_for_page.emplace_back(
           std::make_tuple(it.key(), it.value(), it.type()));
+      bytes_for_page += it.key().size() + it.value().size();
 
       if (it.seq_num() < foptions.deferred_io_max_deferrals &&
           (it.seq_num() + 1) > current_page_deferral_count)
@@ -527,8 +574,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
 
       // As soon as we are sure we will flush to this page, fix it in the
       // background.
-      if (ShouldFlush(foptions, records_for_page.size(),
-                      current_page_deferral_count) &&
+      if (ShouldFlush(foptions, bytes_for_page, current_page_deferral_count) &&
           !current_page_dispatched_fixer) {
         bf_future = workers_->Submit([this, current_page]() mutable {
           return FixOverflowChain(current_page, /*exclusive=*/true,
@@ -539,8 +585,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
     }
 
     // Flush entries in the last page.
-    if (ShouldFlush(foptions, records_for_page.size(),
-                    current_page_deferral_count)) {
+    if (ShouldFlush(foptions, bytes_for_page, current_page_deferral_count)) {
       assert(current_page.IsValid());
       page_write_futures.emplace_back(workers_->Submit(
           [this, records_for_page = std::move(records_for_page),
@@ -550,6 +595,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
                         current_page_deferral_count);
           }));
       records_for_page.clear();
+      bytes_for_page = 0;
     } else {
       page_write_futures.emplace_back(workers_->Submit(
           [this, records_for_page = std::move(records_for_page),
@@ -557,6 +603,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
             ReinsertionWorker(records_for_page, current_page_deferral_count);
           }));
       records_for_page.clear();
+      bytes_for_page = 0;
     }
 
     // Wait for all page updates to complete.
@@ -594,10 +641,10 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
   // writers).
 }
 
-bool DBImpl::ShouldFlush(const FlushOptions& foptions, size_t num_records,
+bool DBImpl::ShouldFlush(const FlushOptions& foptions, size_t batch_size,
                          size_t num_deferrals) const {
   return (foptions.disable_deferred_io ||
-          (num_records >= foptions.deferred_io_min_entries) ||
+          (batch_size >= foptions.deferred_io_batch_size) ||
           (num_deferrals >= foptions.deferred_io_max_deferrals));
 }
 

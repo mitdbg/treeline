@@ -71,6 +71,9 @@ class BufferManager {
   // Provides access to the underlying FileManager
   FileManager* GetFileManager() const { return file_manager_.get(); }
 
+  // Provides the average latency of a buffer manager miss, in nanoseconds.
+  std::chrono::nanoseconds BufMgrMissLatency() const;
+
  private:
   // Writes the page held by `frame` to disk.
   void WritePageOut(BufferFrame* frame) const;
@@ -116,6 +119,11 @@ class BufferManager {
 
   // Pointer to an interface between the BufferManager and pages on disk.
   std::unique_ptr<FileManager> file_manager_;
+
+  // Values used for measuring bufmgr miss delay
+  std::atomic<int64_t> num_misses_;
+  std::atomic<int64_t> cumulative_misses_time_ns_;  // Only store ticks so that
+                                                    // += operator is defined.
 };
 
 }  // namespace llsm

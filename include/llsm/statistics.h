@@ -24,6 +24,8 @@ class Statistics {
     user_reads_bufmgr_hits_records_ = 0;
     user_reads_single_bufmgr_misses_records_ = 0;
     user_reads_multi_bufmgr_misses_records_ = 0;
+
+    last_memtable_creation_ = std::chrono::steady_clock::now();
   }
 
   friend std::ostream& operator<<(std::ostream& output,
@@ -55,6 +57,12 @@ class Statistics {
   std::atomic<size_t> user_reads_bufmgr_hits_records_;
   std::atomic<size_t> user_reads_single_bufmgr_misses_records_;
   std::atomic<size_t> user_reads_multi_bufmgr_misses_records_;
+
+  // Maintains the timestamp of the last memtable creation, to help estimate the
+  // frequency of user inserts.
+  //
+  // Is only set within a critical section, so it doesn't need to be atomic.
+  std::chrono::time_point<std::chrono::steady_clock> last_memtable_creation_;
 };
 
 }  // namespace llsm

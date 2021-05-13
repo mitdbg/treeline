@@ -77,7 +77,7 @@ class DBImpl : public DB {
   // REQUIRES: `mutex_` is held.
   bool FlushInProgress(const std::unique_lock<std::mutex>& lock) const;
 
-  bool ShouldFlush(const FlushOptions& foptions, size_t num_records,
+  bool ShouldFlush(const FlushOptions& foptions, size_t batch_size,
                    size_t num_deferrals) const;
 
   // Code run by a worker thread to write out `records` to the page held by

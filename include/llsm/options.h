@@ -53,13 +53,13 @@ struct Options {
   // storage, in bytes.
   size_t memtable_flush_threshold = 64 * 1024 * 1024;
 
-  // The minimum number of memtable entries associated with a certain page
+  // The minimum size in bytes of a memtable batch associated with a certain page
   // necessary to actually copy the entries out during a memtable flush.
-  size_t deferred_io_min_entries = 1;
+  size_t deferred_io_batch_size = 1;
 
   // The maximum number of times that we are allowed to not copy some page out
   // during a memtable flush.
-  uint64_t deferred_io_max_deferrals = 0;
+  uint64_t deferred_io_max_deferrals = 1;
 
   // Currently only used when creating a new database. When reopening an
   // existing database, these values are ignored.
@@ -74,9 +74,11 @@ struct Options {
   // `background_threads - 1`.
   bool pin_threads = true;
 
-  // If true, LLSM will try to optimize the MemTableOptions each time it
-  // allocates a new memtable, as well as the FlushOptions for every flush.
-  bool adaptive_memtables = false;
+  // If true, LLSM will try to optimize the FlushOptions for every flush.
+  // In this case, `batch_scaling_factor` will be used to calculate optimal
+  // deferred I/O parameters.
+  bool deferral_autotuning = false;
+  double batch_scaling_factor = 1;
 
   // If false, LLSM will use a BTreeModel instead of an ALEXModel.
   bool use_alex = true;
