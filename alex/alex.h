@@ -1414,7 +1414,12 @@ class Alex {
     // Modify the root node appropriately
     int new_nodes_start;  // index of first pointer to a new node
     int new_nodes_end;    // exclusive
-    if (root->num_children_ * expansion_factor <= derived_params_.max_fanout) {
+
+    // Patch (geoffxy): Without these casts, this check can overflow a signed
+    // int when `num_children_` and `expansion_factor` are sufficiently large
+    // (e.g., `num_children = 65536` and `expansion_factor = 32768`).
+    if (static_cast<size_t>(root->num_children_) * expansion_factor <=
+          static_cast<size_t>(derived_params_.max_fanout)) {
       // Expand root node
       stats_.num_model_node_expansions++;
       stats_.num_model_node_expansion_pointers += root->num_children_;
@@ -1472,8 +1477,18 @@ class Alex {
       in_bounds_new_nodes_start =
           std::max(new_nodes_start, root->model_.predict(new_domain_min));
     } else {
-      in_bounds_new_nodes_end =
-          std::min(new_nodes_end, root->model_.predict(new_domain_max) + 1);
+      // Patch (geoffxy): The model's prediction may overflow a signed int. It
+      // seems like `in_bounds_new_nodes_end` should never be negative.
+      //
+      // Original code:
+      // in_bounds_new_nodes_end =
+      //     std::min(new_nodes_end, root->model_.predict(new_domain_max) + 1);
+      const int prediction = root->model_.predict(new_domain_max);
+      // Avoid running this code if `prediction` or `prediction + 1` are
+      // negative values.
+      if (prediction + 1 > 0) {
+        in_bounds_new_nodes_end = std::min(new_nodes_end, prediction + 1);
+      }
     }
 
     // Fill newly created child pointers of the root node with new data nodes.

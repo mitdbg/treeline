@@ -30,8 +30,11 @@ namespace llsm {
 //
 Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
                                        uint32_t page_fill_pct) {
-  OverflowChain chain = FixOverflowChain(page_id, /* exclusive = */ true,
-                                         /* unlock_before_returning = */ false);
+  OverflowChain chain = nullptr;
+  while (chain == nullptr) {
+    chain = FixOverflowChain(page_id, /* exclusive = */ true,
+                             /* unlock_before_returning = */ false);
+  }
 
   // Avoid accidental extra work if we scheduled the reorganization twice.
   if (chain->size() == 1) {
