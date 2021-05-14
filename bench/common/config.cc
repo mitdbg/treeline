@@ -1,6 +1,10 @@
 #include "config.h"
 
+#include <chrono>
+#include <ctime>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <unordered_map>
 
 #include "db/page.h"
@@ -55,7 +59,8 @@ bool ValidateLLSMPageFillPct(const char* flagname, uint32_t pct) {
 DEFINE_string(db, "all", "Which database(s) to use {all, rocksdb, llsm}.");
 DEFINE_validator(db, &ValidateDB);
 
-DEFINE_string(db_path, "", "The path where the database(s) should be stored.");
+DEFINE_string(db_path, llsm::bench::GetDefaultDBPath(),
+              "The path where the database(s) should be stored.");
 DEFINE_validator(db_path, &EnsureNonEmpty);
 
 DEFINE_uint32(trials, 1, "The number of times to repeat the experiment.");
@@ -92,7 +97,7 @@ DEFINE_uint64(max_deferrals, 0,
               "The maximum number of times that a given operation can be "
               "deferred to a future flush.");
 DEFINE_bool(deferral_autotuning, false,
-             "Whether or not to auto-tune deferral parameters");
+            "Whether or not to auto-tune deferral parameters");
 
 DEFINE_bool(bypass_wal, true,
             "If true, all writes will bypass the write-ahead log.");
@@ -161,6 +166,19 @@ llsm::Options BuildLLSMOptions() {
   options.deferral_autotuning = FLAGS_deferral_autotuning;
   return options;
 }
+
+std::string AppendTimestamp(const std::string& prefix) {
+  std::stringstream output;
+  output << prefix << "+";
+  const auto now = std::chrono::system_clock::now();
+  const auto now_time_t = std::chrono::system_clock::to_time_t(now);
+  output << std::put_time(std::localtime(&now_time_t), "%Y-%m-%d+%H-%M-%S");
+  return output.str();
+}
+
+std::string GetDefaultOutputPath() { return AppendTimestamp("llsm-out"); }
+
+std::string GetDefaultDBPath() { return AppendTimestamp("llsm-bench-db"); }
 
 }  // namespace bench
 }  // namespace llsm

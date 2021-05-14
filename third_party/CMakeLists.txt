@@ -63,7 +63,7 @@ if(LLSM_BUILD_BENCHMARKS)
   FetchContent_Declare(
     ycsbr
     GIT_REPOSITORY git@ssh.dev.azure.com:v3/msr-dsail/LearnedLSM/ycsb-runner
-    GIT_TAG        v3.1.0
+    GIT_TAG        v3.2.0
   )
   FetchContent_MakeAvailable(ycsbr)
 endif()

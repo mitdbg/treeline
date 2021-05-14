@@ -74,9 +74,9 @@ run_experiment_group(
   ],
 )
 
-# Runs YCSB A on a database that was preloaded with 100 million 16 byte
-# records. Deferred I/O is turned on with a threshold of 400 with at most 2
-# deferrals per record.
+# Runs YCSB A on a database that was preloaded with 100 million 16 byte records.
+# Deferred I/O is turned on with a threshold of 400 records (6400 bytes) with at
+# most 2 deferrals per record.
 run_experiment(
   name="ycsb_a_16_defer-llsm",
   run="./run_ycsb.sh llsm 16-100M",
@@ -84,7 +84,8 @@ run_experiment(
     **YCSB_OPTIONS,
     "record_size_bytes": 16,
     "cache_size_mib": CACHE_SIZE_MIB_16,
-    "io_threshold": 400,
+    # 400 records x 16 bytes
+    "io_min_batch_size": 6400,
     "max_deferrals": 2,
     "workload_path": "'$YCSB_TRACE_PATH/ycsb-100M-10Mop-wa'",
   },
@@ -93,8 +94,8 @@ run_experiment(
   ],
 )
 
-# Runs YCSB A on a database that was preloaded with 20 million 512 byte
-# records. Deferred I/O is turned on with a threshold of 100 with at most 1
+# Runs YCSB A on a database that was preloaded with 20 million 512 byte records.
+# Deferred I/O is turned on with a threshold of 100 (51200 bytes) with at most 1
 # deferral per record.
 run_experiment(
   name="ycsb_a_512_defer-llsm",
@@ -103,7 +104,8 @@ run_experiment(
     **YCSB_OPTIONS,
     "record_size_bytes": 512,
     "cache_size_mib": CACHE_SIZE_MIB_512,
-    "io_threshold": 100,
+    # 100 records x 512 bytes
+    "io_min_batch_size": 51200,
     "max_deferrals": 1,
     "workload_path": "'$YCSB_TRACE_PATH/ycsb-20M-10Mop-wa'",
   },

@@ -87,5 +87,19 @@ rocksdb::Options BuildRocksDBOptions();
 // specified by the flags set above.
 llsm::Options BuildLLSMOptions();
 
+// Appends a human-readable timestamp to the provided `prefix` string.
+// e.g.: AppendTimestamp("test") -> "test+2021-05-10+11-10-12".
+// The first set of three numbers represent the date (YYYY-MM-DD). The second
+// set of three numbers represent the local time (HH-MM-SS).
+std::string AppendTimestamp(const std::string& prefix);
+
+// Gets a default value for the --output_path flag. The returned value has a
+// timestamp appended.
+std::string GetDefaultOutputPath();
+
+// Gets a default value for the --db_path flag. The returned value has a
+// timestamp appended.
+std::string GetDefaultDBPath();
+
 }  // namespace bench
 }  // namespace llsm

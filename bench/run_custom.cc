@@ -21,6 +21,12 @@ DEFINE_bool(
     "If set to true, this workload runner will skip the initial data load.");
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
 
+DEFINE_string(output_path, llsm::bench::GetDefaultOutputPath(),
+              "A path to where throughput samples should be written.");
+DEFINE_uint64(throughput_sample_period, 0,
+              "How frequently to sample the achieved throughput. Set to 0 to "
+              "disable sampling.");
+
 template <class DatabaseInterface>
 ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
   ycsbr::Session<DatabaseInterface> session(FLAGS_threads);
@@ -49,6 +55,9 @@ ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
 
   ycsbr::RunOptions options;
   options.latency_sample_period = FLAGS_latency_sample_period;
+  options.throughput_sample_period = FLAGS_throughput_sample_period;
+  options.output_dir = std::filesystem::path(FLAGS_output_path);
+  options.throughput_output_file_prefix = "throughput-";
   return session.RunWorkload(workload, options);
 }
 
@@ -97,6 +106,10 @@ int main(int argc, char* argv[]) {
 
   if (!fs::exists(FLAGS_db_path)) {
     fs::create_directory(FLAGS_db_path);
+  }
+  if (FLAGS_throughput_sample_period > 0 && !fs::exists(FLAGS_output_path)) {
+    // Only create the output directory if we will take throughput samples.
+    fs::create_directory(FLAGS_output_path);
   }
 
   std::cout << "db,";

@@ -13,12 +13,14 @@ COMMON_OPTIONS = {
 DEFER_OPTIONS = [
   {
     "record_size_bytes": 16,
-    "io_threshold": 400,
+    # 400 records x 16 bytes
+    "io_min_batch_size": 6400,
     "max_deferrals": 2,
   },
   {
     "record_size_bytes": 512,
-    "io_threshold": 100,
+    # 100 records x 512 bytes
+    "io_min_batch_size": 51200,
     "max_deferrals": 1,
   },
 ]
