@@ -86,6 +86,9 @@ struct Options {
   // The minimum length of an overflow chain for which reorganization is
   // triggered.
   size_t reorg_length = 5;
+
+  // If true, LLSM will print messages to a debug log.
+  bool enable_debug_log = true;
 };
 
 struct ReadOptions {};

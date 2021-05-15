@@ -7,6 +7,7 @@
 #include <limits>
 
 #include "bufmgr/page_memory_allocator.h"
+#include "db/logger.h"
 #include "db/manifest.h"
 #include "db/page.h"
 #include "model/alex_model.h"
@@ -124,6 +125,9 @@ Status DBImpl::InitializeNewDB() {
   try {
     // No error if the directory already exists.
     fs::create_directory(db_path_);
+    if (options_.enable_debug_log) {
+      Logger::Initialize(db_path_);
+    }
     PageMemoryAllocator::SetAlignmentFor(db_path_);
 
     const auto values = key_utils::CreateValues<uint64_t>(options_.key_hints);
@@ -137,6 +141,8 @@ Status DBImpl::InitializeNewDB() {
 
     model_->PreallocateAndInitialize(buf_mgr_, records,
                                      options_.key_hints.records_per_page());
+    Logger::Log("Created new ALEX. Total size: %llu bytes. Indexed pages: %llu",
+                model_->GetSizeBytes(), model_->GetNumPages());
 
     // Write the DB metadata to persistent storage.
     const Status s = Manifest::Builder()
@@ -154,6 +160,9 @@ Status DBImpl::InitializeNewDB() {
 }
 
 Status DBImpl::InitializeExistingDB() {
+  if (options_.enable_debug_log) {
+    Logger::Initialize(db_path_);
+  }
   PageMemoryAllocator::SetAlignmentFor(db_path_);
 
   Status s;
@@ -167,6 +176,8 @@ Status DBImpl::InitializeExistingDB() {
   model_ = std::make_unique<ALEXModel>();
 
   model_->ScanFilesAndInitialize(buf_mgr_);
+  Logger::Log("Rebuilt ALEX. Total size: %llu bytes. Indexed pages: %llu",
+              model_->GetSizeBytes(), model_->GetNumPages());
 
   // Before we can accept requests, we need to replay the writes (if any) that
   // exist in the write-ahead log.
@@ -249,6 +260,8 @@ DBImpl::~DBImpl() {
     std::unique_lock<std::mutex> lock(mutex_);
     wal_.DiscardAllForCleanShutdown();
   }
+
+  Logger::Shutdown();
 }
 
 // Reading a value consists of up to four steps:
@@ -496,6 +509,9 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
         sqrt(Page::kSize * options_.memtable_flush_threshold *
              bufmgr_miss_latency_ns.count() /
              memtable_fill_duration_ns.count());
+
+    Logger::Log("Autotuned deferred I/O batch size: %llu bytes",
+                foptions.deferred_io_batch_size);
   }
 
   // Mark the active memtable as immutable and create a new active memtable.
