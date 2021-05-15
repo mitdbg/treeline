@@ -43,6 +43,14 @@ Status ValidateOptions(const Options& options) {
   if (options.reorg_length < 2) {
     return Status::InvalidArgument("Options::reorg_length must be at least 2");
   }
+  size_t min_memory_budget = Page::kSize * (options.max_reorg_fanout + 2);
+  size_t given_memory_budget =
+      options.memtable_flush_threshold * 2 + options.buffer_pool_size;
+  if (given_memory_budget < min_memory_budget) {
+    return Status::InvalidArgument(
+        "Total memory budget must be at least Page::kSize * "
+        "(options.max_reorg_fanout + 2)");
+  }
 
   return Status::OK();
 }
@@ -72,7 +80,9 @@ DBImpl::DBImpl(const Options options, const fs::path db_path)
       mtable_(nullptr),
       im_mtable_(nullptr),
       all_memtables_full_(false),
-      wal_(db_path_ / kWALDirName) {}
+      wal_(db_path_ / kWALDirName),
+      mem_budget_memtables_(2 * options_.memtable_flush_threshold),
+      mem_budget_(options_.buffer_pool_size + mem_budget_memtables_) {}
 
 Status DBImpl::Initialize() {
   const Status validate = ValidateOptions(options_);
@@ -104,7 +114,7 @@ Status DBImpl::Initialize() {
 
     // Set up the active memtable.
     MemTableOptions moptions;
-    moptions.flush_threshold = options_.memtable_flush_threshold;
+    moptions.flush_threshold = mem_budget_memtables_ >> 1;
     moptions.deferral_granularity =
         (options_.deferred_io_max_deferrals == 0)
             ? 0
@@ -462,47 +472,45 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
   foptions.disable_deferred_io = disable_deferred_io;
   foptions.deferred_io_max_deferrals = options_.deferred_io_max_deferrals;
   foptions.deferred_io_batch_size = options_.deferred_io_batch_size;
-  const MemTableOptions moptions = mtable_->GetOptions();
 
-  // Modify options based on statistics
+  // Autotune deferral, if appropriate.
+  //
+  // clang-format off
+  //
+  // The cost model here is based on the observation that the optimal batch
+  // size threshold is that, for which we are indifferent between the cost of
+  // incurring a buffer manager miss and the cost of deferring.
+  //
+  // The cost of a buffer manager miss (measured in ns) is taken to be the
+  // `bufmgr_miss_latency_ns`, multiplied by the write amplification between
+  // the batch size we are actually writing and the size of the page we need
+  // to bring in (since, to bring it in, we must evict another page):
+  //
+  //                                               Page::kSize
+  //     cost_of_miss = bufmgr_miss_latency_ns * ---------------
+  //                                               batch_size
+  //
+  // The cost of deferring (measured in ns) is taken to be the "lifetime" of
+  // the active memtable that we are expending by re-inserting the deferred
+  // batch, i.e. how much longer the active memtable would go before filling
+  // up if we don't re-insert the deferred batch:
+  //
+  //                                                             batch_size
+  //     cost_of_deferral = memtable_fill_duration_ns * ---------------------------- 
+  //                                                      memtable_flush_threshold
+  //
+  // Therefore, at the point where we become indifferent between the two costs
+  // we have:
+  //                    _____________________________________________________________________
+  //                   /  bufmgr_miss_latency_ns * Page::kSize * memtable_flush_threshold 
+  //     batch_size = / -------------------------------------------------------------------
+  //                 V                       memtable_fill_duration_ns
+  //
+  // clang-format on
   if (options_.deferral_autotuning) {
     const auto memtable_fill_duration_ns =
         std::chrono::steady_clock::now() - stats_.last_memtable_creation_;
     const auto bufmgr_miss_latency_ns = buf_mgr_->BufMgrMissLatency();
-
-    // clang-format off
-    //
-    // The cost model here is based on the observation that the optimal batch
-    // size threshold is that, for which we are indifferent between the cost of
-    // incurring a buffer manager miss and the cost of deferring.
-    //
-    // The cost of a buffer manager miss (measured in ns) is taken to be the
-    // `bufmgr_miss_latency_ns`, multiplied by the write amplification between
-    // the batch size we are actually writing and the size of the page we need
-    // to bring in (since, to bring it in, we must evict another page):
-    //
-    //                                               Page::kSize
-    //     cost_of_miss = bufmgr_miss_latency_ns * ---------------
-    //                                               batch_size
-    //
-    // The cost of deferring (measured in ns) is taken to be the "lifetime" of
-    // the active memtable that we are expending by re-inserting the deferred
-    // batch, i.e. how much longer the active memtable would go before filling
-    // up if we don't re-insert the deferred batch:
-    //
-    //                                                             batch_size
-    //     cost_of_deferral = memtable_fill_duration_ns * ---------------------------- 
-    //                                                      memtable_flush_threshold
-    //
-    // Therefore, at the point where we become indifferent between the two costs
-    // we have:
-    //                    _____________________________________________________________________
-    //                   /  bufmgr_miss_latency_ns * Page::kSize * memtable_flush_threshold 
-    //     batch_size = / -------------------------------------------------------------------
-    //                 V                       memtable_fill_duration_ns
-    //
-    //
-    // clang-format on
 
     foptions.deferred_io_batch_size =
         options_.batch_scaling_factor *
@@ -514,7 +522,86 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
                 foptions.deferred_io_batch_size);
   }
 
+  // Autotune memory budget, if appropriate.
+  //
+  // Note that this type of autotuning is more computationally expensive
+  // compared to deferral autotuning, because modifying the buffer pool size
+  // involves dynamic memory allocation and/or multiple page evictions and
+  // possibly flushes.
+  //
+  // As such, instead of adopting a fine-grained autotuning approach that could
+  // require frequent adjustments, possibly in response to insignificant shifts
+  // in the request distribution, we opt for autotuning based on a few broad
+  // "types" of workloads, as explained below.
+  //
+  // In the table below,
+  //   -- "Read %" refers to the number of user reads since the previous
+  //   memtable flush, as a percentage of total user reads/writes since the
+  //   previous memtable flush. TODO: add range scans into the mix.
+  //   -- "Memtable %" refers to the memtable flush threshold as a percentage of
+  //   the total memory budget. Remember that we need space for two memtables.
+  //   -- "Buffer pool %" refers to the buffer pool size as a percentage of the
+  //   total memory budget.
+  //
+  // We also have the following lower bounds on the sizes:
+  //   -- The buffer pool must be at least as large as the maximum number of
+  //   pages produced by reorganization, since these pages are all fixed
+  //   concurrently.
+  //   -- The memtable can be arbitrarily sized, but we set a lower bound at the
+  //   size of 1 page for convention.
+  //
+  // clang-format off
+  //
+  //   Type name   | Read % | Memtable %                      | Buffer pool %
+  // ----------------------------------------------------------------------------------------
+  //   Read-only   | >98    | Smallest                        | The remaining memory budget
+  //   Read-heavy  | 80-98  | 15                              | 70
+  //   Write-heavy | 20-80  | 35                              | 30
+  //   Write-only  | <20    | The remaining memory budget / 2 | Smallest
+  //
+  // clang-format on
+  //
+  if (options_.memory_autotuning) {
+    // Find read percentage.
+    size_t user_total_reads_records =
+        stats_.user_reads_memtable_hits_records_ +
+        stats_.user_reads_bufmgr_hits_records_ +
+        stats_.user_reads_single_bufmgr_misses_records_ +
+        stats_.user_reads_multi_bufmgr_misses_records_;
+    double read_percentage =
+        100.0 * user_total_reads_records /
+        (user_total_reads_records + stats_.user_writes_records_);
+
+    // Calculate the ideal buffer pool size.
+    size_t buffer_pool_bytes_wanted;
+    const size_t buffer_pool_min_size_bytes =
+        Page::kSize * options_.max_reorg_fanout;
+
+    if (read_percentage > 98) {  // Read-only
+      buffer_pool_bytes_wanted =
+          mem_budget_ - 2 * (/* target memtable size = */ Page::kSize);
+    } else if (read_percentage > 80) {  // Read-heavy
+      buffer_pool_bytes_wanted = mem_budget_ * 70 / 100;
+    } else if (read_percentage > 20) {  // Write-heavy
+      buffer_pool_bytes_wanted = mem_budget_ * 30 / 100;
+    } else {  // Write-only
+      buffer_pool_bytes_wanted = buffer_pool_min_size_bytes;
+    }
+
+    // Adjust for lower bound and for pages actually allocated.
+    buffer_pool_bytes_wanted =
+        std::max(buffer_pool_bytes_wanted, buffer_pool_min_size_bytes);
+    int64_t buffer_pool_pages_added =
+        buf_mgr_->AdjustNumPages(buffer_pool_bytes_wanted / Page::kSize);
+
+    // Adjust memtable size accordingly.
+    mem_budget_memtables_ -= buffer_pool_pages_added * Page::kSize;
+    assert(mem_budget_memtables_ < mem_budget_);
+  }
+
   // Mark the active memtable as immutable and create a new active memtable.
+  MemTableOptions moptions;
+  moptions.flush_threshold = mem_budget_memtables_ >> 1;
   {
     std::unique_lock<std::mutex> mtable_lock(mtable_mutex_);
     im_mtable_ = std::move(mtable_);

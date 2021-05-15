@@ -168,26 +168,45 @@ bool BufferManager::Contains(const PhysicalPageId page_id) {
   return return_val;
 }
 
-// Provide the buffer manager with `num_pages` additional cache pages.
-void BufferManager::IncreaseCachePages(size_t num_pages) {
+// Adjusts the size of the buffer pool to achieve the target number of pages,
+// `num_pages`. Returns the (signed) adjustment in the buffer manager size,
+// measured in pages of expansion.
+int64_t BufferManager::AdjustNumPages(const size_t num_pages) {
+  int64_t diff_num_pages = num_pages - buffer_manager_size_;
+  if (diff_num_pages > 0) {
+    return IncreaseNumPages(diff_num_pages);
+  } else if (diff_num_pages < 0) {
+    return DecreaseNumPages(diff_num_pages);
+  } else {
+    return 0;
+  }
+}
+
+// Increases the buffer pool by `diff_num_pages` additional pages. Returns the
+// (signed) adjustment in the buffer manager size, measured in pages of
+// expansion.
+int64_t BufferManager::IncreaseNumPages(int64_t diff_num_pages) {
+  assert(diff_num_pages > 0);
   LockEvictionMutex();
-  for (size_t i = 0; i < num_pages; ++i) {
+  for (size_t i = 0; i < diff_num_pages; ++i) {
     page_eviction_strategy_->Insert(new BufferFrame());
   }
   UnlockEvictionMutex();
-  buffer_manager_size_ += num_pages;
+  buffer_manager_size_ += diff_num_pages;
+  return diff_num_pages;
 }
 
-// Reduce the available cache pages by up to `num_pages`. Returns the actual
-// number by which the cache pages were reduced, which might be lower if
-// `num_pages` exceeded the number of currently unfixed frames.
-size_t BufferManager::ReduceCachePages(size_t num_pages) {
+// Shrinks the buffer pool by up to `diff_num_pages`. Returns the (signed)
+// adjustment in the buffer manager size, measured in pages of expansion, which
+// might be different than `diff_num_pages`, based on the number of currently
+// unfixed frames.
+int64_t BufferManager::DecreaseNumPages(int64_t diff_num_pages) {
+  assert(diff_num_pages < 0);
   std::vector<BufferFrame*> evicted;
-
   LockMapMutex();
   LockEvictionMutex();
 
-  for (size_t i = 0; i < num_pages; ++i) {
+  for (size_t i = 0; i < -diff_num_pages; ++i) {
     auto frame = page_eviction_strategy_->Evict();
     if (frame == nullptr) break;
 
@@ -208,7 +227,7 @@ size_t BufferManager::ReduceCachePages(size_t num_pages) {
     delete frame;
   }
 
-  return evicted.size();
+  return -evicted.size();
 }
 
 // Provides the average latency of a buffer manager miss, in nanoseconds.

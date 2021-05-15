@@ -44,6 +44,10 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
 
   KeyDistHints dist;
   dist.record_size = options_.key_hints.record_size;
+  while ((chain->size() * 100 / page_fill_pct + 1) >
+         options_.max_reorg_fanout) { // Very conservative estimate.
+    ++page_fill_pct;
+  }
   dist.page_fill_pct = page_fill_pct;
   size_t records_per_page = dist.records_per_page();
 

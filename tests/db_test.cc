@@ -1021,9 +1021,9 @@ TEST_F(DBTest, OverflowChain) {
   llsm::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
-  // 1024 records @ 16B each => 16KiB of data.
-  // Each page is 64 KiB and is filled to 50% => all records fit into 1 page.
-  options.key_hints.num_keys = 1024;
+  // 64 records @ 16B each => 1KiB of data.
+  // Each page is 4 KiB and is filled to 50% => all records fit into 1 page.
+  options.key_hints.num_keys = 64;
   options.key_hints.page_fill_pct = 50;
   options.key_hints.record_size = kKeySize + kValueSize;
   options.key_hints.min_key = 0;
@@ -1051,12 +1051,12 @@ TEST_F(DBTest, OverflowChain) {
   // Flush the writes to the pages.
   db->FlushMemTable(/*disable_deferred_io = */ true);
 
-  // Generate data for enough additional writes to overflow multiple times (128
+  // Generate data for enough additional writes to overflow multiple times (8
   // KiB)
   llsm::KeyDistHints extra_key_hints;
-  extra_key_hints.num_keys = 4096 * 2;
+  extra_key_hints.num_keys = 512;
   extra_key_hints.record_size = kKeySize + kValueSize;
-  extra_key_hints.min_key = 1024;
+  extra_key_hints.min_key = 64;
   extra_key_hints.key_step_size = 1;
   const std::vector<uint64_t> extra_lexicographic_keys =
       llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);

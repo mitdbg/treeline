@@ -125,6 +125,15 @@ class DBImpl : public DB {
   std::unique_ptr<Model> model_;
   std::unique_ptr<ThreadPool> workers_;
 
+  // The memory budget (in bytes) currently available for both memtables
+  // cumulatively. Defined by the user upon creation but can be adjusted if
+  // autotuning is enabled.
+  std::atomic<size_t> mem_budget_memtables_;
+
+  // The user-specified total memory budget (in bytes) across the buffer pool
+  // and the two memtables.
+  const size_t mem_budget_;
+
   // Remaining database state protected by `mutex_`.
   std::mutex mutex_;
 

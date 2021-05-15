@@ -98,6 +98,8 @@ DEFINE_uint64(max_deferrals, 0,
               "deferred to a future flush.");
 DEFINE_bool(deferral_autotuning, false,
             "Whether or not to auto-tune deferral parameters");
+DEFINE_bool(memory_autotuning, false,
+            "Whether or not to auto-tune memory allocation");
 
 DEFINE_bool(bypass_wal, true,
             "If true, all writes will bypass the write-ahead log.");
@@ -164,6 +166,7 @@ llsm::Options BuildLLSMOptions() {
   options.deferred_io_max_deferrals = FLAGS_max_deferrals;
   options.use_alex = FLAGS_use_alex;
   options.deferral_autotuning = FLAGS_deferral_autotuning;
+  options.memory_autotuning = FLAGS_memory_autotuning;
   return options;
 }
 

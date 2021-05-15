@@ -53,8 +53,8 @@ struct Options {
   // storage, in bytes.
   size_t memtable_flush_threshold = 64 * 1024 * 1024;
 
-  // The minimum size in bytes of a memtable batch associated with a certain page
-  // necessary to actually copy the entries out during a memtable flush.
+  // The minimum size in bytes of a memtable batch associated with a certain
+  // page necessary to actually copy the entries out during a memtable flush.
   size_t deferred_io_batch_size = 1;
 
   // The maximum number of times that we are allowed to not copy some page out
@@ -80,6 +80,11 @@ struct Options {
   bool deferral_autotuning = false;
   double batch_scaling_factor = 1;
 
+  // If true, LLSM will try to optimize the memory allocation between the buffer
+  // pool and the memtables, keeping the total memory budget to buffer_pool_size
+  // + 2 * memtable_flush_threshold.
+  bool memory_autotuning = false;
+
   // If false, LLSM will use a BTreeModel instead of an ALEXModel.
   bool use_alex = true;
 
@@ -89,6 +94,9 @@ struct Options {
 
   // If true, LLSM will print messages to a debug log.
   bool enable_debug_log = true;
+  
+  // The maximum number of pages that reorganizing a single chain can produce.
+  size_t max_reorg_fanout = 50;
 };
 
 struct ReadOptions {};

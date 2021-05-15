@@ -68,19 +68,16 @@ class BufferManager {
   // manager.
   bool Contains(const PhysicalPageId page_id);
 
-  // Provide the buffer manager with `num_pages` additional cache pages.
-  void IncreaseCachePages(size_t num_pages);
+  // Adjusts the size of the buffer pool to achieve the target number of pages,
+  // `num_pages`. Returns the (signed) adjustment in the buffer manager size,
+  // measured in pages of expansion.
+  int64_t AdjustNumPages(const size_t num_pages);
 
-  // Reduce the available cache pages by up to `num_pages`. Returns the actual
-  // number by which the cache pages were reduced, which might be lower if
-  // `num_pages` exceeded the number of currently unfixed frames.
-  size_t ReduceCachePages(size_t num_pages);
-
-  // Provides access to the underlying FileManager
+  // Provides access to the underlying FileManager.
   FileManager* GetFileManager() const { return file_manager_.get(); }
 
-  // The number of cache pages managed by the buffer manager
-  size_t NumCachePages() const { return buffer_manager_size_; }
+  // The number of pages in the buffer pool.
+  size_t GetNumPages() const { return buffer_manager_size_; }
 
   // Provides the average latency of a buffer manager miss, in nanoseconds.
   std::chrono::nanoseconds BufMgrMissLatency() const;
@@ -103,6 +100,17 @@ class BufferManager {
   // Writes all dirty pages to disk (without unfixing). If `also_delete` is set,
   // all frames are also deleted (used for destructor).
   void FlushDirty(const bool also_delete);
+  
+  // Increases the buffer pool by `diff_num_pages` additional pages. Returns the
+  // (signed) adjustment in the buffer manager size, measured in pages of
+  // expansion.
+  int64_t IncreaseNumPages(int64_t diff_num_pages);
+
+  // Shrinks the buffer pool by up to `diff_num_pages`. Returns the (signed)
+  // adjustment in the buffer manager size, measured in pages of expansion,
+  // which might be different than `diff_num_pages`, based on the number of
+  // currently unfixed frames.
+  int64_t DecreaseNumPages(int64_t diff_num_pages);
 
   // The number of pages the buffer manager should keep in memory.
   std::atomic<size_t> buffer_manager_size_;

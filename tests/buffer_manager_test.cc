@@ -164,7 +164,7 @@ TEST(BufferManagerTest, Contains) {
   std::filesystem::remove_all(dbname);
 }
 
-TEST(BufferManagerTest, IncreaseCachePages) {
+TEST(BufferManagerTest, IncreaseNumPages) {
   const std::string dbname = "/tmp/llsm-bufmgr-test";
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
@@ -195,9 +195,9 @@ TEST(BufferManagerTest, IncreaseCachePages) {
   }
 
   // Expand cache by 2 pages.
-  ASSERT_EQ(buffer_manager->NumCachePages(), 3);
-  buffer_manager->IncreaseCachePages(2);
-  ASSERT_EQ(buffer_manager->NumCachePages(), 5);
+  ASSERT_EQ(buffer_manager->GetNumPages(), 3);
+  ASSERT_EQ(buffer_manager->AdjustNumPages(5),2);
+  ASSERT_EQ(buffer_manager->GetNumPages(), 5);
 
   // Fix another 2 pages; could not have succeeded with the old cache size.
   for (size_t record_id = 3 * key_hints.records_per_page();
@@ -217,7 +217,7 @@ TEST(BufferManagerTest, IncreaseCachePages) {
   std::filesystem::remove_all(dbname);
 }
 
-TEST(BufferManagerTest, ReduceCachePages) {
+TEST(BufferManagerTest, DecreaseNumPages) {
   const std::string dbname = "/tmp/llsm-bufmgr-test";
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
@@ -248,35 +248,29 @@ TEST(BufferManagerTest, ReduceCachePages) {
   }
 
   // Try shrinking cache by 2 pages; can't because nothing is evictable.
-  ASSERT_EQ(buffer_manager->NumCachePages(), 4);
-  ASSERT_EQ(buffer_manager->ReduceCachePages(2), 0);
-  ASSERT_EQ(buffer_manager->NumCachePages(), 4);
+  ASSERT_EQ(buffer_manager->GetNumPages(), 4);
+  ASSERT_EQ(buffer_manager->AdjustNumPages(2), 0);
+  ASSERT_EQ(buffer_manager->GetNumPages(), 4);
 
   // Unfix the first 2 pages.
   buffer_manager->UnfixPage(*frames.at(0), /*is_dirty = */ false);
   buffer_manager->UnfixPage(*frames.at(1), /*is_dirty = */ false);
 
   // Try shrinking cache by 2 pages; succeeds in full.
-  ASSERT_EQ(buffer_manager->NumCachePages(), 4);
-  ASSERT_EQ(buffer_manager->ReduceCachePages(2), 2);
-  ASSERT_EQ(buffer_manager->NumCachePages(), 2);
+  ASSERT_EQ(buffer_manager->GetNumPages(), 4);
+  ASSERT_EQ(buffer_manager->AdjustNumPages(2), -2);
+  ASSERT_EQ(buffer_manager->GetNumPages(), 2);
 
   // Unfix the next page.
   buffer_manager->UnfixPage(*frames.at(2), /*is_dirty = */ false);
 
   // Try shrinking cache by 2 pages; succeeds in part, only 1 page evictable.
-  ASSERT_EQ(buffer_manager->NumCachePages(), 2);
-  ASSERT_EQ(buffer_manager->ReduceCachePages(2), 1);
-  ASSERT_EQ(buffer_manager->NumCachePages(), 1);
+  ASSERT_EQ(buffer_manager->GetNumPages(), 2);
+  ASSERT_EQ(buffer_manager->AdjustNumPages(0), -1);
+  ASSERT_EQ(buffer_manager->GetNumPages(), 1);
 
   // Unfix the last page.
   buffer_manager->UnfixPage(*frames.at(3), /*is_dirty = */ false);
-
-  // Try shrinking cache by 2 pages; succeeds in part, only 1 page left in
-  // cache.
-  ASSERT_EQ(buffer_manager->NumCachePages(), 1);
-  ASSERT_EQ(buffer_manager->ReduceCachePages(2), 1);
-  ASSERT_EQ(buffer_manager->NumCachePages(), 0);
 
   std::filesystem::remove_all(dbname);
 }

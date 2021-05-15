@@ -56,6 +56,9 @@ DECLARE_uint64(max_deferrals);
 // Whether or not to auto-tune deferral parameters
 DECLARE_bool(deferral_autotuning);
 
+// Whether or not to auto-tune memory allocation
+DECLARE_bool(memory_autotuning);
+
 // If true, all writes will bypass the write-ahead log.
 DECLARE_bool(bypass_wal);
 
