@@ -1,0 +1,79 @@
+record_size_bytes: 64
+
+load:
+  num_records: 20000000
+  distribution:
+    type: linspace
+    start_key: 0
+    step_size: 1
+
+run:
+- num_requests: 6000000
+  read:
+    proportion_pct: 50
+    distribution:
+      type: zipfian    
+      theta: 0.99
+      salt: 12345
+  update:
+    proportion_pct: 50
+    distribution:
+      type: zipfian    
+      theta: 0.99
+      salt: 12345
+
+- num_requests: 60000000
+  read:
+    proportion_pct: 95
+    distribution:
+      type: zipfian    
+      theta: 0.99
+      salt: 12345
+  update:
+    proportion_pct: 5
+    distribution:
+      type: zipfian    
+      theta: 0.99
+      salt: 12345  
+
+- num_requests: 6000000
+  read:
+    proportion_pct: 50
+    distribution:
+      type: zipfian    
+      theta: 0.99
+      salt: 12345
+  update:
+    proportion_pct: 50
+    distribution:
+      type: zipfian    
+      theta: 0.99
+      salt: 12345
+
+- num_requests: 60000000
+  read:
+    proportion_pct: 95
+    distribution:
+      type: zipfian    
+      theta: 0.99
+      salt: 12345
+  update:
+    proportion_pct: 5
+    distribution:
+      type: zipfian    
+      theta: 0.99
+      salt: 12345  
+      
+- num_requests: 6000000
+  read:
+    proportion_pct: 50
+    distribution:
+      type: zipfian    
+      theta: 0.99
+      salt: 12345
+  update:
+    proportion_pct: 50
+    distribution:
+      type: zipfian    
+      theta: 0.99
+      salt: 12345
