@@ -258,9 +258,11 @@ TEST_F(DBTest, DeferByEntries) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.pin_threads = false;
-  options.key_hints.num_keys = 10;
-  options.key_hints.record_size = 16 * 1024;  // 4 per page
-  options.key_hints.page_fill_pct = 100;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = 512;
+  // Enough to be spread out over two pages.
+  options.key_hints.num_keys =
+      llsm::Page::kSize / options.key_hints.record_size;
   options.deferred_io_batch_size = 40;
   options.deferred_io_max_deferrals = 4;
   options.buffer_pool_size = llsm::Page::kSize;
@@ -339,9 +341,11 @@ TEST_F(DBTest, DeferByAttempts) {
   llsm::DB* db = nullptr;
   llsm::Options options;
   options.pin_threads = false;
-  options.key_hints.num_keys = 10;
-  options.key_hints.record_size = 16 * 1024;  // 4 per page
-  options.key_hints.page_fill_pct = 100;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = 512;
+  // Enough to be spread out over two pages.
+  options.key_hints.num_keys =
+      llsm::Page::kSize / options.key_hints.record_size;
   options.deferred_io_batch_size = 2 * options.key_hints.record_size;
   options.deferred_io_max_deferrals = 1;
   options.buffer_pool_size = llsm::Page::kSize;
@@ -732,7 +736,7 @@ TEST_F(DBTest, OverflowByRecordNumber) {
 TEST_F(DBTest, OverflowByLargeValue) {
   constexpr size_t kKeySize = sizeof(uint64_t);
   constexpr size_t kValueSize = 8;
-  constexpr size_t kLongValueSize = 32 * 1024 - 8;
+  constexpr size_t kLongValueSize = 504;
 
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value_old(kValueSize, 0xFF);
@@ -744,11 +748,11 @@ TEST_F(DBTest, OverflowByLargeValue) {
   llsm::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
-  // 1024 records @ 16B each => 16KiB of data.
-  // Each page is 64 KiB and is filled to 50% => all records fit into 1 page.
-  options.key_hints.num_keys = 1024;
-  options.key_hints.page_fill_pct = 50;
   options.key_hints.record_size = kKeySize + kValueSize;
+  // Generate records that will fit in just 1 page.
+  options.key_hints.num_keys =
+      llsm::Page::kSize / 2 / options.key_hints.record_size;
+  options.key_hints.page_fill_pct = 50;
   options.key_hints.min_key = 0;
   options.key_hints.key_step_size = 1;
 
@@ -1086,19 +1090,19 @@ TEST_F(DBTest, OverflowChain) {
 TEST_F(DBTest, RangeScanOverflow) {
   std::mt19937 rng(42);
   constexpr size_t kKeySize = sizeof(uint64_t);
-  constexpr size_t kValueSize = 1016;
+  constexpr size_t kValueSize = 504;
 
-  // Dummy value used for the records (8 byte key; record is 1024 B in total).
+  // Dummy value used for the records (8 byte key; record is 512 B in total).
   const std::string value(kValueSize, 0xFF);
 
   llsm::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
-  // 64 records @ 1024 B each => 64 KiB of data.
-  // Each page is 64 KiB and is filled to 50% => all records fit into 2 pages.
-  options.key_hints.num_keys = 64;
   options.key_hints.page_fill_pct = 50;
   options.key_hints.record_size = kKeySize + kValueSize;
+  // Generate enough records to fit in 2 pages (each page is ~50% full).
+  options.key_hints.num_keys =
+      llsm::Page::kSize / options.key_hints.record_size;
   options.key_hints.min_key = 0;
   options.key_hints.key_step_size = 1000;
 
@@ -1127,8 +1131,8 @@ TEST_F(DBTest, RangeScanOverflow) {
 
   // Generate data to overflow the first page.
   llsm::KeyDistHints extra_key_hints;
-  extra_key_hints.num_keys = 200;
   extra_key_hints.record_size = kKeySize + kValueSize;
+  extra_key_hints.num_keys = llsm::Page::kSize / extra_key_hints.record_size;
   extra_key_hints.min_key = 1;
   extra_key_hints.key_step_size = 1;
   std::vector<uint64_t> extra_keys =
@@ -1146,8 +1150,8 @@ TEST_F(DBTest, RangeScanOverflow) {
   db->FlushMemTable(/*disable_deferred_io=*/true);
 
   // Extra inserts that we keep in the memtable.
-  const uint64_t page0_key = __builtin_bswap64(250ULL);
-  const uint64_t page1_key = __builtin_bswap64(68000ULL);
+  const uint64_t page0_key = __builtin_bswap64(998ULL);
+  const uint64_t page1_key = __builtin_bswap64(99999000ULL);
   status = db->Put(
       woptions,
       llsm::Slice(reinterpret_cast<const char*>(&page0_key), sizeof(page0_key)),
@@ -1180,7 +1184,7 @@ TEST_F(DBTest, RangeScanOverflow) {
                   sizeof(uint64_t)),
       all_keys.size(), &results);
   ASSERT_TRUE(status.ok());
-  ASSERT_TRUE(results.size() == all_keys.size());
+  ASSERT_EQ(results.size(), all_keys.size());
 
   // Ensure all the records were returned in the correct order.
   for (size_t i = 0; i < results.size(); ++i) {
@@ -1204,11 +1208,11 @@ TEST_F(DBTest, ReorgOverflowChain) {
   llsm::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
-  // 1024 records @ 16B each => 16KiB of data.
-  // Each page is 64 KiB and is filled to 50% => all records fit into 1 page.
-  options.key_hints.num_keys = 1024;
   options.key_hints.page_fill_pct = 50;
   options.key_hints.record_size = kKeySize + kValueSize;
+  // Generate records that will all fit on 1 page.
+  options.key_hints.num_keys =
+      llsm::Page::kSize / 2 / options.key_hints.record_size;
   options.key_hints.min_key = 0;
   options.key_hints.key_step_size = 1;
 
@@ -1234,11 +1238,13 @@ TEST_F(DBTest, ReorgOverflowChain) {
   // Flush the writes to the pages.
   db->FlushMemTable(/*disable_deferred_io = */ true);
 
-  // Generate data for enough additional writes to overflow multiple times (256
+  // Generate data for enough additional writes to overflow multiple times (16
   // KiB)
+  constexpr size_t kNumOverflows = 8;
   llsm::KeyDistHints extra_key_hints;
-  extra_key_hints.num_keys = 4096 * 4;
   extra_key_hints.record_size = kKeySize + kValueSize;
+  extra_key_hints.num_keys =
+      llsm::Page::kSize * kNumOverflows / 2 / extra_key_hints.record_size;
   extra_key_hints.min_key = 1024;
   extra_key_hints.key_step_size = 1;
   const std::vector<uint64_t> extra_lexicographic_keys =
@@ -1277,7 +1283,7 @@ TEST_F(DBTest, ReorgOverflowChain) {
   // This is because reads will block for as long as a reorganization on the
   // page they want to access (the only "old" non-overflow page in this context)
   // is going on.
-  ASSERT_EQ(db->GetNumIndexedPages(), 9);
+  ASSERT_EQ(db->GetNumIndexedPages(), 1 + kNumOverflows);
 
   delete db;
   db = nullptr;
@@ -1293,11 +1299,11 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   llsm::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
-  // 1024 records @ 16B each => 16KiB of data.
-  // Each page is 64 KiB and is filled to 50% => all records fit into 1 page.
-  options.key_hints.num_keys = 1024;
   options.key_hints.page_fill_pct = 50;
   options.key_hints.record_size = kKeySize + kValueSize;
+  // Generate records that will all fit on 1 page.
+  options.key_hints.num_keys =
+      llsm::Page::kSize / 2 / options.key_hints.record_size;
   options.key_hints.min_key = 0;
   options.key_hints.key_step_size = 1;
 
@@ -1324,11 +1330,13 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   // Flush the writes to the pages.
   db->FlushMemTable(/*disable_deferred_io = */ true);
 
-  // Generate data for enough additional writes to overflow multiple times (256
+  // Generate data for enough additional writes to overflow multiple times (16
   // KiB)
+  constexpr size_t kNumOverflows = 8;
   llsm::KeyDistHints extra_key_hints;
-  extra_key_hints.num_keys = 4096 * 4;
   extra_key_hints.record_size = kKeySize + kValueSize;
+  extra_key_hints.num_keys =
+      llsm::Page::kSize * kNumOverflows / 2 / extra_key_hints.record_size;
   extra_key_hints.min_key = 1024;
   extra_key_hints.key_step_size = 1;
   const std::vector<uint64_t> extra_lexicographic_keys =
@@ -1367,7 +1375,7 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   // This is because reads will block for as long as a reorganization on the
   // page they want to access (the only "old" non-overflow page in this context)
   // is going on.
-  ASSERT_EQ(db->GetNumIndexedPages(), 9);
+  ASSERT_EQ(db->GetNumIndexedPages(), 1 + kNumOverflows);
 
   delete db;
   db = nullptr;

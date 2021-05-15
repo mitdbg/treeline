@@ -25,7 +25,7 @@ namespace llsm {
 class Page {
  public:
   // The number of bytes needed to store a `Page` (in memory and on disk).
-  static constexpr size_t kSize = 64 * 1024;
+  static constexpr size_t kSize = 4 * 1024;
 
   // The number of bytes in a `Page` that can be used to store data. This value
   // depends on `Page::kSize` and will be smaller than it (some space is used
