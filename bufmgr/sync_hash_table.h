@@ -1,9 +1,12 @@
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <iostream>
+#include <iterator>
 #include <shared_mutex>
 #include <vector>
+
 #include "../util/calc.h"
 
 namespace llsm {
@@ -18,6 +21,7 @@ class SyncHashTable {
     Node* prev = nullptr;
     KeyType key;
     ValueType value;
+    size_t bucket;
     Node* next = nullptr;
   };
 
@@ -68,6 +72,7 @@ class SyncHashTable {
       Node* new_node = new Node;
       new_node->key = key;
       new_node->value = value;
+      new_node->bucket = bucket;
       buckets_.at(bucket) = new_node;
       return false;
     }
@@ -86,6 +91,7 @@ class SyncHashTable {
     Node* new_node = new Node;
     new_node->key = key;
     new_node->value = value;
+    new_node->bucket = bucket;
     new_node->prev = current;
     current->next = new_node;
     return false;
@@ -217,6 +223,10 @@ class SyncHashTable {
     if (old_mutex_id != new_mutex_id) UnlockMutexById(old_mutex_id, exclusive);
   }
 
+  class UnsafeIterator;
+  UnsafeIterator begin() { return UnsafeIterator(this); }
+  UnsafeIterator end() { return UnsafeIterator(); }
+
  private:
   // Remove `current` from the container and delete it, updating the pointers of
   // its neighbors in `bucket` appropriately.
@@ -241,6 +251,64 @@ class SyncHashTable {
 
   const size_t bucket_count_mask_;
   const size_t num_partitions_mask_;
+};
+
+template <class KeyType, class ValueType>
+class SyncHashTable<KeyType, ValueType>::UnsafeIterator {
+ public:
+  using iterator_category = std::forward_iterator_tag;
+  using difference_type = std::ptrdiff_t;
+  using value_type = Node;
+  using pointer = value_type*;
+  using reference = value_type&;
+
+  UnsafeIterator(SyncHashTable<KeyType, ValueType>* h_table)
+      : h_table_(h_table), curr_(NextBucketStart(0)) {}
+  UnsafeIterator() : h_table_(nullptr), curr_(nullptr) {}
+
+  reference operator*() const { return *curr_; }
+  pointer operator->() { return curr_; }
+
+  UnsafeIterator& operator++() {
+    if (curr_->next != nullptr) {
+      curr_ = curr_->next;
+    } else {
+      curr_ = NextBucketStart(curr_->bucket + 1);
+    }
+
+    return *this;
+  }
+
+  UnsafeIterator operator++(int) {
+    UnsafeIterator tmp = *this;
+    ++(*this);
+    return tmp;
+  }
+
+  friend bool operator==(const UnsafeIterator& a, const UnsafeIterator& b) {
+    return a.curr_ == b.curr;
+  };
+  friend bool operator!=(const UnsafeIterator& a, const UnsafeIterator& b) {
+    return a.curr_ != b.curr_;
+  };
+
+  KeyType key() { return curr_->key; }
+  ValueType value() { return curr_->value; }
+
+ private:
+  // Return the first element of the lowest-indexed non-empty bucket with
+  // index
+  // at least `start_bucket`, or nullptr if no such bucket exists.
+  Node* NextBucketStart(size_t start_bucket) {
+    for (size_t i = start_bucket; i < h_table_->buckets_.size(); ++i) {
+      if (h_table_->buckets_.at(i) != nullptr) return h_table_->buckets_.at(i);
+    }
+    return nullptr;
+  }
+
+  friend class SyncHashTable;
+  SyncHashTable<KeyType, ValueType>* h_table_;
+  pointer curr_;
 };
 
 }  // namespace llsm

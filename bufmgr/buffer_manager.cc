@@ -20,18 +20,19 @@ BufferManager::BufferManager(const BufMgrOptions& options,
     : buffer_manager_size_(options.buffer_pool_size / Page::kSize),
       num_misses_(0),
       cumulative_misses_time_ns_(0) {
-  pages_cache_ = PageMemoryAllocator::Allocate(buffer_manager_size_);
-
   page_to_frame_map_ =
       std::make_unique<SyncHashTable<PhysicalPageId, BufferFrame*>>(
           buffer_manager_size_, /*num_partitions = */ 1);
-  frames_ = std::vector<BufferFrame>(buffer_manager_size_);
-  SetFrameDataPointers();
-  free_ptr_ = 0;
-  no_free_left_ = false;
 
   page_eviction_strategy_ =
       std::make_unique<TwoQueueEviction>(buffer_manager_size_);
+
+  // Create the frames and insert them into the page eviction strategy, from
+  // where they will be retrieved to be fixed.
+  for (size_t i = 0; i < buffer_manager_size_; ++i) {
+    page_eviction_strategy_->Insert(new BufferFrame());
+  }
+
   if (!options.simulation_mode) {
     file_manager_ = std::make_unique<FileManager>(options, std::move(db_path));
   } else {
@@ -40,7 +41,16 @@ BufferManager::BufferManager(const BufMgrOptions& options,
 }
 
 // Writes all dirty pages back and frees resources.
-BufferManager::~BufferManager() { FlushDirty(); }
+BufferManager::~BufferManager() {
+  // Clear eviction strategy and delete any invalid frames, since they are not
+  // in the page_to_frame_map_.
+  BufferFrame* frame;
+  while ((frame = page_eviction_strategy_->Evict()) != nullptr) {
+    if (!frame->IsValid()) delete frame;
+  }
+
+  FlushDirty(/*also_delete = */ true);
+}
 
 // Retrieves the page given by `page_id`, to be held exclusively or not
 // based on the value of `exclusive`.
@@ -67,26 +77,22 @@ BufferFrame& BufferManager::FixPage(const PhysicalPageId page_id,
 
     auto start = std::chrono::steady_clock::now();
 
-    frame = GetFreeFrame();
-
-    if (frame == nullptr) {  // Must evict something to make space.
-      // Block here until you can evict something
-      while (frame == nullptr) {
-        LockMapMutex();
-        LockEvictionMutex();
-        frame = page_eviction_strategy_->Evict();
-        if (frame != nullptr) {
-          page_to_frame_map_->UnsafeErase(frame->GetPageId());
-        }
-        UnlockEvictionMutex();
-        UnlockMapMutex();
+    // Block here until you can evict something
+    while (frame == nullptr) {
+      LockMapMutex();
+      LockEvictionMutex();
+      frame = page_eviction_strategy_->Evict();
+      if (frame != nullptr) {
+        page_to_frame_map_->UnsafeErase(frame->GetPageId());
       }
+      UnlockEvictionMutex();
+      UnlockMapMutex();
+    }
 
-      // Write out evicted page if necessary
-      if (frame->IsDirty()) {
-        WritePageOut(frame);
-        frame->UnsetDirty();
-      }
+    // Write out evicted page if necessary
+    if (frame->IsDirty()) {
+      WritePageOut(frame);
+      frame->UnsetDirty();
     }
 
     // Initialize and populate the frame
@@ -128,17 +134,23 @@ void BufferManager::FlushAndUnfixPage(BufferFrame& frame) {
   UnfixPage(frame, /*is_dirty=*/false);
 }
 
-// Writes all dirty pages to disk (without unfixing)
-void BufferManager::FlushDirty() {
+// Writes all dirty pages to disk (without unfixing).
+void BufferManager::FlushDirty() { FlushDirty(/* also_delete = */ false); }
+
+// Writes all dirty pages to disk (without unfixing). If `also_delete` is set,
+// all frames are also deleted (used for destructor).
+void BufferManager::FlushDirty(const bool also_delete) {
   LockMapMutex();
 
-  for (auto& frame : frames_) {
-    if (frame.IsDirty()) {
-      frame.Lock(/*exclusive=*/false);
-      WritePageOut(&frame);
-      frame.UnsetDirty();
-      frame.Unlock();
+  for (auto& it : *page_to_frame_map_) {
+    auto frame = it.value;
+    if (frame->IsDirty()) {
+      frame->Lock(/*exclusive=*/false);
+      WritePageOut(frame);
+      frame->UnsetDirty();
+      frame->Unlock();
     }
+    if (also_delete) delete frame;
   }
 
   UnlockMapMutex();
@@ -154,6 +166,49 @@ bool BufferManager::Contains(const PhysicalPageId page_id) {
   UnlockMapMutex();
 
   return return_val;
+}
+
+// Provide the buffer manager with `num_pages` additional cache pages.
+void BufferManager::IncreaseCachePages(size_t num_pages) {
+  LockEvictionMutex();
+  for (size_t i = 0; i < num_pages; ++i) {
+    page_eviction_strategy_->Insert(new BufferFrame());
+  }
+  UnlockEvictionMutex();
+  buffer_manager_size_ += num_pages;
+}
+
+// Reduce the available cache pages by up to `num_pages`. Returns the actual
+// number by which the cache pages were reduced, which might be lower if
+// `num_pages` exceeded the number of currently unfixed frames.
+size_t BufferManager::ReduceCachePages(size_t num_pages) {
+  std::vector<BufferFrame*> evicted;
+
+  LockMapMutex();
+  LockEvictionMutex();
+
+  for (size_t i = 0; i < num_pages; ++i) {
+    auto frame = page_eviction_strategy_->Evict();
+    if (frame == nullptr) break;
+
+    page_to_frame_map_->UnsafeErase(frame->GetPageId());
+    --buffer_manager_size_;
+    evicted.push_back(frame);
+  }
+
+  UnlockEvictionMutex();
+  UnlockMapMutex();
+
+  // Write out evicted pages if necessary
+  for (auto& frame : evicted) {
+    if (frame->IsDirty()) {
+      WritePageOut(frame);
+    }
+
+    delete frame;
+  }
+
+  return evicted.size();
 }
 
 // Provides the average latency of a buffer manager miss, in nanoseconds.
@@ -177,28 +232,6 @@ void BufferManager::ReadPageIn(BufferFrame* frame) {
   if (file_manager_ == nullptr) return;
   Status s = file_manager_->ReadPage(frame->GetPageId(), frame->GetData());
   if (!s.ok()) throw std::runtime_error("Tried to read from unallocated page.");
-}
-
-// If there are free frames left, returns one of them. Else, returns nullptr.
-BufferFrame* BufferManager::GetFreeFrame() {
-  if (no_free_left_) return nullptr;
-
-  size_t frame_id_loc = free_ptr_++;
-  if (frame_id_loc >= buffer_manager_size_) {
-    no_free_left_ = true;
-    return nullptr;
-  } else {
-    return &frames_[frame_id_loc];
-  }
-}
-
-void BufferManager::SetFrameDataPointers() {
-  char* page_ptr = pages_cache_.get();
-
-  for (uint64_t frame_id = 0; frame_id < frames_.size(); ++frame_id) {
-    frames_[frame_id].SetData(reinterpret_cast<void*>(page_ptr));
-    page_ptr += Page::kSize;
-  }
 }
 
 }  // namespace llsm

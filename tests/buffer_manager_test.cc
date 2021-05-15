@@ -164,4 +164,121 @@ TEST(BufferManagerTest, Contains) {
   std::filesystem::remove_all(dbname);
 }
 
+TEST(BufferManagerTest, IncreaseCachePages) {
+  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  std::filesystem::remove_all(dbname);
+  std::filesystem::create_directory(dbname);
+
+  // Create data and model
+  KeyDistHints key_hints;
+  key_hints.num_keys = 100000;
+  const auto values = key_utils::CreateValues<uint64_t>(key_hints);
+  const auto records = key_utils::CreateRecords<uint64_t>(values);
+  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
+
+  // Create buffer manager with 3 pages.
+  BufMgrOptions bm_options;
+  bm_options.buffer_pool_size = 3 * Page::kSize;
+  const std::unique_ptr<BufferManager> buffer_manager =
+      std::make_unique<BufferManager>(bm_options, dbname);
+  model->PreallocateAndInitialize(buffer_manager, records,
+                                  key_hints.records_per_page());
+
+  // Fix the first 3 pages.
+  std::vector<BufferFrame*> frames;
+  for (size_t record_id = 0; record_id < 3 * key_hints.records_per_page();
+       record_id += key_hints.records_per_page()) {
+    PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
+    auto bf = &buffer_manager->FixPage(page_id, true);
+    frames.push_back(bf);
+    ASSERT_TRUE(bf->IsNewlyFixed());
+  }
+
+  // Expand cache by 2 pages.
+  ASSERT_EQ(buffer_manager->NumCachePages(), 3);
+  buffer_manager->IncreaseCachePages(2);
+  ASSERT_EQ(buffer_manager->NumCachePages(), 5);
+
+  // Fix another 2 pages; could not have succeeded with the old cache size.
+  for (size_t record_id = 3 * key_hints.records_per_page();
+       record_id < 5 * key_hints.records_per_page();
+       record_id += key_hints.records_per_page()) {
+    PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
+    auto bf = &buffer_manager->FixPage(page_id, true);
+    frames.push_back(bf);
+    ASSERT_TRUE(bf->IsNewlyFixed());
+  }
+
+  // Unfix everything
+  for (auto& frame : frames) {
+    buffer_manager->UnfixPage(*frame, /*is_dirty = */ false);
+  }
+
+  std::filesystem::remove_all(dbname);
+}
+
+TEST(BufferManagerTest, ReduceCachePages) {
+  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  std::filesystem::remove_all(dbname);
+  std::filesystem::create_directory(dbname);
+
+  // Create data and model
+  KeyDistHints key_hints;
+  key_hints.num_keys = 100000;
+  const auto values = key_utils::CreateValues<uint64_t>(key_hints);
+  const auto records = key_utils::CreateRecords<uint64_t>(values);
+  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
+
+  // Create buffer manager with 4 pages.
+  BufMgrOptions bm_options;
+  bm_options.buffer_pool_size = 4 * Page::kSize;
+  const std::unique_ptr<BufferManager> buffer_manager =
+      std::make_unique<BufferManager>(bm_options, dbname);
+  model->PreallocateAndInitialize(buffer_manager, records,
+                                  key_hints.records_per_page());
+
+  // Fix the first 4 pages.
+  std::vector<BufferFrame*> frames;
+  for (size_t record_id = 0; record_id < 4 * key_hints.records_per_page();
+       record_id += key_hints.records_per_page()) {
+    PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
+    auto bf = &buffer_manager->FixPage(page_id, true);
+    frames.push_back(bf);
+    ASSERT_TRUE(bf->IsNewlyFixed());
+  }
+
+  // Try shrinking cache by 2 pages; can't because nothing is evictable.
+  ASSERT_EQ(buffer_manager->NumCachePages(), 4);
+  ASSERT_EQ(buffer_manager->ReduceCachePages(2), 0);
+  ASSERT_EQ(buffer_manager->NumCachePages(), 4);
+
+  // Unfix the first 2 pages.
+  buffer_manager->UnfixPage(*frames.at(0), /*is_dirty = */ false);
+  buffer_manager->UnfixPage(*frames.at(1), /*is_dirty = */ false);
+
+  // Try shrinking cache by 2 pages; succeeds in full.
+  ASSERT_EQ(buffer_manager->NumCachePages(), 4);
+  ASSERT_EQ(buffer_manager->ReduceCachePages(2), 2);
+  ASSERT_EQ(buffer_manager->NumCachePages(), 2);
+
+  // Unfix the next page.
+  buffer_manager->UnfixPage(*frames.at(2), /*is_dirty = */ false);
+
+  // Try shrinking cache by 2 pages; succeeds in part, only 1 page evictable.
+  ASSERT_EQ(buffer_manager->NumCachePages(), 2);
+  ASSERT_EQ(buffer_manager->ReduceCachePages(2), 1);
+  ASSERT_EQ(buffer_manager->NumCachePages(), 1);
+
+  // Unfix the last page.
+  buffer_manager->UnfixPage(*frames.at(3), /*is_dirty = */ false);
+
+  // Try shrinking cache by 2 pages; succeeds in part, only 1 page left in
+  // cache.
+  ASSERT_EQ(buffer_manager->NumCachePages(), 1);
+  ASSERT_EQ(buffer_manager->ReduceCachePages(2), 1);
+  ASSERT_EQ(buffer_manager->NumCachePages(), 0);
+
+  std::filesystem::remove_all(dbname);
+}
+
 }  // namespace

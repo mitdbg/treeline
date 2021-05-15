@@ -5,8 +5,9 @@
 namespace llsm {
 
 BufferFrame::BufferFrame() {
-  SetData(nullptr);
+  data_ = PageMemoryAllocator::Allocate(/* num_pages = */ 1);
   pthread_rwlock_init(&rwlock_, nullptr);
+  SetPageId(PhysicalPageId()); // Give it an invalid page id.
   UnsetAllFlags();
   ClearFixCount();
 }
@@ -18,15 +19,17 @@ BufferFrame::~BufferFrame() { pthread_rwlock_destroy(&rwlock_); }
 void BufferFrame::Initialize(const PhysicalPageId page_id) {
   SetPageId(page_id);
   UnsetAllFlags();
+  SetValid();
   ClearFixCount();
 }
 
 // Get the page held in the current frame.
-Page BufferFrame::GetPage() const { return Page(data_); }
+Page BufferFrame::GetPage() const { return Page(GetData()); }
 
-// Set/get a pointer to the data of the page held in the current frame.
-void BufferFrame::SetData(void* data) { data_ = data; }
-void* BufferFrame::GetData() const { return data_; }
+// Get a pointer to the data of the page held in the current frame.
+void* BufferFrame::GetData() const {
+  return reinterpret_cast<void*>(data_.get());
+}
 
 // Set/get the page ID of the page held in the current frame.
 void BufferFrame::SetPageId(PhysicalPageId page_id) { page_id_ = page_id; }
@@ -51,6 +54,11 @@ void BufferFrame::SetEviction(const uint8_t value) {
 void BufferFrame::UnsetEviction() { UnsetFlags(kEvictionFlags); }
 uint8_t BufferFrame::GetEviction() const { return flags_ & kEvictionFlags; }
 bool BufferFrame::IsNewlyFixed() const { return (GetEviction() == 0); }
+
+// Set/Unset/Query the valid flag of the current frame.
+void BufferFrame::SetValid() { SetFlags(kValidFlag); }
+void BufferFrame::UnsetValid() { UnsetFlags(kValidFlag); }
+bool BufferFrame::IsValid() const { return flags_ & kValidFlag; }
 
 // Unset all flags of the current frame.
 void BufferFrame::UnsetAllFlags() { flags_ = 0; }

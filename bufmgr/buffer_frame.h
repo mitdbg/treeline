@@ -6,18 +6,17 @@
 #include <atomic>
 
 #include "db/page.h"
+#include "page_memory_allocator.h"
 
 namespace llsm {
 
 // A wrapper for memory pages, containing metadata used by the buffer manager.
-//
-// Note that the `BufferFrame` does not own the memory used to store the page
-// itself, only the metadata.
 class BufferFrame {
   // Constants for flags. 1 bit for page dirtiness, 2 bits to be used by the
   // page eviction strategy.
   static const uint8_t kDirtyFlag = 1;      // 0000 0001
   static const uint8_t kEvictionFlags = 6;  // 0000 0110
+  static const uint8_t kValidFlag = 8;      // 0000 1000
   static const uint8_t kAllFlags = 255;     // 1111 1111
 
  public:
@@ -33,8 +32,7 @@ class BufferFrame {
   // Return the page held in the current frame.
   Page GetPage() const;
 
-  // Set/get a pointer to the data of the page held in the current frame.
-  void SetData(void* data);
+  // Get a pointer to the data of the page held in the current frame.
   void* GetData() const;
 
   // Set/get the page ID of the page held in the current frame.
@@ -57,6 +55,11 @@ class BufferFrame {
   uint8_t GetEviction() const;
   bool IsNewlyFixed() const;
 
+  // Set/Unset/Query the valid flag of the current frame.
+  void SetValid();
+  void UnsetValid();
+  bool IsValid() const;
+
   // Unset all flags of the current frame.
   void UnsetAllFlags();
 
@@ -73,7 +76,7 @@ class BufferFrame {
   void UnsetFlags(const uint8_t flags) { flags_ &= ~flags; }
 
   // The data of the page held by the frame.
-  void* data_;
+  PageBuffer data_;
 
   // The id of the page held by the frame.
   PhysicalPageId page_id_;

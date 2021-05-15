@@ -61,15 +61,26 @@ class BufferManager {
   // immediately evicted from the cache).
   void FlushAndUnfixPage(BufferFrame& frame);
 
-  // Writes all dirty pages to disk (without unfixing)
+  // Writes all dirty pages to disk (without unfixing).
   void FlushDirty();
 
   // Indicates whether the page given by `page_id` is currently in the buffer
   // manager.
   bool Contains(const PhysicalPageId page_id);
 
+  // Provide the buffer manager with `num_pages` additional cache pages.
+  void IncreaseCachePages(size_t num_pages);
+
+  // Reduce the available cache pages by up to `num_pages`. Returns the actual
+  // number by which the cache pages were reduced, which might be lower if
+  // `num_pages` exceeded the number of currently unfixed frames.
+  size_t ReduceCachePages(size_t num_pages);
+
   // Provides access to the underlying FileManager
   FileManager* GetFileManager() const { return file_manager_.get(); }
+
+  // The number of cache pages managed by the buffer manager
+  size_t NumCachePages() const { return buffer_manager_size_; }
 
   // Provides the average latency of a buffer manager miss, in nanoseconds.
   std::chrono::nanoseconds BufMgrMissLatency() const;
@@ -89,22 +100,12 @@ class BufferManager {
   void LockEvictionMutex() { eviction_mutex_.lock(); }
   void UnlockEvictionMutex() { eviction_mutex_.unlock(); }
 
-  // If there are free frames left, returns one of them. Else, returns nullptr.
-  BufferFrame* GetFreeFrame();
-
-  // Sets the `data_` field of each frame in frames_.
-  void SetFrameDataPointers();
+  // Writes all dirty pages to disk (without unfixing). If `also_delete` is set,
+  // all frames are also deleted (used for destructor).
+  void FlushDirty(const bool also_delete);
 
   // The number of pages the buffer manager should keep in memory.
-  const size_t buffer_manager_size_;
-
-  // Space in memory to hold the cached pages.
-  PageBuffer pages_cache_;
-
-  // Space in memory to hold the metadata for each frame.
-  std::vector<BufferFrame> frames_;
-  std::atomic<uint64_t> free_ptr_;
-  std::atomic<bool> no_free_left_;
+  std::atomic<size_t> buffer_manager_size_;
 
   // Map from page_id to the buffer frame (if any) that currently holds that
   // page in memory, and a mutex for editing it.
