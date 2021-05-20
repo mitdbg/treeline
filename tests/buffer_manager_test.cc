@@ -271,6 +271,11 @@ TEST(BufferManagerTest, DecreaseNumPages) {
 
   // Unfix the last page.
   buffer_manager->UnfixPage(*frames.at(3), /*is_dirty = */ false);
+  ASSERT_EQ(buffer_manager->GetNumPages(), 1);
+
+  // Used to catch errors in signed -> unsigned integer conversion.
+  ASSERT_EQ(buffer_manager->AdjustNumPages(2), 1);
+  ASSERT_EQ(buffer_manager->AdjustNumPages(1), -1);
 
   std::filesystem::remove_all(dbname);
 }

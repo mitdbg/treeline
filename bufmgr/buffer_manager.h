@@ -104,13 +104,13 @@ class BufferManager {
   // Increases the buffer pool by `diff_num_pages` additional pages. Returns the
   // (signed) adjustment in the buffer manager size, measured in pages of
   // expansion.
-  int64_t IncreaseNumPages(int64_t diff_num_pages);
+  int64_t IncreaseNumPages(const size_t diff_num_pages);
 
   // Shrinks the buffer pool by up to `diff_num_pages`. Returns the (signed)
   // adjustment in the buffer manager size, measured in pages of expansion,
   // which might be different than `diff_num_pages`, based on the number of
   // currently unfixed frames.
-  int64_t DecreaseNumPages(int64_t diff_num_pages);
+  int64_t DecreaseNumPages(const size_t diff_num_pages);
 
   // The number of pages the buffer manager should keep in memory.
   std::atomic<size_t> buffer_manager_size_;

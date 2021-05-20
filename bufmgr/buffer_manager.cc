@@ -176,7 +176,7 @@ int64_t BufferManager::AdjustNumPages(const size_t num_pages) {
   if (diff_num_pages > 0) {
     return IncreaseNumPages(diff_num_pages);
   } else if (diff_num_pages < 0) {
-    return DecreaseNumPages(diff_num_pages);
+    return DecreaseNumPages(-diff_num_pages);
   } else {
     return 0;
   }
@@ -185,8 +185,7 @@ int64_t BufferManager::AdjustNumPages(const size_t num_pages) {
 // Increases the buffer pool by `diff_num_pages` additional pages. Returns the
 // (signed) adjustment in the buffer manager size, measured in pages of
 // expansion.
-int64_t BufferManager::IncreaseNumPages(int64_t diff_num_pages) {
-  assert(diff_num_pages > 0);
+int64_t BufferManager::IncreaseNumPages(const size_t diff_num_pages) {
   LockEvictionMutex();
   for (size_t i = 0; i < diff_num_pages; ++i) {
     page_eviction_strategy_->Insert(new BufferFrame());
@@ -200,13 +199,12 @@ int64_t BufferManager::IncreaseNumPages(int64_t diff_num_pages) {
 // adjustment in the buffer manager size, measured in pages of expansion, which
 // might be different than `diff_num_pages`, based on the number of currently
 // unfixed frames.
-int64_t BufferManager::DecreaseNumPages(int64_t diff_num_pages) {
-  assert(diff_num_pages < 0);
+int64_t BufferManager::DecreaseNumPages(const size_t diff_num_pages) {
   std::vector<BufferFrame*> evicted;
   LockMapMutex();
   LockEvictionMutex();
 
-  for (size_t i = 0; i < -diff_num_pages; ++i) {
+  for (size_t i = 0; i < diff_num_pages; ++i) {
     auto frame = page_eviction_strategy_->Evict();
     if (frame == nullptr) break;
 
