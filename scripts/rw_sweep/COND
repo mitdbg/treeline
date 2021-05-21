@@ -1,0 +1,65 @@
+from itertools import product
+
+DB = ["llsm", "rocksdb"]
+WRITE_SPLITS = list(range(0, 110, 10))
+COMMON_OPTIONS = {
+  "bg_threads": 16,
+  "threads": 1,
+  "bypass_wal": True,
+  "llsm_page_fill_pct": 50,
+  "use_direct_io": True,
+  "latency_sample_period": 10,
+  "gen_num_records": 20000000,
+  "gen_num_requests": 10000000,
+}
+
+BUFFER_SIZES = [
+  (64, 280),  # (memtable_size_mib, cache_size_mib) - Total 408 MiB (~33% of the dataset size)
+  (172, 64),
+]
+DISTRIBUTIONS = ["zipfian", "uniform"]
+
+run_experiment_group(
+  name="64B",
+  run="./run.sh rw_sweep-64B",
+  experiments=[
+    ExperimentInstance(
+      name="64B-{}-{}-mem-{}-cache-{}-{}"
+        .format(db, write_split, memtable_mib, cache_mib, dist),
+      options={
+        **COMMON_OPTIONS,
+        "db": db,
+        "memtable_size_mib": memtable_mib,
+        "cache_size_mib": cache_mib,
+        "gen_record_size_bytes": 64,
+        "gen_update_percent": write_split,
+        "gen_distribution": dist,
+      },
+    )
+    for db, write_split, (memtable_mib, cache_mib), dist in \
+      product(DB, WRITE_SPLITS, BUFFER_SIZES, DISTRIBUTIONS)
+  ],
+  deps=[":preload-64B"],
+)
+
+run_command(
+  name="preload-64B",
+  run="".join([
+    "./preload.sh rw_sweep-64B --gen_for_preload"
+    " --gen_num_records=", str(COMMON_OPTIONS["gen_num_records"]),
+    " --gen_num_requests=", str(COMMON_OPTIONS["gen_num_requests"]),
+    " --gen_record_size_bytes=64",
+  ]),
+)
+
+run_command(
+  name="combine-64B",
+  run="python3 combine_raw.py",
+  deps=[":64B"],
+)
+
+run_command(
+  name="plot-64B",
+  run="python3 plot_e2e.py",
+  deps=[":combine-64B"],
+)

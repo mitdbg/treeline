@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "db/format.h"
 #include "db/options.h"
 #include "llsm/slice.h"
@@ -21,7 +23,8 @@ namespace llsm {
 //
 // External mutual exclusion is required if calls to `Add()`, `Put()`,
 // `Delete()`, `Get()`, and `GetIterator()` occur concurrently. If only the
-// `const` methods are called concurrently, no mutual exclusion is needed.
+// `const` methods are called concurrently (including with one of the non-const
+// methods mentioned previously), no mutual exclusion is needed.
 class MemTable {
  public:
   // Create a new MemTable based on the given MemTableOptions.
@@ -66,8 +69,16 @@ class MemTable {
   // this table.
   bool HasEntries() const { return has_entries_; }
 
-  // Returns the options of this memtable.
-  const MemTableOptions& GetOptions() const { return options_; }
+  // Retrieves the table's current flush threshold. This method is thread-safe.
+  size_t GetFlushThreshold() const {
+    return flush_threshold_.load(std::memory_order::memory_order_relaxed);
+  }
+
+  // Sets this table's flush threshold. This method is thread-safe.
+  void SetFlushThreshold(size_t flush_threshold) {
+    flush_threshold_.store(flush_threshold,
+                           std::memory_order::memory_order_relaxed);
+  }
 
  private:
   // Represents a key-value entry in this `MemTable`. Records stored in this
@@ -132,7 +143,8 @@ class MemTable {
   Table table_;
   uint64_t next_sequence_num_;
   bool has_entries_;
-  MemTableOptions options_;
+  std::atomic<size_t> flush_threshold_;
+  size_t deferral_granularity_;
 };
 
 // An iterator for the MemTable.

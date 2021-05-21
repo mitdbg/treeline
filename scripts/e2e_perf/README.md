@@ -35,9 +35,9 @@ Then to generate the YCSB traces, run the `generate_ycsb_traces.sh` script
 (read the comments at the top of the script for more instructions.)
 
 ### Experiment Config
-Make a copy of `experiment_config_example.sh` and name it
-`experiment_config.sh`. Modify the variables as needed (they are documented
-in the file).
+In the `script` top-level directory, make a copy of
+`experiment_config_example.sh` and name it `experiment_config.sh`. Modify the
+variables as needed (they are documented in the file).
 
 ## Running the Experiments
 

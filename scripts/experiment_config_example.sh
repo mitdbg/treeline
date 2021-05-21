@@ -16,3 +16,6 @@ DB_CHECKPOINT_PATH=/flash1/$USER/llsm-checkpoint
 # underlying storage device that is used to store the database, which will
 # affect the experimental results.
 DB_PATH=/flash1/$USER/llsm
+
+# The PRNG seed to use for all experiments (used to ensure reproducibility).
+SEED=42

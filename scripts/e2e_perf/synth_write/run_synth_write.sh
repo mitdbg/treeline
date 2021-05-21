@@ -3,7 +3,7 @@ set -e
 
 script_loc=$(cd $(dirname $0) && pwd -P)
 cd $script_loc/..
-source experiment_config.sh
+source ../experiment_config.sh
 cd ../../build
 
 # The `synth_write` benchmark executable expects the database output directory

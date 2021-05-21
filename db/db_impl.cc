@@ -413,7 +413,7 @@ bool DBImpl::ActiveMemTableFull(
     const std::unique_lock<std::mutex>& lock) const {
   assert(lock.owns_lock());
   return mtable_->ApproximateMemoryUsage() >=
-         mtable_->GetOptions().flush_threshold;
+         mtable_->GetFlushThreshold();
 }
 
 bool DBImpl::FlushInProgress(const std::unique_lock<std::mutex>& lock) const {
@@ -578,13 +578,17 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
         Page::kSize * options_.max_reorg_fanout;
 
     if (read_percentage > 98) {  // Read-only
+      Logger::Log("Memory autotuning: read-only");
       buffer_pool_bytes_wanted =
           mem_budget_ - 2 * (/* target memtable size = */ Page::kSize);
     } else if (read_percentage > 80) {  // Read-heavy
+      Logger::Log("Memory autotuning: read-heavy");
       buffer_pool_bytes_wanted = mem_budget_ * 70 / 100;
     } else if (read_percentage > 20) {  // Write-heavy
+      Logger::Log("Memory autotuning: write-heavy");
       buffer_pool_bytes_wanted = mem_budget_ * 30 / 100;
     } else {  // Write-only
+      Logger::Log("Memory autotuning: write-only");
       buffer_pool_bytes_wanted = buffer_pool_min_size_bytes;
     }
 
@@ -597,6 +601,14 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
     // Adjust memtable size accordingly.
     mem_budget_memtables_ -= buffer_pool_pages_added * Page::kSize;
     assert(mem_budget_memtables_ < mem_budget_);
+
+    // Log the tuned parameters.
+    Logger::Log("Buffer pool bytes wanted: %llu", buffer_pool_bytes_wanted);
+    Logger::Log("Buffer pool pages added: %zd", buffer_pool_pages_added);
+    Logger::Log(
+        "Memtable memory budget: %llu",
+        mem_budget_memtables_.load(std::memory_order::memory_order_relaxed));
+    Logger::Log("Buffer pool pages: %llu", buf_mgr_->GetNumPages());
   }
 
   // Mark the active memtable as immutable and create a new active memtable.

@@ -1,0 +1,81 @@
+from itertools import product
+
+DB = ["llsm", "rocksdb"]
+
+COMMON_OPTIONS = {
+  "bg_threads": 16,
+  "threads": 1,
+  "bypass_wal": True,
+  "llsm_page_fill_pct": 50,
+  "use_direct_io": True,
+  "latency_sample_period": 10,
+  "throughput_sample_period": 100000,
+  "max_deferrals": 1,
+}
+
+# Used by RocksDB
+OPTIONS_512B = {
+  "memtable_size_mib": 64,
+  "cache_size_mib": 3127,  # 3255 MiB in total (~33% of the dataset)
+}
+
+# Used by LLSM
+OPTIONS_512B_EQUAL = {
+  "memtable_size_mib": 814,
+  "cache_size_mib": 1627,  # 3255 MiB in total (2 memtables + cache) (~33% of the dataset)
+}
+
+# Run this task to run the 6.830 project evaluation
+run_command(
+  name="6-830-results",
+  run="python3 combine.py",
+  deps=[
+    ":512B-llsm-equal-bab-long",
+    ":512B-rocksdb-bab-long",
+  ],
+)
+
+# Run this task to generate the plots for the 6.830 report
+run_command(
+  name="6-830-plot-results",
+  run="python3 plot.py",
+  deps=[":6-830-results"],
+)
+
+run_experiment_group(
+  name="512B-llsm-equal-bab-long",
+  run="./run.sh autotuning-512B",
+  experiments=[
+    ExperimentInstance(
+      name="512B-llsm-deferral-{}-memory-{}-equal-bab-long".format(deferral, memory),
+      options={
+        **COMMON_OPTIONS,
+        **OPTIONS_512B_EQUAL,
+        "db": "llsm",
+        "deferral_autotuning": deferral,
+        "memory_autotuning": memory,
+        "workload_config": "phased_512B_B_A_B.yml",
+      },
+    )
+    # Will emit (False, False), (False, True), (True, False), (True, True)
+    for deferral, memory in product([False, True], repeat=2)
+  ],
+  deps=[":preload-512B"],
+)
+
+run_experiment(
+  name="512B-rocksdb-bab-long",
+  run="./run.sh autotuning-512B",
+  options={
+    **COMMON_OPTIONS,
+    **OPTIONS_512B,
+    "db": "rocksdb",
+    "workload_config": "phased_512B_B_A_B.yml",
+  },
+  deps=[":preload-512B"],
+)
+
+run_command(
+  name="preload-512B",
+  run="./preload.sh autotuning-512B preload512.yml",
+)

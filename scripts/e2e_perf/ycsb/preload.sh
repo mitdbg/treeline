@@ -8,7 +8,7 @@ fi
 
 script_loc=$(cd $(dirname $0) && pwd -P)
 cd $script_loc/..
-source experiment_config.sh
+source ../experiment_config.sh
 
 checkpoint_name=$1
 full_checkpoint_path=$DB_CHECKPOINT_PATH/$checkpoint_name

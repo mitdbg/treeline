@@ -1,0 +1,45 @@
+record_size_bytes: 512
+
+load:
+  num_records: 20000000
+  distribution:
+    type: linspace
+    start_key: 0
+    step_size: 1
+
+run:
+- num_requests: 5000000
+  read:
+    proportion_pct: 95
+    distribution:
+      type: zipfian    
+      theta: 0.99
+  update:
+    proportion_pct: 5
+    distribution:
+      type: zipfian    
+      theta: 0.99
+
+- num_requests: 5000000
+  read:
+    proportion_pct: 50
+    distribution:
+      type: zipfian    
+      theta: 0.99
+  update:
+    proportion_pct: 50
+    distribution:
+      type: zipfian    
+      theta: 0.99
+
+- num_requests: 10000000
+  read:
+    proportion_pct: 95
+    distribution:
+      type: zipfian    
+      theta: 0.99
+  update:
+    proportion_pct: 5
+    distribution:
+      type: zipfian    
+      theta: 0.99

@@ -1,0 +1,16 @@
+# Should be the same as bench/workload_configs/phased_512B_A_B_A.yml
+record_size_bytes: 512
+
+load:
+  num_records: 20000000
+  distribution:
+    type: linspace
+    start_key: 0
+    step_size: 1
+
+run:
+- num_requests: 10000000
+  update:
+    proportion_pct: 100
+    distribution:
+      type: uniform

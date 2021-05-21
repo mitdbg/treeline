@@ -15,11 +15,12 @@ constexpr uint64_t kWriteTypeBitWidth = 8;
 namespace llsm {
 
 MemTable::MemTable(const MemTableOptions& moptions)
-    : options_(moptions),
-      arena_(),
+    : arena_(),
       table_(MemTable::Comparator(), &arena_),
       next_sequence_num_(moptions.deferral_granularity + 1),
-      has_entries_(false) {}
+      has_entries_(false),
+      flush_threshold_(moptions.flush_threshold),
+      deferral_granularity_(moptions.deferral_granularity) {}
 
 Status MemTable::Put(const Slice& key, const Slice& value) {
   return Add(key, value, format::WriteType::kWrite);
@@ -60,8 +61,8 @@ Status MemTable::Add(const Slice& key, const Slice& value,
     seq_num = next_sequence_num_++;
   } else {
     // Previous memtables might have had a higher granularity.
-    if (injected_sequence_num > options_.deferral_granularity) {
-      seq_num = options_.deferral_granularity;
+    if (injected_sequence_num > deferral_granularity_) {
+      seq_num = deferral_granularity_;
     } else {
       seq_num = injected_sequence_num;
     }

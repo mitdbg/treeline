@@ -106,7 +106,7 @@ function main() {
   cd $script_loc
 
   # Load the config.
-  source experiment_config.sh
+  source ../experiment_config.sh
 
   mkdir -p $YCSB_TRACE_PATH
   build_and_generate_traces
