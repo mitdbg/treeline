@@ -80,7 +80,8 @@ group(
   name="llsm",
   deps=[
     ":llsm_no_deferral",
-    ":llsm_deferral",
+    # NOTE: We disabled llsm_deferral because it is too slow.
+    #":llsm_deferral",
   ],
 )
 
@@ -115,7 +116,8 @@ run_command(
   run="python3 summarize.py",
   deps=[
     ":llsm_no_deferral",
-    ":llsm_deferral",
+    # NOTE: We disabled llsm_deferral because it is too slow.
+    #":llsm_deferral",
     ":rocksdb",
   ],
 )
