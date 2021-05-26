@@ -52,7 +52,7 @@ void Model::ScanFilesAndInitialize(
         break;
 
       // If not an overflow page, insert lower boundary into index
-      if (!temp_page.IsOverflow()) {
+      if (!temp_page.IsOverflow() && temp_page.IsValid()) {
         this->Insert(temp_page.GetLowerBoundary(), page_id);
       }
     }

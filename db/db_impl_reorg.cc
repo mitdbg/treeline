@@ -1,4 +1,5 @@
 #include "bufmgr/page_memory_allocator.h"
+#include "db/logger.h"
 #include "db/merge_iterators.h"
 
 namespace llsm {
@@ -45,7 +46,7 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
   KeyDistHints dist;
   dist.record_size = options_.key_hints.record_size;
   while ((chain->size() * 100 / page_fill_pct + 1) >
-         options_.max_reorg_fanout) { // Very conservative estimate.
+         options_.max_reorg_fanout) {  // Very conservative estimate.
     ++page_fill_pct;
   }
   dist.page_fill_pct = page_fill_pct;
@@ -117,6 +118,29 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
     // first page will simply be overwritten.
 
     buf_mgr_->UnfixPage(*frame, /* is_dirty = */ true);
+  }
+
+  // This only runs if there are more old pages than new pages. The older pages
+  // will be leaked on disk because no other pages reference them. This is a
+  // defensive check because, in theory, we should never produce fewer pages
+  // compared to what was originally in the chain.
+  for (size_t i = new_num_pages; i < old_num_pages; ++i) {
+    memset(chain->at(i)->GetData(), 0, Page::kSize);
+    buf_mgr_->UnfixPage(*(chain->at(i)), /*is_dirty=*/true);
+  }
+  if (new_num_pages < old_num_pages) {
+    uint64_t lower = 0, upper = 0;
+    lower = *reinterpret_cast<const uint64_t*>(boundary_keys.front().data());
+    if (!boundary_keys.back().empty()) {
+      upper = *reinterpret_cast<const uint64_t*>(boundary_keys.back().data());
+    }
+    lower = __builtin_bswap64(lower);
+    upper = __builtin_bswap64(upper);
+    Logger::Log(
+        "WARNING: Reorganization produced fewer pages than the length of the "
+        "original chain. Pages will be leaked on disk.\nOld Pages: %llu, New "
+        "Pages: %llu\nChain Boundary Lower: %llu, Chain Boundary Upper: %llu",
+        old_num_pages, new_num_pages, lower, upper);
   }
 
   return Status::OK();

@@ -19,3 +19,6 @@ DB_PATH=/flash1/$USER/llsm
 
 # The PRNG seed to use for all experiments (used to ensure reproducibility).
 SEED=42
+
+# Path to third-party datasets.
+TP_DATASET_PATH=/home/$USER/datasets

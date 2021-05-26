@@ -11,6 +11,7 @@
 #include "db/manifest.h"
 #include "db/page.h"
 #include "model/alex_model.h"
+#include "model/btree_model.h"
 #include "util/affinity.h"
 #include "util/key.h"
 
@@ -146,13 +147,18 @@ Status DBImpl::InitializeNewDB() {
     BufMgrOptions bm_options(options_);
     bm_options.num_segments = options_.background_threads;
 
-    model_ = std::make_unique<ALEXModel>();
+    if (options_.use_alex) {
+      model_ = std::make_unique<ALEXModel>();
+    } else {
+      model_ = std::make_unique<BTreeModel>();
+    }
     buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
 
     model_->PreallocateAndInitialize(buf_mgr_, records,
                                      options_.key_hints.records_per_page());
-    Logger::Log("Created new ALEX. Total size: %llu bytes. Indexed pages: %llu",
-                model_->GetSizeBytes(), model_->GetNumPages());
+    Logger::Log("Created new %s. Total size: %llu bytes. Indexed pages: %llu",
+                options_.use_alex ? "ALEX" : "BTree", model_->GetSizeBytes(),
+                model_->GetNumPages());
 
     // Write the DB metadata to persistent storage.
     const Status s = Manifest::Builder()
@@ -183,11 +189,16 @@ Status DBImpl::InitializeExistingDB() {
   bm_options.num_segments = manifest->num_segments();
 
   buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
-  model_ = std::make_unique<ALEXModel>();
+  if (options_.use_alex) {
+    model_ = std::make_unique<ALEXModel>();
+  } else {
+    model_ = std::make_unique<BTreeModel>();
+  }
 
   model_->ScanFilesAndInitialize(buf_mgr_);
-  Logger::Log("Rebuilt ALEX. Total size: %llu bytes. Indexed pages: %llu",
-              model_->GetSizeBytes(), model_->GetNumPages());
+  Logger::Log("Rebuilt %s. Total size: %llu bytes. Indexed pages: %llu",
+              options_.use_alex ? "ALEX" : "BTree", model_->GetSizeBytes(),
+              model_->GetNumPages());
 
   // Before we can accept requests, we need to replay the writes (if any) that
   // exist in the write-ahead log.
@@ -412,8 +423,7 @@ Status DBImpl::FlushMemTable(const bool disable_deferred_io) {
 bool DBImpl::ActiveMemTableFull(
     const std::unique_lock<std::mutex>& lock) const {
   assert(lock.owns_lock());
-  return mtable_->ApproximateMemoryUsage() >=
-         mtable_->GetFlushThreshold();
+  return mtable_->ApproximateMemoryUsage() >= mtable_->GetFlushThreshold();
 }
 
 bool DBImpl::FlushInProgress(const std::unique_lock<std::mutex>& lock) const {

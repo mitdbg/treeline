@@ -116,6 +116,12 @@ DEFINE_bool(use_alex, true,
             "If true, LLSM will use an ALEXModel. Otherwise, it will use a "
             "BTreeModel.");
 
+// The minimum length of an overflow chain for which reorganization is
+// triggered.
+DEFINE_uint64(reorg_length, 5,
+              "The minimum length of an overflow chain for which "
+              "reorganization is triggered.");
+
 namespace llsm {
 namespace bench {
 
@@ -167,6 +173,7 @@ llsm::Options BuildLLSMOptions() {
   options.use_alex = FLAGS_use_alex;
   options.deferral_autotuning = FLAGS_deferral_autotuning;
   options.memory_autotuning = FLAGS_memory_autotuning;
+  options.reorg_length = FLAGS_reorg_length;
   return options;
 }
 

@@ -69,6 +69,13 @@ DECLARE_bool(verbose);
 // every N-th request).
 DECLARE_uint32(latency_sample_period);
 
+// The minimum length of an overflow chain for which reorganization is
+// triggered.
+DECLARE_uint64(reorg_length);
+
+// If true, LLSM will use an ALEXModel. Otherwise, it will use a BTreeModel.
+DECLARE_bool(use_alex);
+
 namespace llsm {
 namespace bench {
 
