@@ -29,6 +29,10 @@ namespace llsm {
 //         where they might discover that they need to try again (see
 //         DBImpl::Get() step 4).
 //
+//
+// N.B.: Some of the assumptions about space usage below will need to be thought
+// out more carefully for dealing with variable-sized records and deletions.
+//
 Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
                                        uint32_t page_fill_pct) {
   OverflowChain chain = nullptr;
@@ -43,13 +47,52 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
     return Status::OK();
   }
 
-  KeyDistHints dist;
-  dist.record_size = options_.key_hints.record_size;
-  while ((chain->size() * 100 / page_fill_pct + 1) >
-         options_.max_reorg_fanout) {  // Very conservative estimate.
-    ++page_fill_pct;
+  // Check that chain is reorganizable within our constraints.
+  if (chain->size() > options_.max_reorg_fanout) {
+    for (auto& frame : *chain) {
+      buf_mgr_->UnfixPage(*frame, /* is_dirty = */ false);
+      return Status::InvalidArgument(
+          "Chain is too long to be reorganized without violating the maximum "
+          "reorganization fanout.");
+    }
   }
+
+  KeyDistHints dist;
+  // All records in a chain currently share a prefix, so they will share a
+  // prefix that is at least as long after reorganization. This reduces their
+  // effective size.
+  size_t full_record_size = options_.key_hints.record_size;
+  size_t effective_record_size =
+      full_record_size - chain->at(0)->GetPage().GetKeyPrefix().size();
+  dist.record_size = effective_record_size;
   dist.page_fill_pct = page_fill_pct;
+
+  // This is a conservative estimate for the number of keys, based on the
+  // assumption that every page in the chain is full of records of size
+  // `effective_record_size` and no additional common prefix compression will
+  // be feasible for any post-reorganization page, beyond that present in the
+  // original chain.
+  //
+  // We need this estimate to calculate `dist.num_pages()` below and adjust
+  // the fill percentage as needed.
+  //
+  // The estimate is refined later on, after we go over the records and count
+  // them.
+  dist.num_keys = chain->size() *
+                  ((Page::UsableSize() -
+                    2 * full_record_size) /  // Subtract space used for fences.
+                   (effective_record_size + Page::PerRecordMetadataSize()));
+
+  while (dist.num_pages() > options_.max_reorg_fanout) {
+    ++dist.page_fill_pct;
+    // This won't exceed 100% because at some point we will hit the equivalent
+    // per-page fullness that corresponds to the current chain length, which we
+    // know is not longer than options_.max_reorg_fanout.
+    //
+    // For example if the chain has 3 links with fullness 100%, 100%, 40%, this
+    // loop will stop once we hit 80%, because that amount of total space (3
+    // pages, each 80% full) is used by the current chain.
+  }
   size_t records_per_page = dist.records_per_page();
 
   // 1. First pass to find boundaries and count number of records
@@ -66,6 +109,7 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
     pmi.Next();
   }
 
+  assert(record_count <= dist.num_keys);  // Sanity check
   dist.num_keys = record_count;
   boundary_keys.emplace_back(
       chain->at(0)->GetPage().GetUpperBoundary().ToString());
@@ -124,6 +168,10 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
   // will be leaked on disk because no other pages reference them. This is a
   // defensive check because, in theory, we should never produce fewer pages
   // compared to what was originally in the chain.
+  //
+  // N.B. This can in fact happen with deletions or with updates to some key
+  // using a larger value than the original. Our code might need more changes to
+  // efficiently handle these scenaria.
   for (size_t i = new_num_pages; i < old_num_pages; ++i) {
     memset(chain->at(i)->GetData(), 0, Page::kSize);
     buf_mgr_->UnfixPage(*(chain->at(i)), /*is_dirty=*/true);
