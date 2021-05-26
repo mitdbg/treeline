@@ -129,7 +129,9 @@ std::optional<DBType> ParseDBType(const std::string& candidate) {
   static std::unordered_map<std::string, DBType> kStringToDBType = {
       {"all", DBType::kAll},
       {"llsm", DBType::kLLSM},
-      {"rocksdb", DBType::kRocksDB}};
+      {"rocksdb", DBType::kRocksDB}, 
+      {"leanstore", DBType::kLeanStore}, 
+      {"kvell", DBType::kKVell}};
 
   auto it = kStringToDBType.find(candidate);
   if (it == kStringToDBType.end()) {

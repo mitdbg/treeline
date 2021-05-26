@@ -66,4 +66,11 @@ if(LLSM_BUILD_BENCHMARKS)
     GIT_TAG        v3.2.0
   )
   FetchContent_MakeAvailable(ycsbr)
+
+  FetchContent_Declare(
+    leanstore
+    GIT_REPOSITORY git@ssh.dev.azure.com:v3/msr-dsail/LearnedLSM/leanstore
+    GIT_TAG        build-compatible
+  )
+  FetchContent_MakeAvailable(leanstore)
 endif()

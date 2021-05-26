@@ -4,6 +4,8 @@
 #include <string>
 
 #include "bench/common/config.h"
+#include "bench/common/kvell_interface.h"
+#include "bench/common/leanstore_interface.h"
 #include "bench/common/llsm_interface.h"
 #include "bench/common/rocksdb_interface.h"
 #include "gflags/gflags.h"
@@ -100,6 +102,12 @@ int main(int argc, char* argv[]) {
   }
   if (db == DBType::kAll || db == DBType::kLLSM) {
     PrintExperimentResult("llsm", Run<LLSMInterface>(load, workload));
+  }
+  if (db == DBType::kAll || db == DBType::kLeanStore) {
+    PrintExperimentResult("leanstore", Run<LeanStoreInterface>(load, workload));
+  }
+  if (db == DBType::kAll || db == DBType::kKVell) {
+    PrintExperimentResult("kvell", Run<KVellInterface>(load, workload));
   }
 
   return 0;

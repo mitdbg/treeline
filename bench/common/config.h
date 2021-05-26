@@ -80,12 +80,14 @@ namespace llsm {
 namespace bench {
 
 // An enum that represents the `db` flag above.
-enum class DBType : uint32_t { kAll = 0, kLLSM = 1, kRocksDB = 2 };
+enum class DBType : uint32_t { kAll = 0, kLLSM = 1, kRocksDB = 2, kLeanStore = 3, kKVell = 4 };
 
 // Returns the `DBType` enum value associated with a given string.
 // - "all" maps to `kAll`
 // - "llsm" maps to `kLLSM`
 // - "rocksdb" maps to `kRocksDB`
+// - "leanstore" maps to `kLeanStore`
+// - "kvell" maps to `kKVell`
 // All other strings map to an empty `std::optional`.
 std::optional<DBType> ParseDBType(const std::string& candidate);
 

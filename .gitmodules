@@ -1,0 +1,3 @@
+[submodule "third_party/kvell"]
+	path = third_party/kvell
+	url = https://github.com/BLepers/KVell
