@@ -33,6 +33,12 @@ combine(
 )
 
 run_command(
+  name="plot",
+  run="python3 plot_bar.py",
+  deps=[":combine"],
+)
+
+run_command(
   name="combine",
   run="python3 combine_raw.py",
   deps=[
