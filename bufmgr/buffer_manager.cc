@@ -52,11 +52,28 @@ BufferManager::~BufferManager() {
   FlushDirty(/*also_delete = */ true);
 }
 
-// Retrieves the page given by `page_id`, to be held exclusively or not
-// based on the value of `exclusive`.
 BufferFrame& BufferManager::FixPage(const PhysicalPageId page_id,
                                     const bool exclusive,
                                     const bool is_newly_allocated) {
+  BufferFrame* const frame = FixPageImpl(
+      page_id, exclusive, /*abort_if_no_frames=*/false, is_newly_allocated);
+  assert(frame != nullptr);
+  return *frame;
+}
+
+BufferFrame* BufferManager::FixPageIfFrameAvailable(
+    const PhysicalPageId page_id, const bool exclusive,
+    const bool is_newly_allocated) {
+  return FixPageImpl(page_id, exclusive, /*abort_if_no_frames=*/true,
+                     is_newly_allocated);
+}
+
+// Retrieves the page given by `page_id`, to be held exclusively or not
+// based on the value of `exclusive`.
+BufferFrame* BufferManager::FixPageImpl(const PhysicalPageId page_id,
+                                        const bool exclusive,
+                                        const bool abort_if_no_frames,
+                                        const bool is_newly_allocated) {
   BufferFrame* frame = nullptr;
   bool success;
 
@@ -77,7 +94,8 @@ BufferFrame& BufferManager::FixPage(const PhysicalPageId page_id,
 
     auto start = std::chrono::steady_clock::now();
 
-    // Block here until you can evict something
+    // Block here until you can evict something, or abort if requested when
+    // there are no frames available.
     while (frame == nullptr) {
       LockMapMutex();
       LockEvictionMutex();
@@ -87,6 +105,11 @@ BufferFrame& BufferManager::FixPage(const PhysicalPageId page_id,
       }
       UnlockEvictionMutex();
       UnlockMapMutex();
+
+      if (frame == nullptr && abort_if_no_frames) {
+        // There are currently no frames available.
+        return nullptr;
+      }
     }
 
     // Write out evicted page if necessary
@@ -112,7 +135,7 @@ BufferFrame& BufferManager::FixPage(const PhysicalPageId page_id,
 
   frame->Lock(exclusive);
 
-  return *frame;
+  return frame;
 }
 
 // Unfixes a page updating whether it is dirty or not.
