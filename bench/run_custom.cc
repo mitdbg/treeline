@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "bench/common/config.h"
+#include "bench/common/leanstore_interface.h"
 #include "bench/common/llsm_interface.h"
 #include "bench/common/load_data.h"
 #include "bench/common/rocksdb_interface.h"
@@ -120,6 +121,9 @@ int main(int argc, char* argv[]) {
   }
   if (db == DBType::kAll || db == DBType::kLLSM) {
     PrintExperimentResult("llsm", Run<LLSMInterface>(*workload));
+  }
+  if (db == DBType::kAll || db == DBType::kLeanStore) {
+    PrintExperimentResult("leanstore", Run<LeanStoreInterface>(*workload));
   }
 
   return 0;

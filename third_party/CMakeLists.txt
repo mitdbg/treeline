@@ -1,3 +1,4 @@
+include(ExternalProject)
 include(FetchContent)
 
 # CRC32C implemented using CPU-specific instructions
@@ -66,6 +67,41 @@ if(LLSM_BUILD_BENCHMARKS)
     GIT_TAG        v3.2.0
   )
   FetchContent_MakeAvailable(ycsbr)
+
+  # This sets up libaio as a local dependency, which is used by LeanStore. We
+  # use `aio` as the target name because LeanStore links against it. We only run
+  # this setup if the `aio` target does not already exist.
+  #
+  # We use both FetchContent and ExternalProject to set up this dependency.
+  # FetchContent allows us to download the libaio library when we configure the
+  # project. ExternalProject helps us compile the library's sources when make is
+  # used to build the entire project.
+  if (NOT TARGET aio)
+    message(STATUS "Building libaio v0.3.112 from source because it was not found locally.")
+    FetchContent_Declare(
+      libaio_src
+      GIT_REPOSITORY https://pagure.io/libaio.git
+      GIT_TAG        libaio-0.3.112
+    )
+    FetchContent_GetProperties(libaio_src)
+    if (NOT libaio_src_POPULATED)
+      FetchContent_Populate(libaio_src)
+    endif()
+    ExternalProject_Add(
+      libaio_src
+      SOURCE_DIR ${libaio_src_SOURCE_DIR}
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND "make"
+      BUILD_IN_SOURCE ON
+      INSTALL_COMMAND ""
+    )
+    add_library(aio STATIC IMPORTED)
+    set_target_properties(
+      aio PROPERTIES IMPORTED_LOCATION
+        ${libaio_src_SOURCE_DIR}/src/libaio.a)
+    target_include_directories(aio INTERFACE
+      ${libaio_src_SOURCE_DIR}/src)
+  endif()
 
   FetchContent_Declare(
     leanstore

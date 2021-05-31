@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <thread>
 
@@ -20,6 +22,16 @@ class LeanStoreInterface {
 
   // Called once before the benchmark.
   void InitializeDatabase() {
+    // LeanStore relies on gflags for its configuration. This is a quick way to
+    // make their configuration assumptions compatible with our configuration
+    // assumptions.
+    FLAGS_ssd_path = FLAGS_db_path + "/leanstore";
+    FLAGS_dram_gib = (2 * FLAGS_memtable_size_mib + FLAGS_cache_size_mib) / 1024.0;
+    if (!std::filesystem::exists(FLAGS_ssd_path)) {
+      // LeanStore requires the on-disk file to actually exist before starting
+      // up (it seems like it can be empty).
+      std::ofstream leanstore_file(FLAGS_ssd_path, std::ofstream::app);
+    }
     db_ = new leanstore::LeanStore();
     table_ = &db_->registerBTreeLL("btree");
   }
