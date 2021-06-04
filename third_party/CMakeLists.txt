@@ -63,7 +63,7 @@ if(LLSM_BUILD_BENCHMARKS)
 
   FetchContent_Declare(
     ycsbr
-    GIT_REPOSITORY git@ssh.dev.azure.com:v3/msr-dsail/LearnedLSM/ycsb-runner
+    GIT_REPOSITORY https://github.com/mitdbg/ycsbr
     GIT_TAG        v3.2.0
   )
   FetchContent_MakeAvailable(ycsbr)
@@ -105,7 +105,7 @@ if(LLSM_BUILD_BENCHMARKS)
 
   FetchContent_Declare(
     leanstore
-    GIT_REPOSITORY git@ssh.dev.azure.com:v3/msr-dsail/LearnedLSM/leanstore
+    GIT_REPOSITORY https://github.com/mitdbg/leanstore
     GIT_TAG        build-compatible
   )
   FetchContent_MakeAvailable(leanstore)
