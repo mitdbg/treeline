@@ -64,7 +64,7 @@ if(LLSM_BUILD_BENCHMARKS)
   FetchContent_Declare(
     ycsbr
     GIT_REPOSITORY https://github.com/mitdbg/ycsbr
-    GIT_TAG        v3.2.0
+    GIT_TAG        v3.2.2
   )
   FetchContent_MakeAvailable(ycsbr)
 
