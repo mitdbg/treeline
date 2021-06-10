@@ -55,6 +55,8 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
           "Chain is too long to be reorganized without violating the maximum "
           "reorganization fanout.");
     }
+    Logger::Log("Chain is too long to be reorganized without violating the maximum "
+                "reorganization fanout. Chain length: %llu", chain->size());
   }
 
   KeyDistHints dist;
