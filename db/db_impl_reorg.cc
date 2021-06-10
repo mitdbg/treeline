@@ -51,12 +51,14 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
   if (chain->size() > options_.max_reorg_fanout) {
     for (auto& frame : *chain) {
       buf_mgr_->UnfixPage(*frame, /* is_dirty = */ false);
-      return Status::InvalidArgument(
-          "Chain is too long to be reorganized without violating the maximum "
-          "reorganization fanout.");
     }
+      
     Logger::Log("Chain is too long to be reorganized without violating the maximum "
                 "reorganization fanout. Chain length: %llu", chain->size());
+    
+    return Status::InvalidArgument(
+          "Chain is too long to be reorganized without violating the maximum "
+          "reorganization fanout.");
   }
 
   KeyDistHints dist;
