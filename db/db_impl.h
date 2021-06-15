@@ -88,8 +88,9 @@ class DBImpl : public DB {
       std::future<OverflowChain>& bf_future,
       size_t current_page_deferral_count);
 
-  // Fixes the page chain starting with the page at `page_id`. Returns `nullptr`
-  // if it detected a reorganization while fixing the first chain link.
+  // Fixes the page chain starting with the page at `page_id`. The returned page
+  // frames can optionally be unlocked before returning. Returns `nullptr` if it
+  // detected a reorganization while fixing the first chain link.
   OverflowChain FixOverflowChain(PhysicalPageId page_id, bool exclusive,
                                  bool unlock_before_returning);
 
