@@ -65,8 +65,8 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
   // All records in a chain currently share a prefix, so they will share a
   // prefix that is at least as long after reorganization. This reduces their
   // effective size.
-  size_t full_record_size = options_.key_hints.record_size;
-  size_t effective_record_size =
+  const size_t full_record_size = options_.key_hints.record_size;
+  const size_t effective_record_size =
       full_record_size - chain->at(0)->GetPage().GetKeyPrefix().size();
   dist.record_size = effective_record_size;
   dist.page_fill_pct = page_fill_pct;
@@ -97,7 +97,7 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
     // loop will stop once we hit 80%, because that amount of total space (3
     // pages, each 80% full) is used by the current chain.
   }
-  size_t records_per_page = dist.records_per_page();
+  const size_t records_per_page = dist.records_per_page();
 
   // 1. First pass to find boundaries and count number of records
   size_t record_count = 0;
