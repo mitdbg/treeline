@@ -30,12 +30,12 @@ class Page {
   // The number of bytes in a `Page` that can be used to store data. This value
   // depends on `Page::kSize` and will be smaller than it (some space is used
   // for internal bookkeeping).
-  static constexpr size_t UsableSize();
+  static size_t UsableSize();
 
   // The number of bytes of extra metadata used per record. Each record
   // currently uses additional metadata for the "slots" abstraction, which takes
   // space in the "usable" portion of the page.
-  static constexpr size_t PerRecordMetadataSize();
+  static size_t PerRecordMetadataSize();
 
   // Construct a `Page` that refers to its contents in the `data` buffer.
   explicit Page(void* data) : data_(data) {}

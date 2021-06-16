@@ -1201,6 +1201,10 @@ TEST_F(DBTest, RangeScanOverflow) {
 TEST_F(DBTest, ReorgOverflowChain) {
   constexpr size_t kKeySize = sizeof(uint64_t);
   constexpr size_t kValueSize = 8;
+  constexpr size_t kRecordSize = kKeySize + kValueSize;
+  size_t kHalfAPageWorthOfKeys =
+      (llsm::Page::UsableSize() - 2 * kRecordSize) / 2 /
+      (kRecordSize + llsm::Page::PerRecordMetadataSize());
 
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value_old(kValueSize, 0xFF);
@@ -1209,10 +1213,9 @@ TEST_F(DBTest, ReorgOverflowChain) {
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
-  options.key_hints.record_size = kKeySize + kValueSize;
+  options.key_hints.record_size = kRecordSize;
   // Generate records that will all fit on 1 page.
-  options.key_hints.num_keys =
-      llsm::Page::kSize / 2 / options.key_hints.record_size;
+  options.key_hints.num_keys = kHalfAPageWorthOfKeys;
   options.key_hints.min_key = 0;
   options.key_hints.key_step_size = 1;
 
@@ -1242,9 +1245,8 @@ TEST_F(DBTest, ReorgOverflowChain) {
   // KiB)
   constexpr size_t kNumOverflows = 8;
   llsm::KeyDistHints extra_key_hints;
-  extra_key_hints.record_size = kKeySize + kValueSize;
-  extra_key_hints.num_keys =
-      llsm::Page::kSize * kNumOverflows / 2 / extra_key_hints.record_size;
+  extra_key_hints.record_size = kRecordSize;
+  extra_key_hints.num_keys = kNumOverflows * kHalfAPageWorthOfKeys;
   extra_key_hints.min_key = 1024;
   extra_key_hints.key_step_size = 1;
   const std::vector<uint64_t> extra_lexicographic_keys =
@@ -1292,6 +1294,10 @@ TEST_F(DBTest, ReorgOverflowChain) {
 TEST_F(DBTest, ReorgOverflowChainNoHint) {
   constexpr size_t kKeySize = sizeof(uint64_t);
   constexpr size_t kValueSize = 8;
+  constexpr size_t kRecordSize = kKeySize + kValueSize;
+  size_t kHalfAPageWorthOfKeys =
+      (llsm::Page::UsableSize() - 2 * kRecordSize) / 2 /
+      (kRecordSize + llsm::Page::PerRecordMetadataSize());
 
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value_old(kValueSize, 0xFF);
@@ -1300,10 +1306,9 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
-  options.key_hints.record_size = kKeySize + kValueSize;
+  options.key_hints.record_size = kRecordSize;
   // Generate records that will all fit on 1 page.
-  options.key_hints.num_keys =
-      llsm::Page::kSize / 2 / options.key_hints.record_size;
+  options.key_hints.num_keys = kHalfAPageWorthOfKeys;
   options.key_hints.min_key = 0;
   options.key_hints.key_step_size = 1;
 
@@ -1334,9 +1339,8 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   // KiB)
   constexpr size_t kNumOverflows = 8;
   llsm::KeyDistHints extra_key_hints;
-  extra_key_hints.record_size = kKeySize + kValueSize;
-  extra_key_hints.num_keys =
-      llsm::Page::kSize * kNumOverflows / 2 / extra_key_hints.record_size;
+  extra_key_hints.record_size = kRecordSize;
+  extra_key_hints.num_keys = kNumOverflows * kHalfAPageWorthOfKeys;
   extra_key_hints.min_key = 1024;
   extra_key_hints.key_step_size = 1;
   const std::vector<uint64_t> extra_lexicographic_keys =

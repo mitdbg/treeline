@@ -33,11 +33,9 @@ inline const PackedMap* AsMapPtr(const void* data) {
 
 namespace llsm {
 
-constexpr size_t Page::UsableSize() { return ::PackedMap::kUsableSize; }
+size_t Page::UsableSize() { return ::PackedMap::kUsableSize; }
 
-constexpr size_t Page::PerRecordMetadataSize() {
-  return ::PackedMap::kSlotSize;
-}
+size_t Page::PerRecordMetadataSize() { return ::PackedMap::kSlotSize; }
 
 Page::Page(void* data, const Slice& lower_key, const Slice& upper_key)
     : Page(data, reinterpret_cast<const uint8_t*>(lower_key.data()),
@@ -142,7 +140,9 @@ Status Page::Delete(const Slice& key) {
 }
 
 // Retrieve the stored `overflow` page id for this page.
-PhysicalPageId Page::GetOverflow() const { return AsMapPtr(data_)->GetOverflow(); }
+PhysicalPageId Page::GetOverflow() const {
+  return AsMapPtr(data_)->GetOverflow();
+}
 
 // Set the stored overflow page id for this page to `overflow`.
 void Page::SetOverflow(PhysicalPageId overflow) {
@@ -150,9 +150,7 @@ void Page::SetOverflow(PhysicalPageId overflow) {
 }
 
 // Determine whether this page has an overflow page.
-bool Page::HasOverflow() {
-  return GetOverflow().IsValid();
-}
+bool Page::HasOverflow() { return GetOverflow().IsValid(); }
 
 // Check whether this is a valid Page (as opposed to a Page-sized
 // block of 0s).
