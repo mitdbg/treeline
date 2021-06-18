@@ -54,6 +54,12 @@ class BufferManager {
   BufferFrame& FixPage(const PhysicalPageId page_id, const bool exclusive,
                        const bool is_newly_allocated = false);
 
+  // Similar to `FixPage()` with the difference that if a frame is not
+  // available, this method will return `nullptr`.
+  BufferFrame* FixPageIfFrameAvailable(const PhysicalPageId page_id,
+                                       const bool exclusive,
+                                       const bool is_newly_allocated = false);
+
   // Unfixes a page updating whether it is dirty or not.
   void UnfixPage(BufferFrame& frame, const bool is_dirty);
 
@@ -83,6 +89,24 @@ class BufferManager {
   std::chrono::nanoseconds BufMgrMissLatency() const;
 
  private:
+  // Retrieves the page given by `page_id`, to be held exclusively or not
+  // based on the value of `exclusive`.
+  //
+  // If `abort_if_no_frames` is set to true, the page will not be fixed if it
+  // needs to be brought in from disk AND there are no frames currently
+  // available. When this happens, this method will return `nullptr`. If
+  // `abort_if_no_frames` is set to false, the returned pointer will always be
+  // valid.
+  //
+  // WARNING: Setting `is_newly_allocated` to true will skip reading the page
+  // from disk. This means that there is NO GUARANTEE about the data contained
+  // in the returned frame. This flag should ONLY be set when the caller will
+  // overwrite the frame data immediately after fixing the page (usually when
+  // allocating a new page).
+  BufferFrame* FixPageImpl(const PhysicalPageId page_id, const bool exclusive,
+                           const bool abort_if_no_frames,
+                           const bool is_newly_allocated = false);
+
   // Writes the page held by `frame` to disk.
   void WritePageOut(BufferFrame* frame) const;
 
@@ -100,7 +124,7 @@ class BufferManager {
   // Writes all dirty pages to disk (without unfixing). If `also_delete` is set,
   // all frames are also deleted (used for destructor).
   void FlushDirty(const bool also_delete);
-  
+
   // Increases the buffer pool by `diff_num_pages` additional pages. Returns the
   // (signed) adjustment in the buffer manager size, measured in pages of
   // expansion.

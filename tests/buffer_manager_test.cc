@@ -280,4 +280,39 @@ TEST(BufferManagerTest, DecreaseNumPages) {
   std::filesystem::remove_all(dbname);
 }
 
+TEST(BufferManagerTest, FixPageIfFrameAvailable) {
+  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  std::filesystem::remove_all(dbname);
+  std::filesystem::create_directory(dbname);
+
+  // Create buffer manager with 2 pages.
+  BufMgrOptions bm_options;
+  bm_options.buffer_pool_size = 2 * Page::kSize;
+  std::unique_ptr<BufferManager> buffer_manager =
+      std::make_unique<BufferManager>(bm_options, dbname);
+  
+  const auto pg1 = buffer_manager->GetFileManager()->AllocatePage();
+  const auto pg2 = buffer_manager->GetFileManager()->AllocatePage();
+  const auto pg3 = buffer_manager->GetFileManager()->AllocatePage();
+
+  BufferFrame* const frame1 = buffer_manager->FixPageIfFrameAvailable(pg1, /*exclusive=*/false);
+  ASSERT_NE(frame1, nullptr);
+
+  BufferFrame* const frame2 = buffer_manager->FixPageIfFrameAvailable(pg2, /*exclusive=*/false);
+  ASSERT_NE(frame2, nullptr);
+
+  BufferFrame* const frame3 = buffer_manager->FixPageIfFrameAvailable(pg3, /*exclusive=*/false);
+  ASSERT_EQ(frame3, nullptr);
+
+  buffer_manager->UnfixPage(*frame2, /*is_dirty=*/false);
+  BufferFrame* const frame4 = buffer_manager->FixPageIfFrameAvailable(pg3, /*exclusive=*/false);
+  ASSERT_NE(frame4, nullptr);
+
+  buffer_manager->UnfixPage(*frame1, /*is_dirty=*/false);
+  buffer_manager->UnfixPage(*frame4, /*is_dirty=*/false);
+  buffer_manager.reset();
+
+  std::filesystem::remove_all(dbname);
+}
+
 }  // namespace

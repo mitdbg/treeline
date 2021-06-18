@@ -6,7 +6,6 @@ namespace llsm {
 
 void Logger::Initialize(const std::filesystem::path& db_path) {
   Logger& logger = Instance();
-  assert(logger.logger_ == nullptr);
   logger.logger_ =
       std::make_unique<PosixLogger>(std::fopen((db_path / "LOG").c_str(), "a"));
 }

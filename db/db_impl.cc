@@ -702,7 +702,8 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
       if (ShouldFlush(foptions, bytes_for_page, current_page_deferral_count) &&
           !current_page_dispatched_fixer) {
         bf_future = workers_->Submit([this, current_page]() mutable {
-          return FixOverflowChain(current_page, /*exclusive=*/true,
+          return FixOverflowChain(current_page,
+                                  /*exclusive=*/true,
                                   /*unlock_before_returning=*/true);
         });
         current_page_dispatched_fixer = true;
@@ -871,18 +872,39 @@ DBImpl::OverflowChain DBImpl::FixOverflowChain(
   }
 
   OverflowChain frames = std::make_unique<std::vector<BufferFrame*>>();
+  frames->push_back(bf);
 
-  while (true) {
-    if (unlock_before_returning) {
+  // Fix all overflow pages in the chain, one by one. This loop will "back off"
+  // and retry if it finds out that there are not enough free frames in the
+  // buffer pool to fix all the pages in the chain.
+  //
+  // Note that it is still possible for this loop to cause a livelock if all
+  // threads end up fixing and unfixing their pages in unison.
+  while (frames->back()->GetPage().HasOverflow()) {
+    local_page_id = frames->back()->GetPage().GetOverflow();
+    bf = buf_mgr_->FixPageIfFrameAvailable(local_page_id, exclusive);
+    if (bf == nullptr) {
+      // No frames left. We should unfix all overflow pages in this chain (i.e.,
+      // all pages except the first page in the chain) to give other workers a
+      // chance to fix their entire chain.
+      while (frames->size() > 1) {
+        buf_mgr_->UnfixPage(*(frames->back()), /*is_dirty=*/false);
+        frames->pop_back();
+      }
+      assert(frames->size() == 1);
+      // Retry from the beginning of the chain.
+      continue;
+    }
+    frames->push_back(bf);
+  }
+
+  if (unlock_before_returning) {
+    for (auto& bf : *frames) {
       // Unlock the frame so that it can be "handed over" to the caller. This
       // does not decrement the fix count of the frame, i.e. there's no danger
       // of eviction before we can use it.
       bf->Unlock();
     }
-    frames->push_back(bf);
-    if (!bf->GetPage().HasOverflow()) break;
-    local_page_id = bf->GetPage().GetOverflow();
-    bf = &(buf_mgr_->FixPage(local_page_id, exclusive));
   }
 
   return frames;
