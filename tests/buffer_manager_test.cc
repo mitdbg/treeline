@@ -31,7 +31,8 @@ TEST(BufferManagerTest, WriteReadSequential) {
 
   // Create data.
   KeyDistHints key_hints;
-  key_hints.num_keys = 100000;
+  key_hints.record_size = 512;
+  key_hints.num_keys = 10 * key_hints.records_per_page();
   const auto values = key_utils::CreateValues<uint64_t>(key_hints);
   const auto records = key_utils::CreateRecords<uint64_t>(values);
 
@@ -72,7 +73,8 @@ TEST(BufferManagerTest, FlushDirty) {
 
   // Create data.
   KeyDistHints key_hints;
-  key_hints.num_keys = 100000;
+  key_hints.record_size = 512;
+  key_hints.num_keys = 10 * key_hints.records_per_page();
   const auto values = key_utils::CreateValues<uint64_t>(key_hints);
   const auto records = key_utils::CreateRecords<uint64_t>(values);
 
