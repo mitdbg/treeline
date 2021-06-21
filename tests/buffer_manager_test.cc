@@ -122,12 +122,14 @@ TEST(BufferManagerTest, Contains) {
 
   // Create data.
   KeyDistHints key_hints;
+  key_hints.record_size = 512;
+  key_hints.num_keys = 10 * key_hints.records_per_page();
   const auto values = key_utils::CreateValues<uint64_t>(key_hints);
   const auto records = key_utils::CreateRecords<uint64_t>(values);
 
   // Create buffer manager.
   BufMgrOptions bm_options;
-
+  bm_options.buffer_pool_size = 3 * Page::kSize;
   const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
   const std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(bm_options, dbname);
@@ -135,14 +137,12 @@ TEST(BufferManagerTest, Contains) {
                                   key_hints.records_per_page());
 
   // Check that first few pages are contained upon being fixed.
-  const size_t few_pages = std::min(
-      static_cast<size_t>(3), buffer_manager->GetFileManager()->GetNumPages());
+  const size_t few_pages = 3;
 
   for (size_t record_id = 0;
        record_id < few_pages * key_hints.records_per_page();
        record_id += key_hints.records_per_page()) {
     PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
-    ASSERT_FALSE(buffer_manager->Contains(page_id));
     llsm::BufferFrame& bf = buffer_manager->FixPage(page_id, true);
     ASSERT_TRUE(buffer_manager->Contains(page_id));
     buffer_manager->UnfixPage(bf, true);
@@ -151,8 +151,7 @@ TEST(BufferManagerTest, Contains) {
 
   // Check that the following few pages are not contained, having never been
   // fixed.
-  const size_t some_more_pages = std::min(
-      static_cast<size_t>(6), buffer_manager->GetFileManager()->GetNumPages());
+  const size_t some_more_pages = 6;
 
   for (size_t record_id = few_pages * key_hints.records_per_page();
        record_id < some_more_pages * key_hints.records_per_page();
