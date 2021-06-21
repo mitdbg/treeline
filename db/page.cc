@@ -37,6 +37,17 @@ size_t Page::UsableSize() { return ::PackedMap::kUsableSize; }
 
 size_t Page::PerRecordMetadataSize() { return ::PackedMap::kSlotSize; }
 
+size_t Page::NumRecordsThatFit(size_t record_size, size_t total_fence_bytes) {
+  return (UsableSize() - total_fence_bytes) /
+         (record_size + PerRecordMetadataSize());
+}
+
+size_t Page::NumPagesNeeded(size_t n, size_t record_size, size_t total_fence_bytes) {
+  const size_t num_records_that_fit =
+      NumRecordsThatFit(record_size, total_fence_bytes);
+  return (n / num_records_that_fit) + ((n % num_records_that_fit) != 0);
+}
+
 Page::Page(void* data, const Slice& lower_key, const Slice& upper_key)
     : Page(data, reinterpret_cast<const uint8_t*>(lower_key.data()),
            lower_key.size(), reinterpret_cast<const uint8_t*>(upper_key.data()),
