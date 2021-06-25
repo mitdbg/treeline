@@ -69,6 +69,7 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
   const size_t effective_record_size =
       full_record_size - chain->at(0)->GetPage().GetKeyPrefix().size();
   dist.record_size = effective_record_size;
+  dist.key_size = options_.key_hints.key_size;
   dist.page_fill_pct = page_fill_pct;
 
   // This is a conservative estimate for the number of keys, based on the

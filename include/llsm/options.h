@@ -19,7 +19,8 @@ struct KeyDistHints {
   size_t num_keys = 5000000;
   uint64_t min_key = 0;
   uint64_t key_step_size = 1;
-  size_t record_size = 16;
+  size_t record_size = 16;  // Including `key_size`.
+  size_t key_size = 8;
 
   // How full each database page should be, as a value between 1 and 100
   // inclusive (representing a percentage).
@@ -94,7 +95,7 @@ struct Options {
 
   // If true, LLSM will print messages to a debug log.
   bool enable_debug_log = true;
-  
+
   // The maximum number of pages that reorganizing a single chain can produce.
   size_t max_reorg_fanout = 50;
 };

@@ -37,6 +37,19 @@ class Page {
   // space in the "usable" portion of the page.
   static size_t PerRecordMetadataSize();
 
+  // The number of records of size `record_size` that would fit into
+  // an empty page with `total_fence_bytes` already used for fences.
+  // `record_size` should already take into account any compression because of
+  // common prefixes.
+  static size_t NumRecordsThatFit(size_t record_size, size_t total_fence_bytes);
+
+  // The minimum number of empty pages, with `total_fence_bytes` already used
+  // for fences in each page, that are required to hold `n` records of size
+  // `record_size`. `record_size` should already take into account any
+  // compression because of common prefixes.
+  static size_t NumPagesNeeded(size_t n, size_t record_size,
+                               size_t total_fence_bytes);
+
   // Construct a `Page` that refers to its contents in the `data` buffer.
   explicit Page(void* data) : data_(data) {}
 
