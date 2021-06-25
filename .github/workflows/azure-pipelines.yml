@@ -16,7 +16,7 @@ trigger:
       - README.md
 
 jobs:
-  - template: azure-ci-job.yml
+    template: azure-ci-job.yml
     parameters:
       jobName: MasterPushCheck
       jobDisplayName: Build, Run Tests, Run Checks (All)
