@@ -1,0 +1,5 @@
+{
+  "name": "Azure CI Workflow",
+  "description": "CI workflow template based on our Azure CI template.",
+  "iconName": "example-icon"
+}
