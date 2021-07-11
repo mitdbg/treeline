@@ -139,6 +139,9 @@ def main():
     fig, _ = plot_point_queries(data, "amzn")
     fig.savefig(out_dir / "ycsb-amzn-64.pdf")
 
+    fig, _ = plot_point_queries(data, "osm")
+    fig.savefig(out_dir / "ycsb-osm-64.pdf")
+
     fig, _ = plot_range_queries(data)
     fig.savefig(out_dir / "ycsb-64-range.pdf")
 
