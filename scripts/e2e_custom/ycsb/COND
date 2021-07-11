@@ -21,6 +21,7 @@ OSM_DATASET = "'$TP_DATASET_PATH/osm_ny.txt'"
 AMZN_DATASET = "'$TP_DATASET_PATH/amazon_reviews.txt'"
 
 # Runs all the YCSB experiments.
+# Running time: 7 hours (including creating the checkpoints)
 combine(
   name="ycsb",
   deps=[
