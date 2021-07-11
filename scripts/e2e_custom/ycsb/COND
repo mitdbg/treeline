@@ -1,8 +1,6 @@
 from itertools import product
 
-#WORKLOADS = ["a", "b", "c", "d", "e", "f"]
-#WORKLOADS = ["a", "b", "c", "d", "f"]
-WORKLOADS = ["a", "b", "c", "f"]
+WORKLOADS = ["a", "b", "c", "d", "e", "f"]
 
 DBS = ["llsm", "rocksdb"]
 
@@ -43,6 +41,7 @@ run_command(
   run="python3 combine_raw.py",
   deps=[
     ":ycsb-amzn-64",
+    ":ycsb-osm-64",
     ":ycsb-synthetic-64",
   ],
 )
