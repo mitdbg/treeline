@@ -68,7 +68,7 @@ def plot_point_queries(data, dataset_filter, show_legend=False):
 
 
 def plot_range_queries(data):
-    fig, ax = plt.subplots(figsize=(3, 3), tight_layout=True)
+    fig, ax = plt.subplots(figsize=(4, 3), tight_layout=True)
     relevant = data[data["workload"] == "E"]
     datasets = list(map(lambda cfg: DATASET_MAP[cfg], data["config"].unique()))
     assert len(relevant) == len(datasets)
@@ -90,7 +90,7 @@ def plot_range_queries(data):
     )
     ax.set_ylabel("Throughput (krecords/s)")
     ax.set_xlabel("Workload")
-    ax.set_xlim((-0.5, 1.5))
+    ax.set_xlim((-0.5, 2.5))
     ax.set_ylim((0, 400))
     ax.set_xticks(xpos)
     ax.set_xticklabels(datasets)

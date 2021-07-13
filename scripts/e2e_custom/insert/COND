@@ -26,6 +26,12 @@ run_command(
   run="../preload.sh insert-synthetic-64 insert/workloads/setup.yml",
 )
 
+run_command(
+  name="combine",
+  run="python3 combine_raw.py",
+  deps=[":insert-synthetic-64"],
+)
+
 run_experiment_group(
   name="insert-synthetic-64",
   run="../run.sh insert-synthetic-64",
