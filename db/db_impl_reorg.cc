@@ -57,7 +57,7 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
 
     Logger::Log(
         "Chain is too long to be reorganized without violating the maximum "
-        "reorganization fanout. Chain length: %" PRIu64,
+        "reorganization fanout. Chain length: %zu",
         chain->size());
 
     return Status::InvalidArgument(
@@ -195,8 +195,8 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
     upper = __builtin_bswap64(upper);
     Logger::Log(
         "WARNING: Reorganization produced fewer pages than the length of the "
-        "original chain. Pages will be leaked on disk.\nOld Pages: %" PRIu64
-        ", New Pages: %" PRIu64 "\nChain Boundary Lower: %" PRIu64
+        "original chain. Pages will be leaked on disk.\nOld Pages: %zu"
+        ", New Pages: %zu\nChain Boundary Lower: %" PRIu64
         ", Chain Boundary Upper: %" PRIu64,
         old_num_pages, new_num_pages, lower, upper);
   }
