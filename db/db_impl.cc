@@ -1,5 +1,7 @@
 #include "db_impl.h"
 
+#include <inttypes.h>
+
 #include <cassert>
 #include <condition_variable>
 #include <cstdlib>
@@ -156,7 +158,7 @@ Status DBImpl::InitializeNewDB() {
 
     model_->PreallocateAndInitialize(buf_mgr_, records,
                                      options_.key_hints.records_per_page());
-    Logger::Log("Created new %s. Total size: %llu bytes. Indexed pages: %llu",
+    Logger::Log("Created new %s. Total size: %" PRIu64 " bytes. Indexed pages: %" PRIu64,
                 options_.use_alex ? "ALEX" : "BTree", model_->GetSizeBytes(),
                 model_->GetNumPages());
 
@@ -196,7 +198,7 @@ Status DBImpl::InitializeExistingDB() {
   }
 
   model_->ScanFilesAndInitialize(buf_mgr_);
-  Logger::Log("Rebuilt %s. Total size: %llu bytes. Indexed pages: %llu",
+  Logger::Log("Rebuilt %s. Total size: %" PRIu64 " bytes. Indexed pages: %" PRIu64,
               options_.use_alex ? "ALEX" : "BTree", model_->GetSizeBytes(),
               model_->GetNumPages());
 
@@ -528,7 +530,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
              bufmgr_miss_latency_ns.count() /
              memtable_fill_duration_ns.count());
 
-    Logger::Log("Autotuned deferred I/O batch size: %llu bytes",
+    Logger::Log("Autotuned deferred I/O batch size: %" PRIu64 " bytes",
                 foptions.deferred_io_batch_size);
   }
 
@@ -613,12 +615,12 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
     assert(mem_budget_memtables_ < mem_budget_);
 
     // Log the tuned parameters.
-    Logger::Log("Buffer pool bytes wanted: %llu", buffer_pool_bytes_wanted);
+    Logger::Log("Buffer pool bytes wanted: %" PRIu64, buffer_pool_bytes_wanted);
     Logger::Log("Buffer pool pages added: %zd", buffer_pool_pages_added);
     Logger::Log(
-        "Memtable memory budget: %llu",
+        "Memtable memory budget: %" PRIu64,
         mem_budget_memtables_.load(std::memory_order::memory_order_relaxed));
-    Logger::Log("Buffer pool pages: %llu", buf_mgr_->GetNumPages());
+    Logger::Log("Buffer pool pages: %" PRIu64, buf_mgr_->GetNumPages());
   }
 
   // Mark the active memtable as immutable and create a new active memtable.

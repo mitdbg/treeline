@@ -1,3 +1,5 @@
+#include <inttypes.h>
+
 #include "bufmgr/page_memory_allocator.h"
 #include "db/logger.h"
 #include "db/merge_iterators.h"
@@ -52,13 +54,15 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
     for (auto& frame : *chain) {
       buf_mgr_->UnfixPage(*frame, /* is_dirty = */ false);
     }
-      
-    Logger::Log("Chain is too long to be reorganized without violating the maximum "
-                "reorganization fanout. Chain length: %llu", chain->size());
-    
+
+    Logger::Log(
+        "Chain is too long to be reorganized without violating the maximum "
+        "reorganization fanout. Chain length: %" PRIu64,
+        chain->size());
+
     return Status::InvalidArgument(
-          "Chain is too long to be reorganized without violating the maximum "
-          "reorganization fanout.");
+        "Chain is too long to be reorganized without violating the maximum "
+        "reorganization fanout.");
   }
 
   KeyDistHints dist;
@@ -191,8 +195,9 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
     upper = __builtin_bswap64(upper);
     Logger::Log(
         "WARNING: Reorganization produced fewer pages than the length of the "
-        "original chain. Pages will be leaked on disk.\nOld Pages: %llu, New "
-        "Pages: %llu\nChain Boundary Lower: %llu, Chain Boundary Upper: %llu",
+        "original chain. Pages will be leaked on disk.\nOld Pages: %" PRIu64
+        ", New Pages: %" PRIu64 "\nChain Boundary Lower: %" PRIu64
+        ", Chain Boundary Upper: %" PRIu64,
         old_num_pages, new_num_pages, lower, upper);
   }
 
