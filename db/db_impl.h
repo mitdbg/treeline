@@ -29,6 +29,9 @@ class DBImpl : public DB {
 
   Status Put(const WriteOptions& options, const Slice& key,
              const Slice& value) override;
+  Status BulkLoad(
+      const WriteOptions& options,
+      std::vector<std::pair<const Slice&, const Slice&>>& records) override;
   Status Get(const ReadOptions& options, const Slice& key,
              std::string* value_out) override;
   Status GetRange(const ReadOptions& options, const Slice& start_key,

@@ -50,6 +50,17 @@ class DB {
   virtual Status Put(const WriteOptions& options, const Slice& key,
                      const Slice& value) = 0;
 
+  // Efficiently add multiple `records` with distinct, sorted, same-sized keys
+  // and payloads to an empty database.
+  //
+  // The caller is responsible for verifying that `records` are distinct and
+  // sorted by key, and setting `options.sorted_load` to true accordingly;
+  // Status::InvalidArgument is returned otherwise. Returns Status::NotSupported
+  // if the database is not initially empty.
+  virtual Status BulkLoad(
+      const WriteOptions& options,
+      std::vector<std::pair<const Slice&, const Slice&>>& records) = 0;
+
   // Retrieve the value corresponding to `key` and store it in `value_out`.
   //
   // If the `key` does not exist, `value_out` will not be changed and a status

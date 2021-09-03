@@ -109,6 +109,9 @@ struct WriteOptions {
   // be checked to ensure they are indeed sorted. If not, the user is
   // responsible for ensuring that.
   bool perform_checks = true;
+  // Only checked when `sorted_load` is true. If true, the loaded records will
+  // be flushed to disk by the buffer manager after the bulk load is complete.
+  bool flush_dirty_after_bulk = true;
 
   // If true, the write will not be written to LLSM's write-ahead log.
   //
