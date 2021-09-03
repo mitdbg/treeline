@@ -89,6 +89,9 @@ class Page {
   // block of 0s).
   const bool IsValid() const;
 
+  // Returns the number of records stored in this page.
+  uint16_t GetNumRecords() const;
+
   // Check whether this is an overflow page & make/unmake it one.
   const bool IsOverflow() const;
   void MakeOverflow();
