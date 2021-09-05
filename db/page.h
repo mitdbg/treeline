@@ -66,7 +66,7 @@ class Page {
   // `Slice` shares the same lifetime as this page's `data` buffer.
   Slice GetKeyPrefix() const;
 
-  // Get the key boundaries for this page
+  // Get the key boundaries for this page.
   Slice GetLowerBoundary() const;
   Slice GetUpperBoundary() const;
 
@@ -88,6 +88,9 @@ class Page {
   // Check whether this is a valid Page (as opposed to a Page-sized
   // block of 0s).
   const bool IsValid() const;
+
+  // Returns the number of records stored in this page.
+  uint16_t GetNumRecords() const;
 
   // Check whether this is an overflow page & make/unmake it one.
   const bool IsOverflow() const;

@@ -52,6 +52,7 @@ if(LLSM_BUILD_BENCHMARKS)
   set(WITH_CORE_TOOLS OFF)
   set(WITH_TOOLS OFF)
   set(ROCKSDB_BUILD_SHARED OFF)
+  set(FAIL_ON_WARNINGS OFF)
   FetchContent_MakeAvailable(rocksdb)
 
   # The RocksDB CMakeLists.txt exports RocksDB as a static library called

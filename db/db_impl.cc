@@ -402,7 +402,63 @@ Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
   return WriteImpl(options, key, Slice(), format::WriteType::kDelete);
 }
 
-// Gets the number of pages indexed by the model
+Status DBImpl::BulkLoad(
+    const WriteOptions& options,
+    std::vector<std::pair<const Slice, const Slice>>& records) {
+  if (records.size() == 0) return Status::OK();
+  if (!options.sorted_load)
+    return Status::InvalidArgument(
+        "`options.sorted_load` must be true, indicating that the contents of "
+        "`records` are sorted and distinct.");
+
+  // Determine number of needed pages.
+  KeyDistHints dist;
+  dist.num_keys = records.size();
+  dist.key_size = records[0].first.size();  // Assume records are same size.
+  dist.record_size = records[0].second.size();
+
+  const size_t needed_pages = dist.num_pages();
+  const size_t records_per_page = dist.records_per_page();
+
+  // Fix sole existing page and check that DB is empty.
+  const PhysicalPageId sole_page_id = model_->KeyToPageId(records[0].first);
+  auto frame = &buf_mgr_->FixPage(sole_page_id, /* exclusive = */ true);
+
+  if (model_->GetNumPages() > 1 || frame->GetPage().GetNumRecords() != 0) {
+    buf_mgr_->UnfixPage(*frame, /*is_dirty = */ false);
+    return Status::NotSupported("Cannot bulk load a non-empty database");
+  }
+
+  // Repurpose the existing page as the first page.
+  Page page(frame->GetData(), Slice(std::string(1, 0x00)),
+            (records_per_page < records.size())
+                ? records.at(records_per_page).first
+                : Slice(""));
+
+  // Allocate additional pages and insert records.
+  page.Put(options, records[0].first, records[0].second);
+  for (size_t i = 1; i < records.size(); ++i) {
+    if (i % records_per_page == 0) {  // Switch over to next page.
+      buf_mgr_->UnfixPage(*frame, /*is_dirty = */ true);
+      const PhysicalPageId page_id = buf_mgr_->GetFileManager()->AllocatePage();
+      frame = &buf_mgr_->FixPage(page_id, /* exclusive = */ true,
+                                 /* is_newly_allocated = */ true);
+      page = Page(frame->GetData(), records.at(i).first,
+                  (i + records_per_page < records.size())
+                      ? records.at(i + records_per_page).first
+                      : Slice(""));
+      model_->Insert(records.at(i).first, page_id);
+    }
+    page.Put(options, records[i].first, records[i].second);
+  }
+
+  buf_mgr_->UnfixPage(*frame, /*is_dirty = */ true);
+  if (options.flush_dirty_after_bulk) buf_mgr_->FlushDirty();
+
+  return Status::OK();
+}
+
+// Gets the number of pages indexed by the model.
 size_t DBImpl::GetNumIndexedPages() const { return model_->GetNumPages(); }
 
 Status DBImpl::FlushMemTable(const bool disable_deferred_io) {

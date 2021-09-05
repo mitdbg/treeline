@@ -1385,4 +1385,109 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   db = nullptr;
 }
 
+TEST_F(DBTest, BulkLoad) {
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 8;
+  const std::string value(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kKeySize + kValueSize;
+  options.key_hints.key_size = kKeySize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1;
+  // Several pages needed for records
+  options.key_hints.num_keys = 100 * options.key_hints.records_per_page();
+
+  // Generate data used for the bulk load (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+  std::vector<std::pair<const llsm::Slice, const llsm::Slice>> records;
+
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    records.push_back(std::make_pair(key, llsm::Slice(value)));
+  }
+
+  // Open the DB without hints.
+  options.key_hints.num_keys = 0;
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Bulk load all the records
+  llsm::WriteOptions woptions;
+  woptions.sorted_load = true;
+  status = db->BulkLoad(woptions, records);
+  ASSERT_TRUE(status.ok());
+
+  // Read them back
+  std::string value_out;
+  for (size_t i = 0; i < records.size(); ++i) {
+    status = db->Get(llsm::ReadOptions(), records[i].first, &value_out);
+    ASSERT_TRUE(status.ok());
+    ASSERT_EQ(value, value_out);
+  }
+}
+
+TEST_F(DBTest, BulkLoadFailureModes) {
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 8;
+  const std::string value(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kKeySize + kValueSize;
+  options.key_hints.key_size = kKeySize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1;
+  // Several pages needed for records
+  options.key_hints.num_keys = 3 * options.key_hints.records_per_page();
+
+  // Generate data used for the write (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+  std::vector<std::pair<const llsm::Slice, const llsm::Slice>> records;
+
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    records.push_back(std::make_pair(key, value));
+  }
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write a single record to the DB.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  status = db->Put(woptions, records[0].first, records[0].second);
+  ASSERT_TRUE(status.ok());
+
+  // Fail 1: write options not set right
+  status = db->BulkLoad(woptions, records);
+  ASSERT_TRUE(status.IsInvalidArgument());
+
+  // Fail 2: a single page exists, but there's already a record there
+  woptions.sorted_load = true;
+  status = db->BulkLoad(woptions, records);
+  ASSERT_TRUE(status.IsNotSupportedError());
+
+  // Write all the records
+  for (size_t i = 0; i < records.size(); ++i) {
+    status = db->Put(woptions, records[i].first, records[i].second);
+  }
+
+  // Fail 3: already several pages there
+  status = db->BulkLoad(woptions, records);
+  ASSERT_TRUE(status.IsNotSupportedError());
+}
+
 }  // namespace

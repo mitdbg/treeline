@@ -42,7 +42,8 @@ size_t Page::NumRecordsThatFit(size_t record_size, size_t total_fence_bytes) {
          (record_size + PerRecordMetadataSize());
 }
 
-size_t Page::NumPagesNeeded(size_t n, size_t record_size, size_t total_fence_bytes) {
+size_t Page::NumPagesNeeded(size_t n, size_t record_size,
+                            size_t total_fence_bytes) {
   const size_t num_records_that_fit =
       NumRecordsThatFit(record_size, total_fence_bytes);
   return (n / num_records_that_fit) + ((n % num_records_that_fit) != 0);
@@ -166,6 +167,10 @@ bool Page::HasOverflow() { return GetOverflow().IsValid(); }
 // Check whether this is a valid Page (as opposed to a Page-sized
 // block of 0s).
 const bool Page::IsValid() const { return AsMapPtr(data_)->IsValid(); };
+
+uint16_t Page::GetNumRecords() const {
+  return AsMapPtr(data_)->GetNumRecords();
+}
 
 const bool Page::IsOverflow() const { return AsMapPtr(data_)->IsOverflow(); }
 
