@@ -59,7 +59,7 @@ class DB {
   // if the database is not initially empty.
   virtual Status BulkLoad(
       const WriteOptions& options,
-      std::vector<std::pair<const Slice&, const Slice&>>& records) = 0;
+      std::vector<std::pair<const Slice, const Slice>>& records) = 0;
 
   // Retrieve the value corresponding to `key` and store it in `value_out`.
   //

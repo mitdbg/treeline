@@ -66,7 +66,7 @@ class Page {
   // `Slice` shares the same lifetime as this page's `data` buffer.
   Slice GetKeyPrefix() const;
 
-  // Get the key boundaries for this page
+  // Get the key boundaries for this page.
   Slice GetLowerBoundary() const;
   Slice GetUpperBoundary() const;
 

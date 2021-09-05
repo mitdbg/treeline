@@ -1404,7 +1404,7 @@ TEST_F(DBTest, BulkLoad) {
   // Generate data used for the bulk load (and later read).
   const std::vector<uint64_t> lexicographic_keys =
       llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
-  std::vector<std::pair<const llsm::Slice&, const llsm::Slice&>> records;
+  std::vector<std::pair<const llsm::Slice, const llsm::Slice>> records;
 
   for (const auto& key_as_int : lexicographic_keys) {
     llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
@@ -1452,7 +1452,7 @@ TEST_F(DBTest, BulkLoadFailureModes) {
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
       llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
-  std::vector<std::pair<const llsm::Slice&, const llsm::Slice&>> records;
+  std::vector<std::pair<const llsm::Slice, const llsm::Slice>> records;
 
   for (const auto& key_as_int : lexicographic_keys) {
     llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
