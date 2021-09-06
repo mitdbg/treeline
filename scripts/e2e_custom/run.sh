@@ -38,6 +38,7 @@ iostat_pid=$!
   --skip_load \
   $args \
   > $COND_OUT/results.csv
+code=$?
 
 cp $DB_PATH/llsm/LOG $COND_OUT/llsm.log
 cp $DB_PATH/rocksdb/LOG $COND_OUT/rocksdb.log
@@ -45,3 +46,8 @@ du -b $DB_PATH > $COND_OUT/db_space.log
 
 kill -s SIGINT -- $iostat_pid
 wait
+
+# Report that the experiment failed if the `run_custom` exit code is not 0
+if [ $code -ne 0 ]; then
+  exit $code
+fi

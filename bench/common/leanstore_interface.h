@@ -27,6 +27,7 @@ class LeanStoreInterface {
     // assumptions.
     FLAGS_ssd_path = FLAGS_db_path + "/leanstore";
     FLAGS_dram_gib = (2 * FLAGS_memtable_size_mib + FLAGS_cache_size_mib) / 1024.0;
+    FLAGS_wal = !FLAGS_bypass_wal;
     if (!std::filesystem::exists(FLAGS_ssd_path)) {
       // LeanStore requires the on-disk file to actually exist before starting
       // up (it seems like it can be empty).
@@ -41,6 +42,10 @@ class LeanStoreInterface {
     if (db_ == nullptr) {
       return;
     }
+    // Persist changes to disk to be able to measure space usage.
+    // NOTE: LeanStore does not support "reopening" a persisted database. So
+    // doing this is primarily useful only for database size measurements.
+    db_->getBufferManager().writeAllBufferFrames();
     delete db_;
     db_ = nullptr;
   }
