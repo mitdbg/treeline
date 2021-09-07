@@ -850,7 +850,7 @@ TEST_F(DBTest, OverflowWithUpdates) {
     ASSERT_TRUE(status.ok());
   }
 
-  // Flush the writes to the pages(shuld cause overflow)
+  // Flush the writes to the pages (should cause overflow).
   db->FlushMemTable(/*disable_deferred_io = */ true);
 
   // Update some old keys.
