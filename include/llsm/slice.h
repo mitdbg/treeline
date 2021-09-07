@@ -17,6 +17,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstring>
+#include <iostream>
 #include <string>
 
 namespace llsm {
@@ -114,3 +115,9 @@ inline int Slice::compare(const Slice& b) const {
 }
 
 }  // namespace llsm
+
+namespace std {
+
+ostream& operator<<(ostream& os, const llsm::Slice& slice);
+
+}  // namespace std
