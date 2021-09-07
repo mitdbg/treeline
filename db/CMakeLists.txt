@@ -14,4 +14,5 @@ target_sources(llsm PRIVATE
   options.h
   page.cc
   page.h
-  posix_logger.h)
+  posix_logger.h
+  slice.cc)
