@@ -6,7 +6,7 @@ ostream& operator<<(ostream& os, const llsm::Slice& slice) {
   std::string s;
   for (int i = 0; i < slice.size(); ++i) {
     s += "(";
-    s += std::to_string(static_cast<int8_t>(slice.data()[i]));
+    s += std::to_string(static_cast<uint8_t>(slice.data()[i]));
     s += ")";
   }
   os << s;
