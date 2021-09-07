@@ -1,0 +1,50 @@
+from itertools import product
+
+WORKLOADS = [
+  "uniform-100",
+  "uniform-95",
+  "middle-95",
+]
+
+DBS = ["llsm", "rocksdb"]
+
+COMMON_OPTIONS = {
+  "bg_threads": 16,
+  "threads": 1,
+  "bypass_wal": True,
+  "llsm_page_fill_pct": 50,
+  "use_direct_io": True,
+  "latency_sample_period": 10,
+  "memtable_size_mib": 64,
+  "cache_size_mib": 279,    # 407 MiB in total (2 x 64 MiB + 279 MiB, ~33% of the dataset)
+  "reorg_length": 2,        # Aggressively reorganize
+  "use_alex": False,
+}
+
+run_command(
+  name="preload-synthetic-64",
+  run="../preload.sh insert-synthetic-64 insert/workloads/setup.yml",
+)
+
+run_command(
+  name="combine",
+  run="python3 combine_raw.py",
+  deps=[":insert-synthetic-64"],
+)
+
+run_experiment_group(
+  name="insert-synthetic-64",
+  run="../run.sh insert-synthetic-64",
+  experiments=[
+    ExperimentInstance(
+      name="insert-synthetic-64-{}-{}".format(db, workload),
+      options={
+        **COMMON_OPTIONS,
+        "db": db,
+        "workload_config": "insert/workloads/{}.yml".format(workload),
+      },
+    )
+    for workload, db in product(WORKLOADS, DBS)
+  ],
+  deps=[":preload-synthetic-64"],
+)

@@ -64,7 +64,7 @@ if(LLSM_BUILD_BENCHMARKS)
 
   FetchContent_Declare(
     ycsbr
-    GIT_REPOSITORY https://github.com/mitdbg/ycsbr
+    GIT_REPOSITORY git@github.com:mitdbg/ycsbr.git
     GIT_TAG        v3.2.2
   )
   FetchContent_MakeAvailable(ycsbr)
@@ -106,7 +106,7 @@ if(LLSM_BUILD_BENCHMARKS)
 
   FetchContent_Declare(
     leanstore
-    GIT_REPOSITORY https://github.com/mitdbg/leanstore
+    GIT_REPOSITORY git@github.com:mitdbg/leanstore.git
     GIT_TAG        build-compatible
   )
   FetchContent_MakeAvailable(leanstore)
