@@ -25,11 +25,12 @@ class LeanStoreInterface {
     // LeanStore relies on gflags for its configuration. This is a quick way to
     // make their configuration assumptions compatible with our configuration
     // assumptions.
-    FLAGS_ssd_path = FLAGS_db_path + "/leanstore";
+    FLAGS_ssd_path = FLAGS_db_path + "/leanstore/dbfile";
     FLAGS_dram_gib = (2 * FLAGS_memtable_size_mib + FLAGS_cache_size_mib) / 1024.0;
     FLAGS_wal = !FLAGS_bypass_wal;
     FLAGS_pp_threads = FLAGS_bg_threads;
     if (!std::filesystem::exists(FLAGS_ssd_path)) {
+      std::filesystem::create_directory(FLAGS_db_path + "/leanstore");
       // LeanStore requires the on-disk file to actually exist before starting
       // up (it seems like it can be empty).
       std::ofstream leanstore_file(FLAGS_ssd_path, std::ofstream::app);

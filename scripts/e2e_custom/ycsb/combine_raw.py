@@ -56,13 +56,14 @@ def main():
     # Process experiment result configs
     for dep in deps:
         for exp_inst in dep.iterdir():
-            # e.g.: ycsb-synthetic-64-llsm-a
+            # e.g.: ycsb-synthetic-64-llsm-a-1
             # NOTE: We don't need to extract the DB because it is already recorded
             #       in the result CSV.
             exp_parts = exp_inst.name.split("-")
             config = "-".join(exp_parts[:3])
             db = exp_parts[3]
             workload = exp_parts[4]
+            threads = int(exp_parts[5])
 
             # Process end-to-end results
             df = pd.read_csv(exp_inst / "results.csv")
@@ -71,6 +72,7 @@ def main():
             orig_columns = list(df.columns)
             df["config"] = config
             df["workload"] = workload
+            df["threads"] = threads
 
             # Process iostat results (physical I/O)
             read_kb, written_kb = process_iostat(
@@ -94,6 +96,10 @@ def main():
                 )
             elif db == "llsm":
                 shutil.copy2(exp_inst / "llsm.log", logs_dir / (exp_inst.name + ".log"))
+            elif db == "leanstore":
+                # As far as we know, LeanStore does not log debug information to
+                # a separate file.
+                pass
             else:
                 print("WARNING: Unknown DB", db)
 
