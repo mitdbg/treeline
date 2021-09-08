@@ -110,6 +110,8 @@ def plot_range_queries(data):
 
 def process_data(raw_data):
     df = raw_data.copy()
+    # This script only plots single threaded results
+    df = df[df["threads"] == 1]
     df["kops_per_s"] = df["mops_per_s"] * 1000
     df["workload"] = df["workload"].str.upper()
     llsm = df[df["db"] == "llsm"]

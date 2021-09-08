@@ -29,6 +29,7 @@ class LeanStoreInterface {
     FLAGS_dram_gib = (2 * FLAGS_memtable_size_mib + FLAGS_cache_size_mib) / 1024.0;
     FLAGS_wal = !FLAGS_bypass_wal;
     FLAGS_pp_threads = FLAGS_bg_threads;
+    FLAGS_falloc = 2;  // GiB
     if (!std::filesystem::exists(FLAGS_ssd_path)) {
       std::filesystem::create_directory(FLAGS_db_path + "/leanstore");
       // LeanStore requires the on-disk file to actually exist before starting
