@@ -722,10 +722,10 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
             // Submit flush job to workers - this is not the "first" page.
             page_write_futures.emplace_back(workers_->Submit(
                 [this, records_for_page = std::move(records_for_page),
-                 bf_future = std::move(bf_future),
-                 current_page_deferral_count]() mutable {
+                 bf_future = std::move(bf_future), current_page_deferral_count,
+                 bytes_for_page]() mutable {
                   FlushWorker(records_for_page, bf_future,
-                              current_page_deferral_count);
+                              current_page_deferral_count, bytes_for_page);
                 }));
             records_for_page.clear();
             bytes_for_page = 0;
@@ -771,10 +771,10 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
       assert(current_page.IsValid());
       page_write_futures.emplace_back(workers_->Submit(
           [this, records_for_page = std::move(records_for_page),
-           bf_future = std::move(bf_future),
-           current_page_deferral_count]() mutable {
+           bf_future = std::move(bf_future), current_page_deferral_count,
+           bytes_for_page]() mutable {
             FlushWorker(records_for_page, bf_future,
-                        current_page_deferral_count);
+                        current_page_deferral_count, bytes_for_page);
           }));
       records_for_page.clear();
       bytes_for_page = 0;
@@ -833,7 +833,8 @@ bool DBImpl::ShouldFlush(const FlushOptions& foptions, size_t batch_size,
 void DBImpl::FlushWorker(
     const std::vector<
         std::tuple<const Slice, const Slice, const format::WriteType>>& records,
-    std::future<OverflowChain>& bf_future, size_t current_page_deferral_count) {
+    std::future<OverflowChain>& bf_future, size_t current_page_deferral_count,
+    size_t batch_size) {
   auto frames = bf_future.get();
 
   if (frames == nullptr) {  // A reorg intervened, fall back to reinsertion
@@ -852,6 +853,24 @@ void DBImpl::FlushWorker(
     // Lock the frame again for use. This does not increment the fix count of
     // the frame, i.e. there is no danger of "double-fixing".
     bf->Lock(/*exclusive = */ true);
+  }
+
+  // Check whether this batch is so large that, most probably, reorg will be
+  // eventually needed.
+  const size_t total_fence_bytes =
+      frames->at(0)->GetPage().GetLowerBoundary().size() +
+      frames->at(0)->GetPage().GetUpperBoundary().size();
+  const size_t avg_full_record_size = batch_size / records.size();
+  const size_t avg_effective_record_size =
+      avg_full_record_size - frames->at(0)->GetPage().GetKeyPrefix().size();
+  const size_t
+      pages_needed =  // Assumption: existing are on avg as large as new.
+      Page::NumPagesNeeded(records.size(), avg_effective_record_size,
+                           total_fence_bytes);
+
+  if (pages_needed >= options_.reorg_length) {  // Can play around with this.
+    PreorganizeOverflowChain(records, frames, options_.key_hints.page_fill_pct);
+    return;
   }
 
   for (const auto& kv : records) {
@@ -930,9 +949,9 @@ DBImpl::OverflowChain DBImpl::FixOverflowChain(
   OverflowChain frames = std::make_unique<std::vector<BufferFrame*>>();
   frames->push_back(bf);
 
-  // Fix all overflow pages in the chain, one by one. This loop will "back off"
-  // and retry if it finds out that there are not enough free frames in the
-  // buffer pool to fix all the pages in the chain.
+  // Fix all overflow pages in the chain, one by one. This loop will "back
+  // off" and retry if it finds out that there are not enough free frames in
+  // the buffer pool to fix all the pages in the chain.
   //
   // Note that it is still possible for this loop to cause a livelock if all
   // threads end up fixing and unfixing their pages in unison.
@@ -940,9 +959,9 @@ DBImpl::OverflowChain DBImpl::FixOverflowChain(
     local_page_id = frames->back()->GetPage().GetOverflow();
     bf = buf_mgr_->FixPageIfFrameAvailable(local_page_id, exclusive);
     if (bf == nullptr) {
-      // No frames left. We should unfix all overflow pages in this chain (i.e.,
-      // all pages except the first page in the chain) to give other workers a
-      // chance to fix their entire chain.
+      // No frames left. We should unfix all overflow pages in this chain
+      // (i.e., all pages except the first page in the chain) to give other
+      // workers a chance to fix their entire chain.
       while (frames->size() > 1) {
         buf_mgr_->UnfixPage(*(frames->back()), /*is_dirty=*/false);
         frames->pop_back();

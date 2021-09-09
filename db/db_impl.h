@@ -47,7 +47,9 @@ class DBImpl : public DB {
   // Gets the number of pages indexed by the model (for debugging).
   size_t GetNumIndexedPages() const;
 
-  using OverflowChain = std::unique_ptr<std::vector<BufferFrame*>>;
+  using OverflowChain = std::shared_ptr<std::vector<BufferFrame*>>;
+  using FlushBatch = std::vector<
+      std::tuple<const Slice, const Slice, const format::WriteType>>;
 
  private:
   Status InitializeNewDB();
@@ -85,11 +87,9 @@ class DBImpl : public DB {
 
   // Code run by a worker thread to write out `records` to the page held by
   // `bf`.
-  void FlushWorker(
-      const std::vector<std::tuple<const Slice, const Slice,
-                                   const format::WriteType>>& records,
-      std::future<OverflowChain>& bf_future,
-      size_t current_page_deferral_count);
+  void FlushWorker(const FlushBatch& records,
+                   std::future<OverflowChain>& bf_future,
+                   size_t current_page_deferral_count, size_t batch_size);
 
   // Fixes the page chain starting with the page at `page_id`. The returned page
   // frames can optionally be unlocked before returning. Returns `nullptr` if it
@@ -102,12 +102,24 @@ class DBImpl : public DB {
   Status ReorganizeOverflowChain(PhysicalPageId page_id,
                                  uint32_t page_fill_pct);
 
+  // Reorganizes the page chain `chain` so as to efficiently insert `records`.
+  Status PreorganizeOverflowChain(const FlushBatch& records,
+                                  OverflowChain chain, uint32_t page_fill_pct);
+
+  // Fill `old_records` with copies of all the records in `chain`.
+  void ExtractOldRecords(OverflowChain chain, RecordBatch* old_records);
+
+  // Merge the records in `old_records` and `records` to create a single
+  // FlushBatch with the union of their records in ascending order. Whenever
+  // the same key exists in both colections, the value (or deletion marker)
+  // in `records` is given precendence.
+  void MergeBatches(RecordBatch& old_records, const FlushBatch& records,
+                    FlushBatch* merged);
+
   // Code run by a worker thread to reinsert `records` into the now-active
   // memtable if their flush was deferred.
-  void ReinsertionWorker(
-      const std::vector<std::tuple<const Slice, const Slice,
-                                   const format::WriteType>>& records,
-      size_t current_page_deferral_count);
+  void ReinsertionWorker(const FlushBatch& records,
+                         size_t current_page_deferral_count);
 
   // All writing threads must call this method "on entry" to ensure they wait if
   // needed (when the memtables are all full).

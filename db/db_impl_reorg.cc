@@ -204,4 +204,149 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
   return Status::OK();
 }
 
+// Reorganizes the page chain `chain` so as to efficiently insert `records`.
+Status DBImpl::PreorganizeOverflowChain(const FlushBatch& records,
+                                        OverflowChain chain,
+                                        uint32_t page_fill_pct) {
+  // 1. Merge the FlushBatch with the records currently in the chain to have
+  // everything in sorted order.
+  RecordBatch old_records;
+  ExtractOldRecords(chain, &old_records);
+  FlushBatch merged;
+  MergeBatches(old_records, records, &merged);
+
+  // 2. Calculate records per page.
+  KeyDistHints dist;
+  dist.num_keys = merged.size();
+  dist.key_size =
+      std::get<0>(records[0]).size() -
+      chain->at(0)->GetPage().GetKeyPrefix().size();  // Assume same size.
+  dist.record_size = dist.key_size + std::get<1>(records[0]).size();
+  dist.page_fill_pct = page_fill_pct;
+  while (dist.num_pages() > options_.max_reorg_fanout) {
+    ++dist.page_fill_pct;  // TODO: Think if this might create issues.
+  }
+  const size_t records_per_page = dist.records_per_page();
+
+  // 3. Allocate and populate in-memory pages
+  const size_t old_num_pages = chain->size();
+  const size_t new_num_pages = dist.num_pages();
+  PageBuffer page_data = PageMemoryAllocator::Allocate(new_num_pages);
+
+  std::vector<Page> pages;
+  Slice old_lower_boundary = chain->at(0)->GetPage().GetLowerBoundary();
+  Slice old_upper_boundary = chain->at(0)->GetPage().GetUpperBoundary();
+  for (size_t i = 0; i < new_num_pages; ++i) {
+    pages.emplace_back(page_data.get() + i * Page::kSize,
+                       (i == 0) ? old_lower_boundary
+                                : std::get<0>(merged[i * records_per_page]),
+                       (i == (new_num_pages - 1))
+                           ? old_upper_boundary
+                           : std::get<0>(merged[(i + 1) * records_per_page]));
+  }
+  for (size_t i = 0; i < merged.size(); ++i) {
+    pages.at(i / records_per_page)
+        .Put(std::get<0>(merged[i]), std::get<1>(merged[i]));
+  }
+
+  // 4. Update data and model, adding new pages to chain as required.
+  // Do this backwards to ensure correct behavior for stalled reads (i.e. ensure
+  // that they will wait for entire reorg to complete).
+  for (size_t i = new_num_pages - 1; i < new_num_pages; --i) {
+    BufferFrame* frame;
+    if (i < old_num_pages) {
+      frame = chain->at(i);
+    } else {
+      PhysicalPageId new_page_id = buf_mgr_->GetFileManager()->AllocatePage();
+      frame = &(buf_mgr_->FixPage(new_page_id, /* exclusive = */ true,
+                                  /* is_newly_allocated = */ true));
+    }
+
+    memcpy(frame->GetData(), page_data.get() + i * Page::kSize, Page::kSize);
+    model_->Insert(frame->GetPage().GetLowerBoundary(), frame->GetPageId());
+    // No need to remove anything from the model; the lower boundary of the
+    // first page will simply be overwritten.
+
+    buf_mgr_->UnfixPage(*frame, /* is_dirty = */ true);
+  }
+
+  // This only runs if there are more old pages than new pages. The older pages
+  // will be leaked on disk because no other pages reference them. This is a
+  // defensive check because, in theory, we should never produce fewer pages
+  // compared to what was originally in the chain.
+  //
+  // N.B. This can in fact happen with deletions or with updates to some key
+  // using a larger value than the original. Our code might need more changes to
+  // efficiently handle these scenaria.
+  for (size_t i = new_num_pages; i < old_num_pages; ++i) {
+    memset(chain->at(i)->GetData(), 0, Page::kSize);
+    buf_mgr_->UnfixPage(*(chain->at(i)), /*is_dirty=*/true);
+  }
+  if (new_num_pages < old_num_pages) {
+    uint64_t lower = 0, upper = 0;
+    lower =
+        *reinterpret_cast<const uint64_t*>(std::get<0>(merged.front()).data());
+    if (!std::get<0>(merged.back()).empty()) {
+      upper =
+          *reinterpret_cast<const uint64_t*>(std::get<0>(merged.back()).data());
+    }
+    lower = __builtin_bswap64(lower);
+    upper = __builtin_bswap64(upper);
+    Logger::Log(
+        "WARNING: Reorganization produced fewer pages than the length of the "
+        "original chain. Pages will be leaked on disk.\nOld Pages: %zu"
+        ", New Pages: %zu\nChain Boundary Lower: %" PRIu64
+        ", Chain Boundary Upper: %" PRIu64,
+        old_num_pages, new_num_pages, lower, upper);
+  }
+
+  return Status::OK();
+}
+
+void DBImpl::ExtractOldRecords(OverflowChain chain, RecordBatch* old_records) {
+  PageMergeIterator page_it(chain);
+
+  while (page_it.Valid()) {
+    old_records->emplace_back(page_it.key().ToString(),
+                              page_it.value().ToString());
+    page_it.Next();
+  }
+}
+
+void DBImpl::MergeBatches(RecordBatch& old_records, const FlushBatch& records,
+                          FlushBatch* merged) {
+  // Setup.
+  merged->reserve(old_records.size() + records.size());  // Overestimate.
+
+  // Handle comparisons
+  size_t i = 0, j = 0;
+  while (i < old_records.size() && j < records.size()) {
+    if (old_records[i].key() < std::get<0>(records[j])) {
+      merged->emplace_back(old_records[i].key(), old_records[i].value(),
+                           format::WriteType::kWrite);
+      ++i;
+    } else if (old_records[i].key() > std::get<0>(records[j])) {
+      merged->emplace_back(records[j]);
+      ++j;
+    } else {
+      if (std::get<2>(records[j]) == format::WriteType::kWrite)
+        merged->emplace_back(records[j]);
+      ++i;
+      ++j;
+    }
+  }
+
+  // Handle leftovers
+  while (i < old_records.size()) {
+    merged->emplace_back(old_records[i].key(), old_records[i].value(),
+                         format::WriteType::kWrite);
+    ++i;
+  }
+
+  while (j < records.size()) {
+    merged->emplace_back(records[j]);
+    ++j;
+  }
+}
+
 }  // namespace llsm
