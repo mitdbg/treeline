@@ -107,7 +107,7 @@ if(LLSM_BUILD_BENCHMARKS)
   FetchContent_Declare(
     leanstore
     GIT_REPOSITORY git@github.com:mitdbg/leanstore.git
-    GIT_TAG        build-compatible-2
+    GIT_TAG        gy-alignment
   )
   FetchContent_MakeAvailable(leanstore)
 endif()
