@@ -106,7 +106,7 @@ def main():
     # Write out the combined results
     combined = pd.concat(all_results)
     combined.sort_values(
-        ["config", "workload", "db"],
+        ["config", "workload", "db", "threads"],
         inplace=True,
         ignore_index=True,
     )
@@ -114,6 +114,7 @@ def main():
         [
             "config",
             "workload",
+            "threads",
             *orig_columns,
             "phys_read_kb",
             "phys_written_kb",

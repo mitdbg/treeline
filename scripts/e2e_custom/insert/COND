@@ -1,12 +1,16 @@
 from itertools import product
 
 WORKLOADS = [
-  "uniform-100",
+  # "uniform-100",  # Excluded for now
   "uniform-95",
   "middle-95",
 ]
 
-DBS = ["llsm", "rocksdb", "leanstore"]
+DBS = [
+  "llsm",
+  "rocksdb",
+  # "leanstore",  # Excluded for now
+]
 
 THREADS = [1, 2, 4, 8, 16]
 
@@ -19,7 +23,9 @@ COMMON_OPTIONS = {
   "memtable_size_mib": 64,
   "cache_size_mib": 279,    # 407 MiB in total (2 x 64 MiB + 279 MiB, ~33% of the dataset)
   "reorg_length": 2,        # Aggressively reorganize
-  "use_alex": False,
+  "use_alex": True,
+  "deferral_autotuning": True,
+  "max_deferrals": 1,
 }
 
 run_command(
