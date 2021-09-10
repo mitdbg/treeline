@@ -23,7 +23,7 @@ COMMON_OPTIONS = {
   "memtable_size_mib": 64,
   "cache_size_mib": 279,    # 407 MiB in total (2 x 64 MiB + 279 MiB, ~33% of the dataset)
   "reorg_length": 2,        # Aggressively reorganize
-  "use_alex": True,
+  "use_alex": False,
   "deferral_autotuning": True,
   "max_deferrals": 1,
 }
