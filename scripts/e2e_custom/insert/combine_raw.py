@@ -114,6 +114,7 @@ def main():
         [
             "config",
             "workload",
+            "threads",
             *orig_columns,
             "phys_read_kb",
             "phys_written_kb",
