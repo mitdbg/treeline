@@ -107,7 +107,7 @@ if(LLSM_BUILD_BENCHMARKS)
   FetchContent_Declare(
     leanstore
     GIT_REPOSITORY git@github.com:mitdbg/leanstore.git
-    GIT_TAG        build-compatible-3
+    GIT_TAG        a390dc62f4e56bb4cfd86e8eded2fcb7cbf634e4
   )
   FetchContent_MakeAvailable(leanstore)
 endif()
