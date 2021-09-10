@@ -3,7 +3,9 @@ from itertools import product
 WORKLOADS = [
   # "uniform-100",  # Excluded for now
   "uniform-95",
+  "uniform-50",
   "middle-95",
+  "middle-50",
 ]
 
 DBS = [
@@ -20,8 +22,8 @@ COMMON_OPTIONS = {
   "llsm_page_fill_pct": 50,
   "use_direct_io": True,
   "latency_sample_period": 10,
-  "memtable_size_mib": 64,
-  "cache_size_mib": 279,    # 407 MiB in total (2 x 64 MiB + 279 MiB, ~33% of the dataset)
+  "memtable_size_mib": 180,
+  "cache_size_mib": 47,     # 407 MiB in total (2 x 180 MiB + 47 MiB, ~33% of the dataset)
   "reorg_length": 2,        # Aggressively reorganize
   "use_alex": False,
   "deferral_autotuning": True,
