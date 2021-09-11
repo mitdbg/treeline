@@ -59,3 +59,6 @@ mkdir -p $DB_CHECKPOINT_PATH
   --verbose \
   --use_alex=false \
   $args
+
+# LeanStore does not support "reopening" an existing persisted database. So we
+# do not preload it here.

@@ -2,11 +2,16 @@ from itertools import product
 
 WORKLOADS = ["a", "b", "c", "d", "e", "f"]
 
-DBS = ["llsm", "rocksdb"]
+DBS = [
+  "llsm",
+  "rocksdb",
+  # "leanstore",  # Excluded for now
+]
+
+THREADS = [1, 2, 4, 8, 16]
 
 COMMON_OPTIONS = {
   "bg_threads": 16,
-  "threads": 1,
   "bypass_wal": True,
   "llsm_page_fill_pct": 50,
   "use_direct_io": True,
@@ -15,6 +20,8 @@ COMMON_OPTIONS = {
   "cache_size_mib": 279,    # 407 MiB in total (2 x 64 MiB + 279 MiB, ~33% of the dataset)
   "reorg_length": 2,        # Aggressively reorganize
   "use_alex": False,
+  "deferral_autotuning": True,
+  "max_deferrals": 1,
 }
 
 OSM_DATASET = "'$TP_DATASET_PATH/osm_ny.txt'"
@@ -69,14 +76,15 @@ run_experiment_group(
   run="../run.sh ycsb-synthetic-64",
   experiments=[
     ExperimentInstance(
-      name="ycsb-synthetic-64-{}-{}".format(db, workload),
+      name="ycsb-synthetic-64-{}-{}-{}".format(db, workload, threads),
       options={
         **COMMON_OPTIONS,
         "db": db,
         "workload_config": "ycsb/workloads/{}.yml".format(workload),
+        "threads": threads,
       },
     )
-    for workload, db in product(WORKLOADS, DBS)
+    for workload, db, threads in product(WORKLOADS, DBS, THREADS)
   ],
   deps=[":preload-synthetic-64"],
 )
@@ -86,15 +94,16 @@ run_experiment_group(
   run="../run.sh ycsb-osm-64",
   experiments=[
     ExperimentInstance(
-      name="ycsb-osm-64-{}-{}".format(db, workload),
+      name="ycsb-osm-64-{}-{}-{}".format(db, workload, threads),
       options={
         **COMMON_OPTIONS,
         "db": db,
         "workload_config": "ycsb/workloads/{}.yml".format(workload),
         "custom_dataset": OSM_DATASET,
+        "threads": threads,
       },
     )
-    for workload, db in product(WORKLOADS, DBS)
+    for workload, db, threads in product(WORKLOADS, DBS, THREADS)
   ],
   deps=[":preload-osm-64"],
 )
@@ -104,15 +113,16 @@ run_experiment_group(
   run="../run.sh ycsb-amzn-64",
   experiments=[
     ExperimentInstance(
-      name="ycsb-amzn-64-{}-{}".format(db, workload),
+      name="ycsb-amzn-64-{}-{}-{}".format(db, workload, threads),
       options={
         **COMMON_OPTIONS,
         "db": db,
         "workload_config": "ycsb/workloads/{}.yml".format(workload),
         "custom_dataset": AMZN_DATASET,
+        "threads": threads,
       },
     )
-    for workload, db in product(WORKLOADS, DBS)
+    for workload, db, threads in product(WORKLOADS, DBS, THREADS)
   ],
   deps=[":preload-amzn-64"],
 )
