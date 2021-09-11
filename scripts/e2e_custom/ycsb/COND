@@ -38,9 +38,23 @@ combine(
   ],
 )
 
-run_command(
+combine(
   name="plot",
+  deps=[
+    ":plot_bar",
+    ":plot_scale",
+  ],
+)
+
+run_command(
+  name="plot_bar",
   run="python3 plot_bar.py",
+  deps=[":combine"],
+)
+
+run_command(
+  name="plot_scale",
+  run="python3 plot_scale.py",
   deps=[":combine"],
 )
 

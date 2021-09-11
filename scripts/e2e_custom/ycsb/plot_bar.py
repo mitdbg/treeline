@@ -3,19 +3,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from plot_common import COLORS, DATASET_MAP
+
 pd.options.mode.chained_assignment = None
 plt.rcParams["font.size"] = 14
-
-COLORS = {
-    "llsm": "#0876B6",
-    "rocksdb": "#59C1FB",
-}
-
-DATASET_MAP = {
-    "ycsb-synthetic-64": "Synthetic",
-    "ycsb-amzn-64": "Amazon",
-    "ycsb-osm-64": "OSM",
-}
 
 
 def plot_point_queries(data, dataset_filter, show_legend=False):
@@ -40,7 +31,6 @@ def plot_point_queries(data, dataset_filter, show_legend=False):
         color=COLORS["rocksdb"],
         label="RocksDB",
     )
-    ax.set_ylabel("Throughput (kops/s)")
     ax.set_xlabel("Workload")
     ax.set_ylim((0, 100))
     ax.set_xticks(xpos)
@@ -63,7 +53,10 @@ def plot_point_queries(data, dataset_filter, show_legend=False):
             fancybox=False,
             framealpha=1,
             edgecolor="#000000",
+            bbox_to_anchor=(1.08, 1.1),
         )
+        # To save horizontal space
+        ax.set_ylabel("Throughput (kops/s)")
     return fig, ax
 
 
@@ -89,7 +82,7 @@ def plot_range_queries(data):
         label="RocksDB",
     )
     ax.set_ylabel("Throughput (krecords/s)")
-    ax.set_xlabel("Workload")
+    ax.set_xlabel("Dataset")
     ax.set_xlim((-0.5, 2.5))
     ax.set_ylim((0, 400))
     ax.set_xticks(xpos)
