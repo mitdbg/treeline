@@ -1,3 +1,4 @@
+import statistics
 import conductor.lib as cond
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,7 +23,7 @@ def plot_point_queries(data, dataset_filter, show_legend=False):
         relevant["kops_per_s_llsm"],
         width,
         color=COLORS["llsm"],
-        label="LLSM (ours)",
+        label="TreeLine",
     )
     ax.bar(
         xpos + width / 2,
@@ -56,7 +57,7 @@ def plot_point_queries(data, dataset_filter, show_legend=False):
             bbox_to_anchor=(1.08, 1.1),
         )
         # To save horizontal space
-        ax.set_ylabel("Throughput (kops/s)")
+        ax.set_ylabel("Throughput (krec/s)")
     return fig, ax
 
 
@@ -72,7 +73,7 @@ def plot_range_queries(data):
         relevant["kops_per_s_llsm"],
         width,
         color=COLORS["llsm"],
-        label="LLSM (ours)",
+        label="TreeLine",
     )
     ax.bar(
         xpos + width / 2,
@@ -81,7 +82,7 @@ def plot_range_queries(data):
         color=COLORS["rocksdb"],
         label="RocksDB",
     )
-    ax.set_ylabel("Throughput (krecords/s)")
+    #ax.set_ylabel("Throughput (krec/s)")
     ax.set_xlabel("Dataset")
     ax.set_xlim((-0.5, 2.5))
     ax.set_ylim((0, 400))
@@ -107,6 +108,8 @@ def process_data(raw_data):
     df = df[df["threads"] == 1]
     df["kops_per_s"] = df["mops_per_s"] * 1000
     df["workload"] = df["workload"].str.upper()
+    relevant_workloads = ["A", "B", "C", "D", "E", "F"]
+    df = df[df["workload"].isin(relevant_workloads)]
     llsm = df[df["db"] == "llsm"]
     rocksdb = df[df["db"] == "rocksdb"]
     combined = pd.merge(
@@ -121,12 +124,30 @@ def process_data(raw_data):
     return thpts_only
 
 
+def compute_summary_stats(data, output_file):
+    read_heavy_workloads = ["B", "C", "D", "E"]
+    overall_speedup = statistics.geometric_mean(data["speedup"])
+    read_heavy_bitmap = data["workload"].isin(read_heavy_workloads)
+    read_heavy = data[read_heavy_bitmap]
+    write_heavy = data[~read_heavy_bitmap]
+
+    read_heavy_speedup = statistics.geometric_mean(read_heavy["speedup"])
+    write_heavy_speedup = statistics.geometric_mean(write_heavy["speedup"])
+
+    print("\\newcommand{{\\TreeLineRocksDBSingleAvgSpeedup}}{{${:.2f}\\times$}}".format(overall_speedup), file=output_file)
+    print("\\newcommand{{\\TreeLineRocksDBSingleRHAvgSpeedup}}{{${:.2f}\\times$}}".format(read_heavy_speedup), file=output_file)
+    print("\\newcommand{{\\TreeLineRocksDBSingleWHAvgSpeedup}}{{${:.2f}\\times$}}".format(write_heavy_speedup), file=output_file)
+
+
 def main():
     deps = cond.get_deps_paths()
     out_dir = cond.get_output_path()
 
     raw_data = pd.read_csv(deps[0] / "all_results.csv")
     data = process_data(raw_data)
+
+    with open(out_dir / "summary_stats.txt", "w") as file:
+        compute_summary_stats(data, file)
 
     fig, _ = plot_point_queries(data, "synthetic", show_legend=True)
     fig.savefig(out_dir / "ycsb-synthetic-64.pdf")

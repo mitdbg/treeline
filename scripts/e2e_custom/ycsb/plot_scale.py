@@ -36,8 +36,8 @@ def plot_scale(data, dataset, workload, show_legend=False, show_ylabel=False):
         & (data["workload"] == workload)
     ]
 
-    linewidth=2.5
-    markersize=10
+    linewidth=3.5
+    markersize=15
 
     ax.plot(
         relevant["threads"],
@@ -46,7 +46,7 @@ def plot_scale(data, dataset, workload, show_legend=False, show_ylabel=False):
         marker="o",
         linewidth=linewidth,
         markersize=markersize,
-        label="LLSM (ours)",
+        label="TreeLine",
     )
     ax.plot(
         relevant["threads"],
@@ -69,7 +69,7 @@ def plot_scale(data, dataset, workload, show_legend=False, show_ylabel=False):
             edgecolor="#000000",
         )
     if show_ylabel:
-        ax.set_ylabel("Throughput (kops/s)")
+        ax.set_ylabel("Throughput (krec/s)")
 
     return fig, ax
 
