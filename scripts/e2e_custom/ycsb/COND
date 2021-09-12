@@ -1,6 +1,9 @@
 from itertools import product
 
-WORKLOADS = ["a", "b", "c", "d", "e", "f"]
+WORKLOADS = [
+  "a", "b", "c", "d", "e", "f",
+  "un_a", "un_b", "un_c", "un_d", "un_e", "un_f",
+]
 
 DBS = [
   "llsm",
