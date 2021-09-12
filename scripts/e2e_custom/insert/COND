@@ -50,6 +50,12 @@ run_command(
   deps=[":insert-synthetic-64"],
 )
 
+run_command(
+  name="combine_sweep",
+  run="python3 combine_raw.py",
+  deps=[":sweep-synthetic-64"],
+)
+
 run_experiment_group(
   name="insert-synthetic-64",
   run="../run.sh insert-synthetic-64",
