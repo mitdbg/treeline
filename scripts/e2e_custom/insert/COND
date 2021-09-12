@@ -8,6 +8,15 @@ WORKLOADS = [
   "middle-50",
 ]
 
+SWEEP_WORKLOADS = [
+  "middle-20",
+  "middle-50",
+  "middle-80",
+  "uniform-20",
+  "uniform-50",
+  "uniform-80",
+]
+
 DBS = [
   "llsm",
   "rocksdb",
@@ -55,6 +64,24 @@ run_experiment_group(
       },
     )
     for workload, db, threads in product(WORKLOADS, DBS, THREADS)
+  ],
+  deps=[":preload-synthetic-64"],
+)
+
+run_experiment_group(
+  name="sweep-synthetic-64",
+  run="../run.sh insert-synthetic-64",  # Same checkpoint name as the experiment above
+  experiments=[
+    ExperimentInstance(
+      name="sweep-synthetic-64-{}-{}-{}".format(db, workload, threads),
+      options={
+        **COMMON_OPTIONS,
+        "db": db,
+        "workload_config": "insert/workloads/{}.yml".format(workload),
+        "threads": threads,
+      },
+    )
+    for workload, db, threads in product(SWEEP_WORKLOADS, DBS, THREADS)
   ],
   deps=[":preload-synthetic-64"],
 )
