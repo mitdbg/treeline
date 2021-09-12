@@ -17,6 +17,15 @@ SWEEP_WORKLOADS = [
   "uniform-80",
 ]
 
+SCAN_WORKLOADS = [
+  "middlescan-20",
+  "middlescan-50",
+  "middlescan-80",
+  "uniformscan-20",
+  "uniformscan-50",
+  "uniformscan-80",
+]
+
 DBS = [
   "llsm",
   "rocksdb",
@@ -56,6 +65,12 @@ run_command(
   deps=[":sweep-synthetic-64"],
 )
 
+run_command(
+  name="combine_scan",
+  run="python3 combine_raw.py",
+  deps=[":scan-synthetic-64"],
+)
+
 run_experiment_group(
   name="insert-synthetic-64",
   run="../run.sh insert-synthetic-64",
@@ -88,6 +103,24 @@ run_experiment_group(
       },
     )
     for workload, db, threads in product(SWEEP_WORKLOADS, DBS, THREADS)
+  ],
+  deps=[":preload-synthetic-64"],
+)
+
+run_experiment_group(
+  name="scan-synthetic-64",
+  run="../run.sh insert-synthetic-64",  # Same checkpoint name as the experiment above
+  experiments=[
+    ExperimentInstance(
+      name="scan-synthetic-64-{}-{}-{}".format(db, workload, threads),
+      options={
+        **COMMON_OPTIONS,
+        "db": db,
+        "workload_config": "insert/workloads/{}.yml".format(workload),
+        "threads": threads,
+      },
+    )
+    for workload, db, threads in product(SCAN_WORKLOADS, DBS, THREADS)
   ],
   deps=[":preload-synthetic-64"],
 )

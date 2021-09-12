@@ -1,0 +1,26 @@
+record_size_bytes: 64
+
+load:
+  num_records: 20000000
+  distribution:
+    type: uniform
+    range_min: 0
+    range_max: 2000000000
+
+run:
+- num_requests: 20000000
+  insert:
+    proportion_pct: 80
+    distribution:
+      type: uniform
+      range_min: 0
+      range_max: 2000000000
+  read:
+    proportion_pct: 16
+    distribution:
+      type: uniform
+  scan:
+    proportion_pct: 4
+    max_length: 100
+    distribution:
+      type: uniform
