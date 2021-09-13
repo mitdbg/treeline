@@ -1,4 +1,5 @@
 import argparse
+import statistics
 import conductor.lib as cond
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,14 +16,19 @@ def process_data(raw_data):
     df = raw_data.copy()
     df["kops_per_s"] = df["mops_per_s"] * 1000
     df["workload"] = df["workload"].str.upper()
+    df["dist"] = df["workload"].apply(lambda w: "uniform" if w.startswith("UN_") else "zipfian")
+    df["workload"] = df["workload"].str.lstrip("UN_")
     llsm = df[df["db"] == "llsm"]
     rocksdb = df[df["db"] == "rocksdb"]
     combined = pd.merge(
-        llsm, rocksdb, on=["config", "workload", "threads"], suffixes=("_llsm", "_rocksdb")
+        llsm, rocksdb, on=["config", "workload", "dist", "threads"], suffixes=("_llsm", "_rocksdb")
     )
     thpts_only = combined[
-        ["config", "workload", "threads", "kops_per_s_llsm", "kops_per_s_rocksdb"]
+        ["config", "workload", "dist", "threads", "kops_per_s_llsm", "kops_per_s_rocksdb"]
     ]
+    thpts_only["speedup"] = (
+        thpts_only["kops_per_s_llsm"] / thpts_only["kops_per_s_rocksdb"]
+    )
     return thpts_only
 
 
@@ -74,6 +80,23 @@ def plot_scale(data, dataset, workload, show_legend=False, show_ylabel=False):
     return fig, ax
 
 
+def compute_summary_stats(data, output_file):
+    zipf_data = data[data["dist"] == "zipfian"]
+    uni_data = data[data["dist"] == "uniform"]
+
+    # Zipfian results
+    overall_speedup = statistics.geometric_mean(zipf_data["speedup"])
+    at16_speedup = statistics.geometric_mean(zipf_data[zipf_data["threads"] == 16]["speedup"])
+    print("\\newcommand{{\\TreeLineRocksDBMultiAvgSpeedup}}{{${:.2f}\\times$}}".format(overall_speedup), file=output_file)
+    print("\\newcommand{{\\TreeLineRocksDBMultiSixteenAvgSpeedup}}{{${:.2f}\\times$}}".format(at16_speedup), file=output_file)
+
+    # Uniform results
+    uni_overall_speedup = statistics.geometric_mean(uni_data["speedup"])
+    uni_at16_speedup = statistics.geometric_mean(uni_data[uni_data["threads"] == 16]["speedup"])
+    print("\\newcommand{{\\TreeLineRocksDBMultiAvgSpeedupUni}}{{${:.2f}\\times$}}".format(uni_overall_speedup), file=output_file)
+    print("\\newcommand{{\\TreeLineRocksDBMultiSixteenAvgSpeedupUni}}{{${:.2f}\\times$}}".format(uni_at16_speedup), file=output_file)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", required=False)
@@ -88,6 +111,11 @@ def main():
 
     data = process_data(raw_data)
 
+    with open(out_dir / "summary_stats.txt", "w") as file:
+        compute_summary_stats(data, file)
+
+    # Zipfian only right now
+    data = data[data["dist"] == "zipfian"]
     datasets = ["synthetic", "amzn", "osm"]
     workloads = ["A", "B", "C", "D", "E", "F"]
 

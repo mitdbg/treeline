@@ -33,7 +33,10 @@ def plot_point_queries(data, dataset_filter, show_legend=False):
         label="RocksDB",
     )
     ax.set_xlabel("Workload")
-    ax.set_ylim((0, 100))
+    if (data["dist"] == "uniform").all():
+        ax.set_ylim((0, 50))
+    else:
+        ax.set_ylim((0, 100))
     ax.set_xticks(xpos)
     ax.set_xticklabels(relevant["workload"])
 
@@ -108,15 +111,15 @@ def process_data(raw_data):
     df = df[df["threads"] == 1]
     df["kops_per_s"] = df["mops_per_s"] * 1000
     df["workload"] = df["workload"].str.upper()
-    relevant_workloads = ["A", "B", "C", "D", "E", "F"]
-    df = df[df["workload"].isin(relevant_workloads)]
+    df["dist"] = df["workload"].apply(lambda w: "uniform" if w.startswith("UN_") else "zipfian")
+    df["workload"] = df["workload"].str.lstrip("UN_")
     llsm = df[df["db"] == "llsm"]
     rocksdb = df[df["db"] == "rocksdb"]
     combined = pd.merge(
-        llsm, rocksdb, on=["config", "workload"], suffixes=("_llsm", "_rocksdb")
+        llsm, rocksdb, on=["config", "workload", "dist"], suffixes=("_llsm", "_rocksdb")
     )
     thpts_only = combined[
-        ["config", "workload", "kops_per_s_llsm", "kops_per_s_rocksdb"]
+        ["config", "workload", "dist", "kops_per_s_llsm", "kops_per_s_rocksdb"]
     ]
     thpts_only["speedup"] = (
         thpts_only["kops_per_s_llsm"] / thpts_only["kops_per_s_rocksdb"]
@@ -126,11 +129,15 @@ def process_data(raw_data):
 
 def compute_summary_stats(data, output_file):
     read_heavy_workloads = ["B", "C", "D", "E"]
-    overall_speedup = statistics.geometric_mean(data["speedup"])
+    # Zipfian only right now
+    zipf_bitmap = data["dist"] == "zipfian"
     read_heavy_bitmap = data["workload"].isin(read_heavy_workloads)
-    read_heavy = data[read_heavy_bitmap]
-    write_heavy = data[~read_heavy_bitmap]
 
+    zipf_overall = data[zipf_bitmap]
+    read_heavy = data[read_heavy_bitmap & zipf_bitmap]
+    write_heavy = data[~read_heavy_bitmap & zipf_bitmap]
+
+    overall_speedup = statistics.geometric_mean(zipf_overall["speedup"])
     read_heavy_speedup = statistics.geometric_mean(read_heavy["speedup"])
     write_heavy_speedup = statistics.geometric_mean(write_heavy["speedup"])
 
@@ -149,17 +156,19 @@ def main():
     with open(out_dir / "summary_stats.txt", "w") as file:
         compute_summary_stats(data, file)
 
-    fig, _ = plot_point_queries(data, "synthetic", show_legend=True)
-    fig.savefig(out_dir / "ycsb-synthetic-64.pdf")
+    for dist in ["zipfian", "uniform"]:
+        rel = data[data["dist"] == dist]
+        fig, _ = plot_point_queries(rel, "synthetic", show_legend=(dist == "zipfian"))
+        fig.savefig(out_dir / "ycsb-synthetic-64-{}.pdf".format(dist))
 
-    fig, _ = plot_point_queries(data, "amzn")
-    fig.savefig(out_dir / "ycsb-amzn-64.pdf")
+        fig, _ = plot_point_queries(rel, "amzn")
+        fig.savefig(out_dir / "ycsb-amzn-64-{}.pdf".format(dist))
 
-    fig, _ = plot_point_queries(data, "osm")
-    fig.savefig(out_dir / "ycsb-osm-64.pdf")
+        fig, _ = plot_point_queries(rel, "osm")
+        fig.savefig(out_dir / "ycsb-osm-64-{}.pdf".format(dist))
 
-    fig, _ = plot_range_queries(data)
-    fig.savefig(out_dir / "ycsb-64-range.pdf")
+        fig, _ = plot_range_queries(rel)
+        fig.savefig(out_dir / "ycsb-64-range-{}.pdf".format(dist))
 
 
 if __name__ == "__main__":

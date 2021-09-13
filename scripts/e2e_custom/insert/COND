@@ -107,6 +107,12 @@ run_experiment_group(
   deps=[":preload-synthetic-64"],
 )
 
+run_command(
+  name="plot_sweep",
+  run="python3 plot.py",
+  deps=[":combine_sweep"],
+)
+
 run_experiment_group(
   name="scan-synthetic-64",
   run="../run.sh insert-synthetic-64",  # Same checkpoint name as the experiment above
