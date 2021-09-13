@@ -167,15 +167,13 @@ run_command(
 run_command(
   name="preload-osm-64rdbb",
   run="../preload.sh ycsb-osm-64rdbb ycsb/workloads/setup.yml rocksdb "
-    "--rdb_bloom_bits={} ".format(RDB_BLOOM_BITS) +
-    "--custom_dataset={}".format(OSM_DATASET),
+    " --rdb_bloom_bits={} --custom_dataset={}".format(RDB_BLOOM_BITS, OSM_DATASET),
 )
 
 run_command(
   name="preload-amzn-64rdbb",
   run="../preload.sh ycsb-amzn-64rdbb ycsb/workloads/setup.yml rocksdb "
-    "--rdb_bloom_bits={} ".format(RDB_BLOOM_BITS) +
-    "--custom_dataset={}".format(AMZN_DATASET),
+    " --rdb_bloom_bits={} --custom_dataset={}".format(RDB_BLOOM_BITS, AMZN_DATASET),
 )
 
 run_experiment_group(

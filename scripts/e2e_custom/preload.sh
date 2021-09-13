@@ -28,7 +28,7 @@ fi
 orig_args=($@)
 args=()
 for val in "${orig_args[@]}"; do
-  args+=$(eval "echo $val")
+  args+=($(eval "echo $val"))
 done
 
 mkdir -p $DB_CHECKPOINT_PATH
