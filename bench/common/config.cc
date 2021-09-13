@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "db/page.h"
+#include "rocksdb/filter_policy.h"
 #include "rocksdb/table.h"
 
 namespace {
@@ -116,6 +117,10 @@ DEFINE_bool(use_alex, true,
             "If true, LLSM will use an ALEXModel. Otherwise, it will use a "
             "BTreeModel.");
 
+DEFINE_uint32(rdb_bloom_bits, 0,
+              "The number of bloom filter bits to use in RocksDB. Set to 0 to "
+              "disable the use of bloom filters.");
+
 // The minimum length of an overflow chain for which reorganization is
 // triggered.
 DEFINE_uint64(reorg_length, 5,
@@ -129,8 +134,8 @@ std::optional<DBType> ParseDBType(const std::string& candidate) {
   static std::unordered_map<std::string, DBType> kStringToDBType = {
       {"all", DBType::kAll},
       {"llsm", DBType::kLLSM},
-      {"rocksdb", DBType::kRocksDB}, 
-      {"leanstore", DBType::kLeanStore}, 
+      {"rocksdb", DBType::kRocksDB},
+      {"leanstore", DBType::kLeanStore},
       {"kvell", DBType::kKVell}};
 
   auto it = kStringToDBType.find(candidate);
@@ -155,6 +160,16 @@ rocksdb::Options BuildRocksDBOptions() {
       Page::kSize;  // Use the same block size as LLSM's pages.
   table_options.checksum = rocksdb::kNoChecksum;
   table_options.block_cache = rocksdb::NewLRUCache(cache_options);
+  if (FLAGS_rdb_bloom_bits > 0) {
+    if (FLAGS_verbose) {
+      std::cerr << "> RocksDB using bloom filters with " << FLAGS_rdb_bloom_bits
+                << " bits." << std::endl;
+    }
+    table_options.filter_policy.reset(
+        rocksdb::NewBloomFilterPolicy(FLAGS_rdb_bloom_bits, false));
+  } else if (FLAGS_verbose) {
+    std::cerr << "> RocksDB is NOT using bloom filters." << std::endl;
+  }
   options.table_factory.reset(
       rocksdb::NewBlockBasedTableFactory(table_options));
 
