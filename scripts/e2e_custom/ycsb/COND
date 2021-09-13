@@ -30,6 +30,9 @@ COMMON_OPTIONS = {
 OSM_DATASET = "'$TP_DATASET_PATH/osm_ny.txt'"
 AMZN_DATASET = "'$TP_DATASET_PATH/amazon_reviews.txt'"
 
+# Number of bits to use for RocksDB's bloom filters
+RDB_BLOOM_BITS = 10
+
 # Runs all the YCSB experiments.
 # Running time: 7 hours (including creating the checkpoints)
 combine(
@@ -73,18 +76,18 @@ run_command(
 
 run_command(
   name="preload-synthetic-64",
-  run="../preload.sh ycsb-synthetic-64 ycsb/workloads/setup.yml",
+  run="../preload.sh ycsb-synthetic-64 ycsb/workloads/setup.yml all",
 )
 
 run_command(
   name="preload-osm-64",
-  run="../preload.sh ycsb-osm-64 ycsb/workloads/setup.yml "
+  run="../preload.sh ycsb-osm-64 ycsb/workloads/setup.yml all "
     "--custom_dataset={}".format(OSM_DATASET),
 )
 
 run_command(
   name="preload-amzn-64",
-  run="../preload.sh ycsb-amzn-64 ycsb/workloads/setup.yml "
+  run="../preload.sh ycsb-amzn-64 ycsb/workloads/setup.yml all "
     "--custom_dataset={}".format(AMZN_DATASET),
 )
 
@@ -142,4 +145,97 @@ run_experiment_group(
     for workload, db, threads in product(WORKLOADS, DBS, THREADS)
   ],
   deps=[":preload-amzn-64"],
+)
+
+# RocksDB experiments with bloom filters
+run_command(
+  name="rdbb",
+  run="python3 combine_raw.py",
+  deps=[
+    ":ycsb-synthetic-64rdbb",
+    ":ycsb-osm-64rdbb",
+    ":ycsb-amzn-64rdbb",
+  ],
+)
+
+run_command(
+  name="preload-synthetic-64rdbb",
+  run="../preload.sh ycsb-synthetic-64rdbb ycsb/workloads/setup.yml rocksdb "
+    "--rdb_bloom_bits={}".format(RDB_BLOOM_BITS),
+)
+
+run_command(
+  name="preload-osm-64rdbb",
+  run="../preload.sh ycsb-osm-64rdbb ycsb/workloads/setup.yml rocksdb "
+    "--rdb_bloom_bits={} ".format(RDB_BLOOM_BITS) +
+    "--custom_dataset={}".format(OSM_DATASET),
+)
+
+run_command(
+  name="preload-amzn-64rdbb",
+  run="../preload.sh ycsb-amzn-64rdbb ycsb/workloads/setup.yml rocksdb "
+    "--rdb_bloom_bits={} ".format(RDB_BLOOM_BITS) +
+    "--custom_dataset={}".format(AMZN_DATASET),
+)
+
+run_experiment_group(
+  name="ycsb-synthetic-64rdbb",
+  run="../run.sh ycsb-synthetic-64rdbb",
+  experiments=[
+    ExperimentInstance(
+      name="ycsb-synthetic-64rdbb-rocksdb-{}-{}".format(workload, threads),
+      options={
+        **COMMON_OPTIONS,
+        "db": "rocksdb",
+        "workload_config": "ycsb/workloads/{}.yml".format(workload),
+        "threads": threads,
+        "rdb_bloom_bits": RDB_BLOOM_BITS,
+      },
+    )
+    for workload, threads in product(WORKLOADS, THREADS)
+    if not workload.startswith("un_")
+  ],
+  deps=[":preload-synthetic-64rdbb"],
+)
+
+run_experiment_group(
+  name="ycsb-osm-64rdbb",
+  run="../run.sh ycsb-osm-64rdbb",
+  experiments=[
+    ExperimentInstance(
+      name="ycsb-osm-64rdbb-rocksdb-{}-{}".format(workload, threads),
+      options={
+        **COMMON_OPTIONS,
+        "db": "rocksdb",
+        "workload_config": "ycsb/workloads/{}.yml".format(workload),
+        "custom_dataset": OSM_DATASET,
+        "threads": threads,
+        "rdb_bloom_bits": RDB_BLOOM_BITS,
+      },
+    )
+    for workload, threads in product(WORKLOADS, THREADS)
+    if not workload.startswith("un_")
+  ],
+  deps=[":preload-osm-64rdbb"],
+)
+
+run_experiment_group(
+  name="ycsb-amzn-64rdbb",
+  run="../run.sh ycsb-amzn-64rdbb",
+  experiments=[
+    ExperimentInstance(
+      name="ycsb-amzn-64rdbb-rocksdb-{}-{}".format(workload, threads),
+      options={
+        **COMMON_OPTIONS,
+        "db": "rocksdb",
+        "workload_config": "ycsb/workloads/{}.yml".format(workload),
+        "custom_dataset": AMZN_DATASET,
+        "threads": threads,
+        "rdb_bloom_bits": RDB_BLOOM_BITS,
+      },
+    )
+    for workload, threads in product(WORKLOADS, THREADS)
+    if not workload.startswith("un_")
+  ],
+  deps=[":preload-amzn-64rdbb"],
 )

@@ -50,7 +50,7 @@ COMMON_OPTIONS = {
 
 run_command(
   name="preload-synthetic-64",
-  run="../preload.sh insert-synthetic-64 insert/workloads/setup.yml",
+  run="../preload.sh insert-synthetic-64 insert/workloads/setup.yml all",
 )
 
 run_command(
