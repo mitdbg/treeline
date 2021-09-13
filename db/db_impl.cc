@@ -917,9 +917,16 @@ void DBImpl::FlushWorker(
 
   // If chain got too long, trigger reorganization
   if (frames->size() >= options_.reorg_length) {
-    workers_->SubmitNoWait([this, page_id = frames->at(0)->GetPageId()]() {
+    const auto page_id = frames->at(0)->GetPageId();
+    if (options_.run_reorg_during_flush) {
       ReorganizeOverflowChain(page_id, options_.key_hints.page_fill_pct);
-    });
+    } else {
+      // By default, the reorganization will be scheduled to run in the
+      // background.
+      workers_->SubmitNoWait([this, page_id]() {
+        ReorganizeOverflowChain(page_id, options_.key_hints.page_fill_pct);
+      });
+    }
   }
 
   // Unfix all

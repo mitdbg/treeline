@@ -130,3 +130,32 @@ run_experiment_group(
   ],
   deps=[":preload-synthetic-64"],
 )
+
+# Factor analysis experiment for reorganization (run during flush or in the background)
+run_experiment_group(
+  name="llsm-factor",
+  run="../run.sh insert-synthetic-64",  # Same checkpoint name as the experiment above
+  experiments=[
+    ExperimentInstance(
+      name="llsm-factor-reorgflush",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "insert/workloads/middle-50.yml",
+        "threads": 8,
+        "run_reorg_during_flush": True,
+      },
+    ),
+    ExperimentInstance(
+      name="llsm-factor-reorgbg",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "insert/workloads/middle-50.yml",
+        "threads": 8,
+        "run_reorg_during_flush": False,
+      },
+    )
+  ],
+  deps=[":preload-synthetic-64"],
+)

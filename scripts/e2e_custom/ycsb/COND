@@ -237,3 +237,51 @@ run_experiment_group(
   ],
   deps=[":preload-amzn-64rdbb"],
 )
+
+# Factor analysis experiments
+# Use YCSB A
+FACTOR_THREADS = 8
+
+run_experiment_group(
+  name="llsm-factor",
+  run="../run.sh ycsb-synthetic-64",
+  experiments=[
+    ExperimentInstance(
+      name="llsm-factor-base",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": FACTOR_THREADS,
+        "bg_threads": 2,
+        "deferral_autotuning": False,
+        "max_deferrals": 0,
+      },
+    ),
+    ExperimentInstance(
+      name="llsm-factor-parflush",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": FACTOR_THREADS,
+        "bg_threads": 16,
+        "deferral_autotuning": False,
+        "max_deferrals": 0,
+      },
+    ),
+    ExperimentInstance(
+      name="llsm-factor-defer",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": FACTOR_THREADS,
+        "bg_threads": 16,
+        "deferral_autotuning": True,
+        "max_deferrals": 1,
+      },
+    ),
+  ],
+  deps=[":preload-synthetic-64"],
+)
