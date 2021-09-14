@@ -262,6 +262,18 @@ run_experiment_group(
       },
     ),
     ExperimentInstance(
+      name="llsm-factor-defer",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": FACTOR_THREADS,
+        "bg_threads": 2,
+        "deferral_autotuning": True,
+        "max_deferrals": 1,
+      },
+    ),
+    ExperimentInstance(
       name="llsm-factor-parflush",
       options={
         **COMMON_OPTIONS,
@@ -269,17 +281,49 @@ run_experiment_group(
         "workload_config": "ycsb/workloads/a.yml",
         "threads": FACTOR_THREADS,
         "bg_threads": 16,
+        "deferral_autotuning": True,
+        "max_deferrals": 1,
+      },
+    ),
+  ],
+  deps=[":preload-synthetic-64"],
+)
+
+run_experiment_group(
+  name="llsm-factor-1",
+  run="../run.sh ycsb-synthetic-64",
+  experiments=[
+    ExperimentInstance(
+      name="llsm-factor-base-1",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": 1,
+        "bg_threads": 2,
         "deferral_autotuning": False,
         "max_deferrals": 0,
       },
     ),
     ExperimentInstance(
-      name="llsm-factor-defer",
+      name="llsm-factor-parflush-1",
       options={
         **COMMON_OPTIONS,
         "db": "llsm",
         "workload_config": "ycsb/workloads/a.yml",
-        "threads": FACTOR_THREADS,
+        "threads": 1,
+        "bg_threads": 16,
+        "deferral_autotuning": False,
+        "max_deferrals": 0,
+      },
+    ),
+    ExperimentInstance(
+      name="llsm-factor-defer-1",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": 1,
         "bg_threads": 16,
         "deferral_autotuning": True,
         "max_deferrals": 1,

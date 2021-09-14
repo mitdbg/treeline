@@ -50,7 +50,7 @@ COMMON_OPTIONS = {
 
 run_command(
   name="preload-synthetic-64",
-  run="../preload.sh insert-synthetic-64 insert/workloads/setup.yml all",
+  run="../preload.sh insert-synthetic-64 insert/workloads/setup.yml all --rdb_bloom_bits=10",
 )
 
 run_command(
@@ -100,6 +100,7 @@ run_experiment_group(
         "db": db,
         "workload_config": "insert/workloads/{}.yml".format(workload),
         "threads": threads,
+        "rdb_bloom_bits": 10,
       },
     )
     for workload, db, threads in product(SWEEP_WORKLOADS, DBS, THREADS)
@@ -124,6 +125,7 @@ run_experiment_group(
         "db": db,
         "workload_config": "insert/workloads/{}.yml".format(workload),
         "threads": threads,
+        "rdb_bloom_bits": 10,
       },
     )
     for workload, db, threads in product(SCAN_WORKLOADS, DBS, THREADS)
@@ -131,31 +133,62 @@ run_experiment_group(
   deps=[":preload-synthetic-64"],
 )
 
+run_command(
+  name="plot-middle8",
+  run="python3 plot.py",
+  deps=[":combine-middle8"],
+)
+
+run_command(
+  name="plot-middlescan8",
+  run="python3 plot.py",
+  deps=[":combine-middlescan8"],
+)
+
+run_command(
+  name="combine-middle8",
+  run="python3 combine_raw.py",
+  deps=[":middle8"],
+)
+
+run_command(
+  name="combine-middlescan8",
+  run="python3 combine_raw.py",
+  deps=[":middlescan8"],
+)
+
+combine(
+  name="middle8",
+  deps=[
+    ":sweep-synthetic-64-{}-{}-8".format(db, workload)
+    for workload, db in product(["middle-20", "middle-50", "middle-80"], DBS)
+  ],
+)
+
+combine(
+  name="middlescan8",
+  deps=[
+    ":scan-synthetic-64-{}-{}-8".format(db, workload)
+    for workload, db in product(["middlescan-20", "middlescan-50", "middlescan-80"], DBS)
+  ],
+)
+
 # Factor analysis experiment for reorganization (run during flush or in the background)
 run_experiment_group(
-  name="llsm-factor",
+  name="llsm-reorg",
   run="../run.sh insert-synthetic-64",  # Same checkpoint name as the experiment above
   experiments=[
     ExperimentInstance(
-      name="llsm-factor-reorgflush",
+      name="llsm-reorg-{}".format(reorg_length),
       options={
         **COMMON_OPTIONS,
         "db": "llsm",
         "workload_config": "insert/workloads/middle-50.yml",
         "threads": 8,
-        "run_reorg_during_flush": True,
-      },
-    ),
-    ExperimentInstance(
-      name="llsm-factor-reorgbg",
-      options={
-        **COMMON_OPTIONS,
-        "db": "llsm",
-        "workload_config": "insert/workloads/middle-50.yml",
-        "threads": 8,
-        "run_reorg_during_flush": False,
+        "reorg_length": reorg_length,
       },
     )
+    for reorg_length in [2, 4, 6]
   ],
   deps=[":preload-synthetic-64"],
 )
