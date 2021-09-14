@@ -55,13 +55,19 @@ combine(
 run_command(
   name="plot_bar",
   run="python3 plot_bar.py",
-  deps=[":combine"],
+  deps=[
+    ":combine",
+    ":rdbb",
+  ],
 )
 
 run_command(
   name="plot_scale",
   run="python3 plot_scale.py",
-  deps=[":combine"],
+  deps=[
+    ":combine",
+    ":rdbb",
+  ],
 )
 
 run_command(

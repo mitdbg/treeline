@@ -2,6 +2,7 @@ import argparse
 import statistics
 import conductor.lib as cond
 import matplotlib.pyplot as plt
+import pathlib
 import numpy as np
 import pandas as pd
 from itertools import product
@@ -18,17 +19,34 @@ def process_data(raw_data):
     df["workload"] = df["workload"].str.upper()
     df["dist"] = df["workload"].apply(lambda w: "uniform" if w.startswith("UN_") else "zipfian")
     df["workload"] = df["workload"].str.lstrip("UN_")
+    df["db"] = df.apply(lambda row: row["db"] + "-bf" if row["config"].endswith("rdbb") else row["db"], axis=1)
+    df["config"] = df["config"].str.rstrip("-rdbb")
     llsm = df[df["db"] == "llsm"]
     rocksdb = df[df["db"] == "rocksdb"]
-    combined = pd.merge(
-        llsm, rocksdb, on=["config", "workload", "dist", "threads"], suffixes=("_llsm", "_rocksdb")
+    rocksdb_bf = df[df["db"] == "rocksdb-bf"]
+    # Three way join
+    join_on = ["config", "workload", "dist", "threads"]
+    combined1 = pd.merge(
+        llsm, rocksdb, on=join_on, suffixes=("_llsm", "_rocksdb")
     )
-    thpts_only = combined[
-        ["config", "workload", "dist", "threads", "kops_per_s_llsm", "kops_per_s_rocksdb"]
-    ]
+    combined = pd.merge(combined1, rocksdb_bf, on=join_on, how="outer")
+    thpts_only = combined[[
+        "config",
+        "workload",
+        "dist",
+        "threads",
+        "kops_per_s_llsm",
+        "kops_per_s_rocksdb",
+        "kops_per_s",
+    ]]
+    thpts_only = thpts_only.rename(columns={"kops_per_s": "kops_per_s_rocksdb_bf"})
     thpts_only["speedup"] = (
         thpts_only["kops_per_s_llsm"] / thpts_only["kops_per_s_rocksdb"]
     )
+    thpts_only["speedup_bf"] = (
+        thpts_only["kops_per_s_llsm"] / thpts_only["kops_per_s_rocksdb_bf"]
+    )
+    thpts_only = thpts_only.sort_values(by=["config", "workload", "dist", "threads"])
     return thpts_only
 
 
@@ -63,6 +81,15 @@ def plot_scale(data, dataset, workload, show_legend=False, show_ylabel=False):
         markersize=markersize,
         label="RocksDB",
     )
+    ax.plot(
+        relevant["threads"],
+        relevant["kops_per_s_rocksdb_bf"],
+        color=COLORS["rocksdb-bf"],
+        marker="d",
+        linewidth=linewidth,
+        markersize=markersize,
+        label="RocksDB BF",
+    )
 
     ax.set_xlabel("Threads")
     ax.set_xticks(relevant["threads"])
@@ -73,6 +100,7 @@ def plot_scale(data, dataset, workload, show_legend=False, show_ylabel=False):
             fancybox=False,
             framealpha=1,
             edgecolor="#000000",
+            bbox_to_anchor=(1.08, -0.1)
         )
     if show_ylabel:
         ax.set_ylabel("Throughput (krec/s)")
@@ -89,6 +117,15 @@ def compute_summary_stats(data, output_file):
     at16_speedup = statistics.geometric_mean(zipf_data[zipf_data["threads"] == 16]["speedup"])
     print("\\newcommand{{\\TreeLineRocksDBMultiAvgSpeedup}}{{${:.2f}\\times$}}".format(overall_speedup), file=output_file)
     print("\\newcommand{{\\TreeLineRocksDBMultiSixteenAvgSpeedup}}{{${:.2f}\\times$}}".format(at16_speedup), file=output_file)
+    print("", file=output_file)
+
+    # Zipfian results over the RocksDB w/ bloom filter
+    overall_speedup_bf = statistics.geometric_mean(zipf_data["speedup_bf"])
+    at16_speedup_bf = statistics.geometric_mean(zipf_data[zipf_data["threads"] == 16]["speedup_bf"])
+    print("\\newcommand{{\\TreeLineRocksDBMultiAvgSpeedupBF}}{{${:.2f}\\times$}}".format(overall_speedup_bf), file=output_file)
+    print("\\newcommand{{\\TreeLineRocksDBMultiSixteenAvgSpeedupBF}}{{${:.2f}\\times$}}".format(at16_speedup_bf), file=output_file)
+    print("\\newcommand{{\\TreeLineRocksDBMultiMaxSpeedupBF}}{{${:.2f}\\times$}}".format(zipf_data["speedup_bf"].max()), file=output_file)
+    print("", file=output_file)
 
     # Uniform results
     uni_overall_speedup = statistics.geometric_mean(uni_data["speedup"])
@@ -99,16 +136,18 @@ def compute_summary_stats(data, output_file):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", required=False)
+    parser.add_argument("--data", nargs="*")
     args = parser.parse_args()
 
     if args.data is None:
         deps = cond.get_deps_paths()
         out_dir = cond.get_output_path()
-        raw_data = pd.read_csv(deps[0] / "all_results.csv")
+        dfs = [pd.read_csv(dep / "all_results.csv") for dep in deps]
     else:
-        raw_data = pd.read_csv(args.data)
+        out_dir = pathlib.Path(".")
+        dfs = [pd.read_csv(file) for file in args.data]
 
+    raw_data = pd.concat(dfs, ignore_index=True)
     data = process_data(raw_data)
 
     with open(out_dir / "summary_stats.txt", "w") as file:
@@ -130,6 +169,7 @@ def main():
         )
         if show_legend and args.data is not None:
             plt.show()
+            return
         elif args.data is None:
             fig.savefig(out_dir / "ycsb-{}-64-{}.pdf".format(dataset, workload))
 

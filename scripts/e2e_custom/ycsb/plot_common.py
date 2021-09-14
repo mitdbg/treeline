@@ -1,6 +1,7 @@
 COLORS = {
-    "llsm": "#0876B6",
-    "rocksdb": "#59C1FB",
+    "llsm": "#022336",
+    "rocksdb": "#0876B6",
+    "rocksdb-bf": "#59C1FB",
 }
 
 DATASET_MAP = {
