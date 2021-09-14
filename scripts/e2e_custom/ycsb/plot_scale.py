@@ -133,6 +133,12 @@ def compute_summary_stats(data, output_file):
     print("\\newcommand{{\\TreeLineRocksDBMultiAvgSpeedupUni}}{{${:.2f}\\times$}}".format(uni_overall_speedup), file=output_file)
     print("\\newcommand{{\\TreeLineRocksDBMultiSixteenAvgSpeedupUni}}{{${:.2f}\\times$}}".format(uni_at16_speedup), file=output_file)
 
+    # Uniform results over RocksDB w/ bloom filter
+    uni_overall_speedup_bf = statistics.geometric_mean(uni_data["speedup_bf"])
+    uni_at16_speedup_bf = statistics.geometric_mean(uni_data[uni_data["threads"] == 16]["speedup_bf"])
+    print("\\newcommand{{\\TreeLineRocksDBMultiAvgSpeedupUniBF}}{{${:.2f}\\times$}}".format(uni_overall_speedup_bf), file=output_file)
+    print("\\newcommand{{\\TreeLineRocksDBMultiSixteenAvgSpeedupUniBF}}{{${:.2f}\\times$}}".format(uni_at16_speedup_bf), file=output_file)
+
 
 def main():
     parser = argparse.ArgumentParser()

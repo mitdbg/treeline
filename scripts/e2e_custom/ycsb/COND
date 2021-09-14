@@ -197,7 +197,6 @@ run_experiment_group(
       },
     )
     for workload, threads in product(WORKLOADS, THREADS)
-    if not workload.startswith("un_")
   ],
   deps=[":preload-synthetic-64rdbb"],
 )
@@ -218,7 +217,6 @@ run_experiment_group(
       },
     )
     for workload, threads in product(WORKLOADS, THREADS)
-    if not workload.startswith("un_")
   ],
   deps=[":preload-osm-64rdbb"],
 )
@@ -239,7 +237,6 @@ run_experiment_group(
       },
     )
     for workload, threads in product(WORKLOADS, THREADS)
-    if not workload.startswith("un_")
   ],
   deps=[":preload-amzn-64rdbb"],
 )
