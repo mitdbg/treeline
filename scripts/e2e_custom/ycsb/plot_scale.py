@@ -79,7 +79,7 @@ def plot_scale(data, dataset, workload, show_legend=False, show_ylabel=False):
         marker="^",
         linewidth=linewidth,
         markersize=markersize,
-        label="RocksDB",
+        label="RocksDB NB",
     )
     ax.plot(
         relevant["threads"],
@@ -88,7 +88,7 @@ def plot_scale(data, dataset, workload, show_legend=False, show_ylabel=False):
         marker="d",
         linewidth=linewidth,
         markersize=markersize,
-        label="RocksDB BF",
+        label="RocksDB",
     )
 
     ax.set_xlabel("Threads")

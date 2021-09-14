@@ -32,7 +32,7 @@ def plot_point_queries(data, dataset_filter, show_legend=False):
         relevant["kops_per_s_rocksdb_bf"],
         width,
         color=COLORS["rocksdb-bf"],
-        label="RocksDB BF",
+        label="RocksDB",
     )
     ax.set_xlabel("Workload")
     if (data["dist"] == "uniform").all():
