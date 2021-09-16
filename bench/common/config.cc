@@ -127,10 +127,6 @@ DEFINE_uint64(reorg_length, 5,
               "The minimum length of an overflow chain for which "
               "reorganization is triggered.");
 
-DEFINE_bool(run_reorg_during_flush, false,
-            "If set to true, reorganizations will run during a flush instead "
-            "of being scheduled to happen in the background.");
-
 namespace llsm {
 namespace bench {
 
@@ -195,7 +191,6 @@ llsm::Options BuildLLSMOptions() {
   options.deferral_autotuning = FLAGS_deferral_autotuning;
   options.memory_autotuning = FLAGS_memory_autotuning;
   options.reorg_length = FLAGS_reorg_length;
-  options.run_reorg_during_flush = FLAGS_run_reorg_during_flush;
   return options;
 }
 

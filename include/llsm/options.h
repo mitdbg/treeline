@@ -98,10 +98,6 @@ struct Options {
 
   // The maximum number of pages that reorganizing a single chain can produce.
   size_t max_reorg_fanout = 50;
-
-  // If true, reorganizations will run during the flush instead of being
-  // scheduled to run in the background.
-  bool run_reorg_during_flush = false;
 };
 
 struct ReadOptions {};

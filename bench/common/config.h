@@ -80,10 +80,6 @@ DECLARE_bool(use_alex);
 // use of bloom filters.
 DECLARE_uint32(rdb_bloom_bits);
 
-// If set to true, reorganizations will run during a flush instead of being
-// scheduled to happen in the background.
-DECLARE_bool(run_reorg_during_flush);
-
 namespace llsm {
 namespace bench {
 
