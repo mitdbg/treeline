@@ -10,7 +10,7 @@ pd.options.mode.chained_assignment = None
 plt.rcParams["font.size"] = 18
 
 COLORS = {
-    "llsm": "#0876B6",
+    "llsm": "#022336",
     "rocksdb": "#59C1FB",
 }
 
