@@ -10,7 +10,7 @@ namespace llsm {
 
 BTreeModel::BTreeModel()
     : index_(TrackingAllocator<std::pair<uint64_t, PhysicalPageId>>(
-          total_allocation_size_)) {}
+          currently_allocated_bytes_)) {}
 
 // Uses the model to predict a page_id given a `key` that is within the
 // correct range (lower bounds `key`).
@@ -71,8 +71,7 @@ size_t BTreeModel::GetNumPages() {
 // Gets the total memory footprint of the model in bytes.
 size_t BTreeModel::GetSizeBytes() {
   mutex_.lock_shared();
-  const size_t size_bytes =
-      index_.get_allocator().total_allocation_size + sizeof(this->index_);
+  const size_t size_bytes = currently_allocated_bytes_ + sizeof(this->index_);
   mutex_.unlock_shared();
   return size_bytes;
 }

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "model.h"
-#include "sosd/tracking_allocator.h"
 #include "tlx/btree_map.h"
+#include "util/tracking_allocator.h"
 
 namespace llsm {
 
@@ -43,7 +43,7 @@ class BTreeModel : public Model {
       tlx::btree_default_traits<uint64_t, std::pair<uint64_t, PhysicalPageId>>,
       TrackingAllocator<std::pair<uint64_t, PhysicalPageId>>>
       index_;
-  uint64_t total_allocation_size_ = 0;
+  uint64_t currently_allocated_bytes_ = 0;
   std::shared_mutex mutex_;
 };
 
