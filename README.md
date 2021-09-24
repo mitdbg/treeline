@@ -1,3 +1,5 @@
+![](https://github.com/mitdbg/learnedlsm/actions/workflows/ci.yml/badge.svg)
+
 # Learned LSM
 An embedded key-value store for modern SSDs.
 
