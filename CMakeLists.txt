@@ -48,6 +48,7 @@ add_subdirectory(wal)
 
 # Build the tests iff requested
 if(LLSM_BUILD_TESTS)
+  enable_testing()
   add_subdirectory(tests)
 endif()
 

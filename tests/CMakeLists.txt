@@ -1,5 +1,4 @@
 include(GoogleTest)
-enable_testing()
 
 add_executable(tester)
 target_sources(tester
