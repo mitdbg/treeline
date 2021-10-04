@@ -1,0 +1,22 @@
+JOBS = [
+  "psync-4k",
+  "psync-16k",
+  "psync-4k-unlim",
+  "psync-16k-unlim",
+  "uring-4k",
+  "uring-16k",
+  "uring-4k-unlim",
+  "uring-16k-unlim",
+]
+
+run_experiment_group(
+  name="mixed",
+  run="../run_fio.sh",
+  experiments=[
+    ExperimentInstance(
+      name="read-{}".format(jobfile),
+      args=[jobfile],
+    )
+    for jobfile in JOBS
+  ],
+)

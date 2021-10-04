@@ -7,6 +7,7 @@ cmake-build-release/
 cond-out*
 scripts/experiment_config.sh
 scripts/e2e_perf/results
+scripts/iochar/fio_config.sh
 
 .idea/
 .vscode/

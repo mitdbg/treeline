@@ -1,0 +1,8 @@
+combine(
+  name="iochar",
+  deps=[
+    "//scripts/iochar/read:read",
+    "//scripts/iochar/write:write",
+    "//scripts/iochar/mixed:mixed",
+  ],
+)
