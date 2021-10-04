@@ -13,3 +13,6 @@ scripts/e2e_perf/results
 
 .DS_Store
 *.swp
+
+*.pyc
+__pycache__

@@ -1,6 +1,9 @@
 from itertools import product
 
-WORKLOADS = ["a", "b", "c", "d", "e", "f"]
+WORKLOADS = [
+  "a", "b", "c", "d", "e", "f",
+  "un_a", "un_b", "un_c", "un_d", "un_e", "un_f",
+]
 
 DBS = [
   "llsm",
@@ -27,6 +30,9 @@ COMMON_OPTIONS = {
 OSM_DATASET = "'$TP_DATASET_PATH/osm_ny.txt'"
 AMZN_DATASET = "'$TP_DATASET_PATH/amazon_reviews.txt'"
 
+# Number of bits to use for RocksDB's bloom filters
+RDB_BLOOM_BITS = 10
+
 # Runs all the YCSB experiments.
 # Running time: 7 hours (including creating the checkpoints)
 combine(
@@ -38,10 +44,30 @@ combine(
   ],
 )
 
-run_command(
+combine(
   name="plot",
+  deps=[
+    ":plot_bar",
+    ":plot_scale",
+  ],
+)
+
+run_command(
+  name="plot_bar",
   run="python3 plot_bar.py",
-  deps=[":combine"],
+  deps=[
+    ":combine",
+    ":rdbb",
+  ],
+)
+
+run_command(
+  name="plot_scale",
+  run="python3 plot_scale.py",
+  deps=[
+    ":combine",
+    ":rdbb",
+  ],
 )
 
 run_command(
@@ -56,18 +82,18 @@ run_command(
 
 run_command(
   name="preload-synthetic-64",
-  run="../preload.sh ycsb-synthetic-64 ycsb/workloads/setup.yml",
+  run="../preload.sh ycsb-synthetic-64 ycsb/workloads/setup.yml all",
 )
 
 run_command(
   name="preload-osm-64",
-  run="../preload.sh ycsb-osm-64 ycsb/workloads/setup.yml "
+  run="../preload.sh ycsb-osm-64 ycsb/workloads/setup.yml all "
     "--custom_dataset={}".format(OSM_DATASET),
 )
 
 run_command(
   name="preload-amzn-64",
-  run="../preload.sh ycsb-amzn-64 ycsb/workloads/setup.yml "
+  run="../preload.sh ycsb-amzn-64 ycsb/workloads/setup.yml all "
     "--custom_dataset={}".format(AMZN_DATASET),
 )
 
@@ -125,4 +151,184 @@ run_experiment_group(
     for workload, db, threads in product(WORKLOADS, DBS, THREADS)
   ],
   deps=[":preload-amzn-64"],
+)
+
+# RocksDB experiments with bloom filters
+run_command(
+  name="rdbb",
+  run="python3 combine_raw.py",
+  deps=[
+    ":ycsb-synthetic-64rdbb",
+    ":ycsb-osm-64rdbb",
+    ":ycsb-amzn-64rdbb",
+  ],
+)
+
+run_command(
+  name="preload-synthetic-64rdbb",
+  run="../preload.sh ycsb-synthetic-64rdbb ycsb/workloads/setup.yml rocksdb "
+    "--rdb_bloom_bits={}".format(RDB_BLOOM_BITS),
+)
+
+run_command(
+  name="preload-osm-64rdbb",
+  run="../preload.sh ycsb-osm-64rdbb ycsb/workloads/setup.yml rocksdb "
+    " --rdb_bloom_bits={} --custom_dataset={}".format(RDB_BLOOM_BITS, OSM_DATASET),
+)
+
+run_command(
+  name="preload-amzn-64rdbb",
+  run="../preload.sh ycsb-amzn-64rdbb ycsb/workloads/setup.yml rocksdb "
+    " --rdb_bloom_bits={} --custom_dataset={}".format(RDB_BLOOM_BITS, AMZN_DATASET),
+)
+
+run_experiment_group(
+  name="ycsb-synthetic-64rdbb",
+  run="../run.sh ycsb-synthetic-64rdbb",
+  experiments=[
+    ExperimentInstance(
+      name="ycsb-synthetic-64rdbb-rocksdb-{}-{}".format(workload, threads),
+      options={
+        **COMMON_OPTIONS,
+        "db": "rocksdb",
+        "workload_config": "ycsb/workloads/{}.yml".format(workload),
+        "threads": threads,
+        "rdb_bloom_bits": RDB_BLOOM_BITS,
+      },
+    )
+    for workload, threads in product(WORKLOADS, THREADS)
+  ],
+  deps=[":preload-synthetic-64rdbb"],
+)
+
+run_experiment_group(
+  name="ycsb-osm-64rdbb",
+  run="../run.sh ycsb-osm-64rdbb",
+  experiments=[
+    ExperimentInstance(
+      name="ycsb-osm-64rdbb-rocksdb-{}-{}".format(workload, threads),
+      options={
+        **COMMON_OPTIONS,
+        "db": "rocksdb",
+        "workload_config": "ycsb/workloads/{}.yml".format(workload),
+        "custom_dataset": OSM_DATASET,
+        "threads": threads,
+        "rdb_bloom_bits": RDB_BLOOM_BITS,
+      },
+    )
+    for workload, threads in product(WORKLOADS, THREADS)
+  ],
+  deps=[":preload-osm-64rdbb"],
+)
+
+run_experiment_group(
+  name="ycsb-amzn-64rdbb",
+  run="../run.sh ycsb-amzn-64rdbb",
+  experiments=[
+    ExperimentInstance(
+      name="ycsb-amzn-64rdbb-rocksdb-{}-{}".format(workload, threads),
+      options={
+        **COMMON_OPTIONS,
+        "db": "rocksdb",
+        "workload_config": "ycsb/workloads/{}.yml".format(workload),
+        "custom_dataset": AMZN_DATASET,
+        "threads": threads,
+        "rdb_bloom_bits": RDB_BLOOM_BITS,
+      },
+    )
+    for workload, threads in product(WORKLOADS, THREADS)
+  ],
+  deps=[":preload-amzn-64rdbb"],
+)
+
+# Factor analysis experiments
+# Use YCSB A
+FACTOR_THREADS = 8
+
+run_experiment_group(
+  name="llsm-factor",
+  run="../run.sh ycsb-synthetic-64",
+  experiments=[
+    ExperimentInstance(
+      name="llsm-factor-base",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": FACTOR_THREADS,
+        "bg_threads": 2,
+        "deferral_autotuning": False,
+        "max_deferrals": 0,
+      },
+    ),
+    ExperimentInstance(
+      name="llsm-factor-defer",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": FACTOR_THREADS,
+        "bg_threads": 2,
+        "deferral_autotuning": True,
+        "max_deferrals": 1,
+      },
+    ),
+    ExperimentInstance(
+      name="llsm-factor-parflush",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": FACTOR_THREADS,
+        "bg_threads": 16,
+        "deferral_autotuning": True,
+        "max_deferrals": 1,
+      },
+    ),
+  ],
+  deps=[":preload-synthetic-64"],
+)
+
+run_experiment_group(
+  name="llsm-factor-1",
+  run="../run.sh ycsb-synthetic-64",
+  experiments=[
+    ExperimentInstance(
+      name="llsm-factor-base-1",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": 1,
+        "bg_threads": 2,
+        "deferral_autotuning": False,
+        "max_deferrals": 0,
+      },
+    ),
+    ExperimentInstance(
+      name="llsm-factor-parflush-1",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": 1,
+        "bg_threads": 16,
+        "deferral_autotuning": False,
+        "max_deferrals": 0,
+      },
+    ),
+    ExperimentInstance(
+      name="llsm-factor-defer-1",
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "ycsb/workloads/a.yml",
+        "threads": 1,
+        "bg_threads": 16,
+        "deferral_autotuning": True,
+        "max_deferrals": 1,
+      },
+    ),
+  ],
+  deps=[":preload-synthetic-64"],
 )

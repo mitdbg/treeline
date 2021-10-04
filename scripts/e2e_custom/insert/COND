@@ -8,6 +8,24 @@ WORKLOADS = [
   "middle-50",
 ]
 
+SWEEP_WORKLOADS = [
+  "middle-20",
+  "middle-50",
+  "middle-80",
+  "uniform-20",
+  "uniform-50",
+  "uniform-80",
+]
+
+SCAN_WORKLOADS = [
+  "middlescan-20",
+  "middlescan-50",
+  "middlescan-80",
+  "uniformscan-20",
+  "uniformscan-50",
+  "uniformscan-80",
+]
+
 DBS = [
   "llsm",
   "rocksdb",
@@ -32,13 +50,25 @@ COMMON_OPTIONS = {
 
 run_command(
   name="preload-synthetic-64",
-  run="../preload.sh insert-synthetic-64 insert/workloads/setup.yml",
+  run="../preload.sh insert-synthetic-64 insert/workloads/setup.yml all --rdb_bloom_bits=10",
 )
 
 run_command(
   name="combine",
   run="python3 combine_raw.py",
   deps=[":insert-synthetic-64"],
+)
+
+run_command(
+  name="combine_sweep",
+  run="python3 combine_raw.py",
+  deps=[":sweep-synthetic-64"],
+)
+
+run_command(
+  name="combine_scan",
+  run="python3 combine_raw.py",
+  deps=[":scan-synthetic-64"],
 )
 
 run_experiment_group(
@@ -55,6 +85,110 @@ run_experiment_group(
       },
     )
     for workload, db, threads in product(WORKLOADS, DBS, THREADS)
+  ],
+  deps=[":preload-synthetic-64"],
+)
+
+run_experiment_group(
+  name="sweep-synthetic-64",
+  run="../run.sh insert-synthetic-64",  # Same checkpoint name as the experiment above
+  experiments=[
+    ExperimentInstance(
+      name="sweep-synthetic-64-{}-{}-{}".format(db, workload, threads),
+      options={
+        **COMMON_OPTIONS,
+        "db": db,
+        "workload_config": "insert/workloads/{}.yml".format(workload),
+        "threads": threads,
+        "rdb_bloom_bits": 10,
+      },
+    )
+    for workload, db, threads in product(SWEEP_WORKLOADS, DBS, THREADS)
+  ],
+  deps=[":preload-synthetic-64"],
+)
+
+run_command(
+  name="plot_sweep",
+  run="python3 plot.py",
+  deps=[":combine_sweep"],
+)
+
+run_experiment_group(
+  name="scan-synthetic-64",
+  run="../run.sh insert-synthetic-64",  # Same checkpoint name as the experiment above
+  experiments=[
+    ExperimentInstance(
+      name="scan-synthetic-64-{}-{}-{}".format(db, workload, threads),
+      options={
+        **COMMON_OPTIONS,
+        "db": db,
+        "workload_config": "insert/workloads/{}.yml".format(workload),
+        "threads": threads,
+        "rdb_bloom_bits": 10,
+      },
+    )
+    for workload, db, threads in product(SCAN_WORKLOADS, DBS, THREADS)
+  ],
+  deps=[":preload-synthetic-64"],
+)
+
+run_command(
+  name="plot-middle8",
+  run="python3 plot.py",
+  deps=[":combine-middle8"],
+)
+
+run_command(
+  name="plot-middlescan8",
+  run="python3 plot.py",
+  deps=[":combine-middlescan8"],
+)
+
+run_command(
+  name="combine-middle8",
+  run="python3 combine_raw.py",
+  deps=[":middle8"],
+)
+
+run_command(
+  name="combine-middlescan8",
+  run="python3 combine_raw.py",
+  deps=[":middlescan8"],
+)
+
+combine(
+  name="middle8",
+  deps=[
+    ":sweep-synthetic-64-{}-{}-8".format(db, workload)
+    for workload, db in product(["middle-20", "middle-50", "middle-80"], DBS)
+  ],
+)
+
+combine(
+  name="middlescan8",
+  deps=[
+    ":scan-synthetic-64-{}-{}-8".format(db, workload)
+    for workload, db in product(["middlescan-20", "middlescan-50", "middlescan-80"], DBS)
+  ],
+)
+
+# Factor analysis experiment for reorganization (run during flush or in the background)
+run_experiment_group(
+  name="llsm-reorg",
+  run="../run.sh insert-synthetic-64",  # Same checkpoint name as the experiment above
+  experiments=[
+    ExperimentInstance(
+      name="llsm-reorg-{}".format(reorg_length),
+      options={
+        **COMMON_OPTIONS,
+        "db": "llsm",
+        "workload_config": "insert/workloads/middle-50.yml",
+        "threads": 8,
+        "reorg_length": reorg_length,
+      },
+    )
+    for reorg_length in [2, 4, 6]
   ],
   deps=[":preload-synthetic-64"],
 )

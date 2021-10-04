@@ -1,0 +1,29 @@
+record_size_bytes: 64
+
+load:
+  num_records: 20000000
+  distribution:
+    type: uniform
+    range_min: 0
+    range_max: 2000000000
+
+run:
+- num_requests: 20000000
+  insert:
+    proportion_pct: 20
+    distribution:
+      type: hotspot
+      range_min: 0
+      range_max: 2000000000
+      hot_proportion_pct: 90
+      hot_range_min: 990000000   #   990,000,000
+      hot_range_max: 1010000000  # 1,010,000,000
+  read:
+    proportion_pct: 64
+    distribution:
+      type: uniform
+  scan:
+    proportion_pct: 16
+    max_length: 100
+    distribution:
+      type: uniform
