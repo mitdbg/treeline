@@ -1,26 +1,23 @@
 [global]
 ioengine=io_uring
-rw=randrw
+rw=randread
 direct=1
-bs=16k
+bs=64k
 size=10g
 time_based
 runtime=10
-overwrite=1
-filename=randrw-uring-16k
-fdatasync=1
+filename=randread-uring-64k
 thread
 stonewall
 
-[randrw-16k-1]
+[randread-64k-1]
 iodepth=1
 
-[randrw-16k-4]
+[randread-64k-4]
 iodepth=4
 
-[randrw-16k-16]
+[randread-64k-16]
 iodepth=16
 
-[randrw-16k-64]
+[randread-64k-64]
 iodepth=64
-

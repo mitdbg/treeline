@@ -17,3 +17,4 @@ filename=randrw-psync-16k-unlim-r
 numjobs=8
 rw=randwrite
 filename=randrw-psync-16k-unlim-w
+fdatasync=1

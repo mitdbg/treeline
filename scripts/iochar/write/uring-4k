@@ -8,6 +8,7 @@ time_based
 runtime=10
 overwrite=1
 filename=randwrite-uring-4k
+fdatasync=1
 thread
 stonewall
 

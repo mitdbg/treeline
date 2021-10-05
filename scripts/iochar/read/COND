@@ -1,8 +1,10 @@
 JOBS = [
   "psync-4k",
   "psync-16k",
+  "psync-64k",
   "uring-4k",
   "uring-16k",
+  "uring-64k",
 ]
 
 run_experiment_group(

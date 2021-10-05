@@ -14,7 +14,7 @@ run_experiment_group(
   run="../run_fio.sh",
   experiments=[
     ExperimentInstance(
-      name="read-{}".format(jobfile),
+      name="mixed-{}".format(jobfile),
       args=[jobfile],
     )
     for jobfile in JOBS
