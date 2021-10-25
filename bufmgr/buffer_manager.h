@@ -88,6 +88,12 @@ class BufferManager {
   // Provides the average latency of a buffer manager miss, in nanoseconds.
   std::chrono::nanoseconds BufMgrMissLatency() const;
 
+  // Provides the buffer manager hit rate.
+  double BufMgrHitRate() const;
+
+  // Clears the buffer manager statistics regarding hit rate and miss latency.
+  void ClearStats();
+
  private:
   // Retrieves the page given by `page_id`, to be held exclusively or not
   // based on the value of `exclusive`.
@@ -153,7 +159,8 @@ class BufferManager {
   // Pointer to an interface between the BufferManager and pages on disk.
   std::unique_ptr<FileManager> file_manager_;
 
-  // Values used for measuring bufmgr miss delay
+  // Values used for measuring bufmgr miss delay and hit rate.
+  std::atomic<int64_t> num_fixes_;
   std::atomic<int64_t> num_misses_;
   std::atomic<int64_t> cumulative_misses_time_ns_;  // Only store ticks so that
                                                     // += operator is defined.
