@@ -285,8 +285,11 @@ DBImpl::~DBImpl() {
     wal_.DiscardAllForCleanShutdown();
   }
 
-  Logger::Log("Overall buffer manager hit rate: %.4f",
-              buf_mgr_->BufMgrHitRate());
+  if (buf_mgr_ != nullptr) {  // Might fail initialization and call destructor
+                              // before buffer manager has been initialized.
+    Logger::Log("Overall buffer manager hit rate: %.4f",
+                buf_mgr_->BufMgrHitRate());
+  }
 
   Logger::Shutdown();
 }
