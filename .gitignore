@@ -4,7 +4,7 @@ bench/workloads/
 build/
 cmake-build-debug/
 cmake-build-release/
-cond-out/
+cond-out*
 scripts/experiment_config.sh
 scripts/e2e_perf/results
 

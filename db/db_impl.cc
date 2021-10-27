@@ -156,6 +156,7 @@ Status DBImpl::InitializeNewDB() {
 
     model_->PreallocateAndInitialize(buf_mgr_, records,
                                      options_.key_hints.records_per_page());
+    buf_mgr_->ClearStats();
     Logger::Log("Created new %s. Total size: %zu bytes. Indexed pages: %zu",
                 options_.use_alex ? "ALEX" : "BTree", model_->GetSizeBytes(),
                 model_->GetNumPages());
@@ -196,6 +197,8 @@ Status DBImpl::InitializeExistingDB() {
   }
 
   model_->ScanFilesAndInitialize(buf_mgr_);
+  buf_mgr_->ClearStats();
+
   Logger::Log("Rebuilt %s. Total size: %zu bytes. Indexed pages: %zu",
               options_.use_alex ? "ALEX" : "BTree", model_->GetSizeBytes(),
               model_->GetNumPages());
@@ -280,6 +283,12 @@ DBImpl::~DBImpl() {
   {
     std::unique_lock<std::mutex> lock(mutex_);
     wal_.DiscardAllForCleanShutdown();
+  }
+
+  if (buf_mgr_ != nullptr) {  // Might fail initialization and call destructor
+                              // before buffer manager has been initialized.
+    Logger::Log("Overall buffer manager hit rate: %.4f",
+                buf_mgr_->BufMgrHitRate());
   }
 
   Logger::Shutdown();

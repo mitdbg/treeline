@@ -17,9 +17,8 @@ namespace llsm {
 // `options.use_direct_io` is true.
 BufferManager::BufferManager(const BufMgrOptions& options,
                              std::filesystem::path db_path)
-    : buffer_manager_size_(options.buffer_pool_size / Page::kSize),
-      num_misses_(0),
-      cumulative_misses_time_ns_(0) {
+    : buffer_manager_size_(options.buffer_pool_size / Page::kSize) {
+  ClearStats();
   page_to_frame_map_ =
       std::make_unique<SyncHashTable<PhysicalPageId, BufferFrame*>>(
           buffer_manager_size_, /*num_partitions = */ 1);
@@ -132,6 +131,8 @@ BufferFrame* BufferManager::FixPageImpl(const PhysicalPageId page_id,
         (std::chrono::steady_clock::now() - start).count();
     ++num_misses_;
   }
+
+  ++num_fixes_;
 
   frame->Lock(exclusive);
 
@@ -258,6 +259,18 @@ std::chrono::nanoseconds BufferManager::BufMgrMissLatency() const {
   } else {
     return std::chrono::nanoseconds(cumulative_misses_time_ns_ / num_misses_);
   }
+}
+
+// Provides the buffer manager hit rate.
+double BufferManager::BufMgrHitRate() const {
+  return 1 - (1.0 * num_misses_) / num_fixes_;
+}
+
+// Clears the buffer manager statistics regarding hit rate and miss latency.
+void BufferManager::ClearStats() {
+  num_fixes_ = 0;
+  num_misses_ = 0;
+  cumulative_misses_time_ns_ = 0;
 }
 
 // Writes the page held by `frame` to disk.
