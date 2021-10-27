@@ -13,7 +13,7 @@ namespace llsm {
 
 // The LRU strategy for evicting in-memory pages back to disk.
 //
-// Upon inserting a page, it is either entered into an LRU queue. Upon deleting
+// Upon inserting a page, it is entered into an LRU queue. Upon deleting
 // a page, it is removed from the queue, if it was in it. Upon needing to evict
 // a page, we evict the head of the LRU queue, if it is non-empty; else, we
 // return nullptr.
@@ -51,7 +51,7 @@ class LRUEviction : public PageEvictionStrategy {
   }
 
   // The LRU eviction queue.
-  HashQueue<BufferFrame*>* lru_;
+  std::unique_ptr<HashQueue<BufferFrame*>> lru_;
 };
 
 }  // namespace llsm

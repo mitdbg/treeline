@@ -8,11 +8,11 @@ namespace llsm {
 
 // Create a new eviction strategy.
 LRUEviction::LRUEviction(size_t num_elements) {
-  lru_ = new HashQueue<BufferFrame*>(num_elements);
+  lru_ = std::make_unique<HashQueue<BufferFrame*>>(num_elements);
 }
 
 // Free all resources.
-LRUEviction::~LRUEviction() { delete lru_; }
+LRUEviction::~LRUEviction() {}
 
 // Makes the page held by `frame` a candidate for eviction.
 void LRUEviction::Insert(BufferFrame* frame) {
