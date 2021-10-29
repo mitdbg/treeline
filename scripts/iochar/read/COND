@@ -12,6 +12,7 @@ JOBS = [
 DEVICES = [
   "nvme_ssd_ext4",
   "nvme_ssd_raw",
+  "nvme_ssd_xfs",
 ]
 
 run_experiment_group(
@@ -30,6 +31,14 @@ group(
   name="read-nvme_ssd_ext4",
   deps=[
     ":read-nvme_ssd_ext4-{}".format(jobfile)
+    for jobfile in JOBS
+  ],
+)
+
+group(
+  name="read-nvme_ssd_xfs",
+  deps=[
+    ":read-nvme_ssd_xfs-{}".format(jobfile)
     for jobfile in JOBS
   ],
 )
