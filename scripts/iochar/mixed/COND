@@ -25,6 +25,9 @@ run_experiment_group(
       args=[device, jobfile],
     )
     for device, jobfile in product(DEVICES, JOBS)
+    # Can't run the "unlim" workloads directly on the block device because they
+    # rely on having the ability to use separate files.
+    if not device.endswith("raw") or not jobfile.endswith("unlim")
   ],
 )
 
@@ -41,5 +44,6 @@ group(
   deps=[
     ":mixed-nvme_ssd_raw-{}".format(jobfile)
     for jobfile in JOBS
+    if not jobfile.endswith("unlim")
   ],
 )
