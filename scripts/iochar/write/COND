@@ -1,3 +1,5 @@
+from itertools import product
+
 JOBS = [
   "psync-4k",
   "psync-16k",
@@ -7,14 +9,35 @@ JOBS = [
   "uring-64k",
 ]
 
+DEVICES = [
+  "nvme_ssd_ext4",
+  "nvme_ssd_raw",
+]
+
 run_experiment_group(
   name="write",
   run="../run_fio.sh",
   experiments=[
     ExperimentInstance(
-      name="write-{}".format(jobfile),
-      args=[jobfile],
+      name="write-{}-{}".format(device, jobfile),
+      args=[device, jobfile],
     )
+    for device, jobfile in product(DEVICES, JOBS)
+  ],
+)
+
+group(
+  name="write-nvme_ssd_ext4",
+  deps=[
+    ":write-nvme_ssd_ext4-{}".format(jobfile)
+    for jobfile in JOBS
+  ],
+)
+
+group(
+  name="write-nvme_ssd_raw",
+  deps=[
+    ":write-nvme_ssd_raw-{}".format(jobfile)
     for jobfile in JOBS
   ],
 )

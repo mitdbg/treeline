@@ -6,3 +6,21 @@ combine(
     "//scripts/iochar/mixed:mixed",
   ],
 )
+
+group(
+  name="nvme_ssd_ext4",
+  deps=[
+    "//scripts/iochar/read:read-nvme_ssd_ext4",
+    "//scripts/iochar/write:write-nvme_ssd_ext4",
+    "//scripts/iochar/mixed:mixed-nvme_ssd_ext4",
+  ],
+)
+
+group(
+  name="nvme_ssd_raw",
+  deps=[
+    "//scripts/iochar/read:read-nvme_ssd_raw",
+    "//scripts/iochar/write:write-nvme_ssd_raw",
+    "//scripts/iochar/mixed:mixed-nvme_ssd_raw",
+  ],
+)

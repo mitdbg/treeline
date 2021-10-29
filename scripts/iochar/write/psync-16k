@@ -7,7 +7,6 @@ size=10g
 time_based
 runtime=10
 overwrite=1
-filename=randwrite-psync-16k
 fdatasync=1
 thread
 stonewall

@@ -6,7 +6,6 @@ bs=16k
 size=10g
 time_based
 runtime=10
-filename=randread-psync-16k
 thread
 stonewall
 
