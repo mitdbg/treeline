@@ -21,7 +21,7 @@ DEFINE_bool(
     skip_load, false,
     "If set to true, this workload runner will skip the initial data load.");
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
-
+DEFINE_string(checkpoint_name, "", "A path to a database checkpoint.");
 DEFINE_string(output_path, llsm::bench::GetDefaultOutputPath(),
               "A path to where throughput samples should be written.");
 DEFINE_uint64(throughput_sample_period, 0,
@@ -81,7 +81,8 @@ int main(int argc, char* argv[]) {
 
   DBType db = llsm::bench::ParseDBType(FLAGS_db).value();
   std::unique_ptr<ycsbr::gen::PhasedWorkload> workload =
-      ycsbr::gen::PhasedWorkload::LoadFrom(FLAGS_workload_config, FLAGS_seed);
+      ycsbr::gen::PhasedWorkload::LoadFrom(FLAGS_workload_config, FLAGS_seed,
+                                           FLAGS_record_size_bytes);
 
   if (!FLAGS_custom_dataset.empty()) {
     std::vector<ycsbr::Request::Key> keys = LoadDatasetFromTextFile(
@@ -93,13 +94,6 @@ int main(int argc, char* argv[]) {
     workload->SetCustomLoadDataset(std::move(keys));
   }
 
-  if (!gflags::GetCommandLineFlagInfoOrDie("record_size_bytes").is_default) {
-    std::cerr
-        << "WARNING: The --record_size_bytes command line option is ignored in "
-           "run_custom. Please set the record size in the workload "
-           "configuration file instead."
-        << std::endl;
-  }
   // The record size is specified in the workload configuration file. We need
   // to keep this command line option to support the other benchmark drivers
   // which use this option.
