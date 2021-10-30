@@ -34,6 +34,8 @@ DBS = [
 
 THREADS = [1, 2, 4, 8, 16]
 
+RECORD_SIZES = [64]
+
 COMMON_OPTIONS = {
   "bg_threads": 16,
   "bypass_wal": True,
@@ -48,64 +50,81 @@ COMMON_OPTIONS = {
   "max_deferrals": 1,
 }
 
-run_command(
-  name="preload-synthetic-64",
-  run="../preload.sh insert-synthetic-64 insert/workloads/setup.yml all --rdb_bloom_bits=10",
+run_experiment_group(
+  name="preload-synthetic",
+  run="../preload.sh",
+  experiments=[
+    ExperimentInstance(
+      name="preload-insert-synthetic-{}-{}".format(record_size_bytes, db),
+      options={
+        "db": db,
+        "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
+        "workload_config": "insert/workloads/setup.yml",
+        "record_size_bytes": record_size_bytes,
+        "rdb_bloom_bits": 10,
+      }
+    )
+    for db, record_size_bytes in product(DBS, RECORD_SIZES)
+  ],
 )
 
 run_command(
   name="combine",
   run="python3 combine_raw.py",
-  deps=[":insert-synthetic-64"],
+  deps=[":insert-synthetic"],
 )
 
 run_command(
   name="combine_sweep",
   run="python3 combine_raw.py",
-  deps=[":sweep-synthetic-64"],
+  deps=[":sweep-synthetic"],
 )
 
 run_command(
   name="combine_scan",
   run="python3 combine_raw.py",
-  deps=[":scan-synthetic-64"],
+  deps=[":scan-synthetic"],
 )
 
 run_experiment_group(
-  name="insert-synthetic-64",
-  run="../run.sh insert-synthetic-64",
+  name="insert-synthetic",
+  run="../run.sh",
   experiments=[
     ExperimentInstance(
-      name="insert-synthetic-64-{}-{}-{}".format(db, workload, threads),
+      name="insert-synthetic-{}-{}-{}-{}".format(record_size_bytes, db, workload, threads),
       options={
         **COMMON_OPTIONS,
         "db": db,
+        "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
         "workload_config": "insert/workloads/{}.yml".format(workload),
         "threads": threads,
+        "record_size_bytes": record_size_bytes,
       },
     )
-    for workload, db, threads in product(WORKLOADS, DBS, THREADS)
+    for record_size_bytes, db, workload, threads in product(RECORD_SIZES, DBS, WORKLOADS, THREADS)
   ],
-  deps=[":preload-synthetic-64"],
+  deps=[":preload-synthetic"],
 )
 
 run_experiment_group(
-  name="sweep-synthetic-64",
-  run="../run.sh insert-synthetic-64",  # Same checkpoint name as the experiment above
+  name="sweep-synthetic",
+  run="../run.sh",  
   experiments=[
     ExperimentInstance(
-      name="sweep-synthetic-64-{}-{}-{}".format(db, workload, threads),
+      name="sweep-synthetic-{}-{}-{}-{}".format(record_size_bytes, db, workload, threads),
       options={
         **COMMON_OPTIONS,
         "db": db,
+        "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
         "workload_config": "insert/workloads/{}.yml".format(workload),
         "threads": threads,
         "rdb_bloom_bits": 10,
+        "record_size_bytes": record_size_bytes,
       },
     )
-    for workload, db, threads in product(SWEEP_WORKLOADS, DBS, THREADS)
+    for record_size_bytes, db, workload, threads in product(RECORD_SIZES, DBS, WORKLOADS, THREADS)
   ],
-  deps=[":preload-synthetic-64"],
+  deps=[":preload-synthetic"],
 )
 
 run_command(
@@ -115,22 +134,24 @@ run_command(
 )
 
 run_experiment_group(
-  name="scan-synthetic-64",
-  run="../run.sh insert-synthetic-64",  # Same checkpoint name as the experiment above
+  name="scan-synthetic",
+  run="../run.sh", 
   experiments=[
     ExperimentInstance(
-      name="scan-synthetic-64-{}-{}-{}".format(db, workload, threads),
+      name="scan-synthetic-{}-{}-{}-{}".format(record_size_bytes, db, workload, threads),
       options={
         **COMMON_OPTIONS,
         "db": db,
+        "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
         "workload_config": "insert/workloads/{}.yml".format(workload),
         "threads": threads,
         "rdb_bloom_bits": 10,
+        "record_size_bytes": record_size_bytes,
       },
     )
-    for workload, db, threads in product(SCAN_WORKLOADS, DBS, THREADS)
+    for record_size_bytes, db, workload, threads in product(RECORD_SIZES, DBS, WORKLOADS, THREADS)
   ],
-  deps=[":preload-synthetic-64"],
+  deps=[":preload-synthetic"],
 )
 
 run_command(
@@ -160,35 +181,37 @@ run_command(
 combine(
   name="middle8",
   deps=[
-    ":sweep-synthetic-64-{}-{}-8".format(db, workload)
-    for workload, db in product(["middle-20", "middle-50", "middle-80"], DBS)
+    ":sweep-synthetic-{}-{}-{}-8".format(record_size_bytes, db, workload)
+    for record_size_bytes, workload, db in product(RECORD_SIZES, ["middle-20", "middle-50", "middle-80"], DBS)
   ],
 )
 
 combine(
   name="middlescan8",
   deps=[
-    ":scan-synthetic-64-{}-{}-8".format(db, workload)
-    for workload, db in product(["middlescan-20", "middlescan-50", "middlescan-80"], DBS)
+    ":scan-synthetic-{}-{}-{}-8".format(record_size_bytes, db, workload)
+    for record_size_bytes, workload, db in product(RECORD_SIZES, ["middlescan-20", "middlescan-50", "middlescan-80"], DBS)
   ],
 )
 
 # Factor analysis experiment for reorganization (run during flush or in the background)
 run_experiment_group(
   name="llsm-reorg",
-  run="../run.sh insert-synthetic-64",  # Same checkpoint name as the experiment above
+  run="../run.sh",  
   experiments=[
     ExperimentInstance(
-      name="llsm-reorg-{}".format(reorg_length),
+      name="llsm-reorg{}-{}".format(reorg_length, record_size_bytes),
       options={
         **COMMON_OPTIONS,
         "db": "llsm",
+        "checkpoint_name": "insert-synthetic-{}-llsm".format(record_size_bytes),
         "workload_config": "insert/workloads/middle-50.yml",
         "threads": 8,
         "reorg_length": reorg_length,
+        "record_size_bytes": record_size_bytes,
       },
     )
-    for reorg_length in [2, 4, 6]
+    for record_size_bytes, reorg_length in product(RECORD_SIZES, [2, 4, 6])
   ],
-  deps=[":preload-synthetic-64"],
+  deps=[":preload-synthetic"],
 )
