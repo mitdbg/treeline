@@ -21,7 +21,7 @@ DEFINE_bool(
     skip_load, false,
     "If set to true, this workload runner will skip the initial data load.");
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
-DEFINE_string(checkpoint_name, "", "A path to a database checkpoint.");
+
 DEFINE_string(output_path, llsm::bench::GetDefaultOutputPath(),
               "A path to where throughput samples should be written.");
 DEFINE_uint64(throughput_sample_period, 0,

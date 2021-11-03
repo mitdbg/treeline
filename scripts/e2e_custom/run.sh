@@ -11,21 +11,23 @@ orig_args=($@)
 args=()
 for val in "${orig_args[@]}"; do
   phys_arg=$(eval "echo $val")
-  args+=($phys_arg)
 
   # Extract the database type (e.g., llsm, rocksdb, leanstore)
   if [[ $phys_arg =~ --db=.+ ]]; then
     db_type=${phys_arg:5}
   fi
 
-  # Extract the checkpoint name
+  # Extract the checkpoint name, which shouldn't be passed as an argument further.
+  # Add anything else to args.
   if [[ $phys_arg =~ --checkpoint_name=.+ ]]; then
     checkpoint_name=${phys_arg:18}
+  else
+    args+=($phys_arg)
   fi
 done
 
 if [[ -z $checkpoint_name ]]; then
-  >&2 echo "Usage: $0 --checkpoint_name=<checkpoint name> [other args passed to run_custom]"
+  echo >&2 "Usage: $0 --checkpoint_name=<checkpoint name> [other args passed to run_custom]"
   exit 1
 fi
 
@@ -53,14 +55,14 @@ fi
 sync $DB_PATH
 
 set +e
-iostat -o JSON -d -y 1 > $COND_OUT/iostat.json &
+iostat -o JSON -d -y 1 >$COND_OUT/iostat.json &
 iostat_pid=$!
 
-../../build/bench/run_custom ${args[@]} > $COND_OUT/results.csv
+../../build/bench/run_custom ${args[@]} >$COND_OUT/results.csv
 code=$?
 
 cp $DB_PATH/$db_type/LOG $COND_OUT/$db_type.log
-du -b $DB_PATH > $COND_OUT/db_space.log
+du -b $DB_PATH >$COND_OUT/db_space.log
 
 kill -s SIGINT -- $iostat_pid
 wait
