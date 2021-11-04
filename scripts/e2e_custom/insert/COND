@@ -245,7 +245,7 @@ run_experiment_group(
   run="../run.sh",  
   experiments=[
     ExperimentInstance(
-      name="llsm-reorg{}-{}".format(reorg_length, record_size_bytes),
+      name="llsm-reorg-{}-{}".format(reorg_length, record_size_bytes),
       options={
         **COMMON_OPTIONS,
         "db": "llsm",
