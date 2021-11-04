@@ -5,29 +5,34 @@ script_loc=$(cd $(dirname $0) && pwd -P)
 cd $script_loc
 source ../experiment_config.sh
 
-if [ -z $1 ]; then
-  >&2 echo "Usage: $0 <checkpoint name> [other args passed to run_custom]"
-  exit 1
-fi
-
-checkpoint_name=$1
-shift 1
-
 # Evaluates any environment variables in this script's arguments. This script
 # should only be run on trusted input.
 orig_args=($@)
 args=()
 for val in "${orig_args[@]}"; do
   phys_arg=$(eval "echo $val")
-  args+=($phys_arg)
 
   # Extract the database type (e.g., llsm, rocksdb, leanstore)
   if [[ $phys_arg =~ --db=.+ ]]; then
     db_type=${phys_arg:5}
   fi
+
+  # Extract the checkpoint name, which shouldn't be passed as an argument further.
+  # Add anything else to args.
+  if [[ $phys_arg =~ --checkpoint_name=.+ ]]; then
+    checkpoint_name=${phys_arg:18}
+  else
+    args+=($phys_arg)
+  fi
 done
 
+if [[ -z $checkpoint_name ]]; then
+  echo >&2 "Usage: $0 --checkpoint_name=<checkpoint name> [other args passed to run_custom]"
+  exit 1
+fi
+
 echo "Detected DB Type: $db_type"
+echo "Detected checkpoint name: $checkpoint_name"
 
 # Add common arguments.
 args+=("--verbose")
@@ -50,15 +55,14 @@ fi
 sync $DB_PATH
 
 set +e
-iostat -o JSON -d -y 1 > $COND_OUT/iostat.json &
+iostat -o JSON -d -y 1 >$COND_OUT/iostat.json &
 iostat_pid=$!
 
-../../build/bench/run_custom ${args[@]} > $COND_OUT/results.csv
+../../build/bench/run_custom ${args[@]} >$COND_OUT/results.csv
 code=$?
 
-cp $DB_PATH/llsm/LOG $COND_OUT/llsm.log
-cp $DB_PATH/rocksdb/LOG $COND_OUT/rocksdb.log
-du -b $DB_PATH > $COND_OUT/db_space.log
+cp $DB_PATH/$db_type/LOG $COND_OUT/$db_type.log
+du -b $DB_PATH >$COND_OUT/db_space.log
 
 kill -s SIGINT -- $iostat_pid
 wait

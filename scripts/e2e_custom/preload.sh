@@ -5,31 +5,44 @@ script_loc=$(cd $(dirname $0) && pwd -P)
 cd $script_loc
 source ../experiment_config.sh
 
-if [ -z $3 ]; then
-  >&2 echo "Usage: $0 <checkpoint name> <workload path> <all|rocksdb|llsm> [other args passed to run_custom]"
-  exit 1
-fi
-
-checkpoint_name=$1
-workload_path=$2
-db_type=$3
-shift 3
-
-full_checkpoint_path=$DB_CHECKPOINT_PATH/$checkpoint_name
-
-# Check if the checkpoint already exists. If so, we do not need to rerun.
-if [ -d "$full_checkpoint_path" ]; then
-  >&2 echo "Checkpoint $checkpoint_name already exists. No need to recreate."
-  exit 0
-fi
-
 # Evaluates any environment variables in this script's arguments. This script
 # should only be run on trusted input.
 orig_args=($@)
 args=()
 for val in "${orig_args[@]}"; do
-  args+=($(eval "echo $val"))
+  phys_arg=$(eval "echo $val")
+
+  # Extract the database type (e.g., llsm, rocksdb, leanstore)
+  if [[ $phys_arg =~ --db=.+ ]]; then
+    db_type=${phys_arg:5}
+  fi
+
+  # Extract the workload path
+  if [[ $phys_arg =~ --workload_config=.+ ]]; then
+    workload_path=${phys_arg:18}
+  fi
+
+  # Extract the checkpoint name, which shouldn't be passed as an argument further.
+  # Add anything else to args.
+  if [[ $phys_arg =~ --checkpoint_name=.+ ]]; then
+    checkpoint_name=${phys_arg:18}
+  else
+    args+=($phys_arg)
+  fi
 done
+
+if [[ -z $db_type || -z $checkpoint_name || -z $workload_path ]]; then
+  echo >&2 "Usage: $0 --checkpoint_name=<checkpoint name> --workload_config=<workload path> --db=<all|rocksdb|llsm> [other args passed to run_custom]"
+  exit 1
+fi
+
+full_checkpoint_path=$DB_CHECKPOINT_PATH/$checkpoint_name
+
+# Check if the checkpoint already exists. If so, we do not need to rerun.
+if [ -d "$full_checkpoint_path" ]; then
+  echo >&2 "Checkpoint $checkpoint_name already exists. No need to recreate."
+  exit 0
+fi
 
 mkdir -p $DB_CHECKPOINT_PATH
 

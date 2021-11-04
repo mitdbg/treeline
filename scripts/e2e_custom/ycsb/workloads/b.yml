@@ -1,5 +1,3 @@
-record_size_bytes: 64
-
 load:
   num_records: 20000000
   distribution:
