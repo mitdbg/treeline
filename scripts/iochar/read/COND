@@ -27,6 +27,18 @@ run_experiment_group(
   ],
 )
 
+run_experiment_group(
+  name="read_seq_scale",
+  run="../run_fio.sh",
+  experiments=[
+    ExperimentInstance(
+      name="read_seq_scale-{}".format(device),
+      args=[device, "seq-scale"],
+    )
+    for device in DEVICES
+  ],
+)
+
 group(
   name="read-nvme_ssd_ext4",
   deps=[
@@ -49,10 +61,4 @@ group(
     ":read-nvme_ssd_raw-{}".format(jobfile)
     for jobfile in JOBS
   ],
-)
-
-run_experiment(
-  name="read_seq_scale-nvme_ssd_ext4",
-  run="../run_fio.sh",
-  args=["nvme_ssd_ext4", "seq-scale"],
 )
