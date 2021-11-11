@@ -1,22 +1,49 @@
 [global]
+include ../common.fio
 ioengine=io_uring
-rw=randread
-direct=1
 bs=64k
-size=10g
-time_based
-runtime=10
-thread
 stonewall
 
+; Random Read
+
 [randread-64k-1]
+rw=randread
 iodepth=1
 
+[randread-64k-2]
+rw=randread
+iodepth=2
+
 [randread-64k-4]
+rw=randread
 iodepth=4
 
+[randread-64k-8]
+rw=randread
+iodepth=8
+
 [randread-64k-16]
+rw=randread
 iodepth=16
 
-[randread-64k-64]
-iodepth=64
+; Sequential Read
+
+[seqread-64k-1]
+rw=read
+iodepth=1
+
+[seqread-64k-2]
+rw=read
+iodepth=2
+
+[seqread-64k-4]
+rw=read
+iodepth=4
+
+[seqread-64k-8]
+rw=read
+iodepth=8
+
+[seqread-64k-16]
+rw=read
+iodepth=16

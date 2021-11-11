@@ -50,3 +50,9 @@ group(
     for jobfile in JOBS
   ],
 )
+
+run_experiment(
+  name="read_seq_scale-nvme_ssd_ext4",
+  run="../run_fio.sh",
+  args=["nvme_ssd_ext4", "seq-scale"],
+)

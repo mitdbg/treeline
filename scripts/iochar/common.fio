@@ -1,0 +1,5 @@
+direct=1
+size=10g
+time_based
+runtime=10
+thread
