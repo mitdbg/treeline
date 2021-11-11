@@ -23,11 +23,11 @@
  * Where is my item in the slab?
  */
 off_t item_page_num(struct slab *s, size_t idx) {
-   size_t items_per_page = PAGE_SIZE/s->item_size;
+   size_t items_per_page = KVELL_PAGE_SIZE/s->item_size;
    return idx / items_per_page;
 }
 static off_t item_in_page_offset(struct slab *s, size_t idx) {
-   size_t items_per_page = PAGE_SIZE/s->item_size;
+   size_t items_per_page = KVELL_PAGE_SIZE/s->item_size;
    return (idx % items_per_page)*s->item_size;
 }
 
@@ -57,12 +57,12 @@ void add_existing_item(struct slab *s, size_t idx, void *_item, struct slab_call
 
 void process_existing_chunk(int slab_worker_id, struct slab *s, size_t nb_files, size_t file_idx, char *data, size_t start, size_t length, struct slab_callback *callback) {
    static __thread declare_periodic_count;
-   size_t nb_items_per_page = PAGE_SIZE / s->item_size;
-   size_t nb_pages = length / PAGE_SIZE;
+   size_t nb_items_per_page = KVELL_PAGE_SIZE / s->item_size;
+   size_t nb_pages = length / KVELL_PAGE_SIZE;
    for(size_t p = 0; p < nb_pages; p++) {
-      size_t page_num = ((start + p*PAGE_SIZE) / PAGE_SIZE); // Physical page to virtual page
+      size_t page_num = ((start + p*KVELL_PAGE_SIZE) / KVELL_PAGE_SIZE); // Physical page to virtual page
       size_t base_idx = page_num*nb_items_per_page*nb_files + file_idx*nb_items_per_page;
-      size_t current = p*PAGE_SIZE;
+      size_t current = p*KVELL_PAGE_SIZE;
       for(size_t i = 0; i < nb_items_per_page; i++) {
          add_existing_item(s, base_idx, &data[current], callback);
          base_idx++;
@@ -74,7 +74,7 @@ void process_existing_chunk(int slab_worker_id, struct slab *s, size_t nb_files,
 
 #define GRANULARITY_REBUILD (2*1024*1024) // We rebuild 2MB by 2MB
 void rebuild_index(int slab_worker_id, struct slab *s, struct slab_callback *callback) {
-   char *cached_data = aligned_alloc(PAGE_SIZE, GRANULARITY_REBUILD);
+   char *cached_data = aligned_alloc(KVELL_PAGE_SIZE, GRANULARITY_REBUILD);
 
    int fd = s->fd;
    size_t start = 0, end;
@@ -82,10 +82,10 @@ void rebuild_index(int slab_worker_id, struct slab *s, struct slab_callback *cal
       end = start + GRANULARITY_REBUILD;
       if(end > s->size_on_disk)
          end = s->size_on_disk;
-      if( ((end - start) % PAGE_SIZE) != 0)
-         end = end - (end % PAGE_SIZE);
-      if( ((end - start) % PAGE_SIZE) != 0)
-         die("File size is wrong (%%PAGE_SIZE!=0)\n");
+      if( ((end - start) % KVELL_PAGE_SIZE) != 0)
+         end = end - (end % KVELL_PAGE_SIZE);
+      if( ((end - start) % KVELL_PAGE_SIZE) != 0)
+         die("File size is wrong (%%KVELL_PAGE_SIZE!=0)\n");
       if(end == start)
          break;
       int r = pread(fd, cached_data, end - start, start);
@@ -120,13 +120,13 @@ struct slab* create_slab(struct slab_context *ctx, int slab_worker_id, size_t it
 
    fstat(s->fd, &sb);
    s->size_on_disk = sb.st_size;
-   if(s->size_on_disk < 2*PAGE_SIZE) {
-      fallocate(s->fd, 0, 0, 2*PAGE_SIZE);
-      s->size_on_disk = 2*PAGE_SIZE;
+   if(s->size_on_disk < 2*KVELL_PAGE_SIZE) {
+      fallocate(s->fd, 0, 0, 2*KVELL_PAGE_SIZE);
+      s->size_on_disk = 2*KVELL_PAGE_SIZE;
    }
 
-   size_t nb_items_per_page = PAGE_SIZE / item_size;
-   s->nb_max_items = s->size_on_disk / PAGE_SIZE * nb_items_per_page;
+   size_t nb_items_per_page = KVELL_PAGE_SIZE / item_size;
+   s->nb_max_items = s->size_on_disk / KVELL_PAGE_SIZE * nb_items_per_page;
    s->nb_items = 0;
    s->item_size = item_size;
    s->nb_free_items = 0;
@@ -153,11 +153,11 @@ struct slab* resize_slab(struct slab *s) {
          perr("Cannot resize slab (item size %lu) new size %lu\n", s->item_size, s->size_on_disk);
       s->nb_max_items *= 2;
    } else {
-      size_t nb_items_per_page = PAGE_SIZE / s->item_size;
+      size_t nb_items_per_page = KVELL_PAGE_SIZE / s->item_size;
       s->size_on_disk += 10000000000LU;
       if(fallocate(s->fd, 0, 0, s->size_on_disk))
          perr("Cannot resize slab (item size %lu) new size %lu\n", s->item_size, s->size_on_disk);
-      s->nb_max_items = s->size_on_disk / PAGE_SIZE * nb_items_per_page;
+      s->nb_max_items = s->size_on_disk / KVELL_PAGE_SIZE * nb_items_per_page;
    }
    return s;
 }
@@ -171,7 +171,7 @@ struct slab* resize_slab(struct slab *s) {
  */
 void *read_item(struct slab *s, size_t idx) {
    size_t page_num = item_page_num(s, idx);
-   char *disk_data = safe_pread(s->fd, page_num*PAGE_SIZE);
+   char *disk_data = safe_pread(s->fd, page_num*KVELL_PAGE_SIZE);
    return &disk_data[item_in_page_offset(s, idx)];
 }
 

@@ -23,7 +23,7 @@ void page_cache_init(struct pagecache *p) {
    declare_timer;
    start_timer {
       printf("#Reserving memory for page cache...\n");
-      p->cached_data = aligned_alloc(PAGE_SIZE, PAGE_CACHE_SIZE/get_nb_workers());
+      p->cached_data = aligned_alloc(KVELL_PAGE_SIZE, PAGE_CACHE_SIZE/get_nb_workers());
       assert(p->cached_data); // If it fails here, it's probably because page cache size is bigger than RAM -- see options.h
       memset(p->cached_data, 0, PAGE_CACHE_SIZE/get_nb_workers());
    } stop_timer("Page cache initialization");
@@ -92,7 +92,7 @@ int get_page(struct pagecache *p, uint64_t hash, void **page, struct lru **lru) 
 
    // Otherwise allocate a new page, either a free one, or reuse the oldest
    if(p->used_page_size < MAX_PAGE_CACHE/get_nb_workers()) {
-      dst = &p->cached_data[PAGE_SIZE*p->used_page_size];
+      dst = &p->cached_data[KVELL_PAGE_SIZE*p->used_page_size];
       lru_entry = add_page_in_lru(p, dst, hash);
       p->used_page_size++;
    } else {

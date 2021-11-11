@@ -295,7 +295,7 @@ again:
          retries++;
          pending = ctx->sent_callbacks - ctx->processed_callbacks;
          if(pending == 0) {
-            wait_for(10000);
+            kvell_wait_for(10000);
          } else {
             goto again;
          }

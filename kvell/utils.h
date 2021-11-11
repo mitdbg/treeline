@@ -3,7 +3,7 @@
 #include "headers.h"
 #include "stats.h"
 
-#define PAGE_SIZE (4LU*1024LU)
+#define KVELL_PAGE_SIZE (4LU*1024LU)
 #define ONE_GB (1024*1024*1024)
 
 #define die(msg, args...) \
@@ -232,7 +232,7 @@
 /*
  * Busy waiting
  */
-#define wait_for(cycles) \
+#define kvell_wait_for(cycles) \
    do { \
       uint64_t _s, _e; \
       rdtscll(_s); \

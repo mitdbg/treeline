@@ -29,10 +29,10 @@
 static __thread char *disk_data;
 void *safe_pread(int fd, off_t offset) {
    if(!disk_data)
-      disk_data = aligned_alloc(PAGE_SIZE, PAGE_SIZE);
-   int r = pread(fd, disk_data, PAGE_SIZE, offset);
-   if(r != PAGE_SIZE)
-      perr("pread failed! Read %d instead of %lu (offset %lu)\n", r, PAGE_SIZE, offset);
+      disk_data = aligned_alloc(KVELL_PAGE_SIZE, KVELL_PAGE_SIZE);
+   int r = pread(fd, disk_data, KVELL_PAGE_SIZE, offset);
+   if(r != KVELL_PAGE_SIZE)
+      perr("pread failed! Read %d instead of %lu (offset %lu)\n", r, KVELL_PAGE_SIZE, offset);
    return disk_data;
 }
 
@@ -178,8 +178,8 @@ char *read_page_async(struct slab_callback *callback) {
    _iocb->aio_lio_opcode = IOCB_CMD_PREAD;
    _iocb->aio_buf = (uint64_t)disk_page;
    _iocb->aio_data = (uint64_t)callback;
-   _iocb->aio_offset = page_num * PAGE_SIZE;
-   _iocb->aio_nbytes = PAGE_SIZE;
+   _iocb->aio_offset = page_num * KVELL_PAGE_SIZE;
+   _iocb->aio_nbytes = KVELL_PAGE_SIZE;
    if(ctx->sent_io - ctx->processed_io >= ctx->max_pending_io)
       die("Sent %lu ios, processed %lu (> %lu waiting), IO buffer is too full!\n", ctx->sent_io, ctx->processed_io, ctx->max_pending_io);
    ctx->sent_io++;
@@ -216,8 +216,8 @@ char *write_page_async(struct slab_callback *callback) {
    _iocb->aio_lio_opcode = IOCB_CMD_PWRITE;
    _iocb->aio_buf = (uint64_t)disk_page;
    _iocb->aio_data = (uint64_t)callback;
-   _iocb->aio_offset = page_num * PAGE_SIZE;
-   _iocb->aio_nbytes = PAGE_SIZE;
+   _iocb->aio_offset = page_num * KVELL_PAGE_SIZE;
+   _iocb->aio_nbytes = KVELL_PAGE_SIZE;
    if(ctx->sent_io - ctx->processed_io >= ctx->max_pending_io)
       die("Sent %lu ios, processed %lu (> %lu waiting), IO buffer is too full!\n", ctx->sent_io, ctx->processed_io, ctx->max_pending_io);
    ctx->sent_io++;

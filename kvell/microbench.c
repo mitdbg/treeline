@@ -63,7 +63,7 @@ void *do_libaio(void *data) {
    struct iocb *cbs[1024];
    struct io_event events[1024];
    int ret;
-   char *buffers = aligned_alloc(PAGE_SIZE, PAGE_SIZE * queue_size);
+   char *buffers = aligned_alloc(KVELL_PAGE_SIZE, KVELL_PAGE_SIZE * queue_size);
 
    ret = io_setup(1024, &ctx);
    if (ret < 0) {
@@ -91,9 +91,9 @@ void *do_libaio(void *data) {
          } else {
             cb[j].aio_lio_opcode = (rand_r(&seed)%100<5)?IOCB_CMD_PWRITE:IOCB_CMD_PREAD;
          }
-         cb[j].aio_buf = (uint64_t)&buffers[PAGE_SIZE*j];
-         cb[j].aio_offset = page * PAGE_SIZE;
-         cb[j].aio_nbytes = PAGE_SIZE;
+         cb[j].aio_buf = (uint64_t)&buffers[KVELL_PAGE_SIZE*j];
+         cb[j].aio_offset = page * KVELL_PAGE_SIZE;
+         cb[j].aio_nbytes = KVELL_PAGE_SIZE;
 
          cbs[j] = &cb[j];
 
@@ -108,7 +108,7 @@ void *do_libaio(void *data) {
       } __1
       ret = io_getevents(ctx, ret, ret, events, NULL); __2
 
-      wait_for(450000); __3
+      kvell_wait_for(450000); __3
 
       show_breakdown_periodic(1000, i, "io_submit", "io_getevents", "waiting", "unused", "unused");
    }
@@ -150,16 +150,16 @@ int bench_io(void) {
       perr("Cannot open %s\n", path);
 
    fstat(fd, &sb);
-   nb_pages = sb.st_size / PAGE_SIZE;
+   nb_pages = sb.st_size / KVELL_PAGE_SIZE;
    printf("# Size of file being benched: %luB = %lu pages\n", sb.st_size, nb_pages);
 
    /* Direct IO perf */
-   /*char page_data[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+   /*char page_data[KVELL_PAGE_SIZE] __attribute__((aligned(KVELL_PAGE_SIZE)));
    start_timer {
       for(size_t i = 0; i < NB_ACCESSES; i++) {
          uint64_t page = xorshf96() % nb_pages;
-         int ret = pread(fd, &page_data, PAGE_SIZE, page * PAGE_SIZE);
-         assert(ret == PAGE_SIZE);
+         int ret = pread(fd, &page_data, KVELL_PAGE_SIZE, page * KVELL_PAGE_SIZE);
+         assert(ret == KVELL_PAGE_SIZE);
       }
    } stop_timer("DirectIO - Time for %lu accesses = %lums (%lu io/s)", NB_ACCESSES, elapsed/1000, NB_ACCESSES*1000000LU/elapsed);*/
 
@@ -195,7 +195,7 @@ int bench_io(void) {
       char *map = mmap(NULL, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
       for(size_t i = 0; i < NB_ACCESSES; i++) {
          uint64_t page = xorshf96() % nb_pages;
-         memcpy(page_data, &map[page * PAGE_SIZE], PAGE_SIZE);
+         memcpy(page_data, &map[page * KVELL_PAGE_SIZE], KVELL_PAGE_SIZE);
       }
    } stop_timer("MMAP - Time for %lu accesses = %lums (%lu io/s)", NB_ACCESSES, elapsed/1000, NB_ACCESSES*1000000LU/elapsed);*/
 

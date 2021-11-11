@@ -21,11 +21,11 @@
 #define WAIT_A_BIT_FOR_MORE_IOS 0 // If we realize we don't have QUEUE_DEPTH IO pending when submitting IOs, check again if new incoming requests have arrived. Boost performance a tiny bit for zipfian workloads on AWS, but really not worthwhile
 
 /* Page cache */
-//#define PAGE_CACHE_SIZE (PAGE_SIZE * 20480)
-#define PAGE_CACHE_SIZE (PAGE_SIZE * 7864320) //30GB
-//#define PAGE_CACHE_SIZE (PAGE_SIZE * 2621440) //10GB
-//#define PAGE_CACHE_SIZE (PAGE_SIZE * 786432) //3GB
-#define MAX_PAGE_CACHE (PAGE_CACHE_SIZE / PAGE_SIZE)
+//#define PAGE_CACHE_SIZE (KVELL_PAGE_SIZE * 20480)
+#define PAGE_CACHE_SIZE (KVELL_PAGE_SIZE * 7864320) //30GB
+//#define PAGE_CACHE_SIZE (KVELL_PAGE_SIZE * 2621440) //10GB
+//#define PAGE_CACHE_SIZE (KVELL_PAGE_SIZE * 786432) //3GB
+#define MAX_PAGE_CACHE (PAGE_CACHE_SIZE / KVELL_PAGE_SIZE)
 
 /* Free list */
 #define FREELIST_IN_MEMORY_ITEMS (256) // We need enough to never have to read from disk
