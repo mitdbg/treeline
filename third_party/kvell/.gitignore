@@ -1,7 +1,0 @@
-*.swp
-*.o
-main
-microbench
-benchcomponents
-scripts/parse_log
-makefile.dep
