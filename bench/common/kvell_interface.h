@@ -5,7 +5,7 @@
 #include <thread>
 
 #include "config.h"
-#include "third_party/kvell/headers.h"
+#include "kvell/slabworker.h"
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 
@@ -80,13 +80,15 @@ class KVellInterface {
 
   // Scan the key range starting from `key` for `amount` records. Return true if
   // the scan succeeded.
-  bool Scan(
-      const ycsbr::Request::Key key, const size_t amount,
-      std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {}
+  bool Scan(const ycsbr::Request::Key key, const size_t amount,
+            std::vector<std::pair<ycsbr::Request::Key, std::string>>*
+                scan_out) {  // TODO
+    return true;
+  }
 
  private:
-  char* serialize_record(ycsbr::Request::Key key, const char* value,
-                           size_t value_size) {
+  static char* serialize_record(ycsbr::Request::Key key, const char* value,
+                         size_t value_size) {
     size_t meta_size = sizeof(struct item_metadata);
     char* item =
         reinterpret_cast<char*>(malloc(sizeof(key) + value_size + meta_size));
@@ -100,4 +102,11 @@ class KVellInterface {
       memcpy(item + meta_size + meta->key_size, value, meta->value_size);
     return item;
   }
+
+  // From workload_common.c
+  static void add_in_tree(struct slab_callback *cb, void *item) {
+   memory_index_add(cb, item);
+   free(cb->item);
+   free(cb);
+}
 };

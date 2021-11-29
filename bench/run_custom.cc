@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "bench/common/config.h"
+#include "bench/common/kvell_interface.h"
 #include "bench/common/leanstore_interface.h"
 #include "bench/common/llsm_interface.h"
 #include "bench/common/load_data.h"
