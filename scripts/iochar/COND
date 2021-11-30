@@ -1,0 +1,35 @@
+combine(
+  name="iochar",
+  deps=[
+    "//scripts/iochar/read:read",
+    "//scripts/iochar/write:write",
+    "//scripts/iochar/mixed:mixed",
+  ],
+)
+
+group(
+  name="nvme_ssd_ext4",
+  deps=[
+    "//scripts/iochar/read:read-nvme_ssd_ext4",
+    "//scripts/iochar/write:write-nvme_ssd_ext4",
+    "//scripts/iochar/mixed:mixed-nvme_ssd_ext4",
+  ],
+)
+
+group(
+  name="nvme_ssd_xfs",
+  deps=[
+    "//scripts/iochar/read:read-nvme_ssd_xfs",
+    "//scripts/iochar/write:write-nvme_ssd_xfs",
+    "//scripts/iochar/mixed:mixed-nvme_ssd_xfs",
+  ],
+)
+
+group(
+  name="nvme_ssd_raw",
+  deps=[
+    "//scripts/iochar/read:read-nvme_ssd_raw",
+    "//scripts/iochar/write:write-nvme_ssd_raw",
+    "//scripts/iochar/mixed:mixed-nvme_ssd_raw",
+  ],
+)

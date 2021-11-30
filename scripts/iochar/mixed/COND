@@ -1,0 +1,62 @@
+from itertools import product
+
+JOBS = [
+  "psync-4k",
+  "psync-16k",
+  "psync-4k-unlim",
+  "psync-16k-unlim",
+  "psync-4k-offset",
+  "psync-16k-offset",
+  "uring-4k",
+  "uring-16k",
+  "uring-4k-unlim",
+  "uring-16k-unlim",
+  "uring-4k-offset",
+  "uring-16k-offset",
+]
+
+DEVICES = [
+  "nvme_ssd_ext4",
+  "nvme_ssd_raw",
+  "nvme_ssd_xfs",
+]
+
+run_experiment_group(
+  name="mixed",
+  run="../run_fio.sh",
+  experiments=[
+    ExperimentInstance(
+      name="mixed-{}-{}".format(device, jobfile),
+      args=[device, jobfile],
+    )
+    for device, jobfile in product(DEVICES, JOBS)
+    # Can't run the "unlim" workloads directly on the block device because they
+    # rely on having the ability to use separate files.
+    if not device.endswith("raw") or not jobfile.endswith("unlim")
+  ],
+)
+
+group(
+  name="mixed-nvme_ssd_ext4",
+  deps=[
+    ":mixed-nvme_ssd_ext4-{}".format(jobfile)
+    for jobfile in JOBS
+  ],
+)
+
+group(
+  name="mixed-nvme_ssd_xfs",
+  deps=[
+    ":mixed-nvme_ssd_xfs-{}".format(jobfile)
+    for jobfile in JOBS
+  ],
+)
+
+group(
+  name="mixed-nvme_ssd_raw",
+  deps=[
+    ":mixed-nvme_ssd_raw-{}".format(jobfile)
+    for jobfile in JOBS
+    if not jobfile.endswith("unlim")
+  ],
+)
