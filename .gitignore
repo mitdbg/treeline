@@ -8,6 +8,7 @@ cond-out*
 scripts/experiment_config.sh
 scripts/e2e_perf/results
 scripts/iochar/fio_config.sh
+simulator/ycsbr_py.*.so
 
 .idea/
 .vscode/
