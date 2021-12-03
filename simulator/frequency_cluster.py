@@ -1,5 +1,6 @@
 import argparse
-from functools import cache
+import csv
+import sys
 import ycsbr_py as ycsbr
 
 from utils.io_count import IOCounter
@@ -60,6 +61,7 @@ def main():
     parser.add_argument("--page_fill_pct", type=int, default=50)
     parser.add_argument("--page_size_bytes", type=int, default=4096)
     parser.add_argument("--cache_size_mib", type=int, default=407)
+    parser.add_argument("--print_csv", action="store_true")
     args = parser.parse_args()
 
     cache_capacity = int(args.cache_size_mib * 1024 * 1024 / args.page_size_bytes)
@@ -67,11 +69,12 @@ def main():
         args.page_size_bytes * args.page_fill_pct / 100 / args.record_size_bytes
     )
 
-    print("Record size bytes: {}".format(args.record_size_bytes))
-    print("Page fill: {}%".format(args.page_fill_pct))
-    print("Cache size: {} MiB".format(args.cache_size_mib))
-    print("Records per page: {}".format(records_per_page))
-    print("Pages in cache: {}".format(cache_capacity))
+    if not args.print_csv:
+        print("Record size bytes: {}".format(args.record_size_bytes))
+        print("Page fill: {}%".format(args.page_fill_pct))
+        print("Cache size: {} MiB".format(args.cache_size_mib))
+        print("Records per page: {}".format(records_per_page))
+        print("Pages in cache: {}".format(cache_capacity))
 
     workload = ycsbr.PhasedWorkload.from_file(
         args.workload_config, set_record_size_bytes=args.record_size_bytes
@@ -83,10 +86,12 @@ def main():
         cache_capacity,
     )
     run_workload(workload, key_clustered_db)
-    print()
-    print("Key Order Clustering")
-    print("Read I/Os:  {}".format(key_clustered_db.read_ios))
-    print("Write I/Os: {}".format(key_clustered_db.write_ios))
+
+    if not args.print_csv:
+        print()
+        print("Key Order Clustering")
+        print("Read I/Os:  {}".format(key_clustered_db.read_ios))
+        print("Write I/Os: {}".format(key_clustered_db.write_ios))
 
     access_clustered_db = IOCounter(
         get_cluster_by_access_mapper(
@@ -95,10 +100,22 @@ def main():
         cache_capacity,
     )
     run_workload(workload, access_clustered_db)
-    print()
-    print("Access Order Clustering")
-    print("Read I/Os:  {}".format(access_clustered_db.read_ios))
-    print("Write I/Os: {}".format(access_clustered_db.write_ios))
+
+    if not args.print_csv:
+        print()
+        print("Access Order Clustering")
+        print("Read I/Os:  {}".format(access_clustered_db.read_ios))
+        print("Write I/Os: {}".format(access_clustered_db.write_ios))
+
+    if args.print_csv:
+        writer = csv.writer(sys.stdout)
+        writer.writerow(["cluster_kind", "read_ios", "write_ios"])
+        writer.writerow(
+            ["key_order", key_clustered_db.read_ios, key_clustered_db.write_ios]
+        )
+        writer.writerow(
+            ["access_freq", access_clustered_db.read_ios, access_clustered_db.write_ios]
+        )
 
 
 if __name__ == "__main__":
