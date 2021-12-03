@@ -62,10 +62,16 @@ def main():
     parser.add_argument("--cache_size_mib", type=int, default=407)
     args = parser.parse_args()
 
-    cache_capacity = args.cache_size_mib * 1024 * 1024 / args.page_size_bytes
-    records_per_page = (
+    cache_capacity = int(args.cache_size_mib * 1024 * 1024 / args.page_size_bytes)
+    records_per_page = int(
         args.page_size_bytes * args.page_fill_pct / 100 / args.record_size_bytes
     )
+
+    print("Record size bytes: {}".format(args.record_size_bytes))
+    print("Page fill: {}%".format(args.page_fill_pct))
+    print("Cache size: {} MiB".format(args.cache_size_mib))
+    print("Records per page: {}".format(records_per_page))
+    print("Pages in cache: {}".format(cache_capacity))
 
     workload = ycsbr.PhasedWorkload.from_file(
         args.workload_config, set_record_size_bytes=args.record_size_bytes
@@ -77,6 +83,7 @@ def main():
         cache_capacity,
     )
     run_workload(workload, key_clustered_db)
+    print()
     print("Key Order Clustering")
     print("Read I/Os:  {}".format(key_clustered_db.read_ios))
     print("Write I/Os: {}".format(key_clustered_db.write_ios))

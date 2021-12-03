@@ -74,6 +74,7 @@ class IOCounter(ycsbr.DatabaseInterface):
         return True
 
     def update(self, key, val):
+        self._update_key_access(key)
         page_id = self._page_mapper(key)
         page_status = self._cache.lookup(page_id)
         if page_status is not None:
@@ -87,13 +88,14 @@ class IOCounter(ycsbr.DatabaseInterface):
         page_status.dirty = True
         evicted = self._cache.add(page_id, page_status)
 
-        if evicted is not None and evicted.dirty:
+        if evicted is not None and evicted[1].dirty:
             # Requires a dirty page write out
             self._write_ios += 1
 
         return True
 
     def read(self, key):
+        self._update_key_access(key)
         page_id = self._page_mapper(key)
         page_status = self._cache.lookup(page_id)
         if page_status is not None:
@@ -106,7 +108,7 @@ class IOCounter(ycsbr.DatabaseInterface):
         page_status.dirty = False
         evicted = self._cache.add(page_id, page_status)
 
-        if evicted is not None and evicted.dirty:
+        if evicted is not None and evicted[1].dirty:
             # Requires a dirty page write out
             self._write_ios += 1
 
