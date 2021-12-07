@@ -51,7 +51,7 @@ def get_cluster_by_access_mapper(dataset, access_freqs, records_per_page):
     def page_mapper(key):
         return key_to_page_map[key]
 
-    return page_mapper
+    return page_mapper, key_access_counts
 
 
 def main():
@@ -62,6 +62,7 @@ def main():
     parser.add_argument("--page_size_bytes", type=int, default=4096)
     parser.add_argument("--cache_size_mib", type=int, default=407)
     parser.add_argument("--print_csv", action="store_true")
+    parser.add_argument("--record_accesses", type=str)
     args = parser.parse_args()
 
     cache_capacity = int(args.cache_size_mib * 1024 * 1024 / args.page_size_bytes)
@@ -93,12 +94,10 @@ def main():
         print("Read I/Os:  {}".format(key_clustered_db.read_ios))
         print("Write I/Os: {}".format(key_clustered_db.write_ios))
 
-    access_clustered_db = IOCounter(
-        get_cluster_by_access_mapper(
-            keys, key_clustered_db.key_access_freqs, records_per_page
-        ),
-        cache_capacity,
+    access_mapper, access_data = get_cluster_by_access_mapper(
+        keys, key_clustered_db.key_access_freqs, records_per_page
     )
+    access_clustered_db = IOCounter(access_mapper, cache_capacity)
     run_workload(workload, access_clustered_db)
 
     if not args.print_csv:
@@ -116,6 +115,15 @@ def main():
         writer.writerow(
             ["access_freq", access_clustered_db.read_ios, access_clustered_db.write_ios]
         )
+
+    if args.record_accesses is not None:
+        with open(args.record_accesses, "w") as file:
+            writer = csv.writer(file)
+            writer.writerow(["key", "access_count"])
+            for key, access in access_data:
+                if access == 0:
+                    break
+                writer.writerow([key, access])
 
 
 if __name__ == "__main__":
