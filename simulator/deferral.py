@@ -3,6 +3,7 @@ import bisect
 import csv
 import statistics
 import pathlib
+from itertools import product
 
 from utils.workload_extractor import extract_workload
 
@@ -229,6 +230,7 @@ def main():
         type=str,
         default="0.05,0.1,0.15,0.2,0.25",
     )
+    parser.add_argument("--max_defer_times", type=str, default="1")
     parser.add_argument("--accumulate_dups", action="store_true")
     parser.add_argument("--out_dir", type=str)
     args = parser.parse_args()
@@ -237,6 +239,7 @@ def main():
 
     memtable_records = int(args.memtable_size_mib * 1024 * 1024 / args.record_size_bytes)
     flush_thresholds = list(map(float, args.flush_thresholds.split(",")))
+    defer_times = list(map(int, args.max_defer_times.split(",")))
 
     db = extract_workload(
         workload_config_file=args.workload_config,
@@ -257,6 +260,7 @@ def main():
         writer.writerow(
             [
                 "flush_fill_threshold",
+                "max_defer_times",
                 "num_flushes",
                 "num_evicts",
                 "num_page_writes",
@@ -267,8 +271,9 @@ def main():
             ]
         )
 
-        for thresh in flush_thresholds:
+        for thresh, max_defer in product(flush_thresholds, defer_times):
             print("Running with threshold:", thresh)
+            print("Max defer times:", max_defer)
             (
                 num_flushes,
                 num_evicts,
@@ -277,7 +282,7 @@ def main():
                 write_amps,
             ) = sim.run_deferral(
                 thresh,
-                defer_count=1,  # N.B. This is hardcoded!
+                defer_count=max_defer,
                 records_per_page=args.keys_per_page,
                 memtable_records=memtable_records,
                 replace_dups=(not args.accumulate_dups),
@@ -285,6 +290,7 @@ def main():
             writer.writerow(
                 [
                     thresh,
+                    max_defer,
                     num_flushes,
                     num_evicts,
                     num_page_writes,

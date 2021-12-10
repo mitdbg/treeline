@@ -13,6 +13,7 @@ run_experiment_group(
         "record_size_bytes": 64,
         "keys_per_page": 32,
         "memtable_size_mib": 64,
+        "max_defer_times": "1,2,3,100000",
       },
     )
     for skew_type, theta in product(["key", "page"], THETAS)
