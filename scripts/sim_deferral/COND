@@ -22,5 +22,5 @@ run_experiment_group(
 run_command(
   name="combine",
   run="python3 combine.py",
-  deps=[":sim_freq"]
+  deps=[":sim_defer_small"]
 )
