@@ -1,0 +1,19 @@
+from itertools import product
+
+THETAS = [99, 79, 59]
+
+run_experiment_group(
+  name="sim_cache_small",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="sim_cache_small-{}-{}".format(skew_type, theta),
+      args=["{}_{}.yml".format(skew_type, theta)],
+      options={
+        "record_size_bytes": 64,
+        "keys_per_page": 32,
+      },
+    )
+    for skew_type, theta in product(["key", "page"], THETAS)
+  ],
+)
