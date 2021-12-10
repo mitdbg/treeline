@@ -1,0 +1,25 @@
+THETAS = [99, 79, 59]
+
+run_experiment_group(
+  name="sim_freq",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="sim_freq-{}".format(theta),
+      args=["a_{}.yml".format(theta), "--print_csv"],
+      options={
+        "record_size_bytes": 64,
+        "page_fill_pct": 50,
+        "page_size_bytes": 4096,
+        "cache_size_mib": 407,
+      },
+    )
+    for theta in THETAS
+  ],
+)
+
+run_command(
+  name="combine",
+  run="python3 combine.py",
+  deps=[":sim_freq"]
+)
