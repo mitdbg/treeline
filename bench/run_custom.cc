@@ -6,6 +6,7 @@
 #include "bench/common/llsm_interface.h"
 #include "bench/common/load_data.h"
 #include "bench/common/rocksdb_interface.h"
+#include "bench/common/startup.h"
 #include "gflags/gflags.h"
 #include "ycsbr/gen.h"
 
@@ -53,6 +54,8 @@ ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
     std::cerr << "> Running workload using " << FLAGS_threads
               << " application thread(s)." << std::endl;
   }
+
+  SendReadySignalToParent();
 
   ycsbr::RunOptions options;
   options.latency_sample_period = FLAGS_latency_sample_period;
