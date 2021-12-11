@@ -54,18 +54,28 @@ fi
 
 sync $DB_PATH
 
-set +e
-iostat -o JSON -d -y 1 >$COND_OUT/iostat.json &
-iostat_pid=$!
+iostat_pid=-1
 
+function start_iostat() {
+  iostat -o JSON -d -y 1 >$COND_OUT/iostat.json &
+  iostat_pid=$!
+}
+
+# Start `iostat` measurements after the database has initialized.
+trap start_iostat USR1
+
+set +e
 ../../build/bench/run_custom ${args[@]} >$COND_OUT/results.csv
 code=$?
 
+# If `iostat` was started, we can stop it now.
+if [ "$iostat_pid" -ne "-1" ]; then
+  kill -s SIGINT -- $iostat_pid
+  wait
+fi
+
 cp $DB_PATH/$db_type/LOG $COND_OUT/$db_type.log
 du -b $DB_PATH >$COND_OUT/db_space.log
-
-kill -s SIGINT -- $iostat_pid
-wait
 
 # Report that the experiment failed if the `run_custom` exit code is not 0
 if [ $code -ne 0 ]; then
