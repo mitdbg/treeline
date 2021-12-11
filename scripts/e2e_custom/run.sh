@@ -55,12 +55,24 @@ fi
 
 sync $DB_PATH
 
-# Interrupt the first wait below when we receive a `SIGUSR1` signal.
-trap " " USR1
+init_finished=0
+
+function on_init_finish() {
+  init_finished=1
+}
+
+# Interrupt the first `wait` below when we receive a `SIGUSR1` signal.
+trap "on_init_finish" USR1
 
 set +e
 ../../build/bench/run_custom ${args[@]} >$COND_OUT/results.csv &
 wait %1
+code=$?
+
+# The experiment failed before it finished initialization.
+if [ "$init_finished" -eq "0" ]; then
+  exit $code
+fi
 
 # The DB has finished initializing, so start `iostat`.
 iostat -o JSON -d -y 1 >$COND_OUT/iostat.json &
