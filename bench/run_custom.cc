@@ -28,6 +28,9 @@ DEFINE_string(output_path, llsm::bench::GetDefaultOutputPath(),
 DEFINE_uint64(throughput_sample_period, 0,
               "How frequently to sample the achieved throughput. Set to 0 to "
               "disable sampling.");
+DEFINE_bool(notify_after_init, false,
+            "If set to true, this process will send a SIGUSR1 signal to its "
+            "parent process after database initialization completes.");
 
 template <class DatabaseInterface>
 ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
@@ -55,7 +58,9 @@ ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
               << " application thread(s)." << std::endl;
   }
 
-  SendReadySignalToParent();
+  if (FLAGS_notify_after_init) {
+    SendReadySignalToParent();
+  }
 
   ycsbr::RunOptions options;
   options.latency_sample_period = FLAGS_latency_sample_period;

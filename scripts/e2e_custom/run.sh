@@ -38,6 +38,7 @@ echo "Detected checkpoint name: $checkpoint_name"
 args+=("--verbose")
 args+=("--db_path=$DB_PATH")
 args+=("--seed=$SEED")
+args+=("--notify_after_init")
 
 full_checkpoint_path=$DB_CHECKPOINT_PATH/$checkpoint_name
 rm -rf $DB_PATH
@@ -54,25 +55,24 @@ fi
 
 sync $DB_PATH
 
-iostat_pid=-1
-
-function start_iostat() {
-  iostat -o JSON -d -y 1 >$COND_OUT/iostat.json &
-  iostat_pid=$!
-}
-
-# Start `iostat` measurements after the database has initialized.
-trap start_iostat USR1
+# Interrupt the first wait below when we receive a `SIGUSR1` signal.
+trap " " USR1
 
 set +e
-../../build/bench/run_custom ${args[@]} >$COND_OUT/results.csv
+../../build/bench/run_custom ${args[@]} >$COND_OUT/results.csv &
+wait %1
+
+# The DB has finished initializing, so start `iostat`.
+iostat -o JSON -d -y 1 >$COND_OUT/iostat.json &
+iostat_pid=$!
+
+# Wait until the workload completes.
+wait %1
 code=$?
 
-# If `iostat` was started, we can stop it now.
-if [ "$iostat_pid" -ne "-1" ]; then
-  kill -s SIGINT -- $iostat_pid
-  wait
-fi
+# Stop `iostat`.
+kill -s SIGINT -- $iostat_pid
+wait
 
 cp $DB_PATH/$db_type/LOG $COND_OUT/$db_type.log
 du -b $DB_PATH >$COND_OUT/db_space.log
