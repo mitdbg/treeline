@@ -20,8 +20,31 @@ run_experiment_group(
   ],
 )
 
+# There is no deferral in this experiment (just flush when full).
+run_experiment_group(
+  name="sim_defer_small_zero",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="sim_defer_small_zero-{}-{}".format(skew_type, theta),
+      args=["{}_{}.yml".format(skew_type, theta)],
+      options={
+        "record_size_bytes": 64,
+        "keys_per_page": 32,
+        "memtable_size_mib": 64,
+        "max_defer_times": "1",
+        "flush_thresholds": "0",
+      },
+    )
+    for skew_type, theta in product(["key", "page"], THETAS)
+  ],
+)
+
 run_command(
   name="combine",
   run="python3 combine.py",
-  deps=[":sim_defer_small"]
+  deps=[
+    ":sim_defer_small",
+    ":sim_defer_small_zero"
+  ]
 )

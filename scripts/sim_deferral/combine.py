@@ -19,7 +19,7 @@ def main():
             results.append(df)
     
     combined = pd.concat(results, ignore_index=True)
-    combined = combined.sort_values(by=["skew_type", "theta", "flush_fill_threshold"])
+    combined = combined.sort_values(by=["skew_type", "theta", "flush_fill_threshold", "max_defer_times"])
     combined.to_csv(out_dir / "results.csv", index=False)
 
 
