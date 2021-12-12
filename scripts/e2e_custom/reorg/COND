@@ -1,0 +1,134 @@
+from itertools import product
+
+DBS = [
+  "llsm",
+  "rocksdb",
+]
+
+RECORD_SIZES = [64, 1024]
+
+COMMON_OPTIONS = {
+  "bg_threads": 16,
+  "bypass_wal": True,
+  "llsm_page_fill_pct": 50,
+  "use_direct_io": True,
+  "latency_sample_period": 10,
+  "reorg_length": 3,
+  "use_alex": False,
+  "deferral_autotuning": True,
+  "max_deferrals": 1,
+  "threads": 1,
+}
+
+BOTH_64_OPTIONS = {
+  "memtable_size_mib": 64,
+  "cache_size_mib": 279,    # 407 MiB in total (2 x 64 MiB + 279 MiB, ~33% of the dataset)
+}
+
+# 20 M records, each size 1 KiB = ~19 GiB
+LLSM_1024_OPTIONS = {
+  "memtable_size_mib": 1024,
+  "cache_size_mib": 4464,   # 6512 MiB in total (2 x 1024 MiB + 4464 MiB, ~33% of the dataset)
+}
+
+# RocksDB does better with 64 MiB memtables, likely in part because the memtable
+# fill threshold impacts the size of the sstables in L0.
+ROCKSDB_1024_OPTIONS = {
+  "memtable_size_mib": 64,
+  "cache_size_mib": 6384,   # 6512 MiB in total (2 x 64 MiB + 6384 MiB, ~33% of the dataset)
+}
+
+def get_common_options(db, record_size):
+  if record_size == 64:
+    return {**COMMON_OPTIONS, **BOTH_64_OPTIONS}
+  elif record_size == 1024:
+    if db == "llsm":
+      return {**COMMON_OPTIONS, **LLSM_1024_OPTIONS}
+    elif db == "rocksdb":
+      return {**COMMON_OPTIONS, **ROCKSDB_1024_OPTIONS}
+    else:
+      raise AssertionError
+  else:
+    raise AssertionError
+
+###
+### Preload.
+###
+
+for db, record_size_bytes in product(DBS, RECORD_SIZES):
+  run_command(
+    name="preload-synthetic-{}-{}".format(record_size_bytes, db),
+    run="../preload.sh --db={db} --checkpoint_name=insert-synthetic-{record_size_bytes}-{db} "
+      "--workload_config=insert/workloads/setup.yml --record_size_bytes={record_size_bytes} "
+      "--rdb_bloom_bits=10".format(
+        db=db, 
+        record_size_bytes=record_size_bytes,
+      )
+  )
+
+group(
+  name="preload-synthetic",
+  deps=[
+    ":preload-synthetic-{}-{}".format(record_size_bytes, db)
+    for db, record_size_bytes in product(DBS, RECORD_SIZES)
+  ],
+)
+
+###
+### Run.
+###
+
+for record_size_bytes in RECORD_SIZES:
+  run_experiment_group(
+    name="middle_skew-{}".format(record_size_bytes),
+    run="../run.sh",
+    experiments=[
+      ExperimentInstance(
+        name="middle_skew-{}-{}".format(record_size_bytes, db),
+        options={
+          **get_common_options(db, record_size_bytes),
+          "db": db,
+          "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
+          "workload_config": "reorg/workloads/middle-80.yml",
+          "record_size_bytes": record_size_bytes,
+        },
+      )
+      for db in DBS
+    ],
+    deps=[
+      ":preload-synthetic-{}-{}".format(record_size_bytes, db)
+      for db in DBS
+    ],
+  )
+
+  run_experiment_group(
+    name="uniform-{}".format(record_size_bytes),
+    run="../run.sh",
+    experiments=[
+      ExperimentInstance(
+        name="uniform-{}-{}".format(record_size_bytes, db),
+        options={
+          **get_common_options(db, record_size_bytes),
+          "db": db,
+          "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
+          "workload_config": "reorg/workloads/uniform-80.yml",
+          "record_size_bytes": record_size_bytes,
+        },
+      )
+      for db in DBS
+    ],
+    deps=[
+      ":preload-synthetic-{}-{}".format(record_size_bytes, db)
+      for db in DBS
+    ],
+  )
+
+group(
+  name="reorg",
+  deps=[
+    ":middle_skew-64",
+    ":middle_skew-1024",
+    ":uniform-64",
+    ":uniform-1024",
+  ],
+)
