@@ -163,7 +163,7 @@ for record_size_bytes in RECORD_SIZES:
     ],
   )
 
-group(
+combine(
   name="reorg",
   deps=[
     ":middle_skew-64",
