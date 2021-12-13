@@ -18,6 +18,7 @@ COMMON_OPTIONS = {
   "deferral_autotuning": True,
   "max_deferrals": 1,
   "threads": 1,
+  "rdb_bloom_bits": 10,     # Bloom filters
 }
 
 R64_OPTIONS = {
@@ -46,7 +47,7 @@ def get_common_options(record_size):
 for db, record_size_bytes in product(DBS, RECORD_SIZES):
   run_command(
     name="preload-synthetic-{}-{}".format(record_size_bytes, db),
-    run="../preload.sh --db={db} --checkpoint_name=insert-synthetic-{record_size_bytes}-{db} "
+    run="../preload.sh --db={db} --checkpoint_name=reorg-synthetic-{record_size_bytes}-{db} "
       "--workload_config=insert/workloads/setup.yml --record_size_bytes={record_size_bytes} "
       "--rdb_bloom_bits=10".format(
         db=db, 
@@ -76,7 +77,7 @@ for record_size_bytes in RECORD_SIZES:
         options={
           **get_common_options(record_size_bytes),
           "db": db,
-          "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
+          "checkpoint_name": "reorg-synthetic-{}-{}".format(record_size_bytes, db),
           "workload_config": "reorg/workloads/middle-80.yml",
           "record_size_bytes": record_size_bytes,
         },
@@ -98,7 +99,7 @@ for record_size_bytes in RECORD_SIZES:
         options={
           **get_common_options(record_size_bytes),
           "db": db,
-          "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
+          "checkpoint_name": "reorg-synthetic-{}-{}".format(record_size_bytes, db),
           "workload_config": "reorg/workloads/uniform-80.yml",
           "record_size_bytes": record_size_bytes,
         },
@@ -120,7 +121,7 @@ for record_size_bytes in RECORD_SIZES:
         options={
           **get_common_options(record_size_bytes),
           "db": db,
-          "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
+          "checkpoint_name": "reorg-synthetic-{}-{}".format(record_size_bytes, db),
           "workload_config": "reorg/workloads/middle-100.yml",
           "record_size_bytes": record_size_bytes,
         },
@@ -142,7 +143,7 @@ for record_size_bytes in RECORD_SIZES:
         options={
           **get_common_options(record_size_bytes),
           "db": db,
-          "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
+          "checkpoint_name": "reorg-synthetic-{}-{}".format(record_size_bytes, db),
           "workload_config": "reorg/workloads/uniform-100.yml",
           "record_size_bytes": record_size_bytes,
         },
