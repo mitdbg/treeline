@@ -5,6 +5,13 @@ DBS = [
   "rocksdb",
 ]
 
+WORKLOADS = [
+  "middle-80",
+  "middle-100",
+  "uniform-80",
+  "uniform-100",
+]
+
 RECORD_SIZES = [64, 1024]
 
 COMMON_OPTIONS = {
@@ -167,5 +174,27 @@ group(
     ":ionly_middle_skew-1024",
     ":ionly_uniform-64",
     ":ionly_uniform-1024",
+  ],
+)
+
+run_experiment_group(
+  name="reinsert",
+  run="./run_reinsert.sh",
+  experiments=[
+    ExperimentInstance(
+      name="reinsert-{}-{}".format(record_size_bytes, workload),
+      options={
+        **get_common_options(record_size_bytes),
+        "db": "llsm",
+        "checkpoint_name": "reorg-synthetic-{}-llsm".format(record_size_bytes),
+        "workload_config": "workloads/{}.yml".format(workload),
+        "record_size_bytes": record_size_bytes,
+      },
+    )
+    for workload, record_size_bytes in product(WORKLOADS, RECORD_SIZES)
+  ],
+  deps=[
+    ":preload-synthetic-{}-llsm".format(record_size_bytes)
+    for record_size_bytes in RECORD_SIZES
   ],
 )
