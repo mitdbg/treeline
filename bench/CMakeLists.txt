@@ -67,3 +67,7 @@ target_link_libraries(bufmgr_benchmark bench_common_config gflags ycsbr benchmar
 # and RocksDB.
 add_executable(run_custom run_custom.cc)
 target_link_libraries(run_custom bench_common_config ycsbr-gen)
+
+# Delete LLSM Inserts: An executable that deletes all inserts in a workload.
+add_executable(delete_llsm_inserts delete_llsm_inserts.cc)
+target_link_libraries(delete_llsm_inserts bench_common_config ycsbr-gen)
