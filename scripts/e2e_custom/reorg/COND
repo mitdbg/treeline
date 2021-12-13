@@ -111,6 +111,50 @@ for record_size_bytes in RECORD_SIZES:
     ],
   )
 
+  run_experiment_group(
+    name="ionly_middle_skew-{}".format(record_size_bytes),
+    run="../run.sh",
+    experiments=[
+      ExperimentInstance(
+        name="ionly_middle_skew-{}-{}".format(record_size_bytes, db),
+        options={
+          **get_common_options(record_size_bytes),
+          "db": db,
+          "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
+          "workload_config": "reorg/workloads/middle-100.yml",
+          "record_size_bytes": record_size_bytes,
+        },
+      )
+      for db in DBS
+    ],
+    deps=[
+      ":preload-synthetic-{}-{}".format(record_size_bytes, db)
+      for db in DBS
+    ],
+  )
+
+  run_experiment_group(
+    name="ionly_uniform-{}".format(record_size_bytes),
+    run="../run.sh",
+    experiments=[
+      ExperimentInstance(
+        name="ionly_uniform-{}-{}".format(record_size_bytes, db),
+        options={
+          **get_common_options(record_size_bytes),
+          "db": db,
+          "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
+          "workload_config": "reorg/workloads/uniform-100.yml",
+          "record_size_bytes": record_size_bytes,
+        },
+      )
+      for db in DBS
+    ],
+    deps=[
+      ":preload-synthetic-{}-{}".format(record_size_bytes, db)
+      for db in DBS
+    ],
+  )
+
 group(
   name="reorg",
   deps=[
@@ -118,13 +162,9 @@ group(
     ":middle_skew-1024",
     ":uniform-64",
     ":uniform-1024",
-  ],
-)
-
-group(
-  name="rocksdb",
-  deps=[
-    ":middle_skew-1024-rocksdb",
-    ":uniform-1024-rocksdb",
+    ":ionly_middle_skew-64",
+    ":ionly_middle_skew-1024",
+    ":ionly_uniform-64",
+    ":ionly_uniform-1024",
   ],
 )
