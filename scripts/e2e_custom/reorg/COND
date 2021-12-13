@@ -20,34 +20,22 @@ COMMON_OPTIONS = {
   "threads": 1,
 }
 
-BOTH_64_OPTIONS = {
+R64_OPTIONS = {
   "memtable_size_mib": 64,
   "cache_size_mib": 279,    # 407 MiB in total (2 x 64 MiB + 279 MiB, ~33% of the dataset)
 }
 
 # 20 M records, each size 1 KiB = ~19 GiB
-LLSM_1024_OPTIONS = {
+R1024_OPTIONS = {
   "memtable_size_mib": 1024,
   "cache_size_mib": 4464,   # 6512 MiB in total (2 x 1024 MiB + 4464 MiB, ~33% of the dataset)
 }
 
-# RocksDB does better with 64 MiB memtables, likely in part because the memtable
-# fill threshold impacts the size of the sstables in L0.
-ROCKSDB_1024_OPTIONS = {
-  "memtable_size_mib": 64,
-  "cache_size_mib": 6384,   # 6512 MiB in total (2 x 64 MiB + 6384 MiB, ~33% of the dataset)
-}
-
-def get_common_options(db, record_size):
+def get_common_options(record_size):
   if record_size == 64:
-    return {**COMMON_OPTIONS, **BOTH_64_OPTIONS}
+    return {**COMMON_OPTIONS, **R64_OPTIONS}
   elif record_size == 1024:
-    if db == "llsm":
-      return {**COMMON_OPTIONS, **LLSM_1024_OPTIONS}
-    elif db == "rocksdb":
-      return {**COMMON_OPTIONS, **ROCKSDB_1024_OPTIONS}
-    else:
-      raise AssertionError
+      return {**COMMON_OPTIONS, **R1024_OPTIONS}
   else:
     raise AssertionError
 
@@ -86,7 +74,7 @@ for record_size_bytes in RECORD_SIZES:
       ExperimentInstance(
         name="middle_skew-{}-{}".format(record_size_bytes, db),
         options={
-          **get_common_options(db, record_size_bytes),
+          **get_common_options(record_size_bytes),
           "db": db,
           "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
           "workload_config": "reorg/workloads/middle-80.yml",
@@ -108,7 +96,7 @@ for record_size_bytes in RECORD_SIZES:
       ExperimentInstance(
         name="uniform-{}-{}".format(record_size_bytes, db),
         options={
-          **get_common_options(db, record_size_bytes),
+          **get_common_options(record_size_bytes),
           "db": db,
           "checkpoint_name": "insert-synthetic-{}-{}".format(record_size_bytes, db),
           "workload_config": "reorg/workloads/uniform-80.yml",
@@ -130,5 +118,13 @@ group(
     ":middle_skew-1024",
     ":uniform-64",
     ":uniform-1024",
+  ],
+)
+
+group(
+  name="rocksdb",
+  deps=[
+    ":middle_skew-1024-rocksdb",
+    ":uniform-1024-rocksdb",
   ],
 )
