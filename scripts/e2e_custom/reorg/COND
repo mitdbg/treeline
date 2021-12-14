@@ -20,7 +20,7 @@ COMMON_OPTIONS = {
   "llsm_page_fill_pct": 50,
   "use_direct_io": True,
   "latency_sample_period": 10,
-  "reorg_length": 3,
+  "reorg_length": 2,
   "use_alex": False,
   "deferral_autotuning": True,
   "max_deferrals": 1,
@@ -57,7 +57,7 @@ for db, record_size_bytes in product(DBS, RECORD_SIZES):
     run="../preload.sh --db={db} --checkpoint_name=reorg-synthetic-{record_size_bytes}-{db} "
       "--workload_config=insert/workloads/setup.yml --record_size_bytes={record_size_bytes} "
       "--rdb_bloom_bits=10".format(
-        db=db, 
+        db=db,
         record_size_bytes=record_size_bytes,
       )
   )
