@@ -17,6 +17,8 @@ DEFINE_uint32(threads, 1, "The number of threads to use to run the workload.");
 DEFINE_string(workload_config, "",
               "The path to the workload configuration file");
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
+DEFINE_bool(verify_deletes, false,
+            "If set, will verify that the deleted keys are not found.");
 
 // Deletes all inserts in the workload.
 class LLSMDeleteInsertsInterface {
@@ -76,6 +78,72 @@ class LLSMDeleteInsertsInterface {
   llsm::DB* db_;
 };
 
+// Verify the deletes.
+class LLSMVerifyDeletesInterface {
+ public:
+  LLSMVerifyDeletesInterface() : db_(nullptr) {}
+
+  const std::vector<ycsbr::Request::Key>& not_deleted_keys() const {
+    return not_deleted_keys_;
+  }
+
+  void InitializeWorker(const std::thread::id& id) {}
+  void ShutdownWorker(const std::thread::id& id) {}
+
+  void InitializeDatabase() {
+    const std::string dbname = FLAGS_db_path + "/llsm";
+    llsm::Options options = llsm::bench::BuildLLSMOptions();
+    llsm::Status status = llsm::DB::Open(options, dbname, &db_);
+    if (!status.ok()) {
+      throw std::runtime_error("Failed to start LLSM: " + status.ToString());
+    }
+  }
+
+  void ShutdownDatabase() {
+    if (db_ == nullptr) {
+      return;
+    }
+    delete db_;
+    db_ = nullptr;
+  }
+
+  void BulkLoad(const ycsbr::BulkLoadTrace& load) {
+    throw std::runtime_error("This tool does not support bulk load.");
+  }
+
+  bool Update(ycsbr::Request::Key key, const char* value, size_t value_size) {
+    return true;
+  }
+
+  bool Insert(ycsbr::Request::Key key, const char* value, size_t value_size) {
+    const llsm::key_utils::IntKeyAsSlice strkey(key);
+    static std::string out;
+    llsm::Status status =
+        db_->Get(llsm::ReadOptions(), strkey.as<llsm::Slice>(), &out);
+    if (!status.IsNotFound()) {
+      not_deleted_keys_.push_back(key);
+    }
+    return true;
+  }
+
+  bool Read(ycsbr::Request::Key key, std::string* value_out) {
+    value_out->clear();
+    return true;
+  }
+
+  bool Scan(
+      const ycsbr::Request::Key key, const size_t amount,
+      std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {
+    scan_out->clear();
+    return true;
+  }
+
+ private:
+  llsm::DB* db_;
+  // This stores keys that should have been deleted but were actually found.
+  std::vector<ycsbr::Request::Key> not_deleted_keys_;
+};
+
 template <class DatabaseInterface>
 ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
   ycsbr::Session<DatabaseInterface> session(FLAGS_threads);
@@ -89,6 +157,24 @@ ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
   ycsbr::RunOptions options;
   options.latency_sample_period = FLAGS_latency_sample_period;
   return session.RunWorkload(workload, options);
+}
+
+void VerifyDeletes(const ycsbr::gen::PhasedWorkload& workload) {
+  ycsbr::Session<LLSMVerifyDeletesInterface> session(FLAGS_threads);
+  session.Initialize();
+  ycsbr::RunOptions options;
+  options.latency_sample_period = FLAGS_latency_sample_period;
+  session.RunWorkload(workload, options);
+
+  const auto& ndks = session.db().not_deleted_keys();
+  if (ndks.empty()) {
+    std::cerr << "> All inserts were deleted." << std::endl;
+    return;
+  }
+
+  std::cerr << "> " << ndks.size()
+            << " inserts that should have been deleted were still found."
+            << std::endl;
 }
 
 void PrintExperimentResult(const std::string& db,
@@ -141,6 +227,10 @@ int main(int argc, char* argv[]) {
   std::cout << "db,";
   ycsbr::BenchmarkResult::PrintCSVHeader(std::cout);
   PrintExperimentResult("llsm", Run<LLSMDeleteInsertsInterface>(*workload));
+
+  if (FLAGS_verify_deletes) {
+    VerifyDeletes(*workload);
+  }
 
   return 0;
 }

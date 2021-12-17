@@ -198,3 +198,25 @@ run_experiment_group(
     for record_size_bytes in RECORD_SIZES
   ],
 )
+
+run_experiment_group(
+  name="reinsert_verify",
+  run="./reinsert_verify.sh",
+  experiments=[
+    ExperimentInstance(
+      name="reinsert_verify-{}-{}".format(record_size_bytes, workload),
+      options={
+        **get_common_options(record_size_bytes),
+        "db": "llsm",
+        "checkpoint_name": "reorg-synthetic-{}-llsm".format(record_size_bytes),
+        "workload_config": "workloads/{}.yml".format(workload),
+        "record_size_bytes": record_size_bytes,
+      },
+    )
+    for workload, record_size_bytes in product(WORKLOADS, RECORD_SIZES)
+  ],
+  deps=[
+    ":preload-synthetic-{}-llsm".format(record_size_bytes)
+    for record_size_bytes in RECORD_SIZES
+  ],
+)
