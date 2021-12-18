@@ -1,0 +1,19 @@
+load:
+  num_records: 20000000
+  distribution:
+    type: uniform
+    range_min: 0
+    range_max: 2000000000
+
+run:
+- num_requests: 10000000
+  read:
+    proportion_pct: 50
+    distribution:
+      type: zipfian
+      theta: 0.99
+  update:
+    proportion_pct: 50
+    distribution:
+      type: zipfian
+      theta: 0.99

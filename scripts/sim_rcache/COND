@@ -1,0 +1,34 @@
+from itertools import product
+
+WORKLOADS = [
+  "a_key_99",
+  "a_key_59",
+  "a_page_99",
+  "a_page_59",
+]
+
+CONFIGS = [
+  {
+    "record_size_bytes": 64,
+    "cache_size_mib": 407,
+    "records_per_page": 50,
+  },
+  {
+    "record_size_bytes": 1024,
+    "cache_size_mib": 6512,
+    "records_per_page": 3,
+  },
+]
+
+run_experiment_group(
+  name="sim_rcache",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="sim_rcache-{}-{}".format(workload, config["record_size_bytes"]),
+      args=["{}.yml".format(workload)],
+      options=config,
+    )
+    for workload, config in product(WORKLOADS, CONFIGS)
+  ],
+)
