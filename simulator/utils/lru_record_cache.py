@@ -41,6 +41,7 @@ class LRUCacheDB(ycsbr.DatabaseInterface):
         # Write out all dirty keys in the same page.
         key, _ = evicted
         page = self._page_mapper(key)
+        needs_write = False
         for page_key in self._page_data[page]:
             if page_key not in self._records_in_cache:
                 continue

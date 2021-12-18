@@ -6,7 +6,13 @@ def process_dataset(dataset, keys_per_page):
     page_data = {}
 
     def page_mapper(key):
-        return bisect.bisect_left(page_boundaries, key)
+        res = bisect.bisect_left(page_boundaries, key)
+        if res == len(page_boundaries):
+            # This means the key is larger than the largest key boundary. Thus
+            # it should go in the last page.
+            assert len(page_boundaries) > 0
+            return len(page_boundaries) - 1
+        return res
 
     dataset.sort()
     count = 0

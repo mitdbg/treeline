@@ -222,7 +222,8 @@ class GreedyCacheDB(ycsbr.DatabaseInterface):
         # Read the record and add it to the cache
         self._read_ios += 1
         if self._admit_read_pages:
-            for page_key in self._page_data[self._page_mapper(key)]:
+            page_for_key = self._page_mapper(key)
+            for page_key in self._page_data[page_for_key]:
                 if page_key == key:
                     # The key being requested is added with hotness 4
                     self._cache.add_read(page_key, if_new_hotness=4)
