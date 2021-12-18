@@ -1,3 +1,4 @@
+import bisect
 import enum
 import ycsbr_py as ycsbr
 
@@ -52,7 +53,7 @@ class GreedyCache:
     def write_ios(self):
         return self._write_ios
 
-    def add_write(self, key):
+    def add_write(self, key, if_new_hotness):
         self._accesses += 1
         if key in self._records:
             self._hits += 1
@@ -66,7 +67,7 @@ class GreedyCache:
 
         # Guaranteed to have space now.
         self._add_new_item(
-            key, CacheItem(CacheItemType.Write, CacheItem.MAX_HOTNESS), slot_idx
+            key, CacheItem(CacheItemType.Write, if_new_hotness), slot_idx
         )
 
     def lookup(self, key):
@@ -77,7 +78,7 @@ class GreedyCache:
         self._records[key].incr_hotness()
         return True
 
-    def add_read(self, key):
+    def add_read(self, key, if_new_hotness):
         if key in self._records:
             return
 
@@ -86,9 +87,7 @@ class GreedyCache:
             slot_idx = self._evict()
 
         # Guaranteed to have space now.
-        self._add_new_item(
-            key, CacheItem(CacheItemType.Read, CacheItem.MAX_HOTNESS), slot_idx
-        )
+        self._add_new_item(key, CacheItem(CacheItemType.Read, if_new_hotness), slot_idx)
 
     def _evict(self):
         # Age cache items until we find one with count 0
@@ -167,9 +166,13 @@ class GreedyCache:
 
 
 class GreedyCacheDB(ycsbr.DatabaseInterface):
-    def __init__(self, page_mapper, cache_capacity):
+    def __init__(self, dataset, keys_per_page, cache_capacity, admit_read_pages=False):
         ycsbr.DatabaseInterface.__init__(self)
+        page_mapper, page_data = GreedyCacheDB.process_dataset(dataset, keys_per_page)
+        self._page_mapper = page_mapper
+        self._page_data = page_data
         self._cache = GreedyCache(page_mapper, cache_capacity)
+        self._admit_read_pages = admit_read_pages
         self._read_ios = 0
         self._write_ios = 0
 
@@ -180,6 +183,33 @@ class GreedyCacheDB(ycsbr.DatabaseInterface):
     @property
     def write_ios(self):
         return self._write_ios + self._cache.write_ios
+
+    @property
+    def hit_rate(self):
+        return self._cache.hit_rate
+
+    @staticmethod
+    def process_dataset(dataset, keys_per_page):
+        page_boundaries = []
+        page_data = {}
+
+        def page_mapper(key):
+            return bisect.bisect_left(page_boundaries, key)
+
+        dataset.sort()
+        count = 0
+        page_id = 0
+        for key in dataset:
+            if count == 0:
+                page_boundaries.append(key)
+                page_data[page_id] = []
+            page_data[page_id].append(key)
+            count += 1
+            if count >= keys_per_page:
+                count = 0
+                page_id += 1
+
+        return page_mapper, page_data
 
     # DatabaseInterface methods below.
 
@@ -196,13 +226,27 @@ class GreedyCacheDB(ycsbr.DatabaseInterface):
         return True
 
     def update(self, key, val):
-        self._cache.add_write(key)
+        self._cache.add_write(key, if_new_hotness=4)
         return True
 
     def read(self, key):
         if self._cache.lookup(key):
-            return None
-        # Need to read the page + add key into cache.
+            # Already in the cache
+            return
+
+        # Read the record and add it to the cache
+        self._read_ios += 1
+        if self._admit_read_pages:
+            for page_key in self._page_data[self._page_mapper(key)]:
+                if page_key == key:
+                    # The key being requested is added with hotness 4
+                    self._cache.add_read(page_key, if_new_hotness=4)
+                else:
+                    # Other keys in the page are added with hotness 1
+                    self._cache.add_read(page_key, if_new_hotness=1)
+        else:
+            # Just admit the key
+            self._cache.add_read(key, if_new_hotness=4)
 
     def scan(self, start, amount):
         return []
