@@ -1,6 +1,7 @@
-import bisect
 import enum
 import ycsbr_py as ycsbr
+
+from utils.dataset import process_dataset
 
 
 class CacheItemType(enum.Enum):
@@ -26,6 +27,8 @@ class CacheItem:
 
 
 class GreedyCache:
+    Name = "greedy"
+
     def __init__(self, page_mapper, capacity):
         self._page_mapper = page_mapper
         self._capacity = capacity
@@ -168,7 +171,7 @@ class GreedyCache:
 class GreedyCacheDB(ycsbr.DatabaseInterface):
     def __init__(self, dataset, keys_per_page, cache_capacity, admit_read_pages=False):
         ycsbr.DatabaseInterface.__init__(self)
-        page_mapper, page_data = GreedyCacheDB.process_dataset(dataset, keys_per_page)
+        page_mapper, page_data = process_dataset(dataset, keys_per_page)
         self._page_mapper = page_mapper
         self._page_data = page_data
         self._cache = GreedyCache(page_mapper, cache_capacity)
@@ -187,29 +190,6 @@ class GreedyCacheDB(ycsbr.DatabaseInterface):
     @property
     def hit_rate(self):
         return self._cache.hit_rate
-
-    @staticmethod
-    def process_dataset(dataset, keys_per_page):
-        page_boundaries = []
-        page_data = {}
-
-        def page_mapper(key):
-            return bisect.bisect_left(page_boundaries, key)
-
-        dataset.sort()
-        count = 0
-        page_id = 0
-        for key in dataset:
-            if count == 0:
-                page_boundaries.append(key)
-                page_data[page_id] = []
-            page_data[page_id].append(key)
-            count += 1
-            if count >= keys_per_page:
-                count = 0
-                page_id += 1
-
-        return page_mapper, page_data
 
     # DatabaseInterface methods below.
 

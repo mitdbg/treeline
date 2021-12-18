@@ -2,8 +2,10 @@ import argparse
 import csv
 import pathlib
 import ycsbr_py as ycsbr
+from itertools import product
 
 from utils.greedy_cache import GreedyCacheDB
+from utils.lru_record_cache import LRUCacheDB
 
 
 def extract_keys(ycsbr_dataset):
@@ -44,21 +46,25 @@ def main():
         out_path = pathlib.Path(args.out_dir)
     else:
         import conductor.lib as cond
+
         out_path = cond.get_output_path()
 
     with open(out_path / "results.csv", "w") as file:
         writer = csv.writer(file)
         writer.writerow(["policy", "hit_rate", "read_ios", "write_ios"])
 
-        for admit_page in [False, True]:
-            db = GreedyCacheDB(
+        for db_type, admit_page in product([GreedyCacheDB, LRUCacheDB], [False, True]):
+            db = db_type(
                 keys,
                 args.records_per_page,
                 records_in_cache,
                 admit_read_pages=admit_page,
             )
+            policy_name = db_type.Name
             run_workload(workload, db)
-            policy = "greedy_admit_record" if not admit_page else "greedy_admit_page"
+            policy = "{}_{}".format(
+                policy_name, "admit_record" if not admit_page else "greedy_admit_page"
+            )
             writer.writerow([policy, db.hit_rate, db.read_ios, db.write_ios])
 
 

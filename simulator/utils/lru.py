@@ -6,11 +6,19 @@ class LRUCache:
     def __init__(self, max_items):
         self._max_items = max_items
         self._cache = collections.OrderedDict()
+        self._accesses = 0
+        self._hits = 0
+
+    @property
+    def hit_rate(self):
+        return self._hits / self._accesses
 
     def lookup(self, key):
+        self._accesses += 1
         try:
             value = self._cache.pop(key)
             self._cache[key] = value
+            self._hits += 1
             return value
         except KeyError:
             return None
