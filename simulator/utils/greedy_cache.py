@@ -27,8 +27,6 @@ class CacheItem:
 
 
 class GreedyCache:
-    Name = "greedy"
-
     def __init__(self, page_mapper, capacity):
         self._page_mapper = page_mapper
         self._capacity = capacity
@@ -153,8 +151,13 @@ class GreedyCache:
         if page in self._page_to_records:
             self._page_to_records[page].add(key)
         else:
-            self._page_to_records[page] = set(key)
-        self._slots[slot_idx] = key
+            self._page_to_records[page] = {key}
+
+        if slot_idx >= len(self._slots):
+            self._slots.append(key)
+            assert len(self._slots) <= self._capacity
+        else:
+            self._slots[slot_idx] = key
 
     def _advance_arm(self):
         self._arm += 1
@@ -169,6 +172,8 @@ class GreedyCache:
 
 
 class GreedyCacheDB(ycsbr.DatabaseInterface):
+    Name = "greedy"
+
     def __init__(self, dataset, keys_per_page, cache_capacity, admit_read_pages=False):
         ycsbr.DatabaseInterface.__init__(self)
         page_mapper, page_data = process_dataset(dataset, keys_per_page)

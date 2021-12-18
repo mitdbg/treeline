@@ -63,7 +63,7 @@ def main():
             policy_name = db_type.Name
             run_workload(workload, db)
             policy = "{}_{}".format(
-                policy_name, "admit_record" if not admit_page else "greedy_admit_page"
+                policy_name, "admit_record" if not admit_page else "admit_page"
             )
             writer.writerow([policy, db.hit_rate, db.read_ios, db.write_ios])
 
