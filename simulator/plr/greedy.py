@@ -9,6 +9,9 @@ class Point:
     def add_delta(self, delta: float) -> "Point":
         return Point(self.x, self.y + delta)
 
+    def __str__(self) -> str:
+        return "Point(x={}, y={})".format(self.x, self.y)
+
 
 class Line:
     def __init__(self, slope: float, intercept: float):
@@ -34,6 +37,13 @@ class Line:
             raise ValueError("Infinite or no intersections.")
         x = (other.intercept - self.intercept) / (self.slope - other.slope)
         return Point(x, self(x))
+
+
+class Segment:
+    def __init__(self, line: Line, start_x: float, end_x: float):
+        self.line = line
+        self.start_point = Point(start_x, self.line(start_x))
+        self.end_point = Point(end_x, self.line(end_x))
 
 
 class GreedyPLRSegment:
@@ -65,20 +75,22 @@ class GreedyPLRSegment:
         # Since `delta` is nonzero and `s1.x < s2.x`, one intersection must
         # exist.
         self._s0 = l1.intersect(l2)
+        self._start_x = s1.x
+        self._last_point = s2
 
     @staticmethod
     def _compute_slope(x1: Point, x2: Point) -> float:
         return (x2.y - x1.y) / (x2.x - x1.x)
 
-    def offer(self, s: Point) -> Optional[Line]:
+    def offer(self, s: Point) -> Optional[Segment]:
         bottom_line = Line.from_slope_and_point(self._slope_bot, self._s0)
         bottom_pred = bottom_line(s.x)
-        if bottom_pred < s.y - self._delta:
+        if bottom_pred >= s.y - self._delta:
             return self.finish()
 
         top_line = Line.from_slope_and_point(self._slope_top, self._s0)
         top_pred = top_line(s.x)
-        if top_pred > s.y + self._delta:
+        if top_pred <= s.y + self._delta:
             return self.finish()
 
         x_diff = s.x - self._s0.x
@@ -91,11 +103,16 @@ class GreedyPLRSegment:
                 self._s0, s.add_delta(self._delta)
             )
 
+        self._last_point = s
         return None
 
-    def finish(self) -> Line:
-        return Line.from_slope_and_point(
-            (self._slope_bot + self._slope_top) / 2, self._s0
+    def finish(self) -> Segment:
+        return Segment(
+            Line.from_slope_and_point(
+                (self._slope_bot + self._slope_top) / 2, self._s0
+            ),
+            self._start_x,
+            self._last_point.x,
         )
 
 
@@ -103,6 +120,9 @@ class GreedyPLR:
     """
     A convenience wrapper around `GreedyPLRSegment` that will return the
     constructed linear segments.
+
+    N.B. This algorithm does not produce connected line segments (i.e.,
+    discontinuities across the linear functions are allowed).
     """
 
     def __init__(self, delta: float):
@@ -111,7 +131,7 @@ class GreedyPLR:
         self._s2 = None
         self._curr = None
 
-    def offer(self, s: Point) -> Optional[Line]:
+    def offer(self, s: Point) -> Optional[Segment]:
         if self._s1 is None:
             self._s1 = s
             return None
@@ -122,12 +142,12 @@ class GreedyPLR:
 
         res = self._curr.offer(s)
         if res is not None:
-            self._s1 = None
-            self._s2 = None
-            self._curr = None
+            self._s1 = self._curr._last_point
+            self._s2 = s
+            self._curr = GreedyPLRSegment(self._s1, self._s2, self._delta)
         return res
 
-    def finish(self) -> Optional[Line]:
+    def finish(self) -> Optional[Segment]:
         if self._s1 is None:
             return None
         elif self._s2 is None:
@@ -135,6 +155,10 @@ class GreedyPLR:
 
         res = self._curr.finish()
         if res is None:
-            return Line.from_two_points(self._s1, self._s2)
+            return Segment(
+                Line.from_two_points(self._s1, self._s2),
+                start_x=self._s1.x,
+                end_x=self._s2.x,
+            )
         else:
             return res
