@@ -61,8 +61,11 @@ class GreedyPLRSegment:
       https://doi.org/10.1007/s00778-014-0355-0
 
     This class greedily consumes points until it can no longer form a line
-    segment that has a maximum error of `delta` relative to each of the provided
-    data points.
+    segment that has a maximum error of less than `delta` relative to each of
+    the provided data points.
+
+    N.B. `delta` is exclusive error. The segment will have an error strictly
+    less than `delta`.
     """
 
     def __init__(self, s1: Point, s2: Point, delta: float):
@@ -90,20 +93,20 @@ class GreedyPLRSegment:
     def offer(self, s: Point) -> Optional[Segment]:
         bottom_line = Line.from_slope_and_point(self._slope_bot, self._s0)
         bottom_pred = bottom_line(s.x)
-        if bottom_pred >= s.y - self._delta:
+        if bottom_pred >= s.y + self._delta:
             return self.finish()
 
         top_line = Line.from_slope_and_point(self._slope_top, self._s0)
         top_pred = top_line(s.x)
-        if top_pred <= s.y + self._delta:
+        if top_pred <= s.y - self._delta:
             return self.finish()
 
         x_diff = s.x - self._s0.x
-        if abs(s.y - self._slope_bot * x_diff - self._s0.y) > self._delta:
+        if abs(s.y - self._slope_bot * x_diff - self._s0.y) >= self._delta:
             self._slope_bot = GreedyPLRSegment._compute_slope(
                 self._s0, s.add_delta(-self._delta)
             )
-        if abs(s.y - self._slope_top * x_diff - self._s0.y) > self._delta:
+        if abs(s.y - self._slope_top * x_diff - self._s0.y) >= self._delta:
             self._slope_top = GreedyPLRSegment._compute_slope(
                 self._s0, s.add_delta(self._delta)
             )
