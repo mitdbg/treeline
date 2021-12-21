@@ -112,27 +112,30 @@ def run_experiment(dataset, records_per_page):
         assert line is None
 
         while pager.has_next() and segment_size < 16:
-            boundaries.append(pager.next())
-            key = boundaries[-1]
-            diff = key - base
+            # Use peek instead and actually call next after incrementing the segment size
+            next_boundary = pager.peek()
+            diff = next_boundary - base
             assert diff > 0
             if diff - 1 != prev_x:
                 line = plr.offer(Point(diff - 1, segment_size - 1))
                 if line is not None:
+                    # Cannot extend the current segment any further with one model
                     break
             prev_x = diff
             line = plr.offer(Point(diff, segment_size))
             if line is not None:
+                # Cannot extend the current segment any further with one model
                 break
+
             segment_size += 1
+            boundaries.append(pager.next())
+            assert boundaries[-1] == next_boundary
 
         if line is None:
             line = plr.finish()
 
         if line is None:
-            # Just one page left
             assert len(boundaries) == 1
-            assert not pager.has_next()
             assert segment_size == 1
             stats.segment_counts[0] += 1
             stats.segments.append(
@@ -163,15 +166,16 @@ def run_experiment(dataset, records_per_page):
         while len(boundaries) > 0:
             pager.put_back(boundaries.pop())
 
-        max_key_in_segment = boundaries_in_segment[-1]
         if pager.has_next():
             max_key_in_segment = pager.peek() - 1
+        else:
+            max_key_in_segment = boundaries_in_segment[-1] + 1
 
         stats.segments.append(
             SegmentMetadata(
                 boundaries_in_segment,
                 max_key_in_segment,
-                line.trim(0, max_key_in_segment - base),
+                line.adjust_bounds(0, max_key_in_segment - base),
             )
         )
 
