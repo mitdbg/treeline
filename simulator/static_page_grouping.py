@@ -2,9 +2,34 @@ import argparse
 import bisect
 import collections
 import csv
-import sys
+import pathlib
 
-from plr.greedy import GreedyPLR, Point
+from plr.greedy import GreedyPLR, Point, Segment, Line
+
+
+class SegmentMetadata:
+    def __init__(self, boundaries, max_key, model):
+        self.boundaries = boundaries
+        self.max_key = max_key
+        self.model = model
+
+    def to_csv_header(self, out):
+        writer = csv.writer(out)
+        writer.writerow(
+            ["segment_size", "min_key", "max_key", "model_slope", "model_intercept"]
+        )
+
+    def to_csv_row(self, out):
+        writer = csv.writer(out)
+        writer.writerow(
+            [
+                len(self.boundaries),
+                self.boundaries[0],
+                self.max_key,
+                self.model.line.slope,
+                self.model.line.intercept,
+            ]
+        )
 
 
 class Stats:
@@ -12,11 +37,17 @@ class Stats:
         # The number of segments we can make, by length.
         # The index i corresponds to a segment of length 2^i.
         self.segment_counts = [0] * 5
+        self.segments = []
 
     def to_csv(self, out):
+        assert len(self.segments) == sum(self.segment_counts)
         writer = csv.writer(out)
-        writer.writerow(["4k", "8k", "16k", "32k", "64k"])
-        writer.writerow(self.segment_counts)
+        writer.writerow(["segment_type", "count"])
+        writer.writerow(["4k", self.segment_counts[0]])
+        writer.writerow(["8k", self.segment_counts[1]])
+        writer.writerow(["16k", self.segment_counts[2]])
+        writer.writerow(["32k", self.segment_counts[3]])
+        writer.writerow(["64k", self.segment_counts[4]])
 
 
 class Pager:
@@ -39,6 +70,12 @@ class Pager:
             item = self.dataset[self._idx]
             self._idx += self.records_per_page
             return item
+
+    def peek(self):
+        if len(self._buffered) > 0:
+            return self._buffered[-1]
+        else:
+            return self.dataset[self._idx]
 
 
 def run_experiment(dataset, records_per_page):
@@ -71,7 +108,8 @@ def run_experiment(dataset, records_per_page):
         segment_size = 1
         prev_x = 0
         plr = GreedyPLR(delta=0.5)
-        line = None
+        line = plr.offer(Point(0, 0))
+        assert line is None
 
         while pager.has_next() and segment_size < 16:
             boundaries.append(pager.next())
@@ -82,6 +120,7 @@ def run_experiment(dataset, records_per_page):
                 line = plr.offer(Point(diff - 1, segment_size - 1))
                 if line is not None:
                     break
+            prev_x = diff
             line = plr.offer(Point(diff, segment_size))
             if line is not None:
                 break
@@ -96,6 +135,17 @@ def run_experiment(dataset, records_per_page):
             assert not pager.has_next()
             assert segment_size == 1
             stats.segment_counts[0] += 1
+            stats.segments.append(
+                SegmentMetadata(
+                    [boundaries[0]],
+                    -1,
+                    Segment(
+                        Line.from_two_points(Point(0, 0), Point(1, 0)),
+                        boundaries[0],
+                        boundaries[0] + 1,
+                    ),
+                )
+            )
             break
 
         # Create as large of a segment as possible
@@ -105,11 +155,25 @@ def run_experiment(dataset, records_per_page):
         # Track the segment size
         stats.segment_counts[segment_size_idx] += 1
 
-        # Put back any "pages" that were processed but cannot be part of this segment
+        boundaries_in_segment = []
         for _ in range(largest_segment_size):
-            boundaries.popleft()
+            boundaries_in_segment.append(boundaries.popleft())
+
+        # Put back any "pages" that were processed but cannot be part of this segment
         while len(boundaries) > 0:
             pager.put_back(boundaries.pop())
+
+        max_key_in_segment = boundaries_in_segment[-1]
+        if pager.has_next():
+            max_key_in_segment = pager.peek() - 1
+
+        stats.segments.append(
+            SegmentMetadata(
+                boundaries_in_segment,
+                max_key_in_segment,
+                line.trim(0, max_key_in_segment - base),
+            )
+        )
 
     return stats
 
@@ -132,16 +196,24 @@ def main():
     parser.add_argument("--records_per_page", type=int, default=50)
     parser.add_argument("--workload_config", type=str)
     parser.add_argument("--custom_dataset", type=str)
+    parser.add_argument("--out_dir", type=str)
     args = parser.parse_args()
 
     if args.workload_config is None and args.custom_dataset is None:
         print("ERROR: Need to provide either a workload config or a custom dataset.")
         return
+    if args.out_dir is None:
+        import conductor.lib as cond
+
+        out_dir = cond.get_output_path()
+    else:
+        out_dir = pathlib.Path(args.out_dir)
 
     if args.custom_dataset is not None:
         dataset = load_dataset(args.custom_dataset)
     else:
         import ycsbr_py as ycsbr
+
         workload = ycsbr.PhasedWorkload.from_file(
             args.workload_config,
             set_record_size_bytes=16,
@@ -149,7 +221,14 @@ def main():
         dataset = extract_keys(workload.get_load_trace())
 
     res = run_experiment(dataset, args.records_per_page)
-    res.to_csv(sys.stdout)
+    assert len(res.segments) > 0
+
+    with open(out_dir / "summary.csv", "w") as f:
+        res.to_csv(f)
+    with open(out_dir / "segments.csv", "w") as f:
+        res.segments[0].to_csv_header(f)
+        for seg in res.segments:
+            seg.to_csv_row(f)
 
 
 if __name__ == "__main__":

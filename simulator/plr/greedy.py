@@ -45,6 +45,11 @@ class Segment:
         self.start_point = Point(start_x, self.line(start_x))
         self.end_point = Point(end_x, self.line(end_x))
 
+    def trim(self, new_start_x: float, new_end_x: float) -> "Segment":
+        assert new_start_x >= self.start_point.x
+        assert new_end_x <= self.end_point.x
+        return Segment(self.line, new_start_x, new_end_x)
+
 
 class GreedyPLRSegment:
     """
@@ -151,7 +156,11 @@ class GreedyPLR:
         if self._s1 is None:
             return None
         elif self._s2 is None:
-            return Line.from_two_points(self._s1, Point(self._s1.x + 1, self._s1.y))
+            return Segment(
+                Line.from_two_points(self._s1, Point(self._s1.x + 1, self._s1.y)),
+                start_x=self._s1.x,
+                end_x=self._s1.x + 1,
+            )
 
         res = self._curr.finish()
         if res is None:
