@@ -32,3 +32,9 @@ run_experiment_group(
     for workload, config in product(WORKLOADS, CONFIGS)
   ],
 )
+
+run_command(
+  name="combine",
+  run="python3 combine.py",
+  deps=[":sim_rcache"],
+)
