@@ -1,0 +1,37 @@
+from itertools import product
+
+RECORDS_PER_PAGE = [
+  50,  # Represents 64 B records, 3200 bytes per page (4 KiB page)
+  3,   # Represents 1024 B records, 3072 bytes per page (4 KiB page)
+]
+
+CUSTOM_DATASET_PATH = "/spinning/kipf/bourbon_datasets/"
+
+CUSTOM_DATASETS = [
+  {"name": "amzn", "file": "amazon_reviews.txt"},
+  {"name": "osm", "file": "osm_ny.txt"},
+]
+
+run_experiment_group(
+  name="sim_static_grouping",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="uniform-{}".format(records_per_page),
+      args=["uniform_20m.yml"],
+      options={
+        "records_per_page": records_per_page,
+      },
+    )
+    for records_per_page in RECORDS_PER_PAGE
+  ] + [
+    ExperimentInstance(
+      name="{}-{}".format(dataset["name"], records_per_page),
+      args=[CUSTOM_DATASET_PATH + dataset["file"]],
+      options={
+        "records_per_page": records_per_page,
+      },
+    )
+    for dataset, records_per_page in product(CUSTOM_DATASETS, RECORDS_PER_PAGE)
+  ],
+)
