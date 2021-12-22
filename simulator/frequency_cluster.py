@@ -3,25 +3,9 @@ import csv
 import sys
 import ycsbr_py as ycsbr
 
+from utils.dataset import extract_keys
 from utils.io_count import IOCounter
-
-
-def extract_keys(ycsbr_dataset):
-    keys = []
-    for i in range(len(ycsbr_dataset)):
-        keys.append(ycsbr_dataset.get_key_at(i))
-    return keys
-
-
-def run_workload(workload, db):
-    session = ycsbr.Session(num_threads=1)
-    session.set_database(db)
-    session.initialize()
-    try:
-        session.run_phased_workload(workload)
-        return db
-    finally:
-        session.terminate()
+from utils.run import run_workload
 
 
 def get_cluster_by_access_mapper(dataset, access_freqs, records_per_page):

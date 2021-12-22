@@ -28,3 +28,10 @@ def process_dataset(dataset, keys_per_page):
             page_id += 1
 
     return page_mapper, page_data
+
+
+def extract_keys(ycsbr_dataset):
+    keys = []
+    for i in range(len(ycsbr_dataset)):
+        keys.append(ycsbr_dataset.get_key_at(i))
+    return keys
