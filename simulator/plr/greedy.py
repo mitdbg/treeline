@@ -38,6 +38,10 @@ class Line:
         x = (other.intercept - self.intercept) / (self.slope - other.slope)
         return Point(x, self(x))
 
+    def scale(self, factor: float) -> "Line":
+        assert factor != 0
+        return Line(self.slope / factor, self.intercept / factor)
+
 
 class Segment:
     def __init__(self, line: Line, start_x: float, end_x: float):
@@ -48,6 +52,9 @@ class Segment:
     def adjust_bounds(self, new_start_x: float, new_end_x: float) -> "Segment":
         assert new_start_x < new_end_x
         return Segment(self.line, new_start_x, new_end_x)
+
+    def scale_in_place(self, factor: float):
+        self.line = self.line.scale(factor)
 
 
 class GreedyPLRSegment:

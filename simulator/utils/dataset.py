@@ -35,3 +35,9 @@ def extract_keys(ycsbr_dataset):
     for i in range(len(ycsbr_dataset)):
         keys.append(ycsbr_dataset.get_key_at(i))
     return keys
+
+
+def load_dataset_from_text_file(filepath):
+    # N.B. Dataset needs to be able to fit into memory for this simulation.
+    with open(filepath) as f:
+        return [int(line) for line in f.readlines()]

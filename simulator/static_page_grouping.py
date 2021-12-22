@@ -5,7 +5,7 @@ import csv
 import pathlib
 
 from plr.greedy import GreedyPLR, Point, Segment, Line
-from utils.dataset import extract_keys
+from utils.dataset import extract_keys, load_dataset_from_text_file
 
 
 class SegmentMetadata:
@@ -183,12 +183,6 @@ def run_experiment(dataset, records_per_page):
     return stats
 
 
-def load_dataset(filepath):
-    # N.B. Dataset needs to be able to fit into memory for this simulation.
-    with open(filepath) as f:
-        return [int(line) for line in f.readlines()]
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--records_per_page", type=int, default=50)
@@ -208,7 +202,7 @@ def main():
         out_dir = pathlib.Path(args.out_dir)
 
     if args.custom_dataset is not None:
-        dataset = load_dataset(args.custom_dataset)
+        dataset = load_dataset_from_text_file(args.custom_dataset)
     else:
         import ycsbr_py as ycsbr
 
