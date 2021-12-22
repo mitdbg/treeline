@@ -87,7 +87,16 @@ def build_segments(dataset, goal, delta):
             bisect.bisect_right(allowed_records_in_segments, records_considered) - 1
         )
         if segment_size_idx < 0:
-            segment_size_idx = 0
+            # Could not model enough keys to fit into one segment. So we just
+            # fill the page completely.
+            assert len(keys_in_segment) < allowed_records_in_segments[0]
+            while (
+                it.has_next() and len(keys_in_segment) < allowed_records_in_segments[0]
+            ):
+                keys_in_segment.append(it.next())
+            segments.append(PageSegment(keys=keys_in_segment, model=None, page_count=1))
+            continue
+
         segment_page_count = SEGMENT_PAGE_COUNTS[segment_size_idx]
         records_in_segment = allowed_records_in_segments[segment_size_idx]
 
@@ -130,32 +139,40 @@ def validate_segments(segments, goal, delta):
     min_in_page = goal - delta
     max_in_page = goal + delta
 
+    def validate_size(num_keys, segment, page):
+        if num_keys > max_in_page:
+            print(
+                "Validation Error: Segment {} page {} has too many keys ({}, expected at most {})".format(
+                    segment, page, num_keys, max_in_page
+                )
+            )
+        if num_keys < min_in_page:
+            print(
+                "Validation Error: Segment {} page {} has too few keys ({}, expected at least {})".format(
+                    segment, page, num_keys, min_in_page
+                )
+            )
+
     for segment_id, segment in enumerate(segments):
         pages = [[] for _ in range(segment.page_count)]
+        if segment.model is None or segment.page_count == 1:
+            assert segment.page_count == 1
+            validate_size(len(segment.keys), segment_id, page=0)
+            continue
+
         for key in segment.keys:
             page_id = int(segment.model.line(key - segment.base))
             if page_id < 0 or page_id >= len(pages):
                 print(
-                    "Validation Error: Segment {} model produced an out of bound page for key {}".format(
-                        segment_id, key
+                    "Validation Error: Segment {} model produced an out of bound page for key {} (page_id: {})".format(
+                        segment_id, key, page_id
                     )
                 )
             else:
                 pages[page_id].append(key)
 
         for page_id, page in enumerate(pages):
-            if len(page) > max_in_page:
-                print(
-                    "Validation Error: Segment {} page {} has too many keys ({}, expected at most {})".format(
-                        segment_id, page_id, len(page), max_in_page
-                    )
-                )
-            if len(page) < min_in_page:
-                print(
-                    "Validation Error: Segment {} page {} has too few keys ({}, expected at least {})".format(
-                        segment_id, page_id, len(page), min_in_page
-                    )
-                )
+            validate_size(len(page), segment_id, page_id)
 
 
 def main():
