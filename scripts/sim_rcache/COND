@@ -12,11 +12,13 @@ CONFIGS = [
     "record_size_bytes": 64,
     "cache_size_mib": 407,
     "records_per_page": 50,
+    "log_writes_period": 1000000,  # ~61 MiB
   },
   {
     "record_size_bytes": 1024,
     "cache_size_mib": 6512,
     "records_per_page": 3,
+    "log_writes_period": 62500,    # ~61 MiB
   },
 ]
 
@@ -37,4 +39,14 @@ run_command(
   name="combine",
   run="python3 combine.py",
   deps=[":sim_rcache"],
+)
+
+combine(
+  name="sim_rcache_key",
+  deps=[
+    ":sim_rcache-a_key_99-64",
+    ":sim_rcache-a_key_99-1024",
+    ":sim_rcache-a_key_59-64",
+    ":sim_rcache-a_key_59-1024",
+  ],
 )

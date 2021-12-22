@@ -32,6 +32,7 @@ def main():
     parser.add_argument("--record_size_bytes", type=int, default=64)
     parser.add_argument("--cache_size_mib", type=int, default=407)
     parser.add_argument("--records_per_page", type=int, default=50)
+    parser.add_argument("--log_writes_period", type=int, default=10000)
     parser.add_argument("--out_dir", type=str)
     args = parser.parse_args()
 
@@ -51,7 +52,9 @@ def main():
 
     with open(out_path / "results.csv", "w") as file:
         writer = csv.writer(file)
-        writer.writerow(["policy", "hit_rate", "read_ios", "write_ios"])
+        writer.writerow(
+            ["policy", "hit_rate", "read_ios", "write_ios", "logged_record_count"]
+        )
 
         for db_type, admit_page in product([GreedyCacheDB, LRUCacheDB], [False, True]):
             db = db_type(
@@ -59,13 +62,17 @@ def main():
                 args.records_per_page,
                 records_in_cache,
                 admit_read_pages=admit_page,
+                log_writes_period=args.log_writes_period,
             )
             policy_name = db_type.Name
             run_workload(workload, db)
+            db.log_writes()
             policy = "{}_{}".format(
                 policy_name, "admit_record" if not admit_page else "admit_page"
             )
-            writer.writerow([policy, db.hit_rate, db.read_ios, db.write_ios])
+            writer.writerow(
+                [policy, db.hit_rate, db.read_ios, db.write_ios, db.logged_record_count]
+            )
 
 
 if __name__ == "__main__":

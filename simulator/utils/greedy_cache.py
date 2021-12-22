@@ -38,6 +38,7 @@ class GreedyCache:
 
         self._read_ios = 0
         self._write_ios = 0
+        self._logged_records = 0
 
         self._accesses = 0
         self._hits = 0
@@ -53,6 +54,10 @@ class GreedyCache:
     @property
     def write_ios(self):
         return self._write_ios
+
+    @property
+    def logged_record_count(self):
+        return self._logged_records
 
     def add_write(self, key, if_new_hotness):
         self._accesses += 1
@@ -89,6 +94,12 @@ class GreedyCache:
 
         # Guaranteed to have space now.
         self._add_new_item(key, CacheItem(CacheItemType.Read, if_new_hotness), slot_idx)
+
+    def log_writes(self):
+        for key in self._slots:
+            if self._records[key].item_type != CacheItemType.Write:
+                continue
+            self._logged_records += 1
 
     def _evict(self):
         # Age cache items until we find one with count 0
@@ -174,7 +185,14 @@ class GreedyCache:
 class GreedyCacheDB(ycsbr.DatabaseInterface):
     Name = "greedy"
 
-    def __init__(self, dataset, keys_per_page, cache_capacity, admit_read_pages=False):
+    def __init__(
+        self,
+        dataset,
+        keys_per_page,
+        cache_capacity,
+        admit_read_pages,
+        log_writes_period,
+    ):
         ycsbr.DatabaseInterface.__init__(self)
         page_mapper, page_data = process_dataset(dataset, keys_per_page)
         self._page_mapper = page_mapper
@@ -183,6 +201,9 @@ class GreedyCacheDB(ycsbr.DatabaseInterface):
         self._admit_read_pages = admit_read_pages
         self._read_ios = 0
         self._write_ios = 0
+
+        self._log_writes_period = log_writes_period
+        self._write_count = 0
 
     @property
     def read_ios(self):
@@ -195,6 +216,13 @@ class GreedyCacheDB(ycsbr.DatabaseInterface):
     @property
     def hit_rate(self):
         return self._cache.hit_rate
+
+    @property
+    def logged_record_count(self):
+        return self._cache.logged_record_count
+
+    def log_writes(self):
+        self._cache.log_writes()
 
     # DatabaseInterface methods below.
 
@@ -212,6 +240,10 @@ class GreedyCacheDB(ycsbr.DatabaseInterface):
 
     def update(self, key, val):
         self._cache.add_write(key, if_new_hotness=4)
+        self._write_count += 1
+        if self._write_count >= self._log_writes_period:
+            self._cache.log_writes()
+            self._write_count = 0
         return True
 
     def read(self, key):
