@@ -126,12 +126,45 @@ def write_summary(segments, out_dir):
     return counts
 
 
+def validate_segments(segments, goal, delta):
+    min_in_page = goal - delta
+    max_in_page = goal + delta
+
+    for segment_id, segment in enumerate(segments):
+        pages = [[] for _ in range(segment.page_count)]
+        for key in segment.keys:
+            page_id = int(segment.model.line(key - segment.base))
+            if page_id < 0 or page_id >= len(pages):
+                print(
+                    "Validation Error: Segment {} model produced an out of bound page for key {}".format(
+                        segment_id, key
+                    )
+                )
+            else:
+                pages[page_id].append(key)
+
+        for page_id, page in enumerate(pages):
+            if len(page) > max_in_page:
+                print(
+                    "Validation Error: Segment {} page {} has too many keys ({}, expected at most {})".format(
+                        segment_id, page_id, len(page), max_in_page
+                    )
+                )
+            if len(page) < min_in_page:
+                print(
+                    "Validation Error: Segment {} page {} has too few keys ({}, expected at least {})".format(
+                        segment_id, page_id, len(page), min_in_page
+                    )
+                )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--records_per_page_goal", type=int, default=50)
     parser.add_argument("--records_per_page_delta", type=int, default=5)
     parser.add_argument("--workload_config", type=str)
     parser.add_argument("--custom_dataset", type=str)
+    parser.add_argument("--validate", action="store_true")
     parser.add_argument("--out_dir", type=str)
     args = parser.parse_args()
 
@@ -160,8 +193,12 @@ def main():
     segments = build_segments(
         dataset, goal=args.records_per_page_goal, delta=args.records_per_page_delta
     )
-
     write_summary(segments, out_dir)
+
+    if args.validate:
+        validate_segments(
+            segments, goal=args.records_per_page_goal, delta=args.records_per_page_delta
+        )
 
 
 if __name__ == "__main__":
