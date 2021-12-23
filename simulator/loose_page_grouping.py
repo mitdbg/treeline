@@ -100,16 +100,43 @@ def build_segments(dataset, goal, delta):
         segment_page_count = SEGMENT_PAGE_COUNTS[segment_size_idx]
         records_in_segment = allowed_records_in_segments[segment_size_idx]
 
-        actual_records_in_segment = min(len(keys_in_segment), records_in_segment)
-        num_extra_keys = len(keys_in_segment) - actual_records_in_segment
+        if segment_page_count == 1:
+            # Special case where we can fill 1 page, but not 2. We do not need a
+            # model for 1 page.
+            num_extra_keys = len(keys_in_segment) - records_in_segment
+            assert num_extra_keys >= 0
+            it.rollback(num_extra_keys)
+            segments.append(
+                PageSegment(
+                    keys=keys_in_segment[:records_in_segment], model=None, page_count=1
+                )
+            )
+            continue
+
+        # We can index at least 2 pages. Use the derived model to figure out how
+        # many records that corresponds to, and then create the segment.
+
+        cutoff_idx = len(keys_in_segment)
+        while (
+            cutoff_idx > 0
+            and int(line.line(keys_in_segment[cutoff_idx - 1] - base))
+            >= records_in_segment
+        ):
+            cutoff_idx -= 1
+        assert (
+            int(line.line(keys_in_segment[cutoff_idx - 1] - base)) < records_in_segment
+        )
+
+        num_extra_keys = len(keys_in_segment) - cutoff_idx
+        assert num_extra_keys >= 0
         it.rollback(num_extra_keys)
 
         # Put records into pages
-        bounded_model = line.adjust_bounds(0, actual_records_in_segment - 1)
+        bounded_model = line.adjust_bounds(0, cutoff_idx)
         bounded_model.scale_in_place(goal)
         segments.append(
             PageSegment(
-                keys=keys_in_segment[:actual_records_in_segment],
+                keys=keys_in_segment[:cutoff_idx],
                 model=bounded_model,
                 page_count=segment_page_count,
             )
@@ -161,11 +188,12 @@ def validate_segments(segments, goal, delta):
             continue
 
         for key in segment.keys:
-            page_id = int(segment.model.line(key - segment.base))
+            page_id_raw = segment.model.line(key - segment.base)
+            page_id = int(page_id_raw)
             if page_id < 0 or page_id >= len(pages):
                 print(
-                    "Validation Error: Segment {} model produced an out of bound page for key {} (page_id: {})".format(
-                        segment_id, key, page_id
+                    "Validation Error: Segment {} model produced an out of bound page for key {} (page_id_raw: {})".format(
+                        segment_id, key, page_id_raw
                     )
                 )
             else:

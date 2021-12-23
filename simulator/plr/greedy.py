@@ -42,6 +42,9 @@ class Line:
         assert factor != 0
         return Line(self.slope / factor, self.intercept / factor)
 
+    def invert(self) -> "Line":
+        return Line(slope=(1.0 / self.slope), intercept=(-self.intercept / self.slope))
+
 
 class Segment:
     def __init__(self, line: Line, start_x: float, end_x: float):
