@@ -1,0 +1,52 @@
+from itertools import product
+
+CONFIGS = [
+  # Represents 64 B records, 3200 bytes per page +/- 320 bytes
+  {
+    "records_per_page_goal": 50,
+    "records_per_page_delta": 5,
+  },
+  # Represents 64 B records, 3200 bytes per page +/- 640 bytes
+  {
+    "records_per_page_goal": 50,
+    "records_per_page_delta": 10,
+  },
+  # Represents 1024 B records, 2048 bytes per page +/- 1024 bytes
+  {
+    "records_per_page_goal": 2,
+    "records_per_page_delta": 1,
+  },
+]
+
+CUSTOM_DATASET_PATH = "/spinning/kipf/bourbon_datasets/"
+
+CUSTOM_DATASETS = [
+  {"name": "amzn", "file": "amazon_reviews.txt"},
+  {"name": "osm", "file": "osm_ny.txt"},
+]
+
+run_experiment_group(
+  name="sim_loose_grouping",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="uniform-{}-{}".format(
+        config["records_per_page_goal"], config["records_per_page_delta"]
+      ),
+      args=["uniform_20m.yml"],
+      options=config,
+    )
+    for config in CONFIGS
+  ] + [
+    ExperimentInstance(
+      name="{}-{}-{}".format(
+        dataset["name"],
+        config["records_per_page_goal"],
+        config["records_per_page_delta"],
+      ),
+      args=[CUSTOM_DATASET_PATH + dataset["file"]],
+      options=config,
+    )
+    for dataset, config in product(CUSTOM_DATASETS, CONFIGS)
+  ],
+)
