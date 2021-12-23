@@ -102,12 +102,12 @@ class GreedyPLRSegment:
     def offer(self, s: Point) -> Optional[Segment]:
         bottom_line = Line.from_slope_and_point(self._slope_bot, self._s0)
         bottom_pred = bottom_line(s.x)
-        if bottom_pred >= s.y + self._delta:
+        if bottom_pred >= s.y:
             return self.finish()
 
         top_line = Line.from_slope_and_point(self._slope_top, self._s0)
         top_pred = top_line(s.x)
-        if top_pred <= s.y - self._delta:
+        if top_pred <= s.y:
             return self.finish()
 
         x_diff = s.x - self._s0.x
