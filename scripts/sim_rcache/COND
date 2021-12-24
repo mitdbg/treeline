@@ -50,3 +50,20 @@ combine(
     ":sim_rcache-a_key_59-1024",
   ],
 )
+
+run_experiment_group(
+  name="sim_belady",
+  run="./run_belady.sh",
+  experiments=[
+    ExperimentInstance(
+      name="sim_belady-{}".format(workload),
+      args=["{}.yml".format(workload)],
+      options={
+        # Corresponds to the memory budget specified at the top of this file.
+        "cache_capacity": 6668288,
+      },
+    )
+    # Key skew experiments only
+    for workload in WORKLOADS if "page" not in workload
+  ],
+)
