@@ -157,6 +157,7 @@ Status DBImpl::InitializeNewDB() {
     model_->PreallocateAndInitialize(buf_mgr_, records,
                                      options_.key_hints.records_per_page());
     buf_mgr_->ClearStats();
+    stats_.ClearAll();
     Logger::Log("Created new %s. Total size: %zu bytes. Indexed pages: %zu",
                 options_.use_alex ? "ALEX" : "BTree", model_->GetSizeBytes(),
                 model_->GetNumPages());
@@ -198,6 +199,7 @@ Status DBImpl::InitializeExistingDB() {
 
   model_->ScanFilesAndInitialize(buf_mgr_);
   buf_mgr_->ClearStats();
+  stats_.ClearAll();
 
   Logger::Log("Rebuilt %s. Total size: %zu bytes. Indexed pages: %zu",
               options_.use_alex ? "ALEX" : "BTree", model_->GetSizeBytes(),
@@ -291,6 +293,9 @@ DBImpl::~DBImpl() {
                 buf_mgr_->BufMgrHitRate());
   }
 
+  stats_.MoveTempToTotalAndClearTemp();
+  Logger::Log(stats_.to_string().c_str());
+
   Logger::Shutdown();
 }
 
@@ -338,7 +343,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   format::WriteType write_type;
   Status status = local_mtable->Get(key, &write_type, value_out);
   if (status.ok()) {
-    ++stats_.user_reads_memtable_hits_records_;
+    ++stats_.temp_user_reads_memtable_hits_records_;
 
     if (write_type == format::WriteType::kDelete) {
       return Status::NotFound("Key not found.");
@@ -350,7 +355,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   if (local_im_mtable != nullptr) {
     status = local_im_mtable->Get(key, &write_type, value_out);
     if (status.ok()) {
-      ++stats_.user_reads_memtable_hits_records_;
+      ++stats_.temp_user_reads_memtable_hits_records_;
 
       if (write_type == format::WriteType::kDelete) {
         return Status::NotFound("Key not found.");
@@ -392,11 +397,11 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   }
 
   if (incurred_multi_io) {
-    ++stats_.user_reads_multi_bufmgr_misses_records_;
+    ++stats_.temp_user_reads_multi_bufmgr_misses_records_;
   } else if (incurred_io) {
-    ++stats_.user_reads_single_bufmgr_misses_records_;
+    ++stats_.temp_user_reads_single_bufmgr_misses_records_;
   } else {
-    ++stats_.user_reads_bufmgr_hits_records_;
+    ++stats_.temp_user_reads_bufmgr_hits_records_;
   }
 
   return status;
@@ -515,7 +520,7 @@ Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
   // Since we are currently holding `mutex_`, no other writing thread can
   // concurrently modify `mtable_`.
   Status write_result = mtable_->Add(key, value, write_type);
-  if (write_result.ok()) ++stats_.user_writes_records_;
+  if (write_result.ok()) ++stats_.temp_user_writes_records_;
   NotifyWaitingWriterIfNeeded(lock);
   return write_result;
 }
@@ -639,13 +644,13 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
   if (options_.memory_autotuning) {
     // Find read percentage.
     size_t user_total_reads_records =
-        stats_.user_reads_memtable_hits_records_ +
-        stats_.user_reads_bufmgr_hits_records_ +
-        stats_.user_reads_single_bufmgr_misses_records_ +
-        stats_.user_reads_multi_bufmgr_misses_records_;
+        stats_.temp_user_reads_memtable_hits_records_ +
+        stats_.temp_user_reads_bufmgr_hits_records_ +
+        stats_.temp_user_reads_single_bufmgr_misses_records_ +
+        stats_.temp_user_reads_multi_bufmgr_misses_records_;
     double read_percentage =
         100.0 * user_total_reads_records /
-        (user_total_reads_records + stats_.user_writes_records_);
+        (user_total_reads_records + stats_.temp_user_writes_records_);
 
     // Calculate the ideal buffer pool size.
     size_t buffer_pool_bytes_wanted;
@@ -695,7 +700,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
     mtable_ = std::make_shared<MemTable>(moptions);
   }
 
-  stats_.Clear();
+  stats_.MoveTempToTotalAndClearTemp();
 
   // Increment the log version and get the log version associated with the
   // to-be-flushed memtable.
@@ -854,9 +859,9 @@ void DBImpl::FlushWorker(
   // again.
   for (auto& bf : *frames) {
     if (bf->IsNewlyFixed()) {
-      ++stats_.flush_bufmgr_misses_pages_;
+      ++stats_.temp_flush_bufmgr_misses_pages_;
     } else {
-      ++stats_.flush_bufmgr_hits_pages_;
+      ++stats_.temp_flush_bufmgr_hits_pages_;
     }
 
     // Lock the frame again for use. This does not increment the fix count of
@@ -1003,8 +1008,8 @@ void DBImpl::ReinsertionWorker(
   // flush. Until this worker completes, no other threads are able to modify
   // `mtable_`. Acquiring `mutex_` ensures writes to the memtable do not occur
   // concurrently.
-  ++stats_.flush_deferred_pages_;
-  stats_.flush_deferred_records_ += records.size();
+  ++stats_.temp_flush_deferred_pages_;
+  stats_.temp_flush_deferred_records_ += records.size();
 
   std::unique_lock<std::mutex> lock(mutex_);
   for (auto& kv : records) {

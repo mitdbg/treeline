@@ -201,6 +201,10 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
         old_num_pages, new_num_pages, lower, upper);
   }
 
+  ++stats_.reorg_count_;
+  stats_.reorg_pre_total_length_ += old_num_pages;
+  stats_.reorg_post_total_length_ += new_num_pages;
+
   return Status::OK();
 }
 
@@ -299,6 +303,10 @@ Status DBImpl::PreorganizeOverflowChain(const FlushBatch& records,
         ", Chain Boundary Upper: %" PRIu64,
         old_num_pages, new_num_pages, lower, upper);
   }
+
+  ++stats_.preorg_count_;
+  stats_.preorg_pre_total_length_ += old_num_pages;
+  stats_.preorg_post_total_length_ += new_num_pages;
 
   return Status::OK();
 }
