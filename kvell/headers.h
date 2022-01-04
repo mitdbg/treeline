@@ -19,7 +19,9 @@
 #include <pthread.h>
 #include <signal.h>
 #include <sys/syscall.h>
-#include <linux/aio_abi.h>
+namespace kvell_aio {
+  #include <linux/aio_abi.h>
+}
 
 #include "options.h"
 

@@ -29,20 +29,20 @@ struct pdata {
 static char *path = NULL;
 static int nb_threads = 0;
 
-static int io_setup(unsigned nr, aio_context_t *ctxp) {
+static int io_setup(unsigned nr, kvell_aio::aio_context_t *ctxp) {
 	return syscall(__NR_io_setup, nr, ctxp);
 }
 
-static int io_destroy(aio_context_t ctx) {
+static int io_destroy(kvell_aio::aio_context_t ctx) {
 	return syscall(__NR_io_destroy, ctx);
 }
 
-static int io_submit(aio_context_t ctx, long nr, struct iocb **iocbpp) {
+static int io_submit(kvell_aio::aio_context_t ctx, long nr, struct kvell_aio::iocb **iocbpp) {
 	return syscall(__NR_io_submit, ctx, nr, iocbpp);
 }
 
-static int io_getevents(aio_context_t ctx, long min_nr, long max_nr,
-		struct io_event *events, struct timespec *timeout) {
+static int io_getevents(kvell_aio::aio_context_t ctx, long min_nr, long max_nr,
+		struct kvell_aio::io_event *events, struct timespec *timeout) {
 	return syscall(__NR_io_getevents, ctx, min_nr, max_nr, events, timeout);
 }
 
@@ -56,12 +56,12 @@ void *do_libaio(void *data) {
    size_t nb_pages = pdata->nb_pages;
    unsigned int seed = rand();
 
-   aio_context_t ctx;
+   kvell_aio::aio_context_t ctx;
    memset(&ctx, 0, sizeof(ctx));
 
-   struct iocb cb[1024];
-   struct iocb *cbs[1024];
-   struct io_event events[1024];
+   struct kvell_aio::iocb cb[1024];
+   struct kvell_aio::iocb *cbs[1024];
+   struct kvell_aio::io_event events[1024];
    int ret;
    char *buffers = aligned_alloc(KVELL_PAGE_SIZE, KVELL_PAGE_SIZE * queue_size);
 
@@ -83,13 +83,13 @@ void *do_libaio(void *data) {
 
          cb[j].aio_fildes = fd;
          if(pdata->rw == RO) {
-            cb[j].aio_lio_opcode = IOCB_CMD_PREAD;
+            cb[j].aio_lio_opcode = kvell_aio::IOCB_CMD_PREAD;
          } else if(pdata->rw == WO) {
-            cb[j].aio_lio_opcode = IOCB_CMD_PWRITE;
+            cb[j].aio_lio_opcode = kvell_aio::IOCB_CMD_PWRITE;
          } else if(pdata->rw == RW) {
-            cb[j].aio_lio_opcode = (rand_r(&seed)%2)?IOCB_CMD_PWRITE:IOCB_CMD_PREAD;
+            cb[j].aio_lio_opcode = (rand_r(&seed)%2)?kvell_aio::IOCB_CMD_PWRITE:kvell_aio::IOCB_CMD_PREAD;
          } else {
-            cb[j].aio_lio_opcode = (rand_r(&seed)%100<5)?IOCB_CMD_PWRITE:IOCB_CMD_PREAD;
+            cb[j].aio_lio_opcode = (rand_r(&seed)%100<5)?kvell_aio::IOCB_CMD_PWRITE:kvell_aio::IOCB_CMD_PREAD;
          }
          cb[j].aio_buf = (uint64_t)&buffers[KVELL_PAGE_SIZE*j];
          cb[j].aio_offset = page * KVELL_PAGE_SIZE;

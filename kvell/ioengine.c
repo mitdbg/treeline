@@ -39,16 +39,16 @@ void *safe_pread(int fd, off_t offset) {
 /*
  * Async API definition
  */
-static int io_setup(unsigned nr, aio_context_t *ctxp) {
+static int io_setup(unsigned nr, kvell_aio::aio_context_t *ctxp) {
 	return syscall(__NR_io_setup, nr, ctxp);
 }
 
-static int io_submit(aio_context_t ctx, long nr, struct iocb **iocbpp) {
+static int io_submit(kvell_aio::aio_context_t ctx, long nr, struct kvell_aio::iocb **iocbpp) {
 	return syscall(__NR_io_submit, ctx, nr, iocbpp);
 }
 
-static int io_getevents(aio_context_t ctx, long min_nr, long max_nr,
-		struct io_event *events, struct timespec *timeout) {
+static int io_getevents(kvell_aio::aio_context_t ctx, long min_nr, long max_nr,
+		struct kvell_aio::io_event *events, struct timespec *timeout) {
 	return syscall(__NR_io_getevents, ctx, min_nr, max_nr, events, timeout);
 }
 
@@ -61,14 +61,14 @@ struct linked_callbacks {
    struct linked_callbacks *next;
 };
 struct io_context {
-   aio_context_t ctx __attribute__((aligned(64)));
+   kvell_aio::aio_context_t ctx __attribute__((aligned(64)));
    volatile size_t sent_io;
    volatile size_t processed_io;
    size_t max_pending_io;
    size_t ios_sent_to_disk;
-   struct iocb *iocb;
-   struct iocb **iocbs;
-   struct io_event *events;
+   struct kvell_aio::iocb *iocb;
+   struct kvell_aio::iocb **iocbs;
+   struct kvell_aio::io_event *events;
    struct linked_callbacks *linked_callbacks;
 };
 
@@ -172,10 +172,10 @@ char *read_page_async(struct slab_callback *callback) {
    }
 
    int buffer_idx = ctx->sent_io % ctx->max_pending_io;
-   struct iocb *_iocb = &ctx->iocb[buffer_idx];
+   struct kvell_aio::iocb *_iocb = &ctx->iocb[buffer_idx];
    memset(_iocb, 0, sizeof(*_iocb));
    _iocb->aio_fildes = callback->slab->fd;
-   _iocb->aio_lio_opcode = IOCB_CMD_PREAD;
+   _iocb->aio_lio_opcode = kvell_aio::IOCB_CMD_PREAD;
    _iocb->aio_buf = (uint64_t)disk_page;
    _iocb->aio_data = (uint64_t)callback;
    _iocb->aio_offset = page_num * KVELL_PAGE_SIZE;
@@ -210,10 +210,10 @@ char *write_page_async(struct slab_callback *callback) {
    lru_entry->dirty = 1;
 
    int buffer_idx = ctx->sent_io % ctx->max_pending_io;
-   struct iocb *_iocb = &ctx->iocb[buffer_idx];
+   struct kvell_aio::iocb *_iocb = &ctx->iocb[buffer_idx];
    memset(_iocb, 0, sizeof(*_iocb));
    _iocb->aio_fildes = callback->slab->fd;
-   _iocb->aio_lio_opcode = IOCB_CMD_PWRITE;
+   _iocb->aio_lio_opcode = kvell_aio::IOCB_CMD_PWRITE;
    _iocb->aio_buf = (uint64_t)disk_page;
    _iocb->aio_data = (uint64_t)callback;
    _iocb->aio_offset = page_num * KVELL_PAGE_SIZE;
@@ -275,7 +275,7 @@ void worker_ioengine_process_completed_ios(struct io_context *ctx) {
    start_debug_timer {
       // Enqueue completed IO requests
       for(size_t i = 0; i < ret; i++) {
-         struct iocb *cb = (void*)ctx->events[i].obj;
+         struct kvell_aio::iocb *cb = (void*)ctx->events[i].obj;
          struct slab_callback *callback = (void*)cb->aio_data;
          assert(ctx->events[i].res == 4096); // otherwise page hasn't been read
          callback->lru_entry->contains_data = 1;

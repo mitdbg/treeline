@@ -5,7 +5,7 @@
 #include <thread>
 
 #include "config.h"
-#include "kvell/slabworker.h"
+#include "kvell/headers.h"
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 
