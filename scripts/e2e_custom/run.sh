@@ -38,6 +38,7 @@ echo "Detected checkpoint name: $checkpoint_name"
 args+=("--verbose")
 args+=("--db_path=$DB_PATH")
 args+=("--seed=$SEED")
+args+=("--notify_after_init")
 
 full_checkpoint_path=$DB_CHECKPOINT_PATH/$checkpoint_name
 rm -rf $DB_PATH
@@ -54,18 +55,39 @@ fi
 
 sync $DB_PATH
 
+init_finished=0
+
+function on_init_finish() {
+  init_finished=1
+}
+
+# Interrupt the first `wait` below when we receive a `SIGUSR1` signal.
+trap "on_init_finish" USR1
+
 set +e
+../../build/bench/run_custom ${args[@]} >$COND_OUT/results.csv &
+wait %1
+code=$?
+
+# The experiment failed before it finished initialization.
+if [ "$init_finished" -eq "0" ]; then
+  exit $code
+fi
+
+# The DB has finished initializing, so start `iostat`.
 iostat -o JSON -d -y 1 >$COND_OUT/iostat.json &
 iostat_pid=$!
 
-../../build/bench/run_custom ${args[@]} >$COND_OUT/results.csv
+# Wait until the workload completes.
+wait %1
 code=$?
+
+# Stop `iostat`.
+kill -s SIGINT -- $iostat_pid
+wait
 
 cp $DB_PATH/$db_type/LOG $COND_OUT/$db_type.log
 du -b $DB_PATH >$COND_OUT/db_space.log
-
-kill -s SIGINT -- $iostat_pid
-wait
 
 # Report that the experiment failed if the `run_custom` exit code is not 0
 if [ $code -ne 0 ]; then

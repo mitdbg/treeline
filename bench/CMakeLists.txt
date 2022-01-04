@@ -4,6 +4,8 @@ add_library(bench_common
   common/data.h
   common/load_data.cc
   common/load_data.h
+  common/startup.cc
+  common/startup.h
   common/timing.h)
 # Any targets linking to `bench_common` will also link to `llsm` and will be
 # able to include LLSM internal headers.

@@ -6,6 +6,7 @@
 #include "bench/common/llsm_interface.h"
 #include "bench/common/load_data.h"
 #include "bench/common/rocksdb_interface.h"
+#include "bench/common/startup.h"
 #include "gflags/gflags.h"
 #include "ycsbr/gen.h"
 
@@ -27,6 +28,9 @@ DEFINE_string(output_path, llsm::bench::GetDefaultOutputPath(),
 DEFINE_uint64(throughput_sample_period, 0,
               "How frequently to sample the achieved throughput. Set to 0 to "
               "disable sampling.");
+DEFINE_bool(notify_after_init, false,
+            "If set to true, this process will send a SIGUSR1 signal to its "
+            "parent process after database initialization completes.");
 
 template <class DatabaseInterface>
 ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
@@ -52,6 +56,10 @@ ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
   if (FLAGS_verbose) {
     std::cerr << "> Running workload using " << FLAGS_threads
               << " application thread(s)." << std::endl;
+  }
+
+  if (FLAGS_notify_after_init) {
+    SendReadySignalToParent();
   }
 
   ycsbr::RunOptions options;
