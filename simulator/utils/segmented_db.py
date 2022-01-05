@@ -50,7 +50,10 @@ class SegmentedDB(ycsbr.DatabaseInterface):
         # First segment handling.
         seg_id = self._find_segment_idx_for(start)
         seg = self._segments[seg_id]
-        page_raw = seg.model.line(start - seg.base)
+        if seg.model is not None:
+            page_raw = seg.model.line(start - seg.base)
+        else:
+            page_raw = 0
         page_idx = int(page_raw)
 
         # Estimate how much of the segment to read.
