@@ -13,11 +13,10 @@
 // Reads in Wikipedia edit timestamp dataset and outputs key-value pairs of the
 // form <`user_id`><`timestamp`> / <`value`> where `user_id` are Zipfian
 // distributed user ids, `timestamp` is the edit timestamp, and `value` is a
-// random integer. All components are 64-bit unsigned integers. Ensures that
-// output is unique (does not contain any duplicates).
+// meaningless integer. All components are 64-bit unsigned integers. Ensures
+// that output is unique (does not contain any duplicates).
 
 constexpr size_t kNumUniqueUserIds = 65536;
-constexpr size_t kNumBitsUserId = 16;
 
 int main(int argc, char** argv) {
   if (argc < 2) {
@@ -26,6 +25,7 @@ int main(int argc, char** argv) {
   }
 
   const std::string filename = argv[1];
+  const size_t num_bits_user_id = std::ceil(log2(kNumUniqueUserIds));
 
   // Load Wikipedia edit timestamps.
   std::vector<uint64_t> timestamps = load_data<uint64_t>(filename);
@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
   // change, meaning the timestamps share at least a 32-bit prefix. These 32
   // bits are not zero though (there are at most two leading zeros).
   for (int i = 0; i < timestamps.size(); ++i) {
-    timestamps[i] = (timestamps[i] << kNumBitsUserId) >> kNumBitsUserId;
+    timestamps[i] = (timestamps[i] << num_bits_user_id) >> num_bits_user_id;
   }
 
   // Remove duplicates.
@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
 
     // Prepend user id.
     uint64_t user_id = zipf(gen);
-    user_id = user_id << (64 - kNumBitsUserId);
+    user_id = user_id << (64 - num_bits_user_id);
     key = key | user_id;
 
     records.push_back({key, i});
