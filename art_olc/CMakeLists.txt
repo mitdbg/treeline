@@ -10,13 +10,14 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wextra -march=native -g")
 
-find_library(JemallocLib jemalloc)
+#find_library(JemallocLib jemalloc)
 find_library(TbbLib tbb)
 find_package (Threads)
 
-set(ART_FILES OptimisticLockCoupling/Tree.cpp ROWEX/Tree.cpp ART/Tree.cpp)
+set(ART_FILES Tree.cpp)
 add_library(ARTSynchronized ${ART_FILES})
-target_link_libraries(ARTSynchronized ${TbbLib} ${JemallocLib} ${CMAKE_THREAD_LIBS_INIT})
+#target_link_libraries(ARTSynchronized ${TbbLib} ${JemallocLib} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(ARTSynchronized ${TbbLib} ${CMAKE_THREAD_LIBS_INIT})
 
 
 set(SOURCE_FILES example.cpp)

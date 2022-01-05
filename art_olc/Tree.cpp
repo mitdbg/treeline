@@ -3,8 +3,8 @@
 #include <functional>
 #include "Tree.h"
 #include "N.cpp"
-#include "../Epoche.cpp"
-#include "../Key.h"
+#include "Epoche.cpp"
+#include "Key.h"
 
 
 namespace ART_OLC {
