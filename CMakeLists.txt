@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project(learnedlsm LANGUAGES CXX)
+project(learnedlsm LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17)
 
 option(LLSM_BUILD_TESTS "Set to build the Learned LSM test suite." OFF)
@@ -54,5 +54,6 @@ endif()
 
 # Build the benchmarks iff requested
 if(LLSM_BUILD_BENCHMARKS)
+  add_subdirectory(kvell)
   add_subdirectory(bench)
 endif()

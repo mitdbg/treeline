@@ -22,7 +22,7 @@ add_library(bench_common_config
   common/leanstore_interface.h
   common/llsm_interface.h
   common/rocksdb_interface.h)
-target_link_libraries(bench_common_config PUBLIC bench_common gflags rocksdb leanstore)
+target_link_libraries(bench_common_config PUBLIC bench_common gflags rocksdb leanstore kvell)
 
 # Synthetic Write: Measure the write throughput when writing synthetic data.
 # This benchmark compares the Learned LSM database against RocksDB.
