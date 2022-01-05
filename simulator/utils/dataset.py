@@ -37,9 +37,12 @@ def extract_keys(ycsbr_dataset):
     return keys
 
 
-def load_dataset_from_text_file(filepath):
+def load_dataset_from_text_file(filepath, shift=True):
     # The workload generator reserves the least significant 16 bits.
     shift16 = 2 ** 16
     # N.B. Dataset needs to be able to fit into memory for this simulation.
     with open(filepath) as f:
-        return [int(line) * shift16 for line in f.readlines()]
+        if shift:
+            return [int(line) * shift16 for line in f.readlines()]
+        else:
+            return [int(line) for line in f.readlines()]

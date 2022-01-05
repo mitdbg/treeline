@@ -32,7 +32,9 @@ def main():
         set_record_size_bytes=16,
     )
     if args.custom_dataset is not None:
-        raw_loaded_dataset = load_dataset_from_text_file(args.custom_dataset)
+        raw_loaded_dataset = load_dataset_from_text_file(
+            args.custom_dataset, shift=False
+        )
         workload.set_custom_load_dataset(raw_loaded_dataset)
     dataset = extract_keys(workload.get_load_trace())
 
@@ -53,7 +55,9 @@ def main():
     page_size_counts = map(lambda p: "count_{}".format(str(p + 1)), range(16))
     with open(out_dir / "results.csv", "w") as f:
         writer = csv.writer(f)
-        writer.writerow(["workload", "goal", "delta", *page_size_counts, "simple_scan_page_count"])
+        writer.writerow(
+            ["workload", "goal", "delta", *page_size_counts, "simple_scan_page_count"]
+        )
         writer.writerow(
             [
                 config_path.stem,
