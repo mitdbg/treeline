@@ -40,6 +40,7 @@ class PageSegment:
         self.base = self.keys[0]
         self.model = model
         self.page_count = page_count
+        self.pages = None
 
 
 def build_segments(dataset, goal, delta):
@@ -185,6 +186,7 @@ def validate_segments(segments, goal, delta):
         if segment.model is None or segment.page_count == 1:
             assert segment.page_count == 1
             validate_size(len(segment.keys), segment_id, page=0)
+            segment.pages = segment.keys
             continue
 
         for key in segment.keys:
@@ -201,6 +203,9 @@ def validate_segments(segments, goal, delta):
 
         for page_id, page in enumerate(pages):
             validate_size(len(page), segment_id, page_id)
+
+        # Store the page breakdown for later use.
+        segment.pages = pages
 
 
 def main():
