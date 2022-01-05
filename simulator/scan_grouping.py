@@ -7,7 +7,7 @@ import ycsbr_py as ycsbr
 from grouping.loose import build_segments
 from grouping.segmented_scan_db import SegmentedScanDB
 from grouping.scan_db import ScanDB
-from utils.dataset import extract_keys
+from utils.dataset import extract_keys, load_dataset_from_text_file
 from utils.run import run_workload
 
 
@@ -32,7 +32,8 @@ def main():
         set_record_size_bytes=16,
     )
     if args.custom_dataset is not None:
-        workload.set_custom_load_dataset(args.custom_dataset)
+        raw_loaded_dataset = load_dataset_from_text_file(args.custom_dataset)
+        workload.set_custom_load_dataset(raw_loaded_dataset)
     dataset = extract_keys(workload.get_load_trace())
 
     print("Building the segments...", file=sys.stderr)
