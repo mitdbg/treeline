@@ -4,7 +4,7 @@ import statistics
 import ycsbr_py as ycsbr
 
 
-class SegmentedDB(ycsbr.DatabaseInterface):
+class SegmentedScanDB(ycsbr.DatabaseInterface):
     def __init__(self, segments):
         ycsbr.DatabaseInterface.__init__(self)
         self._segments = segments
