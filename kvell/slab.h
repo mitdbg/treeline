@@ -46,7 +46,7 @@ struct slab_callback {
    io_cb_t *io_cb;
 };
 
-struct slab* create_slab(struct slab_context *ctx, int worker_id, size_t item_size, struct slab_callback *callback);
+struct slab* create_slab(char* path_template, struct slab_context *ctx, int worker_id, size_t item_size, struct slab_callback *callback);
 struct slab* resize_slab(struct slab *s);
 
 void *read_item(struct slab *s, size_t idx);

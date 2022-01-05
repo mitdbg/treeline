@@ -19,7 +19,7 @@ void kv_read_async_no_lookup(struct slab_callback *callback, struct slab *s, siz
 size_t get_database_size(void);
 
 
-void slab_workers_init(int nb_disks, int nb_workers_per_disk);
+void slab_workers_init(char* path_template, int nb_disks, int nb_workers_per_disk);
 int get_nb_workers(void);
 void *kv_read_sync(void *item); // Unsafe
 struct pagecache *get_pagecache(struct slab_context *ctx);

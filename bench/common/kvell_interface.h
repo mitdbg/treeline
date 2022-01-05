@@ -14,7 +14,7 @@
 #include "ycsbr/ycsbr.h"
 
 DEFINE_uint64(kvell_num_disks, 1,
-              "The number of disks on which KVelldatabase files reside.");
+              "The number of disks on which KVell database files reside.");
 
 class KVellInterface {
  public:
@@ -26,9 +26,9 @@ class KVellInterface {
 
   // Called once before the benchmark.
   void InitializeDatabase() {
+    path_template = FLAGS_db_path + "/segment%lu-slab-%d-%lu-%lu";
     uint64_t workers_per_disk = FLAGS_bg_threads / FLAGS_kvell_num_disks;
-
-    slab_workers_init(FLAGS_kvell_num_disks, workers_per_disk);
+    slab_workers_init(path_template.data(), FLAGS_kvell_num_disks, workers_per_disk);
   }
 
   // Called once after the workload if `InitializeDatabase()` has been called.
@@ -61,7 +61,7 @@ class KVellInterface {
         reinterpret_cast<struct slab_callback*>(malloc(sizeof(*cb)));
     cb->item = serialize_record(key, value, value_size);
     kv_update_async(cb);
-    return false;
+    return true;
   }
 
   // Insert the specified key value pair. Return true if the insert succeeded.
@@ -70,7 +70,7 @@ class KVellInterface {
         reinterpret_cast<struct slab_callback*>(malloc(sizeof(*cb)));
     cb->item = serialize_record(key, value, value_size);
     kv_add_async(cb);
-    return false;
+    return true;
   }
 
   // Read the value at the specified key. Return true if the read succeeded.
@@ -79,7 +79,8 @@ class KVellInterface {
         reinterpret_cast<struct slab_callback*>(malloc(sizeof(*cb)));
     cb->item = serialize_record(key, nullptr, 0);
     kv_read_async(cb);
-    return false;
+
+    return true;
   }
 
   // Scan the key range starting from `key` for `amount` records. Return true if
@@ -91,6 +92,8 @@ class KVellInterface {
   }
 
  private:
+  std::string path_template;
+
   static char* serialize_record(ycsbr::Request::Key key, const char* value,
                          size_t value_size) {
     size_t meta_size = sizeof(struct item_metadata);

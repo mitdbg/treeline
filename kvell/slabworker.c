@@ -55,6 +55,7 @@ struct slab_context {
    struct pagecache *pagecache __attribute__((aligned(64)));
    struct io_context *io_ctx;
    uint64_t rdt;                                         // Latest timestamp
+   char* path_template;
 } *slab_contexts;
 
 /* A file is only managed by 1 worker. File => worker function. */
@@ -344,7 +345,7 @@ static void *worker_slab_init(void *pdata) {
    struct slab_callback *cb = malloc(sizeof(*cb));
    cb->cb = worker_slab_init_cb;
    for(size_t i = 0; i < nb_slabs; i++) {
-      ctx->slabs[i] = create_slab(ctx, ctx->worker_id, slab_sizes[i], cb);
+      ctx->slabs[i] = create_slab(ctx->path_template, ctx, ctx->worker_id, slab_sizes[i], cb);
    }
    free(cb);
 
@@ -379,7 +380,7 @@ static void *worker_slab_init(void *pdata) {
    return NULL;
 }
 
-void slab_workers_init(int _nb_disks, int nb_workers_per_disk) {
+void slab_workers_init(char* path_template, int _nb_disks, int nb_workers_per_disk) {
    size_t max_pending_callbacks = MAX_NB_PENDING_CALLBACKS_PER_WORKER;
    nb_disks = _nb_disks;
    nb_workers = nb_disks * nb_workers_per_disk;
@@ -393,6 +394,7 @@ void slab_workers_init(int _nb_disks, int nb_workers_per_disk) {
       ctx->worker_id = w;
       ctx->max_pending_callbacks = max_pending_callbacks;
       ctx->callbacks = calloc(ctx->max_pending_callbacks, sizeof(*ctx->callbacks));
+      ctx->path_template = path_template;
       pthread_create(&t, NULL, worker_slab_init, ctx);
    }
 
