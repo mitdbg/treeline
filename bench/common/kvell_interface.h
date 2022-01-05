@@ -5,7 +5,11 @@
 #include <thread>
 
 #include "config.h"
+#define iocb kvell_iocb
+#define io_event kvell_io_event
 #include "kvell/headers.h"
+#undef iocb
+#undef io_event
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 

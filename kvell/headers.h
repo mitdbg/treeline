@@ -5,6 +5,10 @@
 #define _GNU_SOURCE
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -19,9 +23,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <sys/syscall.h>
-namespace kvell_aio {
-  #include <linux/aio_abi.h>
-}
+#include <linux/aio_abi.h>
 
 #include "options.h"
 
@@ -38,5 +40,9 @@ namespace kvell_aio {
 #include "freelist.h"
 
 #include "workload-common.h"
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
