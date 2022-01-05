@@ -8,12 +8,13 @@
 #include <unordered_set>
 
 #include "common.h"
+#include "zipf_distribution.h"
 
 // Reads in Wikipedia edit timestamp dataset and outputs key-value pairs of the
-// form <`user_id`><`timestamp`> / <`value`> where `user_id` are uniformly
-// distributed user ids, `timestamp` is the original edit timestamp, and `value`
-// is a random integer. All components are 64-bit unsigned integers. Ensures
-// that output is unique (does not contain any duplicates).
+// form <`user_id`><`timestamp`> / <`value`> where `user_id` are Zipfian
+// distributed user ids, `timestamp` is the edit timestamp, and `value` is a
+// random integer. All components are 64-bit unsigned integers. Ensures that
+// output is unique (does not contain any duplicates).
 
 constexpr size_t kNumUniqueUserIds = 65536;
 constexpr size_t kNumBitsUserId = 16;
@@ -58,15 +59,14 @@ int main(int argc, char** argv) {
   std::vector<Record> records;
   records.reserve(timestamps.size());
 
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<> dist(0, kNumUniqueUserIds - 1);
+  std::mt19937 gen(42);
+  zipf_distribution<uint64_t> zipf(kNumUniqueUserIds - 1, /*q=*/1.0);
 
   for (uint64_t i = 0; i < timestamps.size(); ++i) {
     uint64_t key = timestamps[i];
 
     // Prepend user id.
-    uint64_t user_id = dist(gen);
+    uint64_t user_id = zipf(gen);
     user_id = user_id << (64 - kNumBitsUserId);
     key = key | user_id;
 
