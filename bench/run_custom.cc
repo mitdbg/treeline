@@ -120,6 +120,9 @@ int main(int argc, char* argv[]) {
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(*workload));
   }
+  if (db == DBType::kAll || db == DBType::kKVell) {
+    PrintExperimentResult("kvell", Run<KVellInterface>(*workload));
+  }
 
   return 0;
 }

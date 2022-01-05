@@ -32,7 +32,7 @@ for val in "${orig_args[@]}"; do
 done
 
 if [[ -z $db_type || -z $checkpoint_name || -z $workload_path ]]; then
-  echo >&2 "Usage: $0 --checkpoint_name=<checkpoint name> --workload_config=<workload path> --db=<all|rocksdb|llsm> [other args passed to run_custom]"
+  echo >&2 "Usage: $0 --checkpoint_name=<checkpoint name> --workload_config=<workload path> --db=<all|rocksdb|llsm|kvell> [other args passed to run_custom]"
   exit 1
 fi
 
@@ -80,3 +80,15 @@ fi
 
 # LeanStore does not support "reopening" an existing persisted database. So we
 # do not preload it here.
+
+if [ $db_type == "kvell" ] || [ $db_type == "all" ]; then
+  ../../build/bench/run_custom \
+    --db=kvell \
+    --db_path=$full_checkpoint_path \
+    --bg_threads=16 \
+    --bypass_wal=true \
+    --workload_config=$workload_path \
+    --seed=$SEED \
+    --verbose \
+    ${args[@]}
+fi
