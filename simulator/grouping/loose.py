@@ -1,7 +1,7 @@
 import bisect
-import sys
-from typing import List, Optional
-from plr.greedy import GreedyPLR, Point, Segment
+from typing import List
+from plr.greedy import GreedyPLR, Point
+from grouping.ro_segment import ReadOnlyPageSegment
 
 # Represents numbers of 4 KiB pages
 SEGMENT_PAGE_COUNTS = [1, 2, 4, 8, 16]
@@ -31,44 +31,9 @@ class _ListIterator:
         self.idx -= num
 
 
-class PageSegment:
-    def __init__(self, keys: List[int], model: Optional[Segment], page_count: int):
-        self.keys = keys
-        self.base = self.keys[0]
-        self.model = model
-        self.page_count = page_count
-        self._pages: Optional[List[List[int]]] = None
-
-    @property
-    def pages(self) -> List[List[int]]:
-        if self._pages is not None:
-            return self._pages
-
-        if self.model is None or self.page_count == 1:
-            assert self.page_count == 1
-            self._pages = [self.keys]
-            return self._pages
-
-        self._pages = [[] for _ in range(self.page_count)]
-        for key in self.keys:
-            page_id_raw = self.model.line(key - self.base)
-            page_id = int(page_id_raw)
-            if page_id < 0 or page_id >= len(self._pages):
-                print(
-                    "Validation Error: Model produced an out of bound page for key {} (page_id_raw: {})".format(
-                        key, page_id_raw
-                    ),
-                    file=sys.stderr,
-                )
-            else:
-                self._pages[page_id].append(key)
-
-        return self._pages
-
-
 def build_segments(
     dataset: List[int], goal: int, delta: int, skip_one_page_model: bool = False
-) -> List[PageSegment]:
+) -> List[ReadOnlyPageSegment]:
     allowed_records_in_segments = list(map(lambda s: s * goal, SEGMENT_PAGE_COUNTS))
     max_per_segment = allowed_records_in_segments[-1]
 
@@ -104,7 +69,7 @@ def build_segments(
             if line is None:
                 assert records_considered == 1 and len(keys_in_segment) == 1
                 segments.append(
-                    PageSegment(keys=keys_in_segment, model=None, page_count=1)
+                    ReadOnlyPageSegment(keys=keys_in_segment, model=None, page_count=1)
                 )
                 continue
 
@@ -120,7 +85,9 @@ def build_segments(
                 it.has_next() and len(keys_in_segment) < allowed_records_in_segments[0]
             ):
                 keys_in_segment.append(it.next())
-            segments.append(PageSegment(keys=keys_in_segment, model=None, page_count=1))
+            segments.append(
+                ReadOnlyPageSegment(keys=keys_in_segment, model=None, page_count=1)
+            )
             continue
 
         segment_page_count = SEGMENT_PAGE_COUNTS[segment_size_idx]
@@ -134,7 +101,7 @@ def build_segments(
             assert num_extra_keys >= 0
             it.rollback(num_extra_keys)
             segments.append(
-                PageSegment(
+                ReadOnlyPageSegment(
                     keys=keys_in_segment[:records_in_segment], model=None, page_count=1
                 )
             )
@@ -162,7 +129,7 @@ def build_segments(
         bounded_model = line.adjust_bounds(0, cutoff_idx)
         bounded_model.scale_in_place(goal)
         segments.append(
-            PageSegment(
+            ReadOnlyPageSegment(
                 keys=keys_in_segment[:cutoff_idx],
                 model=bounded_model,
                 page_count=segment_page_count,
@@ -172,7 +139,9 @@ def build_segments(
     return segments
 
 
-def validate_segments(segments: List[PageSegment], goal: int, delta: int) -> None:
+def validate_segments(
+    segments: List[ReadOnlyPageSegment], goal: int, delta: int
+) -> None:
     min_in_page = goal - delta
     max_in_page = goal + delta
 
