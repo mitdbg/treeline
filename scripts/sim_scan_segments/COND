@@ -69,3 +69,11 @@ run_command(
     ":sim_scan_segments",
   ],
 )
+
+run_command(
+  name="ssd_data",
+  run="python3 process_fio.py",
+  deps=[
+    "//scripts/iochar/read:read_rand_sweep",
+  ],
+)

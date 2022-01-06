@@ -39,6 +39,12 @@ run_experiment_group(
   ],
 )
 
+run_experiment(
+  name="read_rand_sweep",
+  run="../run_fio.sh",
+  args=["nvme_ssd_ext4", "psync-sweep"],
+)
+
 group(
   name="read-nvme_ssd_ext4",
   deps=[
