@@ -66,7 +66,9 @@ class PageSegment:
         return self._pages
 
 
-def build_segments(dataset: List[int], goal: int, delta: int) -> List[PageSegment]:
+def build_segments(
+    dataset: List[int], goal: int, delta: int, skip_one_page_model: bool = False
+) -> List[PageSegment]:
     allowed_records_in_segments = list(map(lambda s: s * goal, SEGMENT_PAGE_COUNTS))
     max_per_segment = allowed_records_in_segments[-1]
 
@@ -124,9 +126,10 @@ def build_segments(dataset: List[int], goal: int, delta: int) -> List[PageSegmen
         segment_page_count = SEGMENT_PAGE_COUNTS[segment_size_idx]
         records_in_segment = allowed_records_in_segments[segment_size_idx]
 
-        if segment_page_count == 1:
+        if skip_one_page_model and segment_page_count == 1:
             # Special case where we can fill 1 page, but not 2. We do not need a
-            # model for 1 page.
+            # model for 1 page. The caller has requested skipping storing models
+            # for 1 page segments.
             num_extra_keys = len(keys_in_segment) - records_in_segment
             assert num_extra_keys >= 0
             it.rollback(num_extra_keys)
@@ -137,8 +140,8 @@ def build_segments(dataset: List[int], goal: int, delta: int) -> List[PageSegmen
             )
             continue
 
-        # We can index at least 2 pages. Use the derived model to figure out how
-        # many records that corresponds to, and then create the segment.
+        # Use the derived model to figure out how many records that corresponds
+        # to, and then create the segment.
 
         cutoff_idx = len(keys_in_segment)
         while (

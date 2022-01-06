@@ -34,6 +34,7 @@ run_experiment_group(
         config["records_per_page_goal"], config["records_per_page_delta"]
       ),
       args=["uniform_20m.yml"],
+      parallelizable=True,
       options=config,
     )
     for config in CONFIGS
@@ -45,8 +46,21 @@ run_experiment_group(
         config["records_per_page_delta"],
       ),
       args=[CUSTOM_DATASET_PATH + dataset["file"]],
+      parallelizable=True,
       options=config,
     )
     for dataset, config in product(CUSTOM_DATASETS, CONFIGS)
+  ],
+)
+
+group(
+  name="relevant",
+  deps=[
+    ":uniform-50-10",
+    ":uniform-2-1",
+    ":amzn-50-10",
+    ":amzn-2-1",
+    ":osm-50-10",
+    ":osm-2-1",
   ],
 )
