@@ -61,3 +61,11 @@ run_experiment_group(
     for dataset, config, workload in product(CUSTOM_DATASETS, CONFIGS, WORKLOADS)
   ],
 )
+
+run_command(
+  name="combine",
+  run="python3 combine.py",
+  deps=[
+    ":sim_scan_segments",
+  ],
+)
