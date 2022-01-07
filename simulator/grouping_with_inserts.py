@@ -74,7 +74,7 @@ def main():
     initial_load = dataset[:initial_load_size]
     keys_to_insert = dataset[initial_load_size:]
 
-    print("Running insert workload...", file=sys.stderr)
+    print("Generating initial segments...", file=sys.stderr)
     segments = list(
         map(
             lambda seg: WritablePageSegment.from_ro_segment(
@@ -89,8 +89,11 @@ def main():
             ),
         )
     )
+    print("Running insert workload...", file=sys.stderr)
     db = InsertDB(segments, args.records_per_page_goal, args.records_per_page_delta)
-    for key in keys_to_insert:
+    for idx, key in enumerate(keys_to_insert):
+        if idx % 100000 == 0:
+            print("{}/{}".format(idx, len(keys_to_insert)))
         db.insert(key, 1)
     db.flatten_all_segments()
     write_summary(db.segments, out_dir / "insert_segments.csv")

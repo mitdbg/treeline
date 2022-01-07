@@ -1,4 +1,4 @@
-import bisect
+import sortedcontainers
 import ycsbr_py as ycsbr
 from typing import List
 from grouping.w_segment import WritablePageSegment
@@ -9,11 +9,12 @@ class InsertDB(ycsbr.DatabaseInterface):
         self, segments: List[WritablePageSegment], page_goal: int, page_delta: int
     ):
         ycsbr.DatabaseInterface.__init__(self)
-        self._segments = segments
-        self._page_boundaries = []
-        self._generate_page_boundaries()
+        self._segments = sortedcontainers.SortedKeyList(
+            segments, key=lambda seg: seg.base_key
+        )
         self._page_goal = page_goal
         self._page_delta = page_delta
+        self._key_wrapper = _KeyWrapper()
 
         # Statistics
         self._num_inserts = 0
@@ -21,7 +22,7 @@ class InsertDB(ycsbr.DatabaseInterface):
 
     @property
     def segments(self) -> List[WritablePageSegment]:
-        return self._segments
+        return list(self._segments)
 
     def flatten_all_segments(self):
         new_segments = []
@@ -29,8 +30,9 @@ class InsertDB(ycsbr.DatabaseInterface):
             new_segments.extend(
                 seg.reorg(page_goal=self._page_goal, page_delta=self._page_delta)
             )
-        self._segments = new_segments
-        self._generate_page_boundaries()
+        self._segments = sortedcontainers.SortedKeyList(
+            new_segments, key=self._segments.key
+        )
 
     # DatabaseInterface methods below.
 
@@ -55,11 +57,9 @@ class InsertDB(ycsbr.DatabaseInterface):
         self._num_reorgs += 1
         new_segs = seg.reorg(page_goal=self._page_goal, page_delta=self._page_delta)
         assert len(new_segs) >= 1
-        # Delete the old segment.
-        self._segments[seg_idx] = self._segments[-1]
-        self._segments.pop()
-        self._segments.extend(new_segs)
-        self._generate_page_boundaries()
+        self._segments.remove(seg)
+        for s in new_segs:
+            self._segments.add(s)
 
         # Redo the insert. It must succeed.
         seg_idx = self._segment_for_key(key)
@@ -77,12 +77,8 @@ class InsertDB(ycsbr.DatabaseInterface):
     def scan(self, start, amount):
         return []
 
-    def _generate_page_boundaries(self):
-        self._segments.sort(key=lambda seg: seg.base_key)
-        self._page_boundaries = list(map(lambda seg: seg.base_key, self._segments))
-
     def _segment_for_key(self, key):
-        idx = bisect.bisect_right(self._page_boundaries, key)
+        idx = self._segments.bisect_key_right(key)
         if idx > 0:
             idx -= 1
         return idx
