@@ -1,0 +1,77 @@
+from itertools import product
+
+CONFIGS = [
+  # Represents 64 B records, 3200 bytes per page +/- 640 bytes
+  {
+    "records_per_page_goal": 50,
+    "records_per_page_delta": 10,
+    "max_page_records": 60,
+  },
+  # Represents 1024 B records, 2048 bytes per page +/- 1024 bytes
+  {
+    "records_per_page_goal": 2,
+    "records_per_page_delta": 1,
+    "max_page_records": 3,
+  },
+]
+
+CUSTOM_DATASET_PATH = "/spinning/kipf/bourbon_datasets/"
+
+CUSTOM_DATASETS = [
+  {"name": "amzn", "file": "amazon_reviews.txt"},
+  {"name": "osm", "file": "osm_ny.txt"},
+]
+
+OVERFLOW_FRACS = [
+  {"name": "half", "value": 0.5},
+  {"name": "full", "value": 1},
+]
+
+run_experiment_group(
+  name="simple",
+  run="./run_simple.sh",
+  experiments=[
+    ExperimentInstance(
+      name="uniform-{}-{}-{}".format(
+        config["records_per_page_goal"],
+        config["records_per_page_delta"],
+        frac["name"],
+      ),
+      args=["uniform_20m.yml"],
+      parallelizable=True,
+      options={
+        **config,
+        "max_overflow_frac": frac["value"],
+      }
+    )
+    for config, frac in product(CONFIGS, OVERFLOW_FRACS)
+  ] + [
+    ExperimentInstance(
+      name="{}-{}-{}-{}".format(
+        dataset["name"],
+        config["records_per_page_goal"],
+        config["records_per_page_delta"],
+        frac["name"],
+      ),
+      args=[CUSTOM_DATASET_PATH + dataset["file"]],
+      parallelizable=True,
+      options={
+        **config,
+        "max_overflow_frac": frac["value"],
+      }
+    )
+    for dataset, config, frac in product(CUSTOM_DATASETS, CONFIGS, OVERFLOW_FRACS)
+  ],
+)
+
+group(
+  name="relevant",
+  deps=[
+    ":uniform-50-10",
+    ":uniform-2-1",
+    ":amzn-50-10",
+    ":amzn-2-1",
+    ":osm-50-10",
+    ":osm-2-1",
+  ],
+)
