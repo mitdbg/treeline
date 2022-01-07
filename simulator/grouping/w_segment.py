@@ -75,6 +75,9 @@ class WritablePageSegment:
         """
         Creates new segments from this segment's data plus the overflow records.
         """
+        if len(self._overflow) == 0:
+            return [self]
+
         # Get all data
         all_keys = []
         for page in self._pages:

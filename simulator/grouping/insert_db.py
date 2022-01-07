@@ -23,6 +23,15 @@ class InsertDB(ycsbr.DatabaseInterface):
     def segments(self) -> List[WritablePageSegment]:
         return self._segments
 
+    def flatten_all_segments(self):
+        new_segments = []
+        for seg in self._segments:
+            new_segments.extend(
+                seg.reorg(page_goal=self._page_goal, page_delta=self._page_delta)
+            )
+        self._segments = new_segments
+        self._generate_page_boundaries()
+
     # DatabaseInterface methods below.
 
     def initialize_database(self):
