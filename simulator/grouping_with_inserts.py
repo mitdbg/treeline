@@ -92,7 +92,7 @@ def main():
     print("Running insert workload...", file=sys.stderr)
     db = InsertDB(segments, args.records_per_page_goal, args.records_per_page_delta)
     for idx, key in enumerate(keys_to_insert):
-        if idx % 100000 == 0:
+        if idx % 1000000 == 0:
             print("{}/{}".format(idx, len(keys_to_insert)))
         db.insert(key, 1)
     db.flatten_all_segments()

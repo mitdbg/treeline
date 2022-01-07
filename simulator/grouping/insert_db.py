@@ -14,7 +14,6 @@ class InsertDB(ycsbr.DatabaseInterface):
         )
         self._page_goal = page_goal
         self._page_delta = page_delta
-        self._key_wrapper = _KeyWrapper()
 
         # Statistics
         self._num_inserts = 0
