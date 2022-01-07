@@ -53,6 +53,22 @@ class WritablePageSegment:
     def base_key(self) -> int:
         return self._base_key
 
+    @property
+    def has_overflow(self) -> bool:
+        return len(self._overflow) > 0
+
+    @property
+    def model(self) -> Optional[Segment]:
+        return self._model
+
+    def get_all_keys(self) -> List[int]:
+        # Results are not necessarily in sorted order.
+        all_keys = []
+        for page in self._pages:
+            all_keys.extend(page)
+        all_keys.extend(self._overflow)
+        return all_keys
+
     def insert(self, key) -> bool:
         """
         Inserts the key into this segment. Returns `True` iff the insert
@@ -79,10 +95,7 @@ class WritablePageSegment:
             return [self]
 
         # Get all data
-        all_keys = []
-        for page in self._pages:
-            all_keys.extend(page)
-        all_keys.extend(self._overflow)
+        all_keys = self.get_all_keys()
 
         new_segments = build_segments(all_keys, page_goal, page_delta)
         return list(

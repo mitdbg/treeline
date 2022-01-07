@@ -162,3 +162,95 @@ def validate_segments(
     for segment_id, segment in enumerate(segments):
         for page_id, page in enumerate(segment.pages):
             validate_size(len(page), segment_id, page_id)
+
+
+def build_single_segments(
+    dataset: List[int], goal: int, delta: int
+) -> List[ReadOnlyPageSegment]:
+    """
+    Breaks up the dataset into single-page segments that include a model if
+    possible.
+    """
+    max_per_segment = goal
+
+    dataset.sort()
+    segments = []
+    it = _ListIterator(dataset)
+
+    while it.has_next():
+        base = it.next()
+        plr = GreedyPLR(delta=delta)
+        line = plr.offer(Point(0, 0))
+        records_considered = 1
+        keys_in_segment = [base]
+        assert line is None
+
+        # Attempt to build as large of a segment as possible
+        while it.has_next() and records_considered < max_per_segment:
+            next_key = it.peek()
+            diff = next_key - base
+            # N.B. There are no duplicates allowed. So the x-coord of the point
+            # being offered is always different from the previous point.
+            line = plr.offer(Point(diff, records_considered))
+            if line is not None:
+                # Cannot extend the segment further with the current point
+                break
+            records_considered += 1
+            keys_in_segment.append(next_key)
+            it.next()
+
+        if line is None:
+            line = plr.finish()
+
+            if line is None:
+                assert records_considered == 1 and len(keys_in_segment) == 1
+                segments.append(
+                    ReadOnlyPageSegment(keys=keys_in_segment, model=None, page_count=1)
+                )
+                continue
+
+        if len(keys_in_segment) < max_per_segment:
+            # Could not model enough keys to fit into one segment. So we just
+            # fill the page completely.
+            while (
+                it.has_next() and len(keys_in_segment) < max_per_segment
+            ):
+                keys_in_segment.append(it.next())
+            segments.append(
+                ReadOnlyPageSegment(keys=keys_in_segment, model=None, page_count=1)
+            )
+            continue
+
+        segment_page_count = 1
+        records_in_segment = max_per_segment
+
+        # Use the derived model to figure out how many records that corresponds
+        # to, and then create the segment.
+
+        cutoff_idx = len(keys_in_segment)
+        while (
+            cutoff_idx > 0
+            and int(line.line(keys_in_segment[cutoff_idx - 1] - base))
+            >= records_in_segment
+        ):
+            cutoff_idx -= 1
+        assert (
+            int(line.line(keys_in_segment[cutoff_idx - 1] - base)) < records_in_segment
+        )
+
+        num_extra_keys = len(keys_in_segment) - cutoff_idx
+        assert num_extra_keys >= 0
+        it.rollback(num_extra_keys)
+
+        # Put records into pages
+        bounded_model = line.adjust_bounds(0, cutoff_idx)
+        bounded_model.scale_in_place(goal)
+        segments.append(
+            ReadOnlyPageSegment(
+                keys=keys_in_segment[:cutoff_idx],
+                model=bounded_model,
+                page_count=segment_page_count,
+            )
+        )
+
+    return segments
