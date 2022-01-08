@@ -17,6 +17,7 @@ class WritablePageSegment:
         assert max_overflow_frac > 0
         self._pages = pages
         self._overflow: List[int] = []
+        self._size = sum(map(lambda p: len(p), pages))
         self._model = model
         self._base_key = base_key
         self._max_records_per_page = max_records_per_page
@@ -61,6 +62,10 @@ class WritablePageSegment:
     def model(self) -> Optional[Segment]:
         return self._model
 
+    @property
+    def num_keys(self) -> int:
+        return self._size
+
     def get_all_keys(self) -> List[int]:
         # Results are not necessarily in sorted order.
         all_keys = []
@@ -81,9 +86,11 @@ class WritablePageSegment:
         page = self._pages[page_idx]
         if len(page) < self._max_records_per_page:
             page.append(key)
+            self._size += 1
             return True
         if len(self._overflow) < self._max_overflow_records:
             self._overflow.append(key)
+            self._size += 1
             return True
         return False
 
