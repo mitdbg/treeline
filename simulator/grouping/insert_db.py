@@ -140,6 +140,7 @@ class InsertDB(ycsbr.DatabaseInterface):
         pages_to_read_in_first_seg = 1 + min(
             pages_left_in_first_segment, pages_left_to_read_est
         )
+        pages_to_read_in_first_seg = min(16, max(1, pages_to_read_in_first_seg))
 
         # Record the I/O in the first segment.
         self.scan_read_counts[pages_to_read_in_first_seg - 1] += 1

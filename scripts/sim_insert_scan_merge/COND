@@ -22,6 +22,7 @@ COMMON_OPTS = {
   "merge_trigger_period": 100000,
   "slope_epsilon": 1e3,
   "seed": 42,
+  "reorg_at_length": 3,
 }
 
 CUSTOM_DATASET_PATH = "/spinning/kipf/bourbon_datasets/"
@@ -58,6 +59,42 @@ run_experiment_group(
         config["records_per_page_goal"],
         config["records_per_page_delta"],
       ),
+      options={
+        **COMMON_OPTS,
+        **config,
+        "workload_config": WORKLOAD_PATH + "long.yml",
+      },
+      parallelizable=True,
+    )
+    for config in CONFIGS
+  ],
+)
+
+run_experiment_group(
+  name="chains",
+  run="./run_segments.sh",
+  experiments=[
+    ExperimentInstance(
+      name="chains-{}-{}".format(
+        dataset["name"],
+        config["records_per_page_goal"],
+      ),
+      args=["--chains"],
+      options={
+        **COMMON_OPTS,
+        **config,
+        "workload_config": WORKLOAD_PATH + dataset["workload"],
+        "custom_dataset": CUSTOM_DATASET_PATH + dataset["file"],
+      },
+      parallelizable=True,
+    )
+    for config, dataset in product(CONFIGS, CUSTOM_DATASETS)
+  ] + [
+    ExperimentInstance(
+      name="chains-uniform-{}".format(
+        config["records_per_page_goal"],
+      ),
+      args=["--chains"],
       options={
         **COMMON_OPTS,
         **config,

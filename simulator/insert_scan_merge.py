@@ -4,6 +4,7 @@ import pathlib
 import random
 import ycsbr_py as ycsbr
 from grouping.insert_db import InsertDB
+from grouping.scan_db import ScanDB
 from typing import List
 import sys
 
@@ -46,17 +47,23 @@ def write_page_counts(counts: List[int], outfile: pathlib.Path):
 def write_results(db, out_dir: pathlib.Path):
     write_segment_summary(db.segments, out_dir / "segments.csv")
     write_page_counts(db.scan_read_counts, out_dir / "scan_read_counts.csv")
-    write_page_counts(db.scan_overflow_read_counts, out_dir / "scan_overflow_read_counts.csv")
+    write_page_counts(
+        db.scan_overflow_read_counts, out_dir / "scan_overflow_read_counts.csv"
+    )
 
     with open(out_dir / "stats.csv", "w") as f:
         writer = csv.writer(f)
-        writer.writerow(["inserts", "insert_triggered_reorgs", "merges", "successful_merges"])
-        writer.writerow([
-            db.num_inserts,
-            db.num_insert_triggered_reorgs,
-            db.num_merges,
-            db.num_successful_merges,
-        ])
+        writer.writerow(
+            ["inserts", "insert_triggered_reorgs", "merges", "successful_merges"]
+        )
+        writer.writerow(
+            [
+                db.num_inserts,
+                db.num_insert_triggered_reorgs,
+                db.num_merges,
+                db.num_successful_merges,
+            ]
+        )
 
 
 def run_workload(db, to_insert, to_scan):
@@ -123,6 +130,9 @@ def main():
 
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--out_dir", type=str)
+
+    parser.add_argument("--chains", action="store_true")
+    parser.add_argument("--reorg_at_length", type=int, default=3)
     args = parser.parse_args()
 
     if args.out_dir is None:
@@ -145,40 +155,57 @@ def main():
     print("Extracting scan workload...", file=sys.stderr)
     scan_trace = extract_trace_from_workload(workload)
 
-    print("Generating initial segments...", file=sys.stderr)
+    print("Generating initial dataset...", file=sys.stderr)
     random.seed(args.seed)
     random.shuffle(dataset)
     initial_load_size = int(len(dataset) * args.initial_dataset_frac)
     initial_load = dataset[:initial_load_size]
     keys_to_insert = dataset[initial_load_size:]
 
-    segments = list(
-        map(
-            lambda seg: WritablePageSegment.from_ro_segment(
-                seg,
-                max_records_per_page=args.max_page_records,
-                max_overflow_frac=args.max_overflow_frac,
-            ),
-            build_segments(
-                initial_load,
-                goal=args.records_per_page_goal,
-                delta=args.records_per_page_delta,
-            ),
+    if not args.chains:
+        print("Generating initial segments...", file=sys.stderr)
+        segments = list(
+            map(
+                lambda seg: WritablePageSegment.from_ro_segment(
+                    seg,
+                    max_records_per_page=args.max_page_records,
+                    max_overflow_frac=args.max_overflow_frac,
+                ),
+                build_segments(
+                    initial_load,
+                    goal=args.records_per_page_goal,
+                    delta=args.records_per_page_delta,
+                ),
+            )
         )
-    )
 
-    print("Running workload...", file=sys.stderr)
-    db = InsertDB(
-        segments=segments,
-        page_goal=args.records_per_page_goal,
-        page_delta=args.records_per_page_delta,
-        merge_times=args.merge_times,
-        merge_trigger_period=args.merge_trigger_period,
-        slope_epsilon=args.slope_epsilon,
-    )
-    run_workload(db, keys_to_insert, scan_trace)
-    db.flatten_all_segments()
-    write_results(db, out_dir)
+        print("Running workload...", file=sys.stderr)
+        db = InsertDB(
+            segments=segments,
+            page_goal=args.records_per_page_goal,
+            page_delta=args.records_per_page_delta,
+            merge_times=args.merge_times,
+            merge_trigger_period=args.merge_trigger_period,
+            slope_epsilon=args.slope_epsilon,
+        )
+        run_workload(db, keys_to_insert, scan_trace)
+        db.flatten_all_segments()
+        write_results(db, out_dir)
+    else:
+        print("Running regular chained workload...", file=sys.stderr)
+        db = ScanDB(
+            dataset=initial_load,
+            keys_per_page_goal=args.records_per_page_goal,
+            max_keys_per_page=args.max_page_records,
+            reorg_at_length=args.reorg_at_length,
+        )
+        run_workload(db, keys_to_insert, scan_trace)
+        with open(out_dir / "stats.csv", "w") as f:
+            writer = csv.writer(f)
+            writer.writerow(["inserts", "insert_triggered_reorgs", "scanned_pages"])
+            writer.writerow(
+                [db.num_inserts, db.num_insert_triggered_reorgs, db.scanned_pages]
+            )
 
 
 if __name__ == "__main__":
