@@ -29,7 +29,7 @@ class InsertDB(ycsbr.DatabaseInterface):
         self._page_goal = page_goal
         self._page_delta = page_delta
         self._records_per_page_est = statistics.mean(
-            map(lambda seg: len(seg.keys) / seg.page_count, self._segments)
+            map(lambda seg: len(seg.get_all_keys()) / seg.page_count, self._segments)
         )
 
         # Statistics
@@ -74,7 +74,7 @@ class InsertDB(ycsbr.DatabaseInterface):
 
     def insert(self, key, val):
         self._maybe_run_merge()
-        self._num_inserts += 1
+        self.num_inserts += 1
 
         seg_idx = self._segment_for_key(key)
         seg = self._segments[seg_idx]
@@ -82,7 +82,7 @@ class InsertDB(ycsbr.DatabaseInterface):
         if succeeded:
             return True
 
-        self._num_insert_triggered_reorgs += 1
+        self.num_insert_triggered_reorgs += 1
         new_segs = seg.reorg(page_goal=self._page_goal, page_delta=self._page_delta)
         assert len(new_segs) >= 1
         self._segments.remove(seg)
@@ -124,10 +124,11 @@ class InsertDB(ycsbr.DatabaseInterface):
         seg_id = self._segment_for_key(start)
         seg = self._segments[seg_id]
         if seg.model is not None:
-            page_raw = seg.model.line(start - seg.base)
+            page_raw = seg.model.line(start - seg.base_key)
         else:
             page_raw = 0
         page_idx = int(page_raw)
+        page_idx = max(0, min(page_idx, len(seg.pages) - 1))
 
         # Estimate how much of the segment to read.
         key_pos_est = page_raw - page_idx
@@ -235,6 +236,7 @@ class InsertDB(ycsbr.DatabaseInterface):
                     self._segments.remove(r)
                 for a in results.to_add:
                     self._segments.add(a)
+            self._req_counter = 0
 
         self._req_counter += 1
 

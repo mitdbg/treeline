@@ -137,9 +137,10 @@ def main():
         set_record_size_bytes=16,
     )
     if args.custom_dataset is not None:
-        dataset = load_dataset_from_text_file(args.custom_dataset, shift=True)
-    else:
-        dataset = extract_keys(workload.get_load_trace())
+        raw_dataset = load_dataset_from_text_file(args.custom_dataset, shift=False)
+        workload.set_custom_load_dataset(raw_dataset)
+
+    dataset = extract_keys(workload.get_load_trace())
 
     print("Extracting scan workload...", file=sys.stderr)
     scan_trace = extract_trace_from_workload(workload)

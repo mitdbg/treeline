@@ -75,6 +75,10 @@ class WritablePageSegment:
     def num_keys(self) -> int:
         return self._size
 
+    @property
+    def pages(self) -> List[List[int]]:
+        return self._pages
+
     def get_all_keys(self) -> List[int]:
         # Results are not necessarily in sorted order.
         all_keys = []
