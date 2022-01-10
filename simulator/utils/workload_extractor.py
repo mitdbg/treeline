@@ -34,6 +34,18 @@ def extract_trace(workload_config_file):
         session.terminate()
 
 
+def extract_trace_from_workload(workload: ycsbr.PhasedWorkload):
+    db = _TraceExtractor()
+    session = ycsbr.Session(num_threads=1)
+    session.set_database(db)
+    session.initialize()
+    try:
+        session.run_phased_workload(workload)
+        return db.trace
+    finally:
+        session.terminate()
+
+
 class _WorkloadExtractor(ycsbr.DatabaseInterface):
     """A YCSBR database interface that records the workload's load dataset, read key trace, and update key trace."""
 
@@ -71,6 +83,7 @@ class _WorkloadExtractor(ycsbr.DatabaseInterface):
 class Op(enum.Enum):
     Read = 1
     Update = 2
+    Scan = 3
 
 
 class _TraceExtractor(ycsbr.DatabaseInterface):
@@ -99,4 +112,5 @@ class _TraceExtractor(ycsbr.DatabaseInterface):
         return None
 
     def scan(self, start, amount):
+        self.trace.append((Op.Scan, start, amount))
         return []

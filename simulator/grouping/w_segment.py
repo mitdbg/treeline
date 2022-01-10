@@ -1,3 +1,4 @@
+import math
 from typing import List, Optional
 from plr.greedy import Segment
 from grouping.ro_segment import ReadOnlyPageSegment
@@ -55,8 +56,16 @@ class WritablePageSegment:
         return self._base_key
 
     @property
+    def overflow(self) -> List[int]:
+        return self._overflow
+
+    @property
     def has_overflow(self) -> bool:
         return len(self._overflow) > 0
+
+    @property
+    def overflow_segment_page_count(self) -> int:
+        return math.ceil(len(self._pages) * self._max_overflow_frac)
 
     @property
     def model(self) -> Optional[Segment]:
