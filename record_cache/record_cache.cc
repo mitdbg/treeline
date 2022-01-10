@@ -73,13 +73,13 @@ Status RecordCache::GetIndex(const Slice& key, uint64_t* index_out) const {
   Key art_key;
   SliceToARTKey(key, art_key);
   auto t = tree_->getThreadInfo();
-  TID tid = tree_->lookup(art_key, t);  // handle miss
+  TID tid = tree_->lookup(art_key, t);  
 
   if (tid == 0) return Status::NotFound("Key not in cache");
 
   *index_out = tid - 1;
 
-  return Status::OK();  // PROVISIONAL - HANDLE MISSES
+  return Status::OK();  
 }
 
 void RecordCache::TIDToARTKey(TID tid, Key& key) {
