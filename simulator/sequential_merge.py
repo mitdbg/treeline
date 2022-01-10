@@ -43,7 +43,7 @@ def run_sequential_merge(segments: SortedKeyList, args):
     successful_merges = 0
     for idx in range(args.iterations):
         if idx % 100000 == 0:
-            print("{}/{}".format(idx, args.iterations))
+            print("{}/{}".format(idx, args.iterations), file=sys.stderr)
 
         candidate = random.randrange(0, len(segments) - 1)
         results = try_sequential_merge(
@@ -141,6 +141,7 @@ def main():
     )
     successes = run_sequential_merge(segments, args)
     print("Success count:", successes)
+    print("Success rate:", successes / args.iterations)
     write_summary(segments, out_dir / "after_merge.csv")
 
 
