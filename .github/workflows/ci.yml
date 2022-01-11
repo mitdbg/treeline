@@ -34,7 +34,7 @@ jobs:
       
     - name: Run Tests using CTest
       working-directory: ${{github.workspace}}/build
-      run: ctest -T Test
+      run: ctest -T Test --output-on-failure
       timeout-minutes: 15
 
 
