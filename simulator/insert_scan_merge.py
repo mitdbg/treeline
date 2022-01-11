@@ -71,37 +71,40 @@ def run_workload(db, to_insert, to_scan):
     total = len(to_insert) + len(to_scan)
     insert_idx = 0
     scan_idx = 0
-    insert_next = True
 
-    # Round-robin replay.
-    while insert_idx < len(to_insert) and scan_idx < len(to_scan):
+    # Interleave the inserts with the scans. Generally there are more inserts
+    # than scan requests in the simulations.
+    inserts_per_scan = len(to_insert) // len(to_scan)
+    if inserts_per_scan <= 0:
+        inserts_per_scan = 1
+    print("Inserts per scan:", inserts_per_scan, file=sys.stderr)
+
+    def maybe_report_progress():
+        nonlocal idx
         if idx % 1000000 == 0:
             print("{}/{}".format(idx, total), file=sys.stderr)
         idx += 1
 
-        if insert_next:
+    while insert_idx < len(to_insert) and scan_idx < len(to_scan):
+        for _ in range(inserts_per_scan):
+            if insert_idx >= len(to_insert):
+                break
+            maybe_report_progress()
             db.insert(to_insert[insert_idx], 0)
             insert_idx += 1
-            insert_next = False
-        else:
-            _, start, amount = to_scan[scan_idx]
-            db.scan(start, amount)
-            scan_idx += 1
-            insert_next = True
+
+        maybe_report_progress()
+        _, start, amount = to_scan[scan_idx]
+        db.scan(start, amount)
+        scan_idx += 1
 
     while insert_idx < len(to_insert):
-        if idx % 1000000 == 0:
-            print("{}/{}".format(idx, total), file=sys.stderr)
-        idx += 1
-
+        maybe_report_progress()
         db.insert(to_insert[insert_idx], 0)
         insert_idx += 1
 
     while scan_idx < len(to_scan):
-        if idx % 1000000 == 0:
-            print("{}/{}".format(idx, total), file=sys.stderr)
-        idx += 1
-
+        maybe_report_progress()
         db.scan(start, amount)
         scan_idx += 1
 
