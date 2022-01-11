@@ -20,6 +20,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+
+    - name: Install TBB
+      run: sudo apt-get install libtbb-dev
       
     - name: Configure Project using CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DLLSM_BUILD_TESTS=ON -DLLSM_BUILD_BENCHMARKS=OFF
