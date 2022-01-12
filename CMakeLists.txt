@@ -13,6 +13,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+find_library(tbb tbb)
 
 # Load any third party dependencies
 add_subdirectory(third_party)
@@ -23,7 +24,7 @@ if (LLSM_BUILD_SHARED)
 else()
   add_library(llsm STATIC)
 endif()
-target_link_libraries(llsm crc32c)
+target_link_libraries(llsm crc32c tbb)
 target_include_directories(llsm
   PUBLIC include
   PRIVATE .)
@@ -39,9 +40,11 @@ target_sources(llsm PUBLIC ${llsm_api})
 
 # Add our sources by traversing the repository
 add_subdirectory(alex)
+add_subdirectory(art_olc)
 add_subdirectory(bufmgr)
 add_subdirectory(db)
 add_subdirectory(model)
+add_subdirectory(record_cache)
 add_subdirectory(tlx)
 add_subdirectory(util)
 add_subdirectory(wal)
