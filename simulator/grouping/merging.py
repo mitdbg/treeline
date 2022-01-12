@@ -1,5 +1,6 @@
 from grouping.loose import build_segments, SEGMENT_PAGE_COUNTS
 from grouping.w_segment import WritablePageSegment
+from grouping.w_segment_2 import WritablePageSegment2
 
 from typing import List
 
@@ -119,3 +120,66 @@ def try_sequential_merge(
         )
     )
     return MergeResult(to_remove=merge_candidates, to_add=to_add)
+
+
+class MergeResult2:
+    def __init__(
+        self,
+        remove_start_idx: int,
+        remove_count: int,
+        new_segments: List[WritablePageSegment2],
+    ):
+        self.remove_start_idx = remove_start_idx
+        self.remove_count = remove_count
+        self.new_segments = new_segments
+
+
+def greedy_merge_at(
+    segments: List[WritablePageSegment2],
+    candidate_idx: int,
+    page_goal: int,
+    page_delta: int,
+) -> MergeResult2:
+    # Given a segment that has an overflow and should be "merged", this
+    # algorithm:
+    #   - Finds the largest contiguous range of segments (including the provided
+    #     segment) that also have overflows.
+    #   - Runs a merge on all segments in that range.
+    #   - Returns the result.
+    c = segments[candidate_idx]
+    assert c.has_overflow
+
+    # Compute left boundary (inclusive).
+    left_idx = candidate_idx - 1
+    while left_idx >= 0 and segments[left_idx].has_overflow:
+        left_idx -= 1
+    left_idx += 1
+
+    # Compute right boundary (exclusive).
+    right_idx = candidate_idx + 1
+    while right_idx < len(segments) and segments[right_idx].has_overflow:
+        right_idx += 1
+
+    # Sanity check.
+    assert left_idx <= candidate_idx and candidate_idx < right_idx
+
+    # Perform the merge.
+    all_keys = []
+    for i in range(left_idx, right_idx):
+        all_keys.extend(segments[i].get_all_keys())
+    new_segments = list(
+        map(
+            lambda seg: WritablePageSegment2.from_ro_segment(
+                seg,
+                max_records_per_page=c.max_records_per_page,
+                max_overflow_pages=c.max_overflow_pages,
+            ),
+            build_segments(all_keys, page_goal, page_delta),
+        )
+    )
+
+    return MergeResult2(
+        remove_start_idx=left_idx,
+        remove_count=(right_idx - left_idx),
+        new_segments=new_segments,
+    )
