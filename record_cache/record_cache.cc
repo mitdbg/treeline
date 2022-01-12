@@ -23,11 +23,13 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
                         format::WriteType write_type, uint8_t priority) {
   // Find entry and evict contents if necessary.
   uint64_t index = SelectForEviction();
-  WriteOutIfDirty(index);
-  Key art_key;
-  TIDToARTKey(index + 1, art_key);
-  auto t1 = tree_->getThreadInfo();
-  tree_->remove(art_key, index + 1, t1);
+  if (cache_entries[index].IsValid()) {
+    WriteOutIfDirty(index);
+    Key art_key;
+    TIDToARTKey(index + 1, art_key);
+    auto t1 = tree_->getThreadInfo();
+    tree_->remove(art_key, index + 1, t1);
+  }
   FreeIfValid(index);
 
   // Overwrite metadata.
@@ -44,6 +46,7 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
   cache_entries[index].SetValue(Slice(ptr + key.size(), value.size()));
 
   // Update ART
+  Key art_key;
   TIDToARTKey(index + 1, art_key);
   auto t2 = tree_->getThreadInfo();
   tree_->insert(art_key, index + 1, t2);

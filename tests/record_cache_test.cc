@@ -58,25 +58,25 @@ TEST(RecordCacheTest, PutVariants) {
 TEST(RecordCacheTest, MultiPutGet) {
   auto rc = RecordCache(10);
 
-  for (auto i = 0; i < 200; ++i) {
-    Slice key("a" + std::to_string(i));
-    Slice value("b" + std::to_string(i));
-    rc.Put(key, value);
+  for (auto i = 100; i < 200; ++i) {
+    std::string key_s = "a" + std::to_string(i);
+    std::string val_s = "b" + std::to_string(i);
+    rc.Put(Slice(key_s), Slice(val_s));
   }
 
   uint64_t index_out;
 
-  for (auto i = 0; i < 190; ++i) {
+  for (auto i = 100; i < 190; ++i) {
     Slice key("a" + std::to_string(i));
     ASSERT_TRUE(rc.GetIndex(key, &index_out).IsNotFound());
   }
 
   for (auto i = 190; i < 200; ++i) {
-    Slice key("a" + std::to_string(i));
-    Slice value("b" + std::to_string(i));
+    std::string key_s = "a" + std::to_string(i);
+    std::string val_s = "b" + std::to_string(i);
 
-    ASSERT_TRUE(rc.GetIndex(key, &index_out).ok());
-    ASSERT_EQ(value.compare(rc.cache_entries[index_out].GetValue()), 0);
+    ASSERT_TRUE(rc.GetIndex(Slice(key_s), &index_out).ok());
+    ASSERT_EQ(Slice(val_s).compare(rc.cache_entries[index_out].GetValue()), 0);
   }
 }
 
