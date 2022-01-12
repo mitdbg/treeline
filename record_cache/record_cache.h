@@ -11,7 +11,7 @@ class RecordCache {
  public:
   // A collection of cached records.
   // Must be static to work with the ART implementation.
-  static std::vector<RecordCacheEntry> cache_entries_;
+  static std::vector<RecordCacheEntry> cache_entries;
 
   // Initializes a record cache that can hold `capacity` records.
   RecordCache(uint64_t capacity);
@@ -60,7 +60,7 @@ class RecordCache {
   // stored at `tid` - 1 within the record cache. See note below.
   static void TIDToARTKey(TID tid, Key& key);
 
-  // Populates `key` with the record in `slice_key`.
+  // Populates `art_key` with the record in `slice_key`.
   static void SliceToARTKey(const Slice& slice_key, Key& art_key);
 
   // Selects a cache entry according to the chosen policy, and returns the
@@ -85,7 +85,7 @@ class RecordCache {
   // https://github.com/flode/ARTSynchronized/tree/master/OptimisticLockCoupling.
   //
   // CAUTION: This implementation uses the value 0 to denote lookup misses, so
-  // any indexes referring to `cache_entries_` are incremented by 1 to produce
+  // any indexes referring to `cache_entries` are incremented by 1 to produce
   // the corresponding ART TID.
   std::unique_ptr<ART_OLC::Tree> tree_;
 };

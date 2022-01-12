@@ -1,7 +1,7 @@
 #include <stdint.h>
 
-#include "../db/format.h"
-#include "../include/llsm/slice.h"
+#include "db/format.h"
+#include "llsm/slice.h"
 
 namespace llsm {
 

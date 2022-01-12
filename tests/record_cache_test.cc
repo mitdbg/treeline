@@ -15,7 +15,7 @@ TEST(RecordCacheTest, SimplePutGet) {
 
   uint64_t index_out;
   ASSERT_TRUE(rc.GetIndex(key, &index_out).ok());
-  ASSERT_EQ(value.compare(rc.cache_entries_[index_out].GetValue()), 0);
+  ASSERT_EQ(value.compare(rc.cache_entries[index_out].GetValue()), 0);
 }
 
 TEST(RecordCacheTest, SimpleMiss) {
@@ -37,22 +37,22 @@ TEST(RecordCacheTest, PutVariants) {
 
   uint64_t index_out;
   ASSERT_TRUE(rc.GetIndex(key1, &index_out).ok());
-  ASSERT_EQ(value.compare(rc.cache_entries_[index_out].GetValue()), 0);
-  ASSERT_TRUE(rc.cache_entries_[index_out].IsDirty());
-  ASSERT_TRUE(rc.cache_entries_[index_out].IsWrite());
+  ASSERT_EQ(value.compare(rc.cache_entries[index_out].GetValue()), 0);
+  ASSERT_TRUE(rc.cache_entries[index_out].IsDirty());
+  ASSERT_TRUE(rc.cache_entries[index_out].IsWrite());
 
   rc.PutFromRead(key2, value);
 
   ASSERT_TRUE(rc.GetIndex(key2, &index_out).ok());
-  ASSERT_EQ(value.compare(rc.cache_entries_[index_out].GetValue()), 0);
-  ASSERT_FALSE(rc.cache_entries_[index_out].IsDirty());
+  ASSERT_EQ(value.compare(rc.cache_entries[index_out].GetValue()), 0);
+  ASSERT_FALSE(rc.cache_entries[index_out].IsDirty());
 
   rc.PutFromDelete(key3);
 
   ASSERT_TRUE(rc.GetIndex(key3, &index_out).ok());
-  ASSERT_EQ(Slice().compare(rc.cache_entries_[index_out].GetValue()), 0);
-  ASSERT_TRUE(rc.cache_entries_[index_out].IsDirty());
-  ASSERT_TRUE(rc.cache_entries_[index_out].IsDelete());
+  ASSERT_EQ(Slice().compare(rc.cache_entries[index_out].GetValue()), 0);
+  ASSERT_TRUE(rc.cache_entries[index_out].IsDirty());
+  ASSERT_TRUE(rc.cache_entries[index_out].IsDelete());
 }
 
 TEST(RecordCacheTest, MultiPutGet) {
@@ -76,7 +76,7 @@ TEST(RecordCacheTest, MultiPutGet) {
     Slice value("b" + std::to_string(i));
 
     ASSERT_TRUE(rc.GetIndex(key, &index_out).ok());
-    ASSERT_EQ(value.compare(rc.cache_entries_[index_out].GetValue()), 0);
+    ASSERT_EQ(value.compare(rc.cache_entries[index_out].GetValue()), 0);
   }
 }
 

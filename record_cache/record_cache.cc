@@ -2,12 +2,11 @@
 
 namespace llsm {
 
-std::vector<RecordCacheEntry> RecordCache::cache_entries_ =
-    std::vector<RecordCacheEntry>();
+std::vector<RecordCacheEntry> RecordCache::cache_entries{};
 
 RecordCache::RecordCache(uint64_t capacity) : capacity_(capacity) {
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
-  cache_entries_.resize(capacity_);
+  cache_entries.resize(capacity_);
   clock_ = 0;
 }
 
@@ -17,7 +16,7 @@ RecordCache::~RecordCache() {
     WriteOutIfDirty(i);
     FreeIfValid(i);
   }
-  cache_entries_.clear();
+  cache_entries.clear();
 }
 
 Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
@@ -32,17 +31,17 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
   FreeIfValid(index);
 
   // Overwrite metadata.
-  cache_entries_[index].SetValidTo(true);
-  cache_entries_[index].SetDirtyTo(is_dirty);
-  if (is_dirty) cache_entries_[index].SetWriteType(write_type);
-  cache_entries_[index].SetPriorityTo(priority);
+  cache_entries[index].SetValidTo(true);
+  cache_entries[index].SetDirtyTo(is_dirty);
+  if (is_dirty) cache_entries[index].SetWriteType(write_type);
+  cache_entries[index].SetPriorityTo(priority);
 
   // Overwrite record.
   char* ptr = static_cast<char*>(malloc(key.size() + value.size()));
   memcpy(ptr, key.data(), key.size());
   memcpy(ptr + key.size(), value.data(), value.size());
-  cache_entries_[index].SetKey(Slice(ptr, key.size()));
-  cache_entries_[index].SetValue(Slice(ptr + key.size(), value.size()));
+  cache_entries[index].SetKey(Slice(ptr, key.size()));
+  cache_entries[index].SetValue(Slice(ptr + key.size(), value.size()));
 
   // Update ART
   TIDToARTKey(index + 1, art_key);
@@ -73,17 +72,18 @@ Status RecordCache::GetIndex(const Slice& key, uint64_t* index_out) const {
   Key art_key;
   SliceToARTKey(key, art_key);
   auto t = tree_->getThreadInfo();
-  TID tid = tree_->lookup(art_key, t);  
+  TID tid = tree_->lookup(art_key, t);
 
   if (tid == 0) return Status::NotFound("Key not in cache");
 
   *index_out = tid - 1;
+  cache_entries[*index_out].IncrementPriority();
 
-  return Status::OK();  
+  return Status::OK();
 }
 
 void RecordCache::TIDToARTKey(TID tid, Key& key) {
-  const Slice& slice_key = cache_entries_[tid - 1].GetKey();
+  const Slice& slice_key = cache_entries[tid - 1].GetKey();
   SliceToARTKey(slice_key, key);
 }
 
@@ -96,16 +96,15 @@ uint64_t RecordCache::SelectForEviction() {
 
   while (true) {
     local_clock = (clock_++) % capacity_;
-    uint8_t p = cache_entries_[local_clock].GetPriority();
-    if (p == 0) break;
-    cache_entries_[local_clock].SetPriorityTo(p - 1);
+    if (cache_entries[local_clock].GetPriority() == 0) break;
+    cache_entries[local_clock].DecrementPriority();
   }
 
   return local_clock;
 }
 
 bool RecordCache::WriteOutIfDirty(uint64_t index) {
-  bool was_dirty = cache_entries_[index].IsDirty();
+  bool was_dirty = cache_entries[index].IsDirty();
 
   // Writeout unimplemented - requires LLSM integration.
 
@@ -113,9 +112,9 @@ bool RecordCache::WriteOutIfDirty(uint64_t index) {
 }
 
 bool RecordCache::FreeIfValid(uint64_t index) {
-  if (cache_entries_[index].IsValid()) {
+  if (cache_entries[index].IsValid()) {
     // The value is stored contiguously in the same allocated chunk.
-    free(const_cast<char*>(cache_entries_[index].GetKey().data()));
+    free(const_cast<char*>(cache_entries[index].GetKey().data()));
     return true;
   } else {
     return false;
