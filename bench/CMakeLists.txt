@@ -52,7 +52,6 @@ target_link_libraries(microbench
 # Record cache: A microbenchmark for the performance of the ART-based record cache.
 add_executable(record_cache record_cache_benchmark.cc)
 target_link_libraries(record_cache 
-  tbb
   bench_common
   benchmark::benchmark
   benchmark::benchmark_main)

@@ -24,7 +24,7 @@ if (LLSM_BUILD_SHARED)
 else()
   add_library(llsm STATIC)
 endif()
-target_link_libraries(llsm crc32c)
+target_link_libraries(llsm crc32c tbb)
 target_include_directories(llsm
   PUBLIC include
   PRIVATE .)
