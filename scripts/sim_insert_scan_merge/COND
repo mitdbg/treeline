@@ -105,3 +105,112 @@ run_experiment_group(
     for config in CONFIGS
   ],
 )
+
+##############################################################
+
+# Second set of experiments for the "nearby merge" strategy.
+
+CONFIGS_2 = [
+  # Represents 64 B records, 3200 bytes per page +/- 640 bytes
+  {
+    "records_per_page_goal": 50,
+    "records_per_page_delta": 10,
+    "max_page_records": 60,
+  },
+  # Represents 1024 B records, 2048 bytes per page +/- 1024 bytes
+  {
+    "records_per_page_goal": 2,
+    "records_per_page_delta": 1,
+    "max_page_records": 3,
+  },
+]
+
+COMMON_OPTS_2 = {
+  "max_overflow_pages": 1,
+  "initial_dataset_frac": 0.5,
+  "seed": 42,
+}
+
+run_experiment_group(
+  name="segments2",
+  run="./run_segments2.sh",
+  experiments=[
+    ExperimentInstance(
+      name="2-{}-{}-{}-internalreorg-{}".format(
+        dataset["name"],
+        config["records_per_page_goal"],
+        config["records_per_page_delta"],
+        str(internal_reorg),
+      ),
+      args=(["--internal_reorg_only"] if internal_reorg else []),
+      options={
+        **COMMON_OPTS_2,
+        **config,
+        "workload_config": WORKLOAD_PATH + dataset["workload"],
+        "custom_dataset": CUSTOM_DATASET_PATH + dataset["file"],
+      },
+      parallelizable=True,
+    )
+    for config, dataset, internal_reorg in product(CONFIGS_2, CUSTOM_DATASETS, [False, True])
+  ] + [
+    ExperimentInstance(
+      name="2-uniform-{}-{}-internalreorg-{}".format(
+        config["records_per_page_goal"],
+        config["records_per_page_delta"],
+        str(internal_reorg),
+      ),
+      args=(["--internal_reorg_only"] if internal_reorg else []),
+      options={
+        **COMMON_OPTS_2,
+        **config,
+        "workload_config": WORKLOAD_PATH + "long.yml",
+      },
+      parallelizable=True,
+    )
+    for config, internal_reorg in product(CONFIGS_2, [False, True])
+  ],
+)
+
+run_experiment_group(
+  name="chains2",
+  run="./run_segments2.sh",
+  experiments=[
+    ExperimentInstance(
+      name="2-chains-{}-{}".format(
+        dataset["name"],
+        config["records_per_page_goal"],
+      ),
+      args=["--chains"],
+      options={
+        **COMMON_OPTS_2,
+        **config,
+        "workload_config": WORKLOAD_PATH + dataset["workload"],
+        "custom_dataset": CUSTOM_DATASET_PATH + dataset["file"],
+      },
+      parallelizable=True,
+    )
+    for config, dataset in product(CONFIGS_2, CUSTOM_DATASETS)
+  ] + [
+    ExperimentInstance(
+      name="2-chains-uniform-{}".format(
+        config["records_per_page_goal"],
+      ),
+      args=["--chains"],
+      options={
+        **COMMON_OPTS_2,
+        **config,
+        "workload_config": WORKLOAD_PATH + "long.yml",
+      },
+      parallelizable=True,
+    )
+    for config in CONFIGS_2
+  ],
+)
+
+group(
+  name="ism2",
+  deps=[
+    ":segments2",
+    ":chains2",
+  ],
+)
