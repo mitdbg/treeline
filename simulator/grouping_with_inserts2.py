@@ -53,13 +53,18 @@ def write_merge_stats(stats: List[MergeStat], outfile: pathlib.Path):
 
 class DB:
     def __init__(
-        self, segments: List[WritablePageSegment2], page_goal: int, page_delta: int
+        self,
+        segments: List[WritablePageSegment2],
+        page_goal: int,
+        page_delta: int,
+        internal_reorg_only: bool,
     ):
         self._segments = sortedcontainers.SortedKeyList(
             segments, key=lambda seg: seg.base_key
         )
         self._page_goal = page_goal
         self._page_delta = page_delta
+        self._internal_reorg_only = internal_reorg_only
         self.merge_stats: List[MergeStat] = []
 
     def insert(self, key):
@@ -71,7 +76,11 @@ class DB:
 
         # Need to run a reorg/merge.
         res = greedy_merge_at(
-            self._segments, seg_idx, self._page_goal, self._page_delta
+            self._segments,
+            seg_idx,
+            self._page_goal,
+            self._page_delta,
+            single_only=self._internal_reorg_only,
         )
         assert res.remove_count > 0
         assert len(res.new_segments) > 0
@@ -117,6 +126,8 @@ def main():
     parser.add_argument("--initial_dataset_frac", type=float, default=0.5)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--run_bulk_load", action="store_true")
+    # If set, don't do merging across segments.
+    parser.add_argument("--internal_reorg_only", action="store_true")
     parser.add_argument("--out_dir", type=str)
     args = parser.parse_args()
 
@@ -164,7 +175,12 @@ def main():
             )
         )
         print("Running insert workload...", file=sys.stderr)
-        db = DB(segments, args.records_per_page_goal, args.records_per_page_delta)
+        db = DB(
+            segments,
+            args.records_per_page_goal,
+            args.records_per_page_delta,
+            args.internal_reorg_only,
+        )
         for idx, key in enumerate(keys_to_insert):
             if idx % 1000000 == 0:
                 print("{}/{}".format(idx, len(keys_to_insert)))

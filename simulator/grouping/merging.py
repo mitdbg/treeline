@@ -139,6 +139,7 @@ def greedy_merge_at(
     candidate_idx: int,
     page_goal: int,
     page_delta: int,
+    single_only: bool = False,
 ) -> MergeResult2:
     # Given a segment that has an overflow and should be "merged", this
     # algorithm:
@@ -149,16 +150,20 @@ def greedy_merge_at(
     c = segments[candidate_idx]
     assert c.has_overflow
 
-    # Compute left boundary (inclusive).
-    left_idx = candidate_idx - 1
-    while left_idx >= 0 and segments[left_idx].has_overflow:
-        left_idx -= 1
-    left_idx += 1
+    if not single_only:
+        # Compute left boundary (inclusive).
+        left_idx = candidate_idx - 1
+        while left_idx >= 0 and segments[left_idx].has_overflow:
+            left_idx -= 1
+        left_idx += 1
 
-    # Compute right boundary (exclusive).
-    right_idx = candidate_idx + 1
-    while right_idx < len(segments) and segments[right_idx].has_overflow:
-        right_idx += 1
+        # Compute right boundary (exclusive).
+        right_idx = candidate_idx + 1
+        while right_idx < len(segments) and segments[right_idx].has_overflow:
+            right_idx += 1
+    else:
+        left_idx = candidate_idx
+        right_idx = candidate_idx + 1
 
     # Sanity check.
     assert left_idx <= candidate_idx and candidate_idx < right_idx

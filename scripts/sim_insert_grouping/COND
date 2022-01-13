@@ -225,6 +225,41 @@ run_experiment_group(
   ]
 )
 
+run_experiment_group(
+  name="nearby_merge_internal_only",
+  run="./run_nearby.sh",
+  experiments=[
+    ExperimentInstance(
+      name="nearby_merge_internal_only-uniform-{}-{}".format(
+        config["records_per_page_goal"],
+        config["records_per_page_delta"],
+      ),
+      args=["uniform_20m.yml", "--internal_reorg_only"],
+      parallelizable=True,
+      options={
+        **config,
+        "max_overflow_pages": 1,
+      }
+    )
+    for config in CONFIGS
+  ] + [
+    ExperimentInstance(
+      name="nearby_merge_internal_only-{}-{}-{}".format(
+        dataset["name"],
+        config["records_per_page_goal"],
+        config["records_per_page_delta"],
+      ),
+      args=[CUSTOM_DATASET_PATH + dataset["file"], "--internal_reorg_only"],
+      parallelizable=True,
+      options={
+        **config,
+        "max_overflow_pages": 1,
+      }
+    )
+    for dataset, config in product(CUSTOM_DATASETS, CONFIGS)
+  ],
+)
+
 group(
   name="nearby",
   deps=[
