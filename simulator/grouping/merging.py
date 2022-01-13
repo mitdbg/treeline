@@ -1,3 +1,4 @@
+import collections
 from grouping.loose import build_segments, SEGMENT_PAGE_COUNTS
 from grouping.w_segment import WritablePageSegment
 from grouping.w_segment_2 import WritablePageSegment2
@@ -188,3 +189,8 @@ def greedy_merge_at(
         remove_count=(right_idx - left_idx),
         new_segments=new_segments,
     )
+
+
+MergeStat = collections.namedtuple(
+    "MergeStat", ["in_segments", "in_pages", "out_segments", "out_pages"]
+)

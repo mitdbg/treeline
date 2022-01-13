@@ -1,5 +1,4 @@
 import argparse
-import collections
 import csv
 import pathlib
 import random
@@ -13,14 +12,9 @@ from grouping.loose import (
     SEGMENT_PAGE_COUNTS,
     SEGMENT_PAGE_COUNTS_TO_INDEX,
 )
-from grouping.merging import greedy_merge_at
+from grouping.merging import greedy_merge_at, MergeStat
 from grouping.w_segment_2 import WritablePageSegment2
 from utils.dataset import extract_keys, load_dataset_from_text_file
-
-
-MergeStat = collections.namedtuple(
-    "MergeStat", ["in_segments", "in_pages", "out_segments", "out_pages"]
-)
 
 
 def write_summary(segments: List[WritablePageSegment2], outfile: pathlib.Path):
