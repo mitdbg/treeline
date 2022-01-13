@@ -173,8 +173,7 @@ run_experiment_group(
       args=["uniform_20m.yml"],
       parallelizable=True,
       options={
-        "records_per_page_goal": config["records_per_page_goal"],
-        "records_per_page_delta": config["records_per_page_delta"],
+        **config,
         "max_overflow_pages": 1,
       }
     )
@@ -189,8 +188,7 @@ run_experiment_group(
       args=[CUSTOM_DATASET_PATH + dataset["file"]],
       parallelizable=True,
       options={
-        "records_per_page_goal": config["records_per_page_goal"],
-        "records_per_page_delta": config["records_per_page_delta"],
+        **config,
         "max_overflow_pages": 1,
       }
     )
@@ -209,10 +207,7 @@ run_experiment_group(
       ),
       args=["uniform_20m.yml", "--run_bulk_load"],
       parallelizable=True,
-      options={
-        "records_per_page_goal": config["records_per_page_goal"],
-        "records_per_page_delta": config["records_per_page_delta"],
-      }
+      options=config,
     )
     for config in CONFIGS
   ] + [
@@ -224,10 +219,7 @@ run_experiment_group(
       ),
       args=[CUSTOM_DATASET_PATH + dataset["file"], "--run_bulk_load"],
       parallelizable=True,
-      options={
-        "records_per_page_goal": config["records_per_page_goal"],
-        "records_per_page_delta": config["records_per_page_delta"],
-      }
+      options=config,
     )
     for dataset, config in product(CUSTOM_DATASETS, CONFIGS)
   ]
