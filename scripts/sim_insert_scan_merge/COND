@@ -235,7 +235,7 @@ run_experiment_group(
         config["records_per_page_delta"],
         str(internal_reorg),
       ),
-      args=(["--internal_reorg_only"] if internal_reorg else []).append("--all_inserts_first"),
+      args=(["--internal_reorg_only", "--all_inserts_first"] if internal_reorg else ["--all_inserts_first"]),
       options={
         **COMMON_OPTS_3,
         **config,
@@ -252,7 +252,7 @@ run_experiment_group(
         config["records_per_page_delta"],
         str(internal_reorg),
       ),
-      args=(["--internal_reorg_only"] if internal_reorg else []).append("--all_inserts_first"),
+      args=(["--internal_reorg_only", "--all_inserts_first"] if internal_reorg else ["--all_inserts_first"]),
       options={
         **COMMON_OPTS_3,
         **config,
@@ -297,5 +297,14 @@ run_experiment_group(
       parallelizable=True,
     )
     for config in CONFIGS_2
+  ],
+)
+
+group(
+  name="all_new",
+  deps=[
+    ":segments-insf",
+    ":chains-insf",
+    "//scripts/sim_insert_grouping:nearby_overflow_sweep",
   ],
 )
