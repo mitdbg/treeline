@@ -214,3 +214,88 @@ group(
     ":chains2",
   ],
 )
+
+#######
+
+# Making all inserts first
+
+COMMON_OPTS_3 = {
+  **COMMON_OPTS_2,
+  "initial_dataset_frac": 0.1,  # Only bulk load 10% of the dataset to start.
+}
+
+run_experiment_group(
+  name="segments-insf",
+  run="./run_segments2.sh",
+  experiments=[
+    ExperimentInstance(
+      name="segments-insf-{}-{}-{}-internalreorg-{}".format(
+        dataset["name"],
+        config["records_per_page_goal"],
+        config["records_per_page_delta"],
+        str(internal_reorg),
+      ),
+      args=(["--internal_reorg_only"] if internal_reorg else []).append("--all_inserts_first"),
+      options={
+        **COMMON_OPTS_3,
+        **config,
+        "workload_config": WORKLOAD_PATH + dataset["workload"],
+        "custom_dataset": CUSTOM_DATASET_PATH + dataset["file"],
+      },
+      parallelizable=True,
+    )
+    for config, dataset, internal_reorg in product(CONFIGS_2, CUSTOM_DATASETS, [False, True])
+  ] + [
+    ExperimentInstance(
+      name="segments-insf-uniform-{}-{}-internalreorg-{}".format(
+        config["records_per_page_goal"],
+        config["records_per_page_delta"],
+        str(internal_reorg),
+      ),
+      args=(["--internal_reorg_only"] if internal_reorg else []).append("--all_inserts_first"),
+      options={
+        **COMMON_OPTS_3,
+        **config,
+        "workload_config": WORKLOAD_PATH + "long.yml",
+      },
+      parallelizable=True,
+    )
+    for config, internal_reorg in product(CONFIGS_2, [False, True])
+  ],
+)
+
+run_experiment_group(
+  name="chains-insf",
+  run="./run_segments2.sh",
+  experiments=[
+    ExperimentInstance(
+      name="chains-insf-{}-{}".format(
+        dataset["name"],
+        config["records_per_page_goal"],
+      ),
+      args=["--chains", "--all_inserts_first"],
+      options={
+        **COMMON_OPTS_3,
+        **config,
+        "workload_config": WORKLOAD_PATH + dataset["workload"],
+        "custom_dataset": CUSTOM_DATASET_PATH + dataset["file"],
+      },
+      parallelizable=True,
+    )
+    for config, dataset in product(CONFIGS_2, CUSTOM_DATASETS)
+  ] + [
+    ExperimentInstance(
+      name="chains-insf-uniform-{}".format(
+        config["records_per_page_goal"],
+      ),
+      args=["--chains", "--all_inserts_first"],
+      options={
+        **COMMON_OPTS_3,
+        **config,
+        "workload_config": WORKLOAD_PATH + "long.yml",
+      },
+      parallelizable=True,
+    )
+    for config in CONFIGS_2
+  ],
+)

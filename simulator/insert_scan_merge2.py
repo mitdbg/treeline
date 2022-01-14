@@ -75,7 +75,7 @@ def write_results(db, out_dir: pathlib.Path):
         )
 
 
-def run_workload(db, to_insert, to_scan):
+def run_workload(db, to_insert, to_scan, all_inserts_first):
     idx = 0
     total = len(to_insert) + len(to_scan)
     insert_idx = 0
@@ -86,7 +86,6 @@ def run_workload(db, to_insert, to_scan):
     inserts_per_scan = len(to_insert) // len(to_scan)
     if inserts_per_scan <= 0:
         inserts_per_scan = 1
-    print("Inserts per scan:", inserts_per_scan, file=sys.stderr)
 
     def maybe_report_progress():
         nonlocal idx
@@ -94,18 +93,20 @@ def run_workload(db, to_insert, to_scan):
             print("{}/{}".format(idx, total), file=sys.stderr)
         idx += 1
 
-    while insert_idx < len(to_insert) and scan_idx < len(to_scan):
-        for _ in range(inserts_per_scan):
-            if insert_idx >= len(to_insert):
-                break
-            maybe_report_progress()
-            db.insert(to_insert[insert_idx], 0)
-            insert_idx += 1
+    if not all_inserts_first:
+        print("Inserts per scan:", inserts_per_scan, file=sys.stderr)
+        while insert_idx < len(to_insert) and scan_idx < len(to_scan):
+            for _ in range(inserts_per_scan):
+                if insert_idx >= len(to_insert):
+                    break
+                maybe_report_progress()
+                db.insert(to_insert[insert_idx], 0)
+                insert_idx += 1
 
-        maybe_report_progress()
-        _, start, amount = to_scan[scan_idx]
-        db.scan(start, amount)
-        scan_idx += 1
+            maybe_report_progress()
+            _, start, amount = to_scan[scan_idx]
+            db.scan(start, amount)
+            scan_idx += 1
 
     while insert_idx < len(to_insert):
         maybe_report_progress()
@@ -114,6 +115,7 @@ def run_workload(db, to_insert, to_scan):
 
     while scan_idx < len(to_scan):
         maybe_report_progress()
+        _, start, amount = to_scan[scan_idx]
         db.scan(start, amount)
         scan_idx += 1
 
@@ -144,6 +146,7 @@ def main():
 
     parser.add_argument("--chains", action="store_true")
     parser.add_argument("--internal_reorg_only", action="store_true")
+    parser.add_argument("--all_inserts_first", action="store_true")
     args = parser.parse_args()
 
     if args.out_dir is None:
@@ -197,7 +200,7 @@ def main():
             page_delta=args.records_per_page_delta,
             internal_reorg_only=args.internal_reorg_only,
         )
-        run_workload(db, keys_to_insert, scan_trace)
+        run_workload(db, keys_to_insert, scan_trace, args.all_inserts_first)
         write_results(db, out_dir)
     else:
         print("Running regular chained workload...", file=sys.stderr)
@@ -207,7 +210,7 @@ def main():
             max_keys_per_page=args.max_page_records,
             reorg_at_length=args.max_overflow_pages + 1,
         )
-        run_workload(db, keys_to_insert, scan_trace)
+        run_workload(db, keys_to_insert, scan_trace, args.all_inserts_first)
         with open(out_dir / "stats.csv", "w") as f:
             writer = csv.writer(f)
             writer.writerow(["inserts", "reorgs", "scanned_pages"])

@@ -267,3 +267,40 @@ group(
     ":nearby_bulk_load",
   ],
 )
+
+run_experiment_group(
+  name="nearby_overflow_sweep",
+  run="./run_nearby.sh",
+  experiments=[
+    ExperimentInstance(
+      name="nearby_overflow_sweep-uniform-{}-{}-{}".format(
+        config["records_per_page_goal"],
+        config["records_per_page_delta"],
+        overflow,
+      ),
+      args=["uniform_20m.yml"],
+      parallelizable=True,
+      options={
+        **config,
+        "max_overflow_pages": overflow,
+      }
+    )
+    for config, overflow in product(CONFIGS, range(1, 4))
+  ] + [
+    ExperimentInstance(
+      name="nearby_overflow_sweep-{}-{}-{}-{}".format(
+        dataset["name"],
+        config["records_per_page_goal"],
+        config["records_per_page_delta"],
+        overflow,
+      ),
+      args=[CUSTOM_DATASET_PATH + dataset["file"]],
+      parallelizable=True,
+      options={
+        **config,
+        "max_overflow_pages": overflow,
+      }
+    )
+    for dataset, config, overflow in product(CUSTOM_DATASETS, CONFIGS, range(1, 4))
+  ],
+)
