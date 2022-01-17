@@ -59,3 +59,6 @@ endif()
 if(LLSM_BUILD_BENCHMARKS)
   add_subdirectory(bench)
 endif()
+
+# The page grouping prototype
+add_subdirectory(page_grouping)
