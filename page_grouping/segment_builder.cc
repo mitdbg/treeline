@@ -20,6 +20,23 @@ static const size_t kMaxSegmentSize = kSegmentPageCounts.back();
 namespace llsm {
 namespace pg {
 
+Segment Segment::MultiPage(size_t page_count, std::vector<size_t> indices,
+                           plr::BoundedLine64 model) {
+  Segment s;
+  s.page_count = page_count;
+  s.record_indices = std::move(indices);
+  s.model = model;
+  return s;
+}
+
+Segment Segment::SinglePage(std::vector<size_t> indices) {
+  Segment s;
+  s.page_count = 1;
+  s.record_indices = std::move(indices);
+  s.model = std::optional<plr::BoundedLine64>();
+  return s;
+}
+
 SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
                                const size_t records_per_page_delta)
     : records_per_page_goal_(records_per_page_goal),
@@ -75,7 +92,7 @@ std::vector<Segment> SegmentBuilder::Build(
       if (!maybe_line.has_value()) {
         // This should only happen when there is a single record left.
         assert(records_processed.size() == 1);
-        // TODO: Allocate the segment here.
+        segments.push_back(Segment::SinglePage(std::move(records_processed)));
         continue;
       }
     }
@@ -92,20 +109,25 @@ std::vector<Segment> SegmentBuilder::Build(
     if (segment_size_idx < 0) {
       // Could not build a model that "covers" one full page. So we just fill a
       // page anyways.
-      const size_t addtl_keys =
+      size_t addtl_keys =
           allowed_records_per_segment_[0] - records_processed.size();
-      // TODO: Allocate the segment here.
-      next_idx += addtl_keys;
+      while (addtl_keys > 0 && next_idx < dataset.size()) {
+        records_processed.push_back(dataset[next_idx++]);
+      }
+      segments.push_back(Segment::SinglePage(std::move(records_processed)));
       continue;
     }
 
     const size_t segment_size = kSegmentPageCounts[segment_size_idx];
     if (segment_size == 1) {
       // No need for a model.
-      const size_t extra_keys =
+      size_t extra_keys =
           records_processed.size() - allowed_records_per_segment_[0];
-      // TODO: Allocate the segment here.
-      next_idx -= extra_keys;
+      while (extra_keys > 0) {
+        records_processed.pop_back();
+        next_idx--;
+      }
+      segments.push_back(Segment::SinglePage(std::move(records_processed)));
       continue;
     }
 
@@ -117,7 +139,8 @@ std::vector<Segment> SegmentBuilder::Build(
     // minimize the effect of precision errors.
     const auto cutoff_it = std::lower_bound(
         records_processed.begin(), records_processed.end(), records_in_segment,
-        [&dataset, &maybe_line](const size_t rec_idx_a, const size_t rec_idx_b) {
+        [&dataset, &maybe_line](const size_t rec_idx_a,
+                                const size_t rec_idx_b) {
           const Key key_a = dataset[rec_idx_a];
           const Key key_b = dataset[rec_idx_b];
           const auto pos_a = maybe_line->line(key_a - base_key);
@@ -125,9 +148,14 @@ std::vector<Segment> SegmentBuilder::Build(
           return pos_a < pos_b;
         });
     assert(cutoff_it != records_processed.begin());
-    const size_t extra_keys = records_processed.end() - cutoff_it;
-    next_idx -= extra_keys;
-    // TODO: Allocate the segment here.
+    size_t extra_keys = records_processed.end() - cutoff_it;
+    while (extra_keys > 0) {
+      records_processed.pop_back();
+      next_idx--;
+    }
+    segments.push_back(Segment::MultiPage(
+        segment_size, std::move(records_processed),
+        BoundedLine64(maybe_line->line(), 0, records_processed.size() - 1)));
   }
 
   return segments;

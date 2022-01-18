@@ -72,7 +72,7 @@ class BoundedLine {
       : line_(std::move(line)),
         start_(line_(start_x)),
         end_(line_(end_x)) {
-    std::assert(start_x < end_x);
+    std::assert(start_x <= end_x);
   }
 
   const Point<T>& start() const { return start_; }
