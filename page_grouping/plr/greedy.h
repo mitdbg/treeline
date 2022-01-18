@@ -79,8 +79,8 @@ template <typename T>
 inline GreedyPLRSegmenter<T>::GreedyPLRSegmenter(const Point<T>& s1,
                                                  const Point<T>& s2, T delta)
     : last_point_(s2), delta_(delta), start_x_(s1.x()) {
-  std::assert(s1.x() < s2.x());
-  std::assert(delta > 0);
+  assert(s1.x() < s2.x());
+  assert(delta > 0);
   const auto s1_bot = s1.AddDelta(-delta);
   const auto s1_top = s1.AddDelta(delta);
   const auto s2_bot = s2.AddDelta(-delta);
@@ -101,7 +101,7 @@ inline std::optional<BoundedLine<T>> GreedyPLRSegmenter<T>::Offer(
   // Check if we will violate `delta` if we include this point.
   const auto bottom_line = Line<T>::FromSlopeAndPoint(slope_bot_, s0_);
   const T bottom_pred = bottom_line(p.x());
-  if (bottom_pred >= s.y()) {
+  if (bottom_pred >= p.y()) {
     return Finish();
   }
   const auto top_line = Line<T>::FromSlopeAndPoint(slope_top_, s0_);
@@ -111,13 +111,13 @@ inline std::optional<BoundedLine<T>> GreedyPLRSegmenter<T>::Offer(
   }
 
   // Adjust the slopes.
-  const T x_diff = p.x() - s0.x();
-  const T y_diff = p.y() - s0.y();
+  const T x_diff = p.x() - s0_.x();
+  const T y_diff = p.y() - s0_.y();
   if (std::abs(std::fma(-slope_bot_, x_diff, y_diff)) >= delta_) {
     slope_bot_ = ComputeSlope(s0_, p.AddDelta(-delta_));
   }
   if (std::abs(std::fma(-slope_top_, x_diff, y_diff)) >= delta_) {
-    slope_top_ = ComputeSlope(s0_, p.AddDelta(delta));
+    slope_top_ = ComputeSlope(s0_, p.AddDelta(delta_));
   }
 
   last_point_ = p;
@@ -148,15 +148,15 @@ inline std::optional<BoundedLine<T>> GreedyPLRBuilder<T>::Offer(
     return std::optional<BoundedLine<T>>();
   } else if (!s2_.has_value()) {
     s2_ = p;
-    curr_ = GreedyPLRSegmenter<T>(s1_, s2_, delta_);
+    curr_ = GreedyPLRSegmenter<T>(*s1_, *s2_, delta_);
     return std::optional<BoundedLine<T>>();
   }
 
   const auto res = curr_->Offer(p);
   if (res.has_value()) {
-    s1 = curr_->last_point();
-    s2 = p;
-    curr = GreedyPLRSegmenter<T>(s1_, s2_, delta_);
+    s1_ = curr_->last_point();
+    s2_ = p;
+    curr_ = GreedyPLRSegmenter<T>(*s1_, *s2_, delta_);
   }
   return res;
 }
@@ -168,8 +168,8 @@ inline std::optional<BoundedLine<T>> GreedyPLRBuilder<T>::Finish() const {
   } else if (!s2_.has_value()) {
     // Creates a horizontal line.
     return BoundedLine<T>(
-        Line<T>::FromTwoPoints(s1_, Point<T>(s1_.x() + 1, s1_.y())), s1_.x(),
-        s1_l.x() + 1);
+        Line<T>::FromTwoPoints(*s1_, Point<T>(s1_->x() + 1, s1_->y())),
+        s1_->x(), s1_->x() + 1);
   }
   return curr_->Finish();
 }

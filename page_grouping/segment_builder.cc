@@ -112,7 +112,7 @@ std::vector<Segment> SegmentBuilder::Build(
       size_t addtl_keys =
           allowed_records_per_segment_[0] - records_processed.size();
       while (addtl_keys > 0 && next_idx < dataset.size()) {
-        records_processed.push_back(dataset[next_idx++]);
+        records_processed.push_back(next_idx++);
       }
       segments.push_back(Segment::SinglePage(std::move(records_processed)));
       continue;
@@ -139,12 +139,12 @@ std::vector<Segment> SegmentBuilder::Build(
     // minimize the effect of precision errors.
     const auto cutoff_it = std::lower_bound(
         records_processed.begin(), records_processed.end(), records_in_segment,
-        [&dataset, &maybe_line](const size_t rec_idx_a,
+        [&dataset, &maybe_line, &base_key](const size_t rec_idx_a,
                                 const size_t rec_idx_b) {
-          const Key key_a = dataset[rec_idx_a];
-          const Key key_b = dataset[rec_idx_b];
-          const auto pos_a = maybe_line->line(key_a - base_key);
-          const auto pos_b = maybe_line->line(key_b - base_key);
+          const Key key_a = dataset[rec_idx_a].first;
+          const Key key_b = dataset[rec_idx_b].first;
+          const auto pos_a = maybe_line->line()(key_a - base_key);
+          const auto pos_b = maybe_line->line()(key_b - base_key);
           return pos_a < pos_b;
         });
     assert(cutoff_it != records_processed.begin());
@@ -153,9 +153,10 @@ std::vector<Segment> SegmentBuilder::Build(
       records_processed.pop_back();
       next_idx--;
     }
-    segments.push_back(Segment::MultiPage(
-        segment_size, std::move(records_processed),
-        BoundedLine64(maybe_line->line(), 0, records_processed.size() - 1)));
+    segments.push_back(
+        Segment::MultiPage(segment_size, std::move(records_processed),
+                           plr::BoundedLine64(maybe_line->line(), 0,
+                                              records_processed.size() - 1)));
   }
 
   return segments;

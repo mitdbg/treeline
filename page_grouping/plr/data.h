@@ -56,7 +56,7 @@ class Line {
 
   // Divides the line's output range by `factor`.
   Line<T> Rescale(const T factor) const {
-    std::assert(factor != 0);
+    assert(factor != 0);
     return Line<T>(slope_ / factor, intercept_ / factor);
   }
 
@@ -70,9 +70,9 @@ class BoundedLine {
  public:
   BoundedLine(Line<T> line, const T start_x, const T end_x)
       : line_(std::move(line)),
-        start_(line_(start_x)),
-        end_(line_(end_x)) {
-    std::assert(start_x <= end_x);
+        start_(Point<T>(start_x, line_(start_x))),
+        end_(Point<T>(end_x, line_(end_x))) {
+    assert(start_x <= end_x);
   }
 
   const Point<T>& start() const { return start_; }
