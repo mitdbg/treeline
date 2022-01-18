@@ -48,7 +48,7 @@ class PageGroupingInterface {
               });
 
     // Temporary hook-in for testing.
-    Manager::LoadIntoNew(".", records);
+    Manager::LoadIntoNew(".", records, Manager::LoadOptions());
   }
 
   // Update the value at the specified key. Return true if the update succeeded.

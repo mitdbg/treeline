@@ -17,9 +17,17 @@ using Key = uint64_t;
 
 class Manager {
  public:
+  struct LoadOptions {
+    // If set to false, no segments larger than 1 page will be created.
+    bool use_segments = true;
+    // By default, put 50 +/- 10 records into each page.
+    size_t records_per_page_goal = 50;
+    size_t records_per_page_delta = 10;
+  };
   static Manager LoadIntoNew(
       std::filesystem::path db,
-      const std::vector<std::pair<Key, Slice>>& records);
+      const std::vector<std::pair<Key, Slice>>& records,
+      const LoadOptions& options);
 
   static Manager Reopen(std::filesystem::path db);
 

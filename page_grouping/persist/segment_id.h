@@ -15,6 +15,9 @@ class SegmentId {
  public:
   SegmentId() : value_(kInvalidValue) {}
 
+  // Used in deserialization.
+  explicit SegmentId(size_t value) : value_(value) {}
+
   SegmentId(const size_t file_id, const size_t offset) {
     CheckFileId(file_id);
     CheckOffset(offset);
@@ -44,6 +47,8 @@ class SegmentId {
   size_t GetOffset() const { return value_ & offset_mask_; }
 
   bool IsValid() const { return value_ != kInvalidValue; }
+
+  size_t value() const { return value_; }
 
   // Comparison operators
   inline bool operator==(const SegmentId& rhs) const {

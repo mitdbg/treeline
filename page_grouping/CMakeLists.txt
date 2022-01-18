@@ -1,5 +1,7 @@
 add_library(pg STATIC)
 target_sources(pg PRIVATE
+  persist/page.cc
+  persist/page.h
   persist/segment_id.cc
   persist/segment_id.h
   plr/data.h

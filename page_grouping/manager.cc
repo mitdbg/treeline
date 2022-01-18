@@ -3,13 +3,16 @@
 #include <iostream>
 
 #include "segment_builder.h"
+#include "persist/file.h"
+#include "persist/page.h"
 
 namespace llsm {
 namespace pg {
 
 Manager Manager::LoadIntoNew(
     std::filesystem::path db,
-    const std::vector<std::pair<Key, Slice>>& records) {
+    const std::vector<std::pair<Key, Slice>>& records,
+    const LoadOptions& options) {
   // Temporary for testing.
   SegmentBuilder builder(/*goal=*/50, /*delta=*/10);
   const auto segments = builder.Build(records);
