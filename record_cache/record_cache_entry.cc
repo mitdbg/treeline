@@ -9,6 +9,12 @@ const uint8_t RecordCacheEntry::kDirtyMask = 0x40;      // 0100 0000
 const uint8_t RecordCacheEntry::kWriteTypeMask = 0x20;  // 0010 0000
 const uint8_t RecordCacheEntry::kPriorityMask = 0x07;   // 0000 0111
 
+RecordCacheEntry::RecordCacheEntry() : metadata_(0) {
+  pthread_rwlock_init(&rwlock_, nullptr);
+}
+
+RecordCacheEntry::~RecordCacheEntry() { pthread_rwlock_destroy(&rwlock_); }
+
 void RecordCacheEntry::SetValidTo(bool val) {
   val ? (metadata_ |= kValidMask) : (metadata_ &= ~kValidMask);
 }
@@ -72,5 +78,10 @@ void RecordCacheEntry::SetKey(Slice key) { key_ = key; }
 
 Slice RecordCacheEntry::GetValue() const { return value_; }
 void RecordCacheEntry::SetValue(Slice value) { value_ = value; }
+
+void RecordCacheEntry::Lock(const bool exclusive) {
+  exclusive ? pthread_rwlock_wrlock(&rwlock_) : pthread_rwlock_rdlock(&rwlock_);
+}
+void RecordCacheEntry::Unlock() { pthread_rwlock_unlock(&rwlock_); }
 
 }  // namespace llsm
