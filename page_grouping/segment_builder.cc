@@ -44,12 +44,12 @@ SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
       max_records_in_segment_(records_per_page_goal_ * kMaxSegmentSize) {
   allowed_records_per_segment_.reserve(kSegmentPageCounts.size());
   for (size_t pages : kSegmentPageCounts) {
-    allowed_records_per_segment_.push_back(pages * max_records_in_segment_);
+    allowed_records_per_segment_.push_back(pages * records_per_page_goal_);
   }
 }
 
 std::vector<Segment> SegmentBuilder::Build(
-    const std::vector<std::pair<Key, const Slice>>& dataset) {
+    const std::vector<std::pair<Key, Slice>>& dataset) {
   // Precondition: The dataset is sorted by key in ascending order.
   size_t next_idx = 0;
   std::vector<size_t> records_processed;
@@ -142,12 +142,10 @@ std::vector<Segment> SegmentBuilder::Build(
     const auto cutoff_it = std::lower_bound(
         records_processed.begin(), records_processed.end(), records_in_segment,
         [&dataset, &maybe_line, &base_key](const size_t rec_idx_a,
-                                const size_t rec_idx_b) {
+                                const size_t recs_in_segment) {
           const Key key_a = dataset[rec_idx_a].first;
-          const Key key_b = dataset[rec_idx_b].first;
           const auto pos_a = maybe_line->line()(key_a - base_key);
-          const auto pos_b = maybe_line->line()(key_b - base_key);
-          return pos_a < pos_b;
+          return pos_a < recs_in_segment;
         });
     assert(cutoff_it != records_processed.begin());
     size_t extra_keys = records_processed.end() - cutoff_it;

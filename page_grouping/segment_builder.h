@@ -29,7 +29,7 @@ class SegmentBuilder {
                  const size_t records_per_page_delta);
 
   std::vector<Segment> Build(
-      const std::vector<std::pair<Key, const Slice>>& dataset);
+      const std::vector<std::pair<Key, Slice>>& dataset);
 
  private:
   size_t records_per_page_goal_, records_per_page_delta_;

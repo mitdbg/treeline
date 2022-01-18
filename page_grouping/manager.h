@@ -19,12 +19,12 @@ class Manager {
  public:
   static Manager LoadIntoNew(
       std::filesystem::path db,
-      const std::vector<std::pair<Key, const Slice>>& records);
+      const std::vector<std::pair<Key, Slice>>& records);
 
   static Manager Reopen(std::filesystem::path db);
 
   Status Get(const Key& key, std::string* value_out);
-  Status PutBatch(const std::vector<std::pair<Key, const Slice>>& records);
+  Status PutBatch(const std::vector<std::pair<Key, Slice>>& records);
   Status Scan(const Key& start_key, const size_t amount,
               std::vector<std::pair<Key, std::string>>* values_out);
 

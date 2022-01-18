@@ -9,7 +9,7 @@ namespace pg {
 
 Manager Manager::LoadIntoNew(
     std::filesystem::path db,
-    const std::vector<std::pair<Key, const Slice>>& records) {
+    const std::vector<std::pair<Key, Slice>>& records) {
   // Temporary for testing.
   SegmentBuilder builder(/*goal=*/50, /*delta=*/10);
   const auto segments = builder.Build(records);
@@ -32,7 +32,7 @@ Status Manager::Get(const Key& key, std::string* value_out) {
 }
 
 Status Manager::PutBatch(
-    const std::vector<std::pair<Key, const Slice>>& records) {
+    const std::vector<std::pair<Key, Slice>>& records) {
   return Status::OK();
 }
 
