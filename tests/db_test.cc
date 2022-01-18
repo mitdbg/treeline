@@ -279,14 +279,12 @@ TEST_F(DBTest, DeferByEntries) {
   status = db->Put(llsm::WriteOptions(), key1, value);
   ASSERT_TRUE(status.ok());
 
-  // Get timestamp
-  auto filename = kDBDir / "segment-0";
-  timespec mod_time;
-  struct stat result;
+  // Create a copy
   sync();
-  if (stat(filename.c_str(), &result) == 0) {
-    mod_time = result.st_mtim;
-  }
+  auto source_file = kDBDir / "segment-0";
+  auto dest_file = source_file;
+  dest_file += "_v0";
+  ASSERT_TRUE(std::filesystem::copy_file(source_file, dest_file));
 
   // Flush - shouldn't flush anything
   status = db->FlushMemTable(/*disable_deferred_io = */ false);
@@ -300,10 +298,10 @@ TEST_F(DBTest, DeferByEntries) {
   ASSERT_TRUE(status.IsNotFound());
 
   // Check that the flush never happened.
-  sync();
-  if (stat(filename.c_str(), &result) == 0) {
-    ASSERT_TRUE(EqualTimespec(result.st_mtim, mod_time));
-  }
+  const char command_template[11] = "diff %s %s";
+  char s[7 + source_file.string().length() + dest_file.string().length()];
+  sprintf(s, command_template, source_file.string().data(), dest_file.string().data());
+  ASSERT_EQ(system(s), 0);
 
   // Write another to segment 0
   const uint64_t key_as_int0 = __builtin_bswap64(0ULL);
@@ -322,9 +320,7 @@ TEST_F(DBTest, DeferByEntries) {
 
   // Check that the flush happened.
   sync();
-  if (stat(filename.c_str(), &result) == 0) {
-    ASSERT_FALSE(EqualTimespec(result.st_mtim, mod_time));
-  }
+  ASSERT_NE(system(s), 0);
 
   // Can still read them
   status = db->Get(llsm::ReadOptions(), key1, &value_out);
@@ -362,14 +358,12 @@ TEST_F(DBTest, DeferByAttempts) {
   status = db->Put(llsm::WriteOptions(), key1, value);
   ASSERT_TRUE(status.ok());
 
-  // Get timestamp
-  auto filename = kDBDir / "segment-0";
-  timespec mod_time;
-  struct stat result;
+  // Create a copy
   sync();
-  if (stat(filename.c_str(), &result) == 0) {
-    mod_time = result.st_mtim;
-  }
+  auto source_file = kDBDir / "segment-0";
+  auto dest_file = source_file;
+  dest_file += "_v0";
+  ASSERT_TRUE(std::filesystem::copy_file(source_file, dest_file));
 
   // Flush - shouldn't flush anything
   status = db->FlushMemTable(/*disable_deferred_io = */ false);
@@ -383,10 +377,10 @@ TEST_F(DBTest, DeferByAttempts) {
   ASSERT_TRUE(status.IsNotFound());
 
   // Check that the flush never happened.
-  sync();
-  if (stat(filename.c_str(), &result) == 0) {
-    ASSERT_TRUE(EqualTimespec(result.st_mtim, mod_time));
-  }
+  const char command_template[11] = "diff %s %s";
+  char s[7 + source_file.string().length() + dest_file.string().length()];
+  sprintf(s, command_template, source_file.string().data(), dest_file.string().data());
+  ASSERT_EQ(system(s), 0);
 
   // Flush - should work now
   status = db->FlushMemTable(/*disable_deferred_io = */ false);
@@ -398,9 +392,7 @@ TEST_F(DBTest, DeferByAttempts) {
 
   // Check that the flush happened.
   sync();
-  if (stat(filename.c_str(), &result) == 0) {
-    ASSERT_FALSE(EqualTimespec(result.st_mtim, mod_time));
-  }
+  ASSERT_NE(system(s), 0);
 
   // Can still read
   status = db->Get(llsm::ReadOptions(), key1, &value_out);
