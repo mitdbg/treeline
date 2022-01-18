@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "ycsbr/ycsbr.h"
+#include "llsm/slice.h"
+#include "manager.h"
 
 namespace llsm {
 namespace pg {
@@ -32,7 +34,16 @@ class PageGroupingInterface {
   void ShutdownDatabase() {}
 
   // Load the records into the database.
-  void BulkLoad(const ycsbr::BulkLoadTrace& load) {}
+  void BulkLoad(const ycsbr::BulkLoadTrace& load) {
+    std::vector<std::pair<ycsbr::Request::Key, const Slice>> records;
+    records.reserve(load.size());
+    for (const auto& rec : load) {
+      records.emplace_back(rec.key, llsm::Slice(rec.value, rec.value_size));
+    }
+
+    // Temporary hook-in for testing.
+    Manager::LoadIntoNew(".", records);
+  }
 
   // Update the value at the specified key. Return true if the update succeeded.
   bool Update(ycsbr::Request::Key key, const char* value, size_t value_size) {

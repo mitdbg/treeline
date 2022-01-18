@@ -1,11 +1,27 @@
 #include "manager.h"
 
+#include <iostream>
+
+#include "segment_builder.h"
+
 namespace llsm {
 namespace pg {
 
 Manager Manager::LoadIntoNew(
     std::filesystem::path db,
     const std::vector<std::pair<Key, const Slice>>& records) {
+  // Temporary for testing.
+  SegmentBuilder builder(/*goal=*/50, /*delta=*/10);
+  const auto segments = builder.Build(records);
+  std::cerr << "segment_page_count,num_records,model_slope,model_intercept" << std::endl;
+  for (const auto& seg : segments) {
+    std::cerr << seg.page_count << "," << seg.record_indices.size() << ",";
+    if (seg.model.has_value()) {
+      std::cerr << seg.model->line().slope() << "," << seg.model->line().intercept() << std::endl;
+    } else {
+      std::cerr << "," << std::endl;
+    }
+  }
   return Manager();
 }
 

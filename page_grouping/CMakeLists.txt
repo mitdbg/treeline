@@ -16,7 +16,6 @@ target_sources(pg PRIVATE
 target_include_directories(pg
   PUBLIC
     ${PROJECT_SOURCE_DIR}
-  PRIVATE
     ${PROJECT_SOURCE_DIR}/include
 )
 

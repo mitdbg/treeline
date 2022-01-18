@@ -113,6 +113,7 @@ std::vector<Segment> SegmentBuilder::Build(
           allowed_records_per_segment_[0] - records_processed.size();
       while (addtl_keys > 0 && next_idx < dataset.size()) {
         records_processed.push_back(next_idx++);
+        addtl_keys--;
       }
       segments.push_back(Segment::SinglePage(std::move(records_processed)));
       continue;
@@ -125,6 +126,7 @@ std::vector<Segment> SegmentBuilder::Build(
           records_processed.size() - allowed_records_per_segment_[0];
       while (extra_keys > 0) {
         records_processed.pop_back();
+        extra_keys--;
         next_idx--;
       }
       segments.push_back(Segment::SinglePage(std::move(records_processed)));
@@ -151,6 +153,7 @@ std::vector<Segment> SegmentBuilder::Build(
     size_t extra_keys = records_processed.end() - cutoff_it;
     while (extra_keys > 0) {
       records_processed.pop_back();
+      extra_keys--;
       next_idx--;
     }
     segments.push_back(
