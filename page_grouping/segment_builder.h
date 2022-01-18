@@ -13,16 +13,23 @@ namespace pg {
 
 struct Segment {
  public:
-  static Segment MultiPage(size_t page_count, std::vector<size_t> indices,
+  static Segment MultiPage(size_t page_count, size_t start_idx, size_t end_idx,
                            plr::BoundedLine64 model);
-  static Segment SinglePage(std::vector<size_t> indices);
+  static Segment SinglePage(size_t start_idx, size_t end_idx);
 
   size_t page_count;
-  std::vector<size_t> record_indices;
+  // Start and end index (relative to the dataset) of the records that should be
+  // included in this segment. The start index is inclusive, the end index is
+  // exclusive.
+  size_t start_idx, end_idx;
   // Will be empty when `page_count == 1`.
   std::optional<plr::BoundedLine64> model;
 };
 
+// A first-pass greedy segment builder implementation. For simplicity, this
+// implementation assumes the key dataset can fit in memory. But fundamentally,
+// the algorithm does not require the entire dataset to be materialized in
+// memory (e.g., it could operate on a stream of sorted keys).
 class SegmentBuilder {
  public:
   SegmentBuilder(const size_t records_per_page_goal,

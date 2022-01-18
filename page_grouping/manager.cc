@@ -15,7 +15,7 @@ Manager Manager::LoadIntoNew(
   const auto segments = builder.Build(records);
   std::cerr << "segment_page_count,num_records,model_slope,model_intercept" << std::endl;
   for (const auto& seg : segments) {
-    std::cerr << seg.page_count << "," << seg.record_indices.size() << ",";
+    std::cerr << seg.page_count << "," << (seg.end_idx - seg.start_idx) << ",";
     if (seg.model.has_value()) {
       std::cerr << seg.model->line().slope() << "," << seg.model->line().intercept() << std::endl;
     } else {

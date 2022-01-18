@@ -20,19 +20,21 @@ static const size_t kMaxSegmentSize = kSegmentPageCounts.back();
 namespace llsm {
 namespace pg {
 
-Segment Segment::MultiPage(size_t page_count, std::vector<size_t> indices,
+Segment Segment::MultiPage(size_t page_count, size_t start_idx, size_t end_idx,
                            plr::BoundedLine64 model) {
   Segment s;
   s.page_count = page_count;
-  s.record_indices = std::move(indices);
+  s.start_idx = start_idx;
+  s.end_idx = end_idx;
   s.model = model;
   return s;
 }
 
-Segment Segment::SinglePage(std::vector<size_t> indices) {
+Segment Segment::SinglePage(size_t start_idx, size_t end_idx) {
   Segment s;
   s.page_count = 1;
-  s.record_indices = std::move(indices);
+  s.start_idx = start_idx;
+  s.end_idx = end_idx;
   s.model = std::optional<plr::BoundedLine64>();
   return s;
 }
@@ -92,7 +94,8 @@ std::vector<Segment> SegmentBuilder::Build(
       if (!maybe_line.has_value()) {
         // This should only happen when there is a single record left.
         assert(records_processed.size() == 1);
-        segments.push_back(Segment::SinglePage(std::move(records_processed)));
+        segments.push_back(Segment::SinglePage(records_processed.front(),
+                                               records_processed.back() + 1));
         continue;
       }
     }
@@ -115,7 +118,8 @@ std::vector<Segment> SegmentBuilder::Build(
         records_processed.push_back(next_idx++);
         addtl_keys--;
       }
-      segments.push_back(Segment::SinglePage(std::move(records_processed)));
+      segments.push_back(Segment::SinglePage(records_processed.front(),
+                                             records_processed.back() + 1));
       continue;
     }
 
@@ -129,7 +133,8 @@ std::vector<Segment> SegmentBuilder::Build(
         extra_keys--;
         next_idx--;
       }
-      segments.push_back(Segment::SinglePage(std::move(records_processed)));
+      segments.push_back(Segment::SinglePage(records_processed.front(),
+                                             records_processed.back() + 1));
       continue;
     }
 
@@ -142,7 +147,7 @@ std::vector<Segment> SegmentBuilder::Build(
     const auto cutoff_it = std::lower_bound(
         records_processed.begin(), records_processed.end(), records_in_segment,
         [&dataset, &maybe_line, &base_key](const size_t rec_idx_a,
-                                const size_t recs_in_segment) {
+                                           const size_t recs_in_segment) {
           const Key key_a = dataset[rec_idx_a].first;
           const auto pos_a = maybe_line->line()(key_a - base_key);
           return pos_a < recs_in_segment;
@@ -154,10 +159,10 @@ std::vector<Segment> SegmentBuilder::Build(
       extra_keys--;
       next_idx--;
     }
-    segments.push_back(
-        Segment::MultiPage(segment_size, std::move(records_processed),
-                           plr::BoundedLine64(maybe_line->line(), 0,
-                                              records_processed.size() - 1)));
+    segments.push_back(Segment::MultiPage(
+        segment_size, records_processed.front(), records_processed.back() + 1,
+        plr::BoundedLine64(maybe_line->line(), 0,
+                           records_processed.size() - 1)));
   }
 
   return segments;
