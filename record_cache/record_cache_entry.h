@@ -8,7 +8,6 @@ namespace llsm {
 
 class RecordCacheEntry {
  public:
-
   RecordCacheEntry();
   ~RecordCacheEntry();
 
@@ -42,9 +41,10 @@ class RecordCacheEntry {
   Slice GetValue() const;
   void SetValue(Slice value);
 
-  // Lock/unlock the current entry, possibly for exclusive access if `exclusive`
-  // is true.
+  // Lock/try to lock/unlock the current entry, possibly for exclusive access if
+  // `exclusive` is true.
   void Lock(const bool exclusive);
+  bool TryLock(const bool exclusive); // Returns true iff successful.
   void Unlock();
 
  private:

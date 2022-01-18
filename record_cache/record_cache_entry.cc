@@ -82,6 +82,11 @@ void RecordCacheEntry::SetValue(Slice value) { value_ = value; }
 void RecordCacheEntry::Lock(const bool exclusive) {
   exclusive ? pthread_rwlock_wrlock(&rwlock_) : pthread_rwlock_rdlock(&rwlock_);
 }
+bool RecordCacheEntry::TryLock(const bool exclusive) {
+  auto ret = exclusive ? pthread_rwlock_trywrlock(&rwlock_)
+                       : pthread_rwlock_tryrdlock(&rwlock_);
+  return (ret == 0);
+}
 void RecordCacheEntry::Unlock() { pthread_rwlock_unlock(&rwlock_); }
 
 }  // namespace llsm

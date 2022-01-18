@@ -80,4 +80,36 @@ TEST(RecordCacheTest, MultiPutGet) {
   }
 }
 
+TEST(RecordCacheTest, SimpleLockUnlock) {
+  auto rc = RecordCache(5);
+  Slice key = "aaa";
+  Slice value = "bbb";
+
+  rc.Put(key, value);
+
+  uint64_t index_out;
+  ASSERT_TRUE(rc.GetIndex(key, &index_out).ok());
+  auto entry = rc.cache_entries[index_out];
+
+  entry.Lock(/*exclusive = */ false);
+  ASSERT_EQ(value.compare(entry.GetValue()), 0);
+  entry.Unlock();
+}
+
+TEST(RecordCacheTest, TryLock) {
+  auto rc = RecordCache(5);
+  Slice key = "aaa";
+  Slice value = "bbb";
+
+  rc.Put(key, value);
+
+  uint64_t index_out;
+  ASSERT_TRUE(rc.GetIndex(key, &index_out).ok());
+  auto entry = rc.cache_entries[index_out];
+
+  ASSERT_TRUE(entry.TryLock(/*exclusive = */ false));
+  ASSERT_EQ(value.compare(entry.GetValue()), 0);
+  entry.Unlock();
+}
+
 }  // namespace
