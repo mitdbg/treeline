@@ -84,6 +84,10 @@ class BoundedLine {
   Point<T> start_, end_;
 };
 
+using Point64 = Point<double>;
+using Line64 = Line<double>;
+using BoundedLine64 = BoundedLine<double>;
+
 }  // namespace plr
 }  // namespace pg
 }  // namespace llsm

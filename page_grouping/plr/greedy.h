@@ -71,6 +71,8 @@ class GreedyPLRBuilder {
   std::optional<GreedyPLRSegmenter<T>> curr_;
 };
 
+using GreedyPLRBuilder64 = GreedyPLRBuilder<double>;
+
 // Implementation details follow.
 
 template <typename T>

@@ -6,6 +6,8 @@ target_sources(pg PRIVATE
   plr/greedy.h
   manager.cc
   manager.h
+  segment_builder.cc
+  segment_builder.h
   ../tlx/btree_map.h
   ../tlx/btree.h
   ../tlx/core.cc
