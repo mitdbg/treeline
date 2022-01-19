@@ -38,6 +38,14 @@ class SegmentBuilder {
   std::vector<Segment> Build(
       const std::vector<std::pair<Key, Slice>>& dataset);
 
+  // The number of pages in each segment.
+  // The index of the vector represents the segment "type", and its value
+  // represents the number of pages in the segment.
+  static const std::vector<size_t> kSegmentPageCounts;
+
+  // Maps the page count to the segment "index" (in `kSegmentPageCounts`).
+  static const std::unordered_map<size_t, size_t> kPageCountToSegment;
+
  private:
   size_t records_per_page_goal_, records_per_page_delta_;
   size_t max_records_in_segment_;

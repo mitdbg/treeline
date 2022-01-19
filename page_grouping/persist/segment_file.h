@@ -1,8 +1,11 @@
+#pragma once
+
 #include <assert.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -24,17 +27,26 @@ namespace llsm {
 namespace pg {
 
 // Adapted from db/file.h.
-class File {
+class SegmentFile {
   // The number of pages by which to grow a file when needed.
   const size_t kGrowthPages = 256;
+  const size_t kGrowthBytes = kGrowthPages * Page::kSize;
 
  public:
-  File(const std::filesystem::path& name, bool use_direct_io,
-       size_t initial_num_pages)
+  // Represents an invalid file.
+  SegmentFile()
       : fd_(-1),
         file_size_(0),
-        growth_bytes_(kGrowthPages * Page::kSize),
-        next_page_allocation_offset_(initial_num_pages * Page::kSize) {
+        next_page_allocation_offset_(0),
+        pages_per_segment_(0) {}
+
+  SegmentFile(const std::filesystem::path& name, bool use_direct_io,
+              size_t pages_per_segment)
+      : fd_(-1),
+        file_size_(0),
+        next_page_allocation_offset_(0),
+        pages_per_segment_(pages_per_segment) {
+    assert(pages_per_segment > 0);
     CHECK_ERROR(
         fd_ = open(name.c_str(),
                    O_CREAT | O_RDWR | O_SYNC | (use_direct_io ? O_DIRECT : 0),
@@ -45,45 +57,38 @@ class File {
     CHECK_ERROR(fstat(fd_, &file_status));
     assert(file_status.st_size >= 0);
     file_size_ = file_status.st_size;
-
-    // If file already existed, retrieve next_page_allocation_offset_.
-    if (file_size_ > 0) {
-      PageBuffer page_data = PageMemoryAllocator::Allocate(/*num_pages=*/1);
-      Page temp_page(page_data.get());
-      next_page_allocation_offset_ = file_size_;
-      for (size_t offset = 0; offset < file_size_; offset += Page::kSize) {
-        ReadPage(offset, page_data.get());
-        if (!temp_page.IsValid()) {
-          next_page_allocation_offset_ = offset;
-          break;
-        }
-      }
-    }
   }
-  ~File() { close(fd_); }
-  Status ReadPage(size_t offset, void* data) const {
+
+  ~SegmentFile() { close(fd_); }
+
+  SegmentFile(const SegmentFile&) = delete;
+  SegmentFile& operator=(const SegmentFile&) = delete;
+
+  Status ReadPages(size_t offset, void* data, size_t num_pages) const {
     if (offset >= next_page_allocation_offset_) {
       return Status::InvalidArgument("Tried to read from unallocated page.");
     }
-    CHECK_ERROR(pread(fd_, data, Page::kSize, offset));
+    CHECK_ERROR(pread(fd_, data, Page::kSize * num_pages, offset));
     return Status::OK();
   }
-  Status WritePage(size_t offset, const void* data) const {
+
+  Status WritePages(size_t offset, const void* data, size_t num_pages) const {
     if (offset >= next_page_allocation_offset_) {
       return Status::InvalidArgument("Tried to write to unallocated page.");
     }
-    CHECK_ERROR(pwrite(fd_, data, Page::kSize, offset));
+    CHECK_ERROR(pwrite(fd_, data, Page::kSize * num_pages, offset));
     return Status::OK();
   }
+
   void Sync() const { CHECK_ERROR(fsync(fd_)); }
 
   // Reserves space for an additional page on the file. This might involve
   // growing the file if needed, otherwise it just updates the bookkeeping.
   //
   // Returns the offset of the newly allocated page.
-  size_t AllocatePage() {
+  size_t AllocateSegment() {
     size_t allocated_offset = next_page_allocation_offset_;
-    next_page_allocation_offset_ += Page::kSize;
+    next_page_allocation_offset_ += Page::kSize * pages_per_segment_;
 
     ExpandToIfNeeded(allocated_offset);
     return allocated_offset;
@@ -101,7 +106,7 @@ class File {
 
     size_t bytes_to_add = 0;
     while ((file_size_ + bytes_to_add) < (offset + Page::kSize))
-      bytes_to_add += growth_bytes_;
+      bytes_to_add += kGrowthBytes;
 
     // Ensures the byte range [offset, offset + len) in the file has been
     // allocated (allocate it and zero it out if not).
@@ -111,8 +116,8 @@ class File {
   }
   int fd_;
   size_t file_size_;
-  const size_t growth_bytes_;
   size_t next_page_allocation_offset_;
+  size_t pages_per_segment_;
 };
 
 }  // namespace pg

@@ -5,20 +5,20 @@
 #include "plr/data.h"
 #include "plr/greedy.h"
 
-namespace {
+namespace llsm {
+namespace pg {
 
 using Record = std::pair<llsm::pg::Key, const llsm::Slice>;
 
-// The number of pages in each segment.
-static const std::vector<size_t> kSegmentPageCounts = {1, 2, 4, 8, 16};
+// The number of pages in each segment. If you change this, change `kPageCountToSegment` too.
+const std::vector<size_t> SegmentBuilder::kSegmentPageCounts = {1, 2, 4, 8, 16};
+
+const std::unordered_map<size_t, size_t> SegmentBuilder::kPageCountToSegment = {
+    {1, 0}, {2, 1}, {4, 2}, {8, 3}, {16, 4}};
 
 // The maximum number of pages in any segment.
-static const size_t kMaxSegmentSize = kSegmentPageCounts.back();
-
-}  // namespace
-
-namespace llsm {
-namespace pg {
+static const size_t kMaxSegmentSize =
+    llsm::pg::SegmentBuilder::kSegmentPageCounts.back();
 
 Segment Segment::MultiPage(size_t page_count, size_t start_idx, size_t end_idx,
                            plr::BoundedLine64 model) {
