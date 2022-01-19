@@ -40,11 +40,9 @@ target_sources(llsm PUBLIC ${llsm_api})
 
 # Add our sources by traversing the repository
 add_subdirectory(alex)
-add_subdirectory(art_olc)
 add_subdirectory(bufmgr)
 add_subdirectory(db)
 add_subdirectory(model)
-add_subdirectory(record_cache)
 add_subdirectory(tlx)
 add_subdirectory(util)
 add_subdirectory(wal)

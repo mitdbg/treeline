@@ -11,7 +11,6 @@ target_sources(tester
     memtable_test.cc
     packed_map_test.cc
     page_test.cc
-    record_cache_test.cc
     thread_pool_test.cc
     wal_manager_test.cc
     wal_rw_test.cc)
