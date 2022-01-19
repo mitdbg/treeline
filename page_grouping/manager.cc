@@ -167,6 +167,59 @@ Manager Manager::BulkLoadIntoPages(
     const fs::path& db, const std::vector<std::pair<Key, Slice>>& records,
     const Manager::LoadOptions& options) {
   PageBuffer buf = PageMemoryAllocator::Allocate(/*num_pages=*/1);
+
+  // One single file containing 4 KiB pages.
+  std::vector<SegmentFile> segment_files;
+  segment_files.emplace_back(db / (kSegmentFilePrefix + "0"),
+                             /*use_direct_io=*/true, /*pages_per_segment=*/1);
+  SegmentFile& sf = segment_files.front();
+
+  std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
+
+  size_t page_start_idx = 0;
+  size_t page_end_idx = options.records_per_page_goal;
+  while (page_end_idx <= records.size()) {
+    memset(buf.get(), 0, pg::Page::kSize);
+    auto result = LoadIntoPage(buf, 0, records[page_start_idx].first,
+                               records[page_end_idx].first, records,
+                               page_start_idx, page_end_idx);
+    assert(result.ok());
+
+    // Write page to disk.
+    const size_t byte_offset = sf.AllocateSegment();
+    sf.WritePages(byte_offset, buf.get(), /*num_pages=*/1);
+
+    // Record the page boundary.
+    SegmentId seg_id(/*file_id=*/0,
+                     /*page_offset=*/byte_offset / pg::Page::kSize);
+    segment_boundaries.emplace_back(
+        records[page_start_idx].first,
+        SegmentInfo(seg_id, std::optional<plr::Line64>()));
+
+    page_start_idx = page_end_idx;
+    page_end_idx = page_start_idx + options.records_per_page_goal;
+  }
+  if (page_start_idx < records.size()) {
+    // Records that go on the last page.
+    memset(buf.get(), 0, pg::Page::kSize);
+    auto result = LoadIntoPage(buf, 0, records[page_start_idx].first,
+                               std::numeric_limits<uint64_t>::max(), records,
+                               page_start_idx, page_end_idx);
+    assert(result.ok());
+
+    // Write page to disk.
+    const size_t byte_offset = sf.AllocateSegment();
+    sf.WritePages(byte_offset, buf.get(), /*num_pages=*/1);
+
+    // Record the page boundary.
+    SegmentId seg_id(/*file_id=*/0,
+                     /*page_offset=*/byte_offset / pg::Page::kSize);
+    segment_boundaries.emplace_back(
+        records[page_start_idx].first,
+        SegmentInfo(seg_id, std::optional<plr::Line64>()));
+  }
+
+  return Manager(db, std::move(segment_boundaries), std::move(segment_files));
 }
 
 Manager::Manager(fs::path db_path,
