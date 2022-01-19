@@ -25,6 +25,9 @@ class Manager {
     // By default, put 50 +/- 10 records into each page.
     size_t records_per_page_goal = 50;
     size_t records_per_page_delta = 10;
+    // If set to true, will write out the segment sizes and models to a CSV file
+    // for debug purposes.
+    bool print_segment_details = true;
   };
   static Manager LoadIntoNew(const std::filesystem::path& db,
                              const std::vector<std::pair<Key, Slice>>& records,

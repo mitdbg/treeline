@@ -64,6 +64,9 @@ class SegmentFile {
   SegmentFile(const SegmentFile&) = delete;
   SegmentFile& operator=(const SegmentFile&) = delete;
 
+  SegmentFile(SegmentFile&&) = default;
+  SegmentFile& operator=(SegmentFile&&) = default;
+
   Status ReadPages(size_t offset, void* data, size_t num_pages) const {
     if (offset >= next_page_allocation_offset_) {
       return Status::InvalidArgument("Tried to read from unallocated page.");

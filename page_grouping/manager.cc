@@ -1,5 +1,6 @@
 #include "manager.h"
 
+#include <fstream>
 #include <iostream>
 #include <limits>
 
@@ -14,6 +15,9 @@ using namespace llsm::pg;
 namespace fs = std::filesystem;
 
 namespace {
+
+const std::string kSegmentFilePrefix = "sf-";
+const std::string kSegmentDetailCsvFileName = "loaded_segments.csv";
 
 Status LoadIntoPage(PageBuffer& buf, size_t page_idx, Key lower, Key upper,
                     const std::vector<std::pair<Key, Slice>>& records,
@@ -32,17 +36,17 @@ Status LoadIntoPage(PageBuffer& buf, size_t page_idx, Key lower, Key upper,
   return Status::OK();
 }
 
-// Currently unused, but retained for debugging purposes.
-void PrintSegmentInfoAsCSV(const std::vector<Segment>& segments) {
-  std::cerr << "segment_page_count,num_records,model_slope,model_intercept"
-            << std::endl;
+void PrintSegmentsAsCSV(std::ostream& out,
+                        const std::vector<Segment>& segments) {
+  out << "segment_page_count,num_records,model_slope,model_intercept"
+      << std::endl;
   for (const auto& seg : segments) {
-    std::cerr << seg.page_count << "," << (seg.end_idx - seg.start_idx) << ",";
+    out << seg.page_count << "," << (seg.end_idx - seg.start_idx) << ",";
     if (seg.model.has_value()) {
-      std::cerr << seg.model->line().slope() << ","
-                << seg.model->line().intercept() << std::endl;
+      out << seg.model->line().slope() << "," << seg.model->line().intercept()
+          << std::endl;
     } else {
-      std::cerr << "," << std::endl;
+      out << "," << std::endl;
     }
   }
 }
@@ -59,9 +63,10 @@ Manager Manager::BulkLoadIntoSegments(
 
   std::vector<SegmentFile> segment_files;
   for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
-    segment_files.emplace_back(db_path / ("sf-" + std::to_string(i)),
-                               /*use_direct_io=*/true,
-                               /*initial_num_pages=*/1);
+    segment_files.emplace_back(
+        db_path / (kSegmentFilePrefix + std::to_string(i)),
+        /*use_direct_io=*/true,
+        /*initial_num_pages=*/1);
   }
   std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
 
@@ -72,6 +77,10 @@ Manager Manager::BulkLoadIntoSegments(
   SegmentBuilder builder(options.records_per_page_goal,
                          options.records_per_page_delta);
   const auto segments = builder.Build(records);
+  if (options.print_segment_details) {
+    std::ofstream segment_details(db_path / kSegmentDetailCsvFileName);
+    PrintSegmentsAsCSV(segment_details, segments);
+  }
 
   // 2. Load the data into pages on disk.
   for (size_t seg_idx = 0; seg_idx < segments.size(); ++seg_idx) {

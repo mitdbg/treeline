@@ -16,6 +16,7 @@ target_sources(pg PRIVATE
   ../tlx/btree.h
   ../tlx/core.cc
   ../tlx/core.h
+  ../util/status.cc
 )
 target_include_directories(pg
   PUBLIC
