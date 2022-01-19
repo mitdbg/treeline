@@ -14,13 +14,7 @@ class Statistics {
   Statistics& operator=(const Statistics&) = delete;
 
   void ClearAll() {
-    total_flush_bufmgr_hits_pages_ = 0;
-    total_flush_bufmgr_misses_pages_ = 0;
-    total_flush_deferred_pages_ = 0;
-    total_flush_deferred_records_ = 0;
-
     total_user_writes_records_ = 0;
-    total_user_reads_memtable_hits_records_ = 0;
     total_user_reads_bufmgr_hits_records_ = 0;
     total_user_reads_single_bufmgr_misses_records_ = 0;
     total_user_reads_multi_bufmgr_misses_records_ = 0;
@@ -34,35 +28,18 @@ class Statistics {
     preorg_count_ = 0;
     preorg_pre_total_length_ = 0;
     preorg_post_total_length_ = 0;
-
-    last_memtable_creation_ = std::chrono::steady_clock::now();
   }
 
   void ClearTemp() {
-    temp_flush_bufmgr_hits_pages_ = 0;
-    temp_flush_bufmgr_misses_pages_ = 0;
-    temp_flush_deferred_pages_ = 0;
-    temp_flush_deferred_records_ = 0;
-
     temp_user_writes_records_ = 0;
-    temp_user_reads_memtable_hits_records_ = 0;
     temp_user_reads_bufmgr_hits_records_ = 0;
     temp_user_reads_single_bufmgr_misses_records_ = 0;
     temp_user_reads_multi_bufmgr_misses_records_ = 0;
   }
 
   void MoveTempToTotalAndClearTemp() {
-    // This is only "atomic" because we know it is ONLY called within
-    // DBImpl::ScheduleMemTableFlush() (which owns locks) and DBImpl::~DBImpl.
-    // Not necessarily safe to call it elsewhere.
-    total_flush_bufmgr_hits_pages_ += temp_flush_bufmgr_hits_pages_;
-    total_flush_bufmgr_misses_pages_ += temp_flush_bufmgr_misses_pages_;
-    total_flush_deferred_pages_ += temp_flush_deferred_pages_;
-    total_flush_deferred_records_ += temp_flush_deferred_records_;
-
     total_user_writes_records_ += temp_user_writes_records_;
-    total_user_reads_memtable_hits_records_ +=
-        temp_user_reads_memtable_hits_records_;
+
     total_user_reads_bufmgr_hits_records_ +=
         temp_user_reads_bufmgr_hits_records_;
     total_user_reads_single_bufmgr_misses_records_ +=
@@ -78,16 +55,9 @@ class Statistics {
     str += "Statistics:\n";
     str += "\tIO:\n";
     str +=
-        "flush bufmgr hits (pgs), flush bufmgr misses (pgs), flush deferrals "
-        "(pgs), flush deferrals (recs), user writes (recs), user reads "
-        "memtable hits (recs), user reads bufmgr hits (recs), user reads "
+        "user writes (recs), user reads bufmgr hits (recs), user reads "
         "single bufmgr miss (recs), user reads multiple bufmgr misses (recs)\n";
-    str += std::to_string(total_flush_bufmgr_hits_pages_) + "," +
-           std::to_string(total_flush_bufmgr_misses_pages_) + "," +
-           std::to_string(total_flush_deferred_pages_) + "," +
-           std::to_string(total_flush_deferred_records_) + "," +
-           std::to_string(total_user_writes_records_) + "," +
-           std::to_string(total_user_reads_memtable_hits_records_) + "," +
+    str += std::to_string(total_user_writes_records_) + "," +
            std::to_string(total_user_reads_bufmgr_hits_records_) + "," +
            std::to_string(total_user_reads_single_bufmgr_misses_records_) +
            "," + std::to_string(total_user_reads_multi_bufmgr_misses_records_) +
@@ -109,24 +79,12 @@ class Statistics {
     return str;
   }
 
-  std::atomic<size_t> total_flush_bufmgr_hits_pages_;
-  std::atomic<size_t> total_flush_bufmgr_misses_pages_;
-  std::atomic<size_t> total_flush_deferred_pages_;
-  std::atomic<size_t> total_flush_deferred_records_;
-
   std::atomic<size_t> total_user_writes_records_;
-  std::atomic<size_t> total_user_reads_memtable_hits_records_;
   std::atomic<size_t> total_user_reads_bufmgr_hits_records_;
   std::atomic<size_t> total_user_reads_single_bufmgr_misses_records_;
   std::atomic<size_t> total_user_reads_multi_bufmgr_misses_records_;
 
-  std::atomic<size_t> temp_flush_bufmgr_hits_pages_;
-  std::atomic<size_t> temp_flush_bufmgr_misses_pages_;
-  std::atomic<size_t> temp_flush_deferred_pages_;
-  std::atomic<size_t> temp_flush_deferred_records_;
-
   std::atomic<size_t> temp_user_writes_records_;
-  std::atomic<size_t> temp_user_reads_memtable_hits_records_;
   std::atomic<size_t> temp_user_reads_bufmgr_hits_records_;
   std::atomic<size_t> temp_user_reads_single_bufmgr_misses_records_;
   std::atomic<size_t> temp_user_reads_multi_bufmgr_misses_records_;
@@ -138,12 +96,6 @@ class Statistics {
   std::atomic<size_t> preorg_count_;
   std::atomic<size_t> preorg_pre_total_length_;
   std::atomic<size_t> preorg_post_total_length_;
-
-  // Maintains the timestamp of the last memtable creation, to help estimate the
-  // frequency of user inserts.
-  //
-  // Is only set within a critical section, so it doesn't need to be atomic.
-  std::chrono::time_point<std::chrono::steady_clock> last_memtable_creation_;
 };
 
 }  // namespace llsm

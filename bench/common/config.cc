@@ -179,17 +179,13 @@ rocksdb::Options BuildRocksDBOptions() {
 llsm::Options BuildLLSMOptions() {
   llsm::Options options;
   options.buffer_pool_size = FLAGS_cache_size_mib * 1024 * 1024;
-  options.memtable_flush_threshold = FLAGS_memtable_size_mib * 1024 * 1024;
   options.use_direct_io = FLAGS_use_direct_io;
   options.background_threads = FLAGS_bg_threads;
   options.key_hints.record_size = FLAGS_record_size_bytes;
   options.key_hints.page_fill_pct = FLAGS_llsm_page_fill_pct;
   options.pin_threads = true;
-  options.deferred_io_batch_size = FLAGS_io_min_batch_size;
-  options.deferred_io_max_deferrals = FLAGS_max_deferrals;
   options.use_alex = FLAGS_use_alex;
   options.deferral_autotuning = FLAGS_deferral_autotuning;
-  options.memory_autotuning = FLAGS_memory_autotuning;
   options.reorg_length = FLAGS_reorg_length;
   return options;
 }

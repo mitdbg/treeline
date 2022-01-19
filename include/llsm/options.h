@@ -50,18 +50,6 @@ struct Options {
   // The maximum size of LLSM's buffer pool, in bytes.
   size_t buffer_pool_size = 64 * 1024 * 1024;
 
-  // The maximum size of a memtable before it should be flushed to persistent
-  // storage, in bytes.
-  size_t memtable_flush_threshold = 64 * 1024 * 1024;
-
-  // The minimum size in bytes of a memtable batch associated with a certain
-  // page necessary to actually copy the entries out during a memtable flush.
-  size_t deferred_io_batch_size = 1;
-
-  // The maximum number of times that we are allowed to not copy some page out
-  // during a memtable flush.
-  uint64_t deferred_io_max_deferrals = 1;
-
   // Currently only used when creating a new database. When reopening an
   // existing database, these values are ignored.
   KeyDistHints key_hints;
@@ -80,11 +68,6 @@ struct Options {
   // deferred I/O parameters.
   bool deferral_autotuning = false;
   double batch_scaling_factor = 1;
-
-  // If true, LLSM will try to optimize the memory allocation between the buffer
-  // pool and the memtables, keeping the total memory budget to buffer_pool_size
-  // + 2 * memtable_flush_threshold.
-  bool memory_autotuning = false;
 
   // If false, LLSM will use a BTreeModel instead of an ALEXModel.
   bool use_alex = true;

@@ -43,8 +43,6 @@ class LLSMInterface {
     }
 
     if (FLAGS_verbose) {
-      std::cerr << "> LLSM memtable flush threshold: "
-                << options.memtable_flush_threshold << " bytes" << std::endl;
       std::cerr << "> LLSM buffer pool size: " << options.buffer_pool_size
                 << " bytes" << std::endl;
       std::cerr << "> Opening LLSM DB at " << dbname << std::endl;
@@ -72,7 +70,6 @@ class LLSMInterface {
         throw std::runtime_error("Failed to bulk load a record!");
       }
     }
-    db_->FlushMemTable(/*disable_deferred_io = */ true);
   }
 
   // Update the value at the specified key. Return true if the update succeeded.
