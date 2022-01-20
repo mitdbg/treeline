@@ -59,13 +59,33 @@ class SegmentFile {
     file_size_ = file_status.st_size;
   }
 
-  ~SegmentFile() { close(fd_); }
+  ~SegmentFile() {
+    if (fd_ < 0) {
+      // A negative file descriptor signifies an invalid file.
+      return;
+    }
+    close(fd_);
+  }
 
   SegmentFile(const SegmentFile&) = delete;
   SegmentFile& operator=(const SegmentFile&) = delete;
 
-  SegmentFile(SegmentFile&&) = default;
-  SegmentFile& operator=(SegmentFile&&) = default;
+  SegmentFile(SegmentFile&& other)
+      : fd_(other.fd_),
+        file_size_(other.file_size_),
+        next_page_allocation_offset_(other.next_page_allocation_offset_),
+        pages_per_segment_(other.pages_per_segment_) {
+    other.fd_ = -1;
+  }
+
+  SegmentFile& operator=(SegmentFile&& other) {
+    fd_ = other.fd_;
+    file_size_ = other.file_size_;
+    next_page_allocation_offset_ = other.next_page_allocation_offset_;
+    pages_per_segment_ = other.pages_per_segment_;
+    other.fd_ = -1;
+    return *this;
+  }
 
   Status ReadPages(size_t offset, void* data, size_t num_pages) const {
     if (offset >= next_page_allocation_offset_) {

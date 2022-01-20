@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <optional>
 
 #include "bufmgr/page_memory_allocator.h"
 #include "persist/page.h"
@@ -18,6 +19,7 @@ namespace {
 
 const std::string kSegmentFilePrefix = "sf-";
 const std::string kSegmentDetailCsvFileName = "loaded_segments.csv";
+const std::string kPageDetailCsvFileName = "page_bounds.csv";
 
 Status LoadIntoPage(PageBuffer& buf, size_t page_idx, Key lower, Key upper,
                     const std::vector<std::pair<Key, Slice>>& records,
@@ -79,9 +81,13 @@ Manager Manager::BulkLoadIntoSegments(
   SegmentBuilder builder(options.records_per_page_goal,
                          options.records_per_page_delta);
   const auto segments = builder.Build(records);
-  if (options.print_segment_details) {
+  std::optional<std::ofstream> page_details;
+  if (options.write_debug_info) {
     std::ofstream segment_details(db_path / kSegmentDetailCsvFileName);
     PrintSegmentsAsCSV(segment_details, segments);
+
+    page_details = std::ofstream(db_path / kPageDetailCsvFileName);
+    (*page_details) << "num_records,min_key,max_key" << std::endl;
   }
 
   // 2. Load the data into pages on disk.
@@ -110,22 +116,33 @@ Manager Manager::BulkLoadIntoSegments(
               /*upper_key=*/rec.first, records,
               /*start_idx=*/curr_page_first_record_idx, /*end_idx=*/i);
           assert(result.ok());
+          if (page_details.has_value()) {
+            (*page_details) << (i - curr_page_first_record_idx) << ","
+                            << records[curr_page_first_record_idx].first << ","
+                            << rec.first << std::endl;
+          }
           curr_page = assigned_page;
           curr_page_first_record_idx = i;
         }
       }
+      const Key upper_key =
+          (seg_idx == segments.size() - 1)
+              // Max key if this is the last segment.
+              ? std::numeric_limits<uint64_t>::max()
+              // Otherwise, the next segment's first key.
+              : records[segments[seg_idx + 1].start_idx].first;
       // Flush remaining to a page.
       const auto result =
           LoadIntoPage(buf, curr_page,
                        /*lower=*/records[curr_page_first_record_idx].first,
-                       /*upper=*/
-                       (seg_idx == segments.size() - 1)
-                           // Max key if this is the last segment.
-                           ? std::numeric_limits<uint64_t>::max()
-                           // Otherwise, the next segment's first key.
-                           : records[segments[seg_idx + 1].start_idx].first,
-                       records, curr_page_first_record_idx, seg.end_idx);
+                       /*upper=*/upper_key, records, curr_page_first_record_idx,
+                       seg.end_idx);
       assert(result.ok());
+      if (page_details.has_value()) {
+        (*page_details) << (seg.end_idx - curr_page_first_record_idx) << ","
+                        << records[curr_page_first_record_idx].first << ","
+                        << upper_key << std::endl;
+      }
 
       // Write model into the first page (for deserialization).
       pg::Page first_page(buf.get());
