@@ -33,3 +33,10 @@ add_executable(pg_bench
   ../bench/common/startup.h
 )
 target_link_libraries(pg_bench PRIVATE pg gflags ycsbr-gen Threads::Threads)
+
+add_executable(pg_standalone
+  pg_standalone.cc
+  ../bench/common/load_data.cc
+  ../bench/common/load_data.h
+)
+target_link_libraries(pg_standalone PRIVATE pg gflags)
