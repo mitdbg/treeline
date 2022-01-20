@@ -10,7 +10,8 @@ namespace pg {
 
 using Record = std::pair<llsm::pg::Key, const llsm::Slice>;
 
-// The number of pages in each segment. If you change this, change `kPageCountToSegment` too.
+// The number of pages in each segment. If you change this, change
+// `kPageCountToSegment` too.
 const std::vector<size_t> SegmentBuilder::kSegmentPageCounts = {1, 2, 4, 8, 16};
 
 const std::unordered_map<size_t, size_t> SegmentBuilder::kPageCountToSegment = {
@@ -161,8 +162,8 @@ std::vector<Segment> SegmentBuilder::Build(
     }
     segments.push_back(Segment::MultiPage(
         segment_size, records_processed.front(), records_processed.back() + 1,
-        plr::BoundedLine64(maybe_line->line(), 0,
-                           records_processed.size() - 1)));
+        plr::BoundedLine64(maybe_line->line().Rescale(records_per_page_goal_),
+                           0, records_processed.size() - 1)));
   }
 
   return segments;

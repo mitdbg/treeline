@@ -30,6 +30,8 @@ Status LoadIntoPage(PageBuffer& buf, size_t page_idx, Key lower, Key upper,
     key_utils::IntKeyAsSlice key(r.first);
     const auto res = page.Put(key.as<Slice>(), r.second);
     if (!res.ok()) {
+      std::cerr << "Page full. Current size: " << page.GetNumRecords()
+                << std::endl;
       return res;
     }
   }
@@ -66,7 +68,7 @@ Manager Manager::BulkLoadIntoSegments(
     segment_files.emplace_back(
         db_path / (kSegmentFilePrefix + std::to_string(i)),
         /*use_direct_io=*/true,
-        /*initial_num_pages=*/1);
+        /*pages_per_segment=*/SegmentBuilder::kSegmentPageCounts[i]);
   }
   std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
 
@@ -122,7 +124,7 @@ Manager Manager::BulkLoadIntoSegments(
                            ? std::numeric_limits<uint64_t>::max()
                            // Otherwise, the next segment's first key.
                            : records[segments[seg_idx + 1].start_idx].first,
-                       records, curr_page_first_record_idx, records.size());
+                       records, curr_page_first_record_idx, seg.end_idx);
       assert(result.ok());
 
       // Write model into the first page (for deserialization).
