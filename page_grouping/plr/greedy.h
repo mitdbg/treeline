@@ -20,8 +20,8 @@ namespace plr {
 // segment that has a maximum error of less than `delta` relative to each of
 // the provided data points.
 //
-// N.B. `delta` is exclusive error. The segment will have an error strictly
-// less than `delta`.
+// N.B. `delta` is inclusive error. The segment will have an error of at most
+// `delta`.
 template <typename T>
 class GreedyPLRSegmenter {
  public:
@@ -101,22 +101,22 @@ inline std::optional<BoundedLine<T>> GreedyPLRSegmenter<T>::Offer(
   // Check if we will violate `delta` if we include this point.
   const auto bottom_line = Line<T>::FromSlopeAndPoint(slope_bot_, s0_);
   const T bottom_pred = bottom_line(p.x());
-  if (bottom_pred >= p.y()) {
+  if (bottom_pred > p.y()) {
     return Finish();
   }
   const auto top_line = Line<T>::FromSlopeAndPoint(slope_top_, s0_);
   const T top_pred = top_line(p.x());
-  if (top_pred <= p.y()) {
+  if (top_pred < p.y()) {
     return Finish();
   }
 
   // Adjust the slopes.
   const T x_diff = p.x() - s0_.x();
   const T y_diff = p.y() - s0_.y();
-  if (std::abs(std::fma(-slope_bot_, x_diff, y_diff)) >= delta_) {
+  if (std::abs(std::fma(-slope_bot_, x_diff, y_diff)) > delta_) {
     slope_bot_ = ComputeSlope(s0_, p.AddDelta(-delta_));
   }
-  if (std::abs(std::fma(-slope_top_, x_diff, y_diff)) >= delta_) {
+  if (std::abs(std::fma(-slope_top_, x_diff, y_diff)) > delta_) {
     slope_top_ = ComputeSlope(s0_, p.AddDelta(delta_));
   }
 
@@ -127,7 +127,7 @@ inline std::optional<BoundedLine<T>> GreedyPLRSegmenter<T>::Offer(
 template <typename T>
 inline BoundedLine<T> GreedyPLRSegmenter<T>::Finish() const {
   return BoundedLine<T>(
-      Line<T>::FromSlopeAndPoint((0.5 * slope_bot_) + (0.5 * slope_top_), s0_),
+      Line<T>::FromSlopeAndPoint((slope_bot_ + slope_top_) / 2.0, s0_),
       start_x_, last_point_.x());
 }
 
