@@ -112,8 +112,8 @@ std::vector<Segment> SegmentBuilder::Build(
 
     // Find the largest possible segment we can make.
     // `allowed_records_per_segment_` contains the ideal size for each segment.
-    // We want to find the index of the *largest* value that is less than or equal
-    // to `last_record_size`.
+    // We want to find the index of the *largest* value that is less than or
+    // equal to `last_record_size`.
     const auto segment_size_idx_it =
         std::upper_bound(allowed_records_per_segment_.begin(),
                          allowed_records_per_segment_.end(), last_record_size);
@@ -170,10 +170,15 @@ std::vector<Segment> SegmentBuilder::Build(
       extra_keys--;
       next_idx--;
     }
+
+    Key last_key = std::numeric_limits<Key>::max();
+    if (next_idx < dataset.size()) {
+      last_key = dataset[next_idx].first;
+    }
     segments.push_back(Segment::MultiPage(
         segment_size, records_processed.front(), records_processed.back() + 1,
         plr::BoundedLine64(maybe_line->line().Rescale(records_per_page_goal_),
-                           0, records_processed.size() - 1)));
+                           /*start_x=*/0, /*end_x=*/last_key - base_key)));
   }
 
   return segments;
