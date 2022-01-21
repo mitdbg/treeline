@@ -18,21 +18,26 @@ namespace pg {
 
 class Manager {
  public:
-  struct LoadOptions {
+  struct Options {
     // If set to false, no segments larger than 1 page will be created.
     bool use_segments = true;
+
     // By default, put 45 +/- (2 * 5) records into each page.
     size_t records_per_page_goal = 45;
     size_t records_per_page_delta = 5;
+
     // If set to true, will write out the segment sizes and models to a CSV file
     // for debug purposes.
     bool write_debug_info = true;
+
+    // If set to false, direct I/O will be disabled (used for end-to-end tests).
+    bool use_direct_io = true;
   };
   static Manager LoadIntoNew(const std::filesystem::path& db,
                              const std::vector<std::pair<Key, Slice>>& records,
-                             const LoadOptions& options);
+                             const Options& options);
 
-  static Manager Reopen(const std::filesystem::path& db);
+  static Manager Reopen(const std::filesystem::path& db, const Options& options);
 
   Status Get(const Key& key, std::string* value_out);
   Status PutBatch(const std::vector<std::pair<Key, Slice>>& records);
@@ -53,12 +58,12 @@ class Manager {
   static Manager BulkLoadIntoSegments(
       const std::filesystem::path& db_path,
       const std::vector<std::pair<Key, Slice>>& records,
-      const Manager::LoadOptions& options);
+      const Manager::Options& options);
 
   static Manager BulkLoadIntoPages(
       const std::filesystem::path& db,
       const std::vector<std::pair<Key, Slice>>& records,
-      const Manager::LoadOptions& options);
+      const Manager::Options& options);
 
   std::filesystem::path db_path_;
   tlx::btree_map<Key, SegmentInfo> index_;

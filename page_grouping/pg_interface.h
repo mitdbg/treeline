@@ -36,7 +36,7 @@ class PageGroupingInterface {
         std::filesystem::is_directory(db_path_) &&
         !std::filesystem::is_empty(db_path_)) {
       // Reopening an existing database.
-      pg_mgr_ = Manager::Reopen(db_path_);
+      pg_mgr_ = Manager::Reopen(db_path_, GetOptions());
     } else {
       // No-op. Will initialize during bulk load.
     }
@@ -63,11 +63,7 @@ class PageGroupingInterface {
                 return r1.first < r2.first;
               });
 
-    Manager::LoadOptions options;
-    options.records_per_page_goal = FLAGS_records_per_page_goal;
-    options.records_per_page_delta = FLAGS_records_per_page_delta;
-    options.use_segments = !FLAGS_disable_segments;
-    pg_mgr_ = Manager::LoadIntoNew(db_path_, records, options);
+    pg_mgr_ = Manager::LoadIntoNew(db_path_, records, GetOptions());
   }
 
   // Update the value at the specified key. Return true if the update succeeded.
@@ -92,6 +88,14 @@ class PageGroupingInterface {
   }
 
  private:
+  Manager::Options GetOptions() {
+    Manager::Options options;
+    options.records_per_page_goal = FLAGS_records_per_page_goal;
+    options.records_per_page_delta = FLAGS_records_per_page_delta;
+    options.use_segments = !FLAGS_disable_segments;
+    return options;
+  }
+
   std::filesystem::path db_path_;
   std::optional<Manager> pg_mgr_;
 };

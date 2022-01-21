@@ -63,14 +63,14 @@ namespace pg {
 
 Manager Manager::BulkLoadIntoSegments(
     const fs::path& db_path, const std::vector<std::pair<Key, Slice>>& records,
-    const Manager::LoadOptions& options) {
+    const Manager::Options& options) {
   assert(options.use_segments);
 
   std::vector<SegmentFile> segment_files;
   for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
     segment_files.emplace_back(
         db_path / (kSegmentFilePrefix + std::to_string(i)),
-        /*use_direct_io=*/true,
+        options.use_direct_io,
         /*pages_per_segment=*/SegmentBuilder::kSegmentPageCounts[i]);
   }
   std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
@@ -183,13 +183,13 @@ Manager Manager::BulkLoadIntoSegments(
 
 Manager Manager::BulkLoadIntoPages(
     const fs::path& db, const std::vector<std::pair<Key, Slice>>& records,
-    const Manager::LoadOptions& options) {
+    const Manager::Options& options) {
   PageBuffer buf = PageMemoryAllocator::Allocate(/*num_pages=*/1);
 
   // One single file containing 4 KiB pages.
   std::vector<SegmentFile> segment_files;
   segment_files.emplace_back(db / (kSegmentFilePrefix + "0"),
-                             /*use_direct_io=*/true, /*pages_per_segment=*/1);
+                             options.use_direct_io, /*pages_per_segment=*/1);
   SegmentFile& sf = segment_files.front();
 
   std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
@@ -249,7 +249,7 @@ Manager::Manager(fs::path db_path,
 
 Manager Manager::LoadIntoNew(const fs::path& db,
                              const std::vector<std::pair<Key, Slice>>& records,
-                             const LoadOptions& options) {
+                             const Options& options) {
   fs::create_directory(db);
 
   if (options.use_segments) {
@@ -259,7 +259,7 @@ Manager Manager::LoadIntoNew(const fs::path& db,
   }
 }
 
-Manager Manager::Reopen(const fs::path& db) {
+Manager Manager::Reopen(const fs::path& db, const Options& options) {
   // Figure out if there are segments in this DB.
   const bool uses_segments = fs::exists(db / (kSegmentFilePrefix + "1"));
   PageBuffer buf = PageMemoryAllocator::Allocate(/*num_pages=*/1);
@@ -272,7 +272,7 @@ Manager Manager::Reopen(const fs::path& db) {
     if (i > 0 && !uses_segments) break;
     const size_t pages_per_segment = SegmentBuilder::kSegmentPageCounts[i];
     segment_files.emplace_back(db / (kSegmentFilePrefix + std::to_string(i)),
-                               /*use_direct_io=*/true, pages_per_segment);
+                               options.use_direct_io, pages_per_segment);
     SegmentFile& sf = segment_files.back();
 
     const size_t num_segments = sf.NumSegments();
