@@ -11,6 +11,7 @@ target_sources(pg PRIVATE
   manager.h
   segment_builder.cc
   segment_builder.h
+  workspace.h
   ../bufmgr/page_memory_allocator.cc
   ../bufmgr/page_memory_allocator.h
   ../tlx/btree_map.h

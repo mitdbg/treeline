@@ -2,6 +2,8 @@
 
 #include <filesystem>
 #include <vector>
+#include <random>
+#include <string>
 
 #include "../key.h"
 #include "../segment_info.h"
@@ -38,6 +40,7 @@ TEST_F(ManagerTest, CreateReopenSegments) {
   Manager::Options options;
   options.records_per_page_goal = 15;
   options.records_per_page_delta = 5;
+  options.use_segments = true;
   options.write_debug_info = false;
   options.use_direct_io = false;
 
@@ -111,3 +114,144 @@ TEST_F(ManagerTest, CreateReopenPages) {
   }
 }
 
+TEST_F(ManagerTest, PointReadSegments) {
+  Manager::Options options;
+  options.records_per_page_goal = 15;
+  options.records_per_page_delta = 5;
+  options.use_segments = true;
+  options.write_debug_info = false;
+  options.use_direct_io = false;
+
+  std::vector<std::pair<uint64_t, Slice>> dataset =
+      BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
+
+  // Select 20 "random" dataset indices to read.
+  std::vector<size_t> to_read;
+  to_read.reserve(20);
+  std::uniform_int_distribution<size_t> dist(0, dataset.size() - 1);
+  std::mt19937 prng(42);
+  for (size_t i = 0; i < 20; ++i) {
+    to_read.push_back(dist(prng));
+  }
+
+  // Read from newly loaded dataset.
+  {
+    Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 5);
+
+    std::string out;
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(Slice(out)), 0);
+    }
+  }
+
+  // Read from reopened DB.
+  {
+    Manager m = Manager::Reopen(kDBDir, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 5);
+
+    std::string out;
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(Slice(out)), 0);
+    }
+  }
+}
+
+TEST_F(ManagerTest, PointReadPages) {
+  Manager::Options options;
+  options.records_per_page_goal = 15;
+  options.records_per_page_delta = 5;
+  options.use_segments = false;
+  options.write_debug_info = false;
+  options.use_direct_io = false;
+
+  std::vector<std::pair<uint64_t, Slice>> dataset =
+      BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
+
+  // Select 20 "random" dataset indices to read.
+  std::vector<size_t> to_read;
+  to_read.reserve(20);
+  std::uniform_int_distribution<size_t> dist(0, dataset.size() - 1);
+  std::mt19937 prng(42);
+  for (size_t i = 0; i < 20; ++i) {
+    to_read.push_back(dist(prng));
+  }
+
+  // Read from newly loaded dataset.
+  {
+    Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 1);
+
+    std::string out;
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(Slice(out)), 0);
+    }
+  }
+
+  // Read from reopened DB.
+  {
+    Manager m = Manager::Reopen(kDBDir, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 1);
+
+    std::string out;
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(Slice(out)), 0);
+    }
+  }
+}
+
+TEST_F(ManagerTest, PointReadSegmentsSequential) {
+  Manager::Options options;
+  options.records_per_page_goal = 45;
+  options.records_per_page_delta = 5;
+  options.use_segments = true;
+  options.write_debug_info = false;
+  options.use_direct_io = false;
+
+  // Use the sequential dataset instead of the uniform one.
+  std::vector<std::pair<uint64_t, Slice>> dataset =
+      BuildRecords(Datasets::kSequentialKeys, u8"08 bytes");
+
+  // Select 20 "random" dataset indices to read.
+  std::vector<size_t> to_read;
+  to_read.reserve(20);
+  std::uniform_int_distribution<size_t> dist(0, dataset.size() - 1);
+  std::mt19937 prng(42);
+  for (size_t i = 0; i < 20; ++i) {
+    to_read.push_back(dist(prng));
+  }
+
+  // Read from newly loaded dataset.
+  {
+    Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 5);
+
+    std::string out;
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(Slice(out)), 0);
+    }
+  }
+
+  // Read from reopened DB.
+  {
+    Manager m = Manager::Reopen(kDBDir, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 5);
+
+    std::string out;
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(Slice(out)), 0);
+    }
+  }
+}

@@ -12,6 +12,7 @@
 #include "persist/segment_file.h"
 #include "segment_info.h"
 #include "tlx/btree_map.h"
+#include "workspace.h"
 
 namespace llsm {
 namespace pg {
@@ -37,7 +38,8 @@ class Manager {
                              const std::vector<std::pair<Key, Slice>>& records,
                              const Options& options);
 
-  static Manager Reopen(const std::filesystem::path& db, const Options& options);
+  static Manager Reopen(const std::filesystem::path& db,
+                        const Options& options);
 
   Status Get(const Key& key, std::string* value_out);
   Status PutBatch(const std::vector<std::pair<Key, Slice>>& records);
@@ -73,6 +75,11 @@ class Manager {
   std::filesystem::path db_path_;
   tlx::btree_map<Key, SegmentInfo> index_;
   std::vector<SegmentFile> segment_files_;
+
+  // Holds state used by individual worker threads.
+  // This is static for convenience (to use `thread_local`). So for correctness
+  // there can only be one active `Manager` in a process at any time.
+  static thread_local Workspace w_;
 };
 
 }  // namespace pg

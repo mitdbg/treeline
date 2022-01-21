@@ -61,6 +61,8 @@ void PrintSegmentsAsCSV(std::ostream& out,
 namespace llsm {
 namespace pg {
 
+thread_local Workspace Manager::w_;
+
 Manager Manager::BulkLoadIntoSegments(
     const fs::path& db_path, const std::vector<std::pair<Key, Slice>>& records,
     const Manager::Options& options) {
@@ -304,7 +306,25 @@ Manager Manager::Reopen(const fs::path& db, const Options& options) {
 }
 
 Status Manager::Get(const Key& key, std::string* value_out) {
-  return Status::OK();
+  // 1. Find the segment that should hold the key.
+  auto it = index_.upper_bound(key);
+  if (it != index_.begin()) {
+    --it;
+  }
+
+  // 2. Figure out the page offset.
+  const Key base_key = it->first;
+  const size_t page_idx = it->second.PageForKey(base_key, key);
+
+  // 3. Read the page in (there are no overflows right now).
+  const SegmentFile& sf = segment_files_[it->second.id().GetFileId()];
+  const size_t page_offset = it->second.id().GetOffset() + page_idx;
+  sf.ReadPages(page_offset * pg::Page::kSize, w_.buffer().get(), /*num_pages=*/1);
+
+  // 4. Search for the record on the page.
+  pg::Page page(w_.buffer().get());
+  key_utils::IntKeyAsSlice key_slice(key);
+  return page.Get(key_slice.as<Slice>(), value_out);
 }
 
 Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {

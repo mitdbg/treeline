@@ -4,8 +4,8 @@
 #include <utility>
 #include <vector>
 
+#include "key.h"
 #include "llsm/slice.h"
-#include "manager.h"
 #include "plr/data.h"
 
 namespace llsm {
