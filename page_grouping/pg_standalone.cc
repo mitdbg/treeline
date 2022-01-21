@@ -18,8 +18,8 @@ using namespace llsm::pg;
 
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
-  const size_t max_records_per_page = FLAGS_goal + FLAGS_delta;
-  const size_t min_records_per_page = FLAGS_goal - FLAGS_delta;
+  const size_t max_records_per_page = FLAGS_goal + 2 * FLAGS_delta;
+  const size_t min_records_per_page = FLAGS_goal - 2 * FLAGS_delta;
 
   std::vector<uint64_t> keys = llsm::bench::LoadDatasetFromTextFile(
       FLAGS_custom_dataset, /*warn_on_duplicates=*/true);
@@ -76,6 +76,8 @@ int main(int argc, char* argv[]) {
       std::cerr << "Last model output: " << outputs.back() << std::endl;
     }
   }
+
+  std::cerr << "> Done validation." << std::endl;
 
   return 0;
 }

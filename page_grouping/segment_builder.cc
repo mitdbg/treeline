@@ -44,7 +44,9 @@ SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
                                const size_t records_per_page_delta)
     : records_per_page_goal_(records_per_page_goal),
       records_per_page_delta_(records_per_page_delta),
-      max_records_in_segment_(records_per_page_goal_ * kMaxSegmentSize) {
+      max_records_in_segment_(
+          (records_per_page_goal_ + records_per_page_delta_) *
+          kMaxSegmentSize) {
   allowed_records_per_segment_.reserve(kSegmentPageCounts.size());
   for (size_t pages : kSegmentPageCounts) {
     allowed_records_per_segment_.push_back(pages * records_per_page_goal_);
@@ -101,23 +103,42 @@ std::vector<Segment> SegmentBuilder::Build(
       }
     }
 
-    // Determine how large of a segment we can make.
-    const auto upper_bound_it = std::upper_bound(
-        allowed_records_per_segment_.begin(),
-        allowed_records_per_segment_.end(), records_processed.size());
-    const int64_t segment_size_idx =
-        static_cast<int>(upper_bound_it -
-                         allowed_records_per_segment_.begin()) -
-        1;
+    // According to the generated model, how many records have we processed when
+    // we hit the last key?
+    const double last_record_size =
+        1.0 +
+        std::max(0.0, maybe_line->line()(
+                          dataset[records_processed.back()].first - base_key));
 
-    if (segment_size_idx < 0) {
-      // Could not build a model that "covers" one full page. So we just fill a
-      // page anyways.
-      size_t addtl_keys =
-          allowed_records_per_segment_[0] - records_processed.size();
-      while (addtl_keys > 0 && next_idx < dataset.size()) {
-        records_processed.push_back(next_idx++);
-        addtl_keys--;
+    // Find the largest possible segment we can make. A linear search is
+    // acceptable because there are only 5 elements in the vector.
+    int segment_size_idx = allowed_records_per_segment_.size() - 1;
+    while (segment_size_idx >= 0) {
+      if (last_record_size >= allowed_records_per_segment_[segment_size_idx]) {
+        break;
+      }
+      --segment_size_idx;
+    }
+
+    if (segment_size_idx <= 0) {
+      // One of two cases:
+      // - Could not build a model that "covers" one full page
+      // - Could not build a model that "covers" more than one page
+      // So we just fill one page regardless and omit the model.
+      const size_t target_size = allowed_records_per_segment_[0];
+      if (target_size > records_processed.size()) {
+        // Can add more records.
+        while (records_processed.size() < target_size &&
+               next_idx < dataset.size()) {
+          records_processed.push_back(next_idx++);
+        }
+      } else if (target_size < records_processed.size()) {
+        // Have too many records.
+        size_t extra_keys = records_processed.size() - target_size;
+        while (extra_keys > 0) {
+          --next_idx;
+          --extra_keys;
+        }
       }
       segments.push_back(Segment::SinglePage(records_processed.front(),
                                              records_processed.back() + 1));
@@ -125,19 +146,7 @@ std::vector<Segment> SegmentBuilder::Build(
     }
 
     const size_t segment_size = kSegmentPageCounts[segment_size_idx];
-    if (segment_size == 1) {
-      // No need for a model.
-      size_t extra_keys =
-          records_processed.size() - allowed_records_per_segment_[0];
-      while (extra_keys > 0) {
-        records_processed.pop_back();
-        extra_keys--;
-        next_idx--;
-      }
-      segments.push_back(Segment::SinglePage(records_processed.front(),
-                                             records_processed.back() + 1));
-      continue;
-    }
+    assert(segment_size > 1);
 
     const size_t records_in_segment =
         allowed_records_per_segment_[segment_size_idx];
