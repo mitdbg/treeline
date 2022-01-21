@@ -22,9 +22,9 @@ class Manager {
   struct LoadOptions {
     // If set to false, no segments larger than 1 page will be created.
     bool use_segments = true;
-    // By default, put 44 +/- 10 records into each page.
-    size_t records_per_page_goal = 44;
-    size_t records_per_page_delta = 10;
+    // By default, put 45 +/- (2 * 5) records into each page.
+    size_t records_per_page_goal = 45;
+    size_t records_per_page_delta = 5;
     // If set to true, will write out the segment sizes and models to a CSV file
     // for debug purposes.
     bool write_debug_info = true;

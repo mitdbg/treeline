@@ -136,6 +136,7 @@ std::vector<Segment> SegmentBuilder::Build(
         // Have too many records.
         size_t extra_keys = records_processed.size() - target_size;
         while (extra_keys > 0) {
+          records_processed.pop_back();
           --next_idx;
           --extra_keys;
         }
