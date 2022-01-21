@@ -222,7 +222,7 @@ Manager Manager::BulkLoadIntoPages(
     memset(buf.get(), 0, pg::Page::kSize);
     auto result = LoadIntoPage(buf, 0, records[page_start_idx].first,
                                std::numeric_limits<uint64_t>::max(), records,
-                               page_start_idx, page_end_idx);
+                               page_start_idx, records.size());
     assert(result.ok());
 
     // Write page to disk.
@@ -282,7 +282,7 @@ Manager Manager::Reopen(const fs::path& db, const Options& options) {
       if (!page.IsValid() || page.IsOverflow()) {
         continue;
       }
-      SegmentId id(i, seg_idx);
+      SegmentId id(i, seg_idx * pages_per_segment);  // Offset is the page offset.
       const Key base_key = key_utils::ExtractHead64(page.GetLowerBoundary());
       if (pages_per_segment == 1) {
         segment_boundaries.emplace_back(
