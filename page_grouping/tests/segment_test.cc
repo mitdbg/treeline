@@ -94,48 +94,9 @@ TEST(PLRTest, Uniform) {
   }
 }
 
-TEST(SegmentBuilderTest, Sequential) {
-  std::vector<std::pair<uint64_t, Slice>> records;
-  records.reserve(kSequentialKeys.size());
-  for (const auto& key : kSequentialKeys) {
-    records.emplace_back(key, Slice());
-  }
-
-  const size_t goal = 45;
-  const size_t delta = 5;
-  SegmentBuilder builder(goal, delta);
-  const auto segments = builder.Build(records);
-  ASSERT_FALSE(segments.empty());
-
-  for (size_t i = 0; i < segments.size(); ++i) {
-    const auto& seg = segments[i];
-    if (seg.page_count == 1) {
-      ASSERT_FALSE(seg.model.has_value());
-    } else {
-      ASSERT_TRUE(seg.model.has_value());
-    }
-
-    const size_t max_records_in_segment = seg.page_count * (goal + delta);
-    const size_t min_records_in_segment = seg.page_count * (goal - delta);
-    const size_t num_records = seg.end_idx - seg.start_idx;
-    ASSERT_LE(num_records, max_records_in_segment);
-    if (i != segments.size() - 1) {
-      ASSERT_GE(num_records, min_records_in_segment);
-    }
-  }
-}
-
-TEST(SegmentBuilderTest, Uniform) {
-  std::vector<std::pair<uint64_t, Slice>> records;
-  records.reserve(kUniformKeys.size());
-  for (const auto& key : kUniformKeys) {
-    records.emplace_back(key, Slice());
-  }
-
-  const size_t goal = 15;
-  const size_t delta = 5;
-  SegmentBuilder builder(goal, delta);
-  const auto segments = builder.Build(records);
+void CheckSegments(const std::vector<uint64_t>& dataset,
+                   const std::vector<Segment>& segments, const size_t goal,
+                   const size_t delta) {
   ASSERT_FALSE(segments.empty());
 
   for (size_t i = 0; i < segments.size(); ++i) {
@@ -163,10 +124,10 @@ TEST(SegmentBuilderTest, Uniform) {
       page_counts.push_back(0);
     }
 
-    const Key base_key = kUniformKeys[seg.start_idx];
+    const Key base_key = dataset[seg.start_idx];
     for (size_t j = seg.start_idx; j < seg.end_idx; ++j) {
-      const size_t page_idx = PageForKey(base_key, seg.model->line(),
-                                         seg.page_count, kUniformKeys[j]);
+      const size_t page_idx =
+          PageForKey(base_key, seg.model->line(), seg.page_count, dataset[j]);
       ++page_counts[page_idx];
     }
 
@@ -181,4 +142,64 @@ TEST(SegmentBuilderTest, Uniform) {
       }
     }
   }
+}
+
+TEST(SegmentBuilderTest, Sequential_45_5) {
+  std::vector<std::pair<uint64_t, Slice>> records;
+  records.reserve(kSequentialKeys.size());
+  for (const auto& key : kSequentialKeys) {
+    records.emplace_back(key, Slice());
+  }
+
+  const size_t goal = 45;
+  const size_t delta = 5;
+  SegmentBuilder builder(goal, delta);
+  const auto segments = builder.Build(records);
+
+  CheckSegments(kSequentialKeys, segments, goal, delta);
+}
+
+TEST(SegmentBuilderTest, Sequential_15_5) {
+  std::vector<std::pair<uint64_t, Slice>> records;
+  records.reserve(kSequentialKeys.size());
+  for (const auto& key : kSequentialKeys) {
+    records.emplace_back(key, Slice());
+  }
+
+  const size_t goal = 15;
+  const size_t delta = 5;
+  SegmentBuilder builder(goal, delta);
+  const auto segments = builder.Build(records);
+
+  CheckSegments(kSequentialKeys, segments, goal, delta);
+}
+
+TEST(SegmentBuilderTest, Uniform_45_5) {
+  std::vector<std::pair<uint64_t, Slice>> records;
+  records.reserve(kUniformKeys.size());
+  for (const auto& key : kUniformKeys) {
+    records.emplace_back(key, Slice());
+  }
+
+  const size_t goal = 45;
+  const size_t delta = 5;
+  SegmentBuilder builder(goal, delta);
+  const auto segments = builder.Build(records);
+
+  CheckSegments(kUniformKeys, segments, goal, delta);
+}
+
+TEST(SegmentBuilderTest, Uniform_15_5) {
+  std::vector<std::pair<uint64_t, Slice>> records;
+  records.reserve(kUniformKeys.size());
+  for (const auto& key : kUniformKeys) {
+    records.emplace_back(key, Slice());
+  }
+
+  const size_t goal = 15;
+  const size_t delta = 5;
+  SegmentBuilder builder(goal, delta);
+  const auto segments = builder.Build(records);
+
+  CheckSegments(kUniformKeys, segments, goal, delta);
 }
