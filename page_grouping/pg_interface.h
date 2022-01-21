@@ -50,7 +50,8 @@ class PageGroupingInterface {
   void BulkLoad(const ycsbr::BulkLoadTrace& load) {
     if (pg_mgr_.has_value()) {
       // Already initialized existing DB! Cannot bulk load.
-      throw std::runtime_error("DB already exists! Bulk load is not supported.");
+      throw std::runtime_error(
+          "DB already exists! Bulk load is not supported.");
     }
     std::vector<std::pair<ycsbr::Request::Key, Slice>> records;
     records.reserve(load.size());
@@ -77,7 +78,9 @@ class PageGroupingInterface {
   }
 
   // Read the value at the specified key. Return true if the read succeeded.
-  bool Read(ycsbr::Request::Key key, std::string* value_out) { return false; }
+  bool Read(ycsbr::Request::Key key, std::string* value_out) {
+    return pg_mgr_->Get(key, value_out).ok();
+  }
 
   // Scan the key range starting from `key` for `amount` records. Return true if
   // the scan succeeded.
