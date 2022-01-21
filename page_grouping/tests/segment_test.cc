@@ -1,7 +1,5 @@
 #include <algorithm>
 #include <cstdint>
-#include <random>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -9,58 +7,24 @@
 #include "../plr/data.h"
 #include "../plr/greedy.h"
 #include "../segment_builder.h"
+#include "datasets.h"
 #include "gtest/gtest.h"
 #include "llsm/slice.h"
 
 using namespace llsm;
 using namespace llsm::pg;
 
-// Uniformly selects `num_samples` samples from the range [min_val, max_val]
-// without replacement.
-std::vector<uint64_t> FloydSample(const size_t num_samples, uint64_t min_val,
-                                  uint64_t max_val, std::mt19937& rng) {
-  std::unordered_set<uint64_t> samples;
-  samples.reserve(num_samples);
-  for (uint64_t curr = max_val - num_samples + 1; curr <= max_val; ++curr) {
-    std::uniform_int_distribution<uint64_t> dist(min_val, curr);
-    const uint64_t next = dist(rng);
-    auto res = samples.insert(next);
-    if (!res.second) {
-      samples.insert(curr);
-    }
-  }
-  assert(samples.size() == num_samples);
-  return std::vector<uint64_t>(samples.begin(), samples.end());
-}
-
-static const std::vector<uint64_t> kSequentialKeys = ([](const size_t range) {
-  std::vector<uint64_t> results;
-  results.reserve(range);
-  for (uint64_t i = 0; i < range; ++i) {
-    results.push_back(i);
-  }
-  return results;
-})(1000);
-
-static const std::vector<uint64_t> kUniformKeys =
-    ([](const size_t num_samples, uint64_t min_val, uint64_t max_val) {
-      std::mt19937 prng(42);
-      auto res = FloydSample(num_samples, min_val, max_val, prng);
-      std::sort(res.begin(), res.end());
-      return res;
-    })(1000, 0, 1000000);
-
 TEST(PLRTest, Sequential) {
   const double delta = 10.0;
   plr::GreedyPLRBuilder64 plr(delta);
-  for (const auto& key : kSequentialKeys) {
+  for (const auto& key : Datasets::kSequentialKeys) {
     const auto line = plr.Offer(plr::Point64(key, key));
     ASSERT_FALSE(line.has_value());
   }
   const auto line = plr.Finish();
   ASSERT_TRUE(line.has_value());
 
-  for (const auto& key : kSequentialKeys) {
+  for (const auto& key : Datasets::kSequentialKeys) {
     const double out = line->line()(key);
     ASSERT_LE(std::abs(out - static_cast<double>(key)), delta);
   }
@@ -70,8 +34,8 @@ TEST(PLRTest, Uniform) {
   const double delta = 10.0;
   plr::GreedyPLRBuilder64 plr(delta);
   std::vector<plr::BoundedLine64> lines;
-  for (size_t i = 0; i < kUniformKeys.size(); ++i) {
-    const auto line = plr.Offer(plr::Point64(kUniformKeys[i], i));
+  for (size_t i = 0; i < Datasets::kUniformKeys.size(); ++i) {
+    const auto line = plr.Offer(plr::Point64(Datasets::kUniformKeys[i], i));
     if (line.has_value()) {
       lines.push_back(*line);
     }
@@ -83,8 +47,8 @@ TEST(PLRTest, Uniform) {
   ASSERT_FALSE(lines.empty());
 
   size_t curr_line_idx = 0;
-  for (size_t i = 0; i < kUniformKeys.size(); ++i) {
-    const auto key = kUniformKeys[i];
+  for (size_t i = 0; i < Datasets::kUniformKeys.size(); ++i) {
+    const auto key = Datasets::kUniformKeys[i];
     while (key > lines[curr_line_idx].end()) {
       ++curr_line_idx;
       ASSERT_LT(curr_line_idx, lines.size());
@@ -146,8 +110,8 @@ void CheckSegments(const std::vector<uint64_t>& dataset,
 
 TEST(SegmentBuilderTest, Sequential_45_5) {
   std::vector<std::pair<uint64_t, Slice>> records;
-  records.reserve(kSequentialKeys.size());
-  for (const auto& key : kSequentialKeys) {
+  records.reserve(Datasets::kSequentialKeys.size());
+  for (const auto& key : Datasets::kSequentialKeys) {
     records.emplace_back(key, Slice());
   }
 
@@ -156,13 +120,13 @@ TEST(SegmentBuilderTest, Sequential_45_5) {
   SegmentBuilder builder(goal, delta);
   const auto segments = builder.Build(records);
 
-  CheckSegments(kSequentialKeys, segments, goal, delta);
+  CheckSegments(Datasets::kSequentialKeys, segments, goal, delta);
 }
 
 TEST(SegmentBuilderTest, Sequential_15_5) {
   std::vector<std::pair<uint64_t, Slice>> records;
-  records.reserve(kSequentialKeys.size());
-  for (const auto& key : kSequentialKeys) {
+  records.reserve(Datasets::kSequentialKeys.size());
+  for (const auto& key : Datasets::kSequentialKeys) {
     records.emplace_back(key, Slice());
   }
 
@@ -171,13 +135,13 @@ TEST(SegmentBuilderTest, Sequential_15_5) {
   SegmentBuilder builder(goal, delta);
   const auto segments = builder.Build(records);
 
-  CheckSegments(kSequentialKeys, segments, goal, delta);
+  CheckSegments(Datasets::kSequentialKeys, segments, goal, delta);
 }
 
 TEST(SegmentBuilderTest, Uniform_45_5) {
   std::vector<std::pair<uint64_t, Slice>> records;
-  records.reserve(kUniformKeys.size());
-  for (const auto& key : kUniformKeys) {
+  records.reserve(Datasets::kUniformKeys.size());
+  for (const auto& key : Datasets::kUniformKeys) {
     records.emplace_back(key, Slice());
   }
 
@@ -186,13 +150,13 @@ TEST(SegmentBuilderTest, Uniform_45_5) {
   SegmentBuilder builder(goal, delta);
   const auto segments = builder.Build(records);
 
-  CheckSegments(kUniformKeys, segments, goal, delta);
+  CheckSegments(Datasets::kUniformKeys, segments, goal, delta);
 }
 
 TEST(SegmentBuilderTest, Uniform_15_5) {
   std::vector<std::pair<uint64_t, Slice>> records;
-  records.reserve(kUniformKeys.size());
-  for (const auto& key : kUniformKeys) {
+  records.reserve(Datasets::kUniformKeys.size());
+  for (const auto& key : Datasets::kUniformKeys) {
     records.emplace_back(key, Slice());
   }
 
@@ -201,5 +165,5 @@ TEST(SegmentBuilderTest, Uniform_15_5) {
   SegmentBuilder builder(goal, delta);
   const auto segments = builder.Build(records);
 
-  CheckSegments(kUniformKeys, segments, goal, delta);
+  CheckSegments(Datasets::kUniformKeys, segments, goal, delta);
 }

@@ -50,6 +50,11 @@ class Manager {
   Manager(Manager&&) = default;
   Manager& operator=(Manager&&) = default;
 
+  // Not intended for external use (used by the tests).
+  auto IndexBeginIterator() const { return index_.begin(); }
+  auto IndexEndIterator() const { return index_.end(); }
+  size_t NumSegmentFiles() const { return segment_files_.size(); }
+
  private:
   Manager(std::filesystem::path db_path,
           std::vector<std::pair<Key, SegmentInfo>> boundaries,

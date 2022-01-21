@@ -60,6 +60,11 @@ class Line {
     return Line<T>(slope_ / factor, intercept_ / factor);
   }
 
+  bool operator==(const Line<T>& other) const {
+    // N.B. Exact equality.
+    return slope_ == other.slope_ && intercept_ == other.intercept_;
+  }
+
  private:
   // y = slope_ * x + intercept_;
   T slope_, intercept_;
@@ -69,9 +74,7 @@ template <typename T>
 class BoundedLine {
  public:
   BoundedLine(Line<T> line, const T start_x, const T end_x)
-      : line_(std::move(line)),
-        start_(start_x),
-        end_(end_x) {
+      : line_(std::move(line)), start_(start_x), end_(end_x) {
     assert(start_x <= end_x);
   }
 

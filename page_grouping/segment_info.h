@@ -27,6 +27,10 @@ class SegmentInfo {
     return pg::PageForKey(base_key, *model_, pages, candidate);
   }
 
+  bool operator==(const SegmentInfo& other) const {
+    return id_ == other.id_ && model_ == other.model_;
+  }
+
  private:
   SegmentId id_;
   std::optional<plr::Line64> model_;
