@@ -43,6 +43,9 @@ class Manager {
   Manager(const Manager&) = delete;
   Manager& operator=(const Manager&) = delete;
 
+  Manager(Manager&&) = default;
+  Manager& operator=(Manager&&) = default;
+
  private:
   Manager(std::filesystem::path db_path,
           std::vector<std::pair<Key, SegmentInfo>> boundaries,

@@ -25,6 +25,8 @@ target_include_directories(pg
 )
 
 add_executable(pg_bench
+  config.cc
+  config.h
   pg_bench.cc
   pg_interface.h
   ../bench/common/load_data.cc

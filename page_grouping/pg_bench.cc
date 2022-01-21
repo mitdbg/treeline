@@ -3,6 +3,7 @@
 
 #include "bench/common/load_data.h"
 #include "bench/common/startup.h"
+#include "config.h"
 #include "gflags/gflags.h"
 #include "pg_interface.h"
 #include "ycsbr/gen.h"
@@ -14,7 +15,6 @@ namespace fs = std::filesystem;
 DEFINE_uint32(threads, 1, "The number of threads to use to run the workload.");
 DEFINE_string(workload_config, "",
               "The path to the workload configuration file");
-DEFINE_string(db_path, "", "The path where the database(s) should be stored.");
 DEFINE_bool(
     skip_load, false,
     "If set to true, this workload runner will skip the initial data load.");

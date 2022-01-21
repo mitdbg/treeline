@@ -1,11 +1,13 @@
 #pragma once
 
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <thread>
 #include <utility>
 #include <vector>
 
+#include "config.h"
 #include "llsm/slice.h"
 #include "manager.h"
 #include "ycsbr/ycsbr.h"
@@ -28,7 +30,17 @@ class PageGroupingInterface {
 
   // Called once before the benchmark.
   // Put any needed initialization code in here.
-  void InitializeDatabase() {}
+  void InitializeDatabase() {
+    db_path_ = std::filesystem::path(FLAGS_db_path);
+    if (std::filesystem::exists(db_path_) &&
+        std::filesystem::is_directory(db_path_) &&
+        !std::filesystem::is_empty(db_path_)) {
+      // Reopening an existing database.
+      pg_mgr_ = Manager::Reopen(db_path_);
+    } else {
+      // No-op. Will initialize during bulk load.
+    }
+  }
 
   // Called once if `InitializeDatabase()` has been called.
   // Put any needed clean up code in here.
@@ -36,6 +48,10 @@ class PageGroupingInterface {
 
   // Load the records into the database.
   void BulkLoad(const ycsbr::BulkLoadTrace& load) {
+    if (pg_mgr_.has_value()) {
+      // Already initialized existing DB! Cannot bulk load.
+      throw std::runtime_error("DB already exists! Bulk load is not supported.");
+    }
     std::vector<std::pair<ycsbr::Request::Key, Slice>> records;
     records.reserve(load.size());
     for (const auto& rec : load) {
@@ -47,8 +63,11 @@ class PageGroupingInterface {
                 return r1.first < r2.first;
               });
 
-    // Temporary hook-in for testing.
-    Manager::LoadIntoNew("pg", records, Manager::LoadOptions());
+    Manager::LoadOptions options;
+    options.records_per_page_goal = FLAGS_records_per_page_goal;
+    options.records_per_page_delta = FLAGS_records_per_page_delta;
+    options.use_segments = !FLAGS_disable_segments;
+    pg_mgr_ = Manager::LoadIntoNew(db_path_, records, options);
   }
 
   // Update the value at the specified key. Return true if the update succeeded.
@@ -71,6 +90,10 @@ class PageGroupingInterface {
       std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {
     return false;
   }
+
+ private:
+  std::filesystem::path db_path_;
+  std::optional<Manager> pg_mgr_;
 };
 
 }  // namespace pg
