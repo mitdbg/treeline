@@ -57,6 +57,39 @@ class SegmentFile {
     CHECK_ERROR(fstat(fd_, &file_status));
     assert(file_status.st_size >= 0);
     file_size_ = file_status.st_size;
+
+    // If the file already existed, compute next_page_allocation_offset_. Note
+    // that this assumes that segments are allocated contiguously.
+    // TODO: This approach is temporary and will change to accomodate recovery.
+    if (file_size_ > 0) {
+      PageBuffer page_data = PageMemoryAllocator::Allocate(/*num_pages=*/1);
+      Page temp_page(page_data.get());
+
+      const size_t bytes_per_segment = pages_per_segment_ * Page::kSize;
+      const size_t num_complete_segments = file_size_ / bytes_per_segment;
+      assert(num_complete_segments > 0);
+
+      size_t segment_idx = num_complete_segments - 1;
+      size_t segment_offset = segment_idx * bytes_per_segment;
+      next_page_allocation_offset_ = file_size_;
+      // Scan backwards through the file until we find the first valid segment.
+      while (true) {
+        ReadPages(segment_offset, page_data.get(), /*num_pages=*/1);
+        if (temp_page.IsValid()) {
+          // Next segment is where the next allocation offset should be.
+          next_page_allocation_offset_ = segment_offset + bytes_per_segment;
+          break;
+        }
+        if (segment_idx == 0) {
+          assert(segment_offset == 0);
+          next_page_allocation_offset_ = 0;
+          break;
+        } else {
+          --segment_idx;
+          segment_offset -= bytes_per_segment;
+        }
+      }
+    }
   }
 
   ~SegmentFile() {
@@ -85,6 +118,16 @@ class SegmentFile {
     pages_per_segment_ = other.pages_per_segment_;
     other.fd_ = -1;
     return *this;
+  }
+
+  // The number of allocated segments in this file.
+  // TODO: This will change when we implement proper recovery.
+  size_t NumSegments() const {
+    return next_page_allocation_offset_ / (pages_per_segment_ * Page::kSize);
+  }
+
+  size_t PagesPerSegment() const {
+    return pages_per_segment_;
   }
 
   Status ReadPages(size_t offset, void* data, size_t num_pages) const {

@@ -260,7 +260,49 @@ Manager Manager::LoadIntoNew(const fs::path& db,
   }
 }
 
-Manager Manager::Reopen(const fs::path& db) {}
+Manager Manager::Reopen(const fs::path& db) {
+  // Figure out if there are segments in this DB.
+  const bool uses_segments = fs::exists(db / (kSegmentFilePrefix + "1"));
+  PageBuffer buf = PageMemoryAllocator::Allocate(/*num_pages=*/1);
+  Page page(buf.get());
+
+  std::vector<SegmentFile> segment_files;
+  std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
+
+  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
+    if (i > 0 && !uses_segments) break;
+    const size_t pages_per_segment = SegmentBuilder::kSegmentPageCounts[i];
+    segment_files.emplace_back(db / (kSegmentFilePrefix + std::to_string(i)),
+                               /*use_direct_io=*/true, pages_per_segment);
+    SegmentFile& sf = segment_files.back();
+
+    const size_t num_segments = sf.NumSegments();
+    const size_t bytes_per_segment = pages_per_segment * Page::kSize;
+    for (size_t seg_idx = 0; seg_idx < num_segments; ++seg_idx) {
+      sf.ReadPages(seg_idx * bytes_per_segment, buf.get(), /*num_pages=*/1);
+      if (!page.IsValid() || page.IsOverflow()) {
+        continue;
+      }
+      SegmentId id(i, seg_idx);
+      const Key base_key = key_utils::ExtractHead64(page.GetLowerBoundary());
+      if (pages_per_segment == 1) {
+        segment_boundaries.emplace_back(
+            base_key, SegmentInfo(id, std::optional<plr::Line64>()));
+      } else {
+        segment_boundaries.emplace_back(base_key,
+                                        SegmentInfo(id, page.GetModel()));
+      }
+    }
+  }
+
+  std::sort(segment_boundaries.begin(), segment_boundaries.end(),
+            [](const std::pair<Key, SegmentInfo>& left,
+               const std::pair<Key, SegmentInfo>& right) {
+              return left.first < right.first;
+            });
+
+  return Manager(db, std::move(segment_boundaries), std::move(segment_files));
+}
 
 Status Manager::Get(const Key& key, std::string* value_out) {
   return Status::OK();
