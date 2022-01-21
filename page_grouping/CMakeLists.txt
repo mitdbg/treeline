@@ -42,3 +42,9 @@ add_executable(pg_standalone
   ../bench/common/load_data.h
 )
 target_link_libraries(pg_standalone PRIVATE pg gflags)
+
+add_executable(pg_test
+  tests/reopen_test.cc
+  tests/segment_test.cc
+)
+target_link_libraries(pg_test PRIVATE pg gtest gtest_main)

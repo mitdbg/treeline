@@ -70,18 +70,18 @@ class BoundedLine {
  public:
   BoundedLine(Line<T> line, const T start_x, const T end_x)
       : line_(std::move(line)),
-        start_(Point<T>(start_x, line_(start_x))),
-        end_(Point<T>(end_x, line_(end_x))) {
+        start_(start_x),
+        end_(end_x) {
     assert(start_x <= end_x);
   }
 
-  const Point<T>& start() const { return start_; }
-  const Point<T>& end() const { return end_; }
+  T start() const { return start_; }
+  T end() const { return end_; }
   const Line<T>& line() const { return line_; }
 
  private:
   Line<T> line_;
-  Point<T> start_, end_;
+  T start_, end_;
 };
 
 using Point64 = Point<double>;

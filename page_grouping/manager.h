@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "key.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
 #include "persist/segment_file.h"
@@ -14,8 +15,6 @@
 
 namespace llsm {
 namespace pg {
-
-using Key = uint64_t;
 
 class Manager {
  public:
