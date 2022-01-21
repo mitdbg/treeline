@@ -110,15 +110,15 @@ std::vector<Segment> SegmentBuilder::Build(
         std::max(0.0, maybe_line->line()(
                           dataset[records_processed.back()].first - base_key));
 
-    // Find the largest possible segment we can make. A linear search is
-    // acceptable because there are only 5 elements in the vector.
-    int segment_size_idx = allowed_records_per_segment_.size() - 1;
-    while (segment_size_idx >= 0) {
-      if (last_record_size >= allowed_records_per_segment_[segment_size_idx]) {
-        break;
-      }
-      --segment_size_idx;
-    }
+    // Find the largest possible segment we can make.
+    // `allowed_records_per_segment_` contains the ideal size for each segment.
+    // We want to find the index of the *largest* value that is less than or equal
+    // to `last_record_size`.
+    const auto segment_size_idx_it =
+        std::upper_bound(allowed_records_per_segment_.begin(),
+                         allowed_records_per_segment_.end(), last_record_size);
+    const int segment_size_idx =
+        (segment_size_idx_it - allowed_records_per_segment_.begin()) - 1;
 
     if (segment_size_idx <= 0) {
       // One of two cases:
