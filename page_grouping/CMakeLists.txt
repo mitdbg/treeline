@@ -6,6 +6,7 @@ target_sources(pg PRIVATE
   persist/segment_id.h
   plr/data.h
   plr/greedy.h
+  key.h
   manager.cc
   manager.h
   segment_builder.cc

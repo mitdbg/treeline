@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "bufmgr/page_memory_allocator.h"
+#include "key.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
 #include "segment_builder.h"
@@ -105,9 +106,7 @@ Manager Manager::BulkLoadIntoSegments(
         const auto& rec = records[i];
         // Use the page assigned by the model.
         const size_t assigned_page =
-            std::min(seg.page_count - 1,
-                     static_cast<size_t>(std::max(
-                         0.0, seg.model->line()(rec.first - base_key))));
+            PageForKey(base_key, seg.model->line(), seg.page_count, rec.first);
         if (assigned_page != curr_page) {
           // Flush to page.
           const auto result = LoadIntoPage(

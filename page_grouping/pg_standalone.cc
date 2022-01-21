@@ -6,6 +6,7 @@
 
 #include "bench/common/load_data.h"
 #include "gflags/gflags.h"
+#include "key.h"
 #include "llsm/slice.h"
 #include "segment_builder.h"
 
@@ -44,12 +45,10 @@ int main(int argc, char* argv[]) {
     const auto base_key = dataset[seg.start_idx].first;
     size_t curr_page = 0;
     size_t recs_in_page = 0;
-    std::vector<double> outputs;
     for (size_t i = seg.start_idx; i < seg.end_idx; ++i) {
       const auto& rec = dataset[i];
-      const auto pred = seg.model->line()(rec.first - base_key);
-      const size_t assigned_page = std::min(
-          seg.page_count - 1, static_cast<size_t>(std::max(0.0, pred)));
+      const size_t assigned_page =
+          PageForKey(base_key, seg.model->line(), seg.page_count, rec.first);
       if (assigned_page == curr_page) {
         recs_in_page++;
       } else {
@@ -60,20 +59,16 @@ int main(int argc, char* argv[]) {
                     << " in segment " << seg_id
                     << " (segment size: " << seg.page_count
                     << "). Size: " << recs_in_page << std::endl;
-          std::cerr << "Last model output: " << outputs.back() << std::endl;
         }
         curr_page = assigned_page;
         recs_in_page = 1;
-        outputs.clear();
       }
-      outputs.push_back(pred);
     }
     if (recs_in_page > max_records_per_page ||
         recs_in_page < min_records_per_page) {
       std::cerr << "Overfull or underfull page " << curr_page << " in segment "
                 << seg_id << " (segment size: " << seg.page_count
                 << "). Size: " << recs_in_page << std::endl;
-      std::cerr << "Last model output: " << outputs.back() << std::endl;
     }
   }
 
