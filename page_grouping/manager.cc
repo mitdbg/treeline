@@ -375,7 +375,8 @@ Status Manager::Scan(const Key& start_key, const size_t amount,
       // read.
       const double page_pos = pos - page_idx;
       const int64_t est_matching_records_on_first_page =
-          page_pos * options_.records_per_page_goal;
+          options_.records_per_page_goal -
+          (page_pos * options_.records_per_page_goal);
       const int64_t est_remaining_records =
           records_left - est_matching_records_on_first_page;
 
@@ -414,8 +415,8 @@ Status Manager::Scan(const Key& start_key, const size_t amount,
 
   // Scan the rest of the pages in the segment that we read in.
   size_t start_seg_page_idx = start_page_idx + 1;
-  while (records_left > 0 && start_seg_page_idx < est_start_pages_to_read) {
-    Page page(w_.buffer().get() + start_seg_page_idx * Page::kSize);
+  while (records_left > 0 && start_seg_page_idx < (start_page_idx + est_start_pages_to_read)) {
+    Page page(w_.buffer().get() + (start_seg_page_idx - start_page_idx) * Page::kSize);
     auto page_it = page.GetIterator();
     for (auto page_it = page.GetIterator(); records_left > 0 && page_it.Valid();
          page_it.Next()) {
@@ -442,7 +443,7 @@ Status Manager::Scan(const Key& start_key, const size_t amount,
     ++start_seg_page_idx;
   }
 
-  // 4. Done reading the first segment. Now keep scanning forward as long as
+  // 4. Done reading the first segment. Now keep scanning forward as far as
   // needed.
   ++it;
   while (records_left > 0 && it != index_.end()) {
