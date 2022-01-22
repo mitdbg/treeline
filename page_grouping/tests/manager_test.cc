@@ -1,9 +1,9 @@
 #include "../manager.h"
 
 #include <filesystem>
-#include <vector>
 #include <random>
 #include <string>
+#include <vector>
 
 #include "../key.h"
 #include "../segment_info.h"
@@ -253,5 +253,55 @@ TEST_F(ManagerTest, PointReadSegmentsSequential) {
       ASSERT_TRUE(m.Get(rec.first, &out).ok());
       ASSERT_EQ(rec.second.compare(Slice(out)), 0);
     }
+  }
+}
+
+TEST_F(ManagerTest, ScanSegments) {
+  Manager::Options options;
+  options.records_per_page_goal = 15;
+  options.records_per_page_delta = 5;
+  options.use_segments = true;
+  options.write_debug_info = false;
+  options.use_direct_io = false;
+
+  std::vector<std::pair<uint64_t, Slice>> dataset =
+      BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
+
+  Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+  ASSERT_EQ(m.NumSegmentFiles(), 5);
+
+  const size_t start_idx = 10;
+  const size_t scan_amount = 200;
+  std::vector<std::pair<uint64_t, std::string>> scanned;
+  m.Scan(dataset[start_idx].first, scan_amount, &scanned);
+  ASSERT_EQ(scanned.size(), scan_amount);
+  for (size_t i = 0; i < scan_amount; ++i) {
+    ASSERT_EQ(dataset[start_idx + i].first, scanned[i].first);
+    ASSERT_EQ(dataset[start_idx + i].second.compare(scanned[i].second), 0);
+  }
+}
+
+TEST_F(ManagerTest, ScanPages) {
+  Manager::Options options;
+  options.records_per_page_goal = 15;
+  options.records_per_page_delta = 5;
+  options.use_segments = false;
+  options.write_debug_info = false;
+  options.use_direct_io = false;
+
+  std::vector<std::pair<uint64_t, Slice>> dataset =
+      BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
+
+  Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+  ASSERT_EQ(m.NumSegmentFiles(), 1);
+
+  const size_t start_idx = 10;
+  const size_t scan_amount = 200;
+  std::vector<std::pair<uint64_t, std::string>> scanned;
+  m.Scan(dataset[start_idx].first, scan_amount, &scanned);
+  ASSERT_EQ(scanned.size(), scan_amount);
+  for (size_t i = 0; i < scan_amount; ++i) {
+    ASSERT_EQ(dataset[start_idx + i].first, scanned[i].first);
+    ASSERT_EQ(dataset[start_idx + i].second.compare(scanned[i].second), 0);
   }
 }
