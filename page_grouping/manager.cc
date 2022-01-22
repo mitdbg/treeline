@@ -180,7 +180,7 @@ Manager Manager::BulkLoadIntoSegments(
   }
 
   return Manager(db_path, std::move(segment_boundaries),
-                 std::move(segment_files));
+                 std::move(segment_files), options);
 }
 
 Manager Manager::BulkLoadIntoPages(
@@ -239,13 +239,16 @@ Manager Manager::BulkLoadIntoPages(
         SegmentInfo(seg_id, std::optional<plr::Line64>()));
   }
 
-  return Manager(db, std::move(segment_boundaries), std::move(segment_files));
+  return Manager(db, std::move(segment_boundaries), std::move(segment_files),
+                 options);
 }
 
 Manager::Manager(fs::path db_path,
                  std::vector<std::pair<Key, SegmentInfo>> boundaries,
-                 std::vector<SegmentFile> segment_files)
-    : db_path_(std::move(db_path)), segment_files_(std::move(segment_files)) {
+                 std::vector<SegmentFile> segment_files, Options options)
+    : db_path_(std::move(db_path)),
+      segment_files_(std::move(segment_files)),
+      options_(std::move(options)) {
   index_.bulk_load(boundaries.begin(), boundaries.end());
 }
 
@@ -284,7 +287,8 @@ Manager Manager::Reopen(const fs::path& db, const Options& options) {
       if (!page.IsValid() || page.IsOverflow()) {
         continue;
       }
-      SegmentId id(i, seg_idx * pages_per_segment);  // Offset is the page offset.
+      SegmentId id(i,
+                   seg_idx * pages_per_segment);  // Offset is the page offset.
       const Key base_key = key_utils::ExtractHead64(page.GetLowerBoundary());
       if (pages_per_segment == 1) {
         segment_boundaries.emplace_back(
@@ -302,7 +306,8 @@ Manager Manager::Reopen(const fs::path& db, const Options& options) {
               return left.first < right.first;
             });
 
-  return Manager(db, std::move(segment_boundaries), std::move(segment_files));
+  return Manager(db, std::move(segment_boundaries), std::move(segment_files),
+                 options);
 }
 
 Status Manager::Get(const Key& key, std::string* value_out) {
@@ -319,7 +324,8 @@ Status Manager::Get(const Key& key, std::string* value_out) {
   // 3. Read the page in (there are no overflows right now).
   const SegmentFile& sf = segment_files_[it->second.id().GetFileId()];
   const size_t page_offset = it->second.id().GetOffset() + page_idx;
-  sf.ReadPages(page_offset * pg::Page::kSize, w_.buffer().get(), /*num_pages=*/1);
+  sf.ReadPages(page_offset * pg::Page::kSize, w_.buffer().get(),
+               /*num_pages=*/1);
 
   // 4. Search for the record on the page.
   pg::Page page(w_.buffer().get());
@@ -333,6 +339,113 @@ Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {
 
 Status Manager::Scan(const Key& start_key, const size_t amount,
                      std::vector<std::pair<Key, std::string>>* values_out) {
+  // Scan strategy (all scans are forward scans):
+  // - Find segment containing starting key.
+  // - Estimate how much of the segment to read based on the position of the
+  // key.
+  // - Scan forward, reading the whole segment when able.
+  values_out->clear();
+  values_out->reserve(amount);
+
+  if (amount == 0) return Status::OK();
+  size_t records_left = amount;
+
+  // 1. Find the segment that should hold the start key.
+  auto it = index_.upper_bound(start_key);
+  if (it != index_.begin()) {
+    --it;
+  }
+
+  // 2. Estimate how much of the segment to read based on the position of the
+  // key.
+  size_t est_start_pages_to_read = 1;
+  size_t start_page_idx = 0;
+  const size_t first_segment_page_count = it->second.page_count();
+  if (first_segment_page_count > 1) {
+    const Key base_key = it->first;
+    const double pos =
+        std::max(0.0, it->second.model()->operator()(start_key - base_key));
+    const size_t page_idx = static_cast<size_t>(pos);
+    if (page_idx >= first_segment_page_count) {
+      // Edge case due to numeric errors.
+      start_page_idx = first_segment_page_count - 1;
+      est_start_pages_to_read = 1;
+    } else {
+      // Use the predicted position to estimate how many more pages we need to
+      // read.
+      const double page_pos = pos - page_idx;
+      const int64_t est_matching_records_on_first_page =
+          page_pos * options_.records_per_page_goal;
+      const int64_t est_remaining_records =
+          records_left - est_matching_records_on_first_page;
+
+      start_page_idx = page_idx;
+      if (est_remaining_records > 0) {
+        const size_t est_remaining_pages =
+            std::ceil(est_remaining_records /
+                      static_cast<double>(options_.records_per_page_goal));
+        est_start_pages_to_read =
+            1 + std::min(est_remaining_pages,
+                         first_segment_page_count - page_idx - 1);
+      } else {
+        est_start_pages_to_read = 1;
+      }
+    }
+
+    // 3. Start scanning the first segment, reading in more pages as needed if
+    // our estimate was incorrect.
+    const SegmentFile& sf = segment_files_[it->second.id().GetFileId()];
+    const size_t segment_byte_offset =
+        it->second.id().GetOffset() * Page::kSize;
+    sf.ReadPages(segment_byte_offset + start_page_idx * Page::kSize,
+                 w_.buffer().get(), est_start_pages_to_read);
+
+    // Scan the first page.
+    Page first_page(w_.buffer().get());
+    auto page_it = first_page.GetIterator();
+    key_utils::IntKeyAsSlice start_key_slice(start_key);
+    page_it.Seek(start_key_slice.as<Slice>());
+    while (records_left > 0 && page_it.Valid()) {
+      values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
+                               page_it.value().ToString());
+      --records_left;
+      page_it.Next();
+    }
+
+    // Scan the rest of the pages in the segment that we read in.
+    size_t start_seg_page_idx = start_page_idx + 1;
+    while (records_left > 0 && start_seg_page_idx < est_start_pages_to_read) {
+      Page page(w_.buffer().get() + start_seg_page_idx * Page::kSize);
+      auto page_it = page.GetIterator();
+      for (auto page_it = page.GetIterator();
+           records_left > 0 && page_it.Valid(); page_it.Next()) {
+        values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
+                                 page_it.value().ToString());
+        --records_left;
+      }
+      ++start_seg_page_idx;
+    }
+
+    // If we estimated incorrectly and we still have more pages to read in the
+    // first segment.
+    while (records_left > 0 && start_seg_page_idx < first_segment_page_count) {
+      // Read 1 page at a time.
+      sf.ReadPages(segment_byte_offset + start_seg_page_idx * Page::kSize,
+                   w_.buffer().get(), /*num_pages=*/1);
+      Page page(w_.buffer().get());
+      for (auto page_it = page.GetIterator();
+           records_left > 0 && page_it.Valid(); page_it.Next()) {
+        values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
+                                 page_it.value().ToString());
+        --records_left;
+      }
+      ++start_seg_page_idx;
+    }
+
+    // 4. Done reading the first segment. Now keep scanning forward as long as
+    // needed.
+  }
+
   return Status::OK();
 }
 

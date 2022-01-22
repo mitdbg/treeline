@@ -60,7 +60,8 @@ class Manager {
  private:
   Manager(std::filesystem::path db_path,
           std::vector<std::pair<Key, SegmentInfo>> boundaries,
-          std::vector<SegmentFile> segment_files);
+          std::vector<SegmentFile> segment_files,
+          Options options);
 
   static Manager BulkLoadIntoSegments(
       const std::filesystem::path& db_path,
@@ -75,6 +76,9 @@ class Manager {
   std::filesystem::path db_path_;
   tlx::btree_map<Key, SegmentInfo> index_;
   std::vector<SegmentFile> segment_files_;
+
+  // Options passed in when the `Manager` was created.
+  Options options_;
 
   // Holds state used by individual worker threads.
   // This is static for convenience (to use `thread_local`). So for correctness
