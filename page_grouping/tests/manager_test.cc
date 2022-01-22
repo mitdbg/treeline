@@ -256,6 +256,35 @@ TEST_F(ManagerTest, PointReadSegmentsSequential) {
   }
 }
 
+void ValidateScanResults(
+    const size_t start_idx, const size_t amount,
+    const std::vector<std::pair<uint64_t, Slice>>& dataset,
+    const std::vector<std::pair<uint64_t, std::string>>& scanned) {
+  ASSERT_EQ(scanned.size(), amount);
+  for (size_t i = 0; i < amount; ++i) {
+    ASSERT_EQ(dataset[start_idx + i].first, scanned[i].first);
+    ASSERT_EQ(dataset[start_idx + i].second.compare(scanned[i].second), 0);
+  }
+}
+
+const std::vector<std::pair<size_t, size_t>> kScanRequests = ([]() {
+  // Select "random" dataset indices to scan.
+  const size_t num_starts = 50;
+  const size_t max_length = 200;
+  const size_t dataset_size = Datasets::kUniformKeys.size();
+
+  std::vector<std::pair<size_t, size_t>> to_scan;
+  to_scan.reserve(num_starts);
+  std::uniform_int_distribution<size_t> start_dist(
+      0, dataset_size - 1 - max_length),
+      length_dist(1, max_length);
+  std::mt19937 prng(42);
+  for (size_t i = 0; i < num_starts; ++i) {
+    to_scan.emplace_back(start_dist(prng), length_dist(prng));
+  }
+  return to_scan;
+})();
+
 TEST_F(ManagerTest, ScanSegments) {
   Manager::Options options;
   options.records_per_page_goal = 15;
@@ -270,14 +299,10 @@ TEST_F(ManagerTest, ScanSegments) {
   Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
   ASSERT_EQ(m.NumSegmentFiles(), 5);
 
-  const size_t start_idx = 10;
-  const size_t scan_amount = 200;
   std::vector<std::pair<uint64_t, std::string>> scanned;
-  m.Scan(dataset[start_idx].first, scan_amount, &scanned);
-  ASSERT_EQ(scanned.size(), scan_amount);
-  for (size_t i = 0; i < scan_amount; ++i) {
-    ASSERT_EQ(dataset[start_idx + i].first, scanned[i].first);
-    ASSERT_EQ(dataset[start_idx + i].second.compare(scanned[i].second), 0);
+  for (const auto& [start_idx, scan_amount] : kScanRequests) {
+    m.Scan(dataset[start_idx].first, scan_amount, &scanned);
+    ValidateScanResults(start_idx, scan_amount, dataset, scanned);
   }
 }
 
@@ -295,14 +320,10 @@ TEST_F(ManagerTest, ScanSegmentsSequential) {
   Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
   ASSERT_EQ(m.NumSegmentFiles(), 5);
 
-  const size_t start_idx = 15;
-  const size_t scan_amount = 200;
   std::vector<std::pair<uint64_t, std::string>> scanned;
-  m.Scan(dataset[start_idx].first, scan_amount, &scanned);
-  ASSERT_EQ(scanned.size(), scan_amount);
-  for (size_t i = 0; i < scan_amount; ++i) {
-    ASSERT_EQ(dataset[start_idx + i].first, scanned[i].first);
-    ASSERT_EQ(dataset[start_idx + i].second.compare(scanned[i].second), 0);
+  for (const auto& [start_idx, scan_amount] : kScanRequests) {
+    m.Scan(dataset[start_idx].first, scan_amount, &scanned);
+    ValidateScanResults(start_idx, scan_amount, dataset, scanned);
   }
 }
 
@@ -320,13 +341,9 @@ TEST_F(ManagerTest, ScanPages) {
   Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
   ASSERT_EQ(m.NumSegmentFiles(), 1);
 
-  const size_t start_idx = 10;
-  const size_t scan_amount = 200;
   std::vector<std::pair<uint64_t, std::string>> scanned;
-  m.Scan(dataset[start_idx].first, scan_amount, &scanned);
-  ASSERT_EQ(scanned.size(), scan_amount);
-  for (size_t i = 0; i < scan_amount; ++i) {
-    ASSERT_EQ(dataset[start_idx + i].first, scanned[i].first);
-    ASSERT_EQ(dataset[start_idx + i].second.compare(scanned[i].second), 0);
+  for (const auto& [start_idx, scan_amount] : kScanRequests) {
+    m.Scan(dataset[start_idx].first, scan_amount, &scanned);
+    ValidateScanResults(start_idx, scan_amount, dataset, scanned);
   }
 }
