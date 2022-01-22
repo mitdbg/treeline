@@ -406,24 +406,27 @@ Status Manager::Scan(const Key& start_key, const size_t amount,
   auto page_it = first_page.GetIterator();
   key_utils::IntKeyAsSlice start_key_slice(start_key);
   page_it.Seek(start_key_slice.as<Slice>());
-  while (records_left > 0 && page_it.Valid()) {
+  for (; records_left > 0 && page_it.Valid(); --records_left, page_it.Next()) {
     values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
                              page_it.value().ToString());
-    --records_left;
-    page_it.Next();
   }
+
+  // Common code used to scan a whole page.
+  const auto scan_page = [&records_left, values_out](const Page& page) {
+    for (auto page_it = page.GetIterator(); records_left > 0 && page_it.Valid();
+         --records_left, page_it.Next()) {
+      values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
+                               page_it.value().ToString());
+    }
+  };
 
   // Scan the rest of the pages in the segment that we read in.
   size_t start_seg_page_idx = start_page_idx + 1;
-  while (records_left > 0 && start_seg_page_idx < (start_page_idx + est_start_pages_to_read)) {
-    Page page(w_.buffer().get() + (start_seg_page_idx - start_page_idx) * Page::kSize);
-    auto page_it = page.GetIterator();
-    for (auto page_it = page.GetIterator(); records_left > 0 && page_it.Valid();
-         page_it.Next()) {
-      values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
-                               page_it.value().ToString());
-      --records_left;
-    }
+  while (records_left > 0 &&
+         start_seg_page_idx < (start_page_idx + est_start_pages_to_read)) {
+    Page page(w_.buffer().get() +
+              (start_seg_page_idx - start_page_idx) * Page::kSize);
+    scan_page(page);
     ++start_seg_page_idx;
   }
 
@@ -434,18 +437,15 @@ Status Manager::Scan(const Key& start_key, const size_t amount,
     sf.ReadPages(segment_byte_offset + start_seg_page_idx * Page::kSize,
                  w_.buffer().get(), /*num_pages=*/1);
     Page page(w_.buffer().get());
-    for (auto page_it = page.GetIterator(); records_left > 0 && page_it.Valid();
-         page_it.Next()) {
-      values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
-                               page_it.value().ToString());
-      --records_left;
-    }
+    scan_page(page);
     ++start_seg_page_idx;
   }
 
   // 4. Done reading the first segment. Now keep scanning forward as far as
   // needed.
-  ++it;
+  if (it != index_.end()) {
+    ++it;
+  }
   while (records_left > 0 && it != index_.end()) {
     const size_t seg_page_count = it->second.page_count();
     const size_t seg_byte_offset = it->second.id().GetOffset() * Page::kSize;
@@ -462,12 +462,7 @@ Status Manager::Scan(const Key& start_key, const size_t amount,
     size_t page_idx = 0;
     while (records_left > 0 && page_idx < pages_to_read) {
       Page page(w_.buffer().get() + page_idx * Page::kSize);
-      for (auto page_it = page.GetIterator();
-           records_left > 0 && page_it.Valid(); page_it.Next()) {
-        values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
-                                 page_it.value().ToString());
-        --records_left;
-      }
+      scan_page(page);
       ++page_idx;
     }
 
@@ -478,12 +473,7 @@ Status Manager::Scan(const Key& start_key, const size_t amount,
       sf.ReadPages(seg_byte_offset + page_idx * Page::kSize, w_.buffer().get(),
                    /*num_pages=*/1);
       Page page(w_.buffer().get());
-      for (auto page_it = page.GetIterator();
-           records_left > 0 && page_it.Valid(); page_it.Next()) {
-        values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
-                                 page_it.value().ToString());
-        --records_left;
-      }
+      scan_page(page);
       ++page_idx;
     }
 
