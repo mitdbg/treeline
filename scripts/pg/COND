@@ -1,0 +1,137 @@
+from itertools import product
+
+CONFIGS = [
+  # Represents 64 B records, 2880 bytes per page +/- (2 * 320) bytes
+  {
+    "goal": 45,
+    "delta": 5,
+    "record_size_bytes": 64,
+  },
+  # Represents 1024 B records, 2048 bytes per page +/- (2 * 1024) bytes
+  {
+    "goal": 2,
+    "delta": 1,
+    "record_size_bytes": 1024,
+  },
+]
+
+CUSTOM_DATASETS = [
+  {"name": "amzn", "file": "amazon_reviews.txt", "workload": "long_scan-amzn.yml"},
+  {"name": "osm", "file": "osm_ny.txt", "workload": "long_scan-osm.yml"},
+]
+
+run_experiment_group(
+  name="long_scan",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="long_scan-uniform-{record_size_bytes}-{goal}-{delta}-{segs}".format(segs=segs, **config),
+      options={
+        **config,
+        "workload_config": "workloads/long_scan.yml",
+        "checkpoint_name": "uniform-{record_size_bytes}-{goal}-{delta}-{segs}".format(segs=segs, **config),
+        "disable_segments": (segs == "pages"),
+      },
+    )
+    for config, segs in product(CONFIGS, ["segs", "pages"])
+  ] + [
+    ExperimentInstance(
+      name="long_scan-{dataset}-{record_size_bytes}-{goal}-{delta}-{segs}".format(
+        segs=segs,
+        dataset=dataset["name"],
+        **config,
+      ),
+      options={
+        **config,
+        "workload_config": "workloads/{}".format(dataset["workload"]),
+        "custom_dataset": "$TP_DATASET_PATH/{}".format(dataset["file"]),
+        "checkpoint_name": "{dataset}-{record_size_bytes}-{goal}-{delta}-{segs}".format(
+          segs=segs,
+          dataset=dataset["name"],
+          **config,
+        ),
+        "disable_segments": (segs == "pages"),
+      },
+    )
+    for config, segs, dataset in product(CONFIGS, ["segs", "pages"], CUSTOM_DATASETS)
+  ],
+  deps=[":preload"],
+)
+
+# Checkpoint set up tasks.
+
+group(
+  name="preload",
+  deps=[
+    ":preload-{dataset}-{record_size_bytes}-{goal}-{delta}-{segs}".format(dataset=dataset, segs=segs, **config)
+    for config, dataset, segs in product(
+      CONFIGS,
+      ["uniform", *map(lambda d: d["name"], CUSTOM_DATASETS)],
+      ["segs", "pages"],
+    )
+  ],
+)
+
+# Uniform dataset.
+for config in CONFIGS:
+  run_command(
+    name="preload-uniform-{record_size_bytes}-{goal}-{delta}-segs".format(**config),
+    run="./preload.sh "
+      "--workload_config=workloads/preload.yml "
+      "--records_per_page_goal={goal} "
+      "--records_per_page_delta={delta} "
+      "--record_size_bytes={record_size_bytes} "
+      "--checkpoint_name=uniform-{record_size_bytes}-{goal}-{delta}-segs "
+      "--disable_segments=false".format(**config),
+  )
+
+  run_command(
+    name="preload-uniform-{record_size_bytes}-{goal}-{delta}-pages".format(**config),
+    run="./preload.sh "
+      "--workload_config=workloads/preload.yml "
+      "--records_per_page_goal={goal} "
+      "--records_per_page_delta={delta} "
+      "--record_size_bytes={record_size_bytes} "
+      "--checkpoint_name=uniform-{record_size_bytes}-{goal}-{delta}-pages "
+      "--disable_segments=true".format(**config),
+  )
+
+# Custom datasets.
+for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
+  run_command(
+    name="preload-{dataset}-{record_size_bytes}-{goal}-{delta}-segs".format(
+      dataset=dataset["name"],
+      **config,
+    ),
+    run="./preload.sh "
+      "--workload_config=workloads/preload.yml "
+      "--custom_dataset=$TP_DATASET_PATH/{dataset_file} "
+      "--records_per_page_goal={goal} "
+      "--records_per_page_delta={delta} "
+      "--record_size_bytes={record_size_bytes} "
+      "--checkpoint_name={dataset}-{record_size_bytes}-{goal}-{delta}-segs "
+      "--disable_segments=false".format(
+        dataset=dataset["name"],
+        dataset_file=dataset["file"],
+        **config,
+      ),
+  )
+
+  run_command(
+    name="preload-{dataset}-{record_size_bytes}-{goal}-{delta}-pages".format(
+      dataset=dataset["name"],
+      **config,
+    ),
+    run="./preload.sh "
+      "--workload_config=workloads/preload.yml "
+      "--custom_dataset=$TP_DATASET_PATH/{dataset_file} "
+      "--records_per_page_goal={goal} "
+      "--records_per_page_delta={delta} "
+      "--record_size_bytes={record_size_bytes} "
+      "--checkpoint_name={dataset}-{record_size_bytes}-{goal}-{delta}-pages "
+      "--disable_segments=true".format(
+        dataset=dataset["name"],
+        dataset_file=dataset["file"],
+        **config,
+      ),
+  )
