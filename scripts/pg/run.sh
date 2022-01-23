@@ -74,10 +74,6 @@ code=$?
 kill -s SIGINT -- $iostat_pid
 wait
 
-# Keep a copy of the debug files.
-mkdir -p $COND_OUT/debug
-cp $DB_PATH/*.csv $COND_OUT/debug
-
 # Store the database size.
 du -b $DB_PATH >$COND_OUT/db_space.log
 

@@ -105,7 +105,7 @@ class PageGroupingInterface {
   bool Scan(
       ycsbr::Request::Key key, size_t amount,
       std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {
-    return false;
+    return pg_mgr_->Scan(key, amount, scan_out).ok();
   }
 
   const std::vector<size_t>& GetReadCounts() const {
