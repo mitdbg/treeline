@@ -326,6 +326,7 @@ Status Manager::Get(const Key& key, std::string* value_out) {
   const size_t page_offset = it->second.id().GetOffset() + page_idx;
   sf.ReadPages(page_offset * pg::Page::kSize, w_.buffer().get(),
                /*num_pages=*/1);
+  w_.BumpReadCount(1);
 
   // 4. Search for the record on the page.
   pg::Page page(w_.buffer().get());
@@ -400,6 +401,7 @@ Status Manager::Scan(const Key& start_key, const size_t amount,
   const size_t segment_byte_offset = it->second.id().GetOffset() * Page::kSize;
   sf.ReadPages(segment_byte_offset + start_page_idx * Page::kSize,
                w_.buffer().get(), est_start_pages_to_read);
+  w_.BumpReadCount(est_start_pages_to_read);
 
   // Scan the first page.
   Page first_page(w_.buffer().get());
@@ -436,6 +438,7 @@ Status Manager::Scan(const Key& start_key, const size_t amount,
     // Read 1 page at a time.
     sf.ReadPages(segment_byte_offset + start_seg_page_idx * Page::kSize,
                  w_.buffer().get(), /*num_pages=*/1);
+    w_.BumpReadCount(1);
     Page page(w_.buffer().get());
     scan_page(page);
     ++start_seg_page_idx;
@@ -458,6 +461,7 @@ Status Manager::Scan(const Key& start_key, const size_t amount,
     const size_t pages_to_read = std::min(seg_page_count, est_pages_left);
     const SegmentFile& sf = segment_files_[it->second.id().GetFileId()];
     sf.ReadPages(seg_byte_offset, w_.buffer().get(), pages_to_read);
+    w_.BumpReadCount(pages_to_read);
 
     size_t page_idx = 0;
     while (records_left > 0 && page_idx < pages_to_read) {
@@ -472,6 +476,7 @@ Status Manager::Scan(const Key& start_key, const size_t amount,
       // Read 1 page at a time.
       sf.ReadPages(seg_byte_offset + page_idx * Page::kSize, w_.buffer().get(),
                    /*num_pages=*/1);
+      w_.BumpReadCount(1);
       Page page(w_.buffer().get());
       scan_page(page);
       ++page_idx;

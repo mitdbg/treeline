@@ -1,6 +1,8 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
@@ -26,7 +28,20 @@ class PageGroupingInterface {
   // Called once by each worker thread after it is done running. This method is
   // called concurrently by each worker thread and may run concurrently with
   // `DeleteDatabase()`.
-  void ShutdownWorker(const std::thread::id& worker_id) {}
+  void ShutdownWorker(const std::thread::id& worker_id) {
+    if (!pg_mgr_.has_value()) return;
+
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (read_counts_.empty()) {
+      read_counts_ = pg_mgr_->GetReadCounts();
+    } else {
+      const auto& local_read_counts = pg_mgr_->GetReadCounts();
+      assert(read_counts_.size() == local_read_counts.size());
+      for (size_t i = 0; i < local_read_counts.size(); ++i) {
+        read_counts_[i] += local_read_counts[i];
+      }
+    }
+  }
 
   // Called once before the benchmark.
   // Put any needed initialization code in here.
@@ -44,7 +59,10 @@ class PageGroupingInterface {
 
   // Called once if `InitializeDatabase()` has been called.
   // Put any needed clean up code in here.
-  void ShutdownDatabase() {}
+  void ShutdownDatabase() {
+    // Purposefully keep the `Manager` around for statistics aggregation in
+    // `ShutdownWorker()`.
+  }
 
   // Load the records into the database.
   void BulkLoad(const ycsbr::BulkLoadTrace& load) {
@@ -90,6 +108,10 @@ class PageGroupingInterface {
     return false;
   }
 
+  const std::vector<size_t>& GetReadCounts() const {
+    return read_counts_;
+  }
+
  private:
   Manager::Options GetOptions() {
     Manager::Options options;
@@ -101,6 +123,10 @@ class PageGroupingInterface {
 
   std::filesystem::path db_path_;
   std::optional<Manager> pg_mgr_;
+
+  // Combined read counts from all worker threads.
+  std::mutex mutex_;
+  std::vector<size_t> read_counts_;
 };
 
 }  // namespace pg

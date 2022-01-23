@@ -1,4 +1,5 @@
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 
 #include "bench/common/load_data.h"
@@ -12,6 +13,8 @@ namespace {
 
 namespace fs = std::filesystem;
 
+DEFINE_string(output_path, ".",
+              "A path to where the results should be written.");
 DEFINE_uint32(threads, 1, "The number of threads to use to run the workload.");
 DEFINE_string(workload_config, "",
               "The path to the workload configuration file");
@@ -21,8 +24,6 @@ DEFINE_bool(
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
 DEFINE_uint32(record_size_bytes, 16, "The size of each record, in bytes.");
 
-DEFINE_string(output_path, ".",
-              "A path to where throughput samples should be written.");
 DEFINE_uint64(throughput_sample_period, 0,
               "How frequently to sample the achieved throughput. Set to 0 to "
               "disable sampling.");
@@ -38,8 +39,9 @@ DEFINE_bool(notify_after_init, false,
             "If set to true, this process will send a SIGUSR1 signal to its "
             "parent process after database initialization completes.");
 
-ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
-  ycsbr::Session<llsm::pg::PageGroupingInterface> session(FLAGS_threads);
+ycsbr::BenchmarkResult Run(
+    ycsbr::Session<llsm::pg::PageGroupingInterface>& session,
+    const ycsbr::gen::PhasedWorkload& workload) {
   if (!FLAGS_skip_load) {
     const auto load = workload.GetLoadTrace();
     session.Initialize();
@@ -105,13 +107,32 @@ int main(int argc, char* argv[]) {
   if (!fs::exists(FLAGS_db_path)) {
     fs::create_directory(FLAGS_db_path);
   }
-  if (FLAGS_throughput_sample_period > 0 && !fs::exists(FLAGS_output_path)) {
+  if (!fs::exists(FLAGS_output_path)) {
     // Only create the output directory if we will take throughput samples.
     fs::create_directory(FLAGS_output_path);
   }
+  const fs::path output_dir = fs::path(FLAGS_output_path);
 
-  const auto result = Run(*workload);
-  result.PrintAsCSV(std::cout, /*print_header=*/true);
+  // Run benchmark.
+  ycsbr::Session<llsm::pg::PageGroupingInterface> session(FLAGS_threads);
+  const auto result = Run(session, *workload);
+  session.Terminate();
+
+  // Overall performance results.
+  {
+    std::ofstream overall(output_dir / "overall.csv");
+    result.PrintAsCSV(overall, /*print_header=*/true);
+  }
+
+  // Read I/O statistics.
+  {
+    const auto& read_counts = session.db().GetReadCounts();
+    std::ofstream out(output_dir / "read_counts.csv");
+    out << "num_contiguous_pages,count" << std::endl;
+    for (size_t i = 0; i < read_counts.size(); ++i) {
+      out << (i + 1) << "," << read_counts[i] << std::endl;
+    }
+  }
 
   return 0;
 }

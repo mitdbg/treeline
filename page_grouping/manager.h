@@ -46,6 +46,9 @@ class Manager {
   Status Scan(const Key& start_key, const size_t amount,
               std::vector<std::pair<Key, std::string>>* values_out);
 
+  // Benchmark statistics.
+  const std::vector<size_t>& GetReadCounts() const { return w_.read_counts(); }
+
   Manager(const Manager&) = delete;
   Manager& operator=(const Manager&) = delete;
 
