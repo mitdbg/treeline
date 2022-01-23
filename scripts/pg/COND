@@ -27,7 +27,9 @@ run_experiment_group(
     ExperimentInstance(
       name="long_scan-uniform-{record_size_bytes}-{goal}-{delta}-{segs}".format(segs=segs, **config),
       options={
-        **config,
+        "records_per_page_goal": config["goal"],
+        "records_per_page_delta": config["delta"],
+        "record_size_bytes": config["record_size_bytes"],
         "workload_config": "workloads/long_scan.yml",
         "checkpoint_name": "uniform-{record_size_bytes}-{goal}-{delta}-{segs}".format(segs=segs, **config),
         "disable_segments": (segs == "pages"),
@@ -42,9 +44,11 @@ run_experiment_group(
         **config,
       ),
       options={
-        **config,
+        "records_per_page_goal": config["goal"],
+        "records_per_page_delta": config["delta"],
+        "record_size_bytes": config["record_size_bytes"],
         "workload_config": "workloads/{}".format(dataset["workload"]),
-        "custom_dataset": "$TP_DATASET_PATH/{}".format(dataset["file"]),
+        "custom_dataset": "'$TP_DATASET_PATH/{}'".format(dataset["file"]),
         "checkpoint_name": "{dataset}-{record_size_bytes}-{goal}-{delta}-{segs}".format(
           segs=segs,
           dataset=dataset["name"],
@@ -105,7 +109,7 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
     ),
     run="./preload.sh "
       "--workload_config=workloads/preload.yml "
-      "--custom_dataset=$TP_DATASET_PATH/{dataset_file} "
+      "--custom_dataset='$TP_DATASET_PATH/{dataset_file}' "
       "--records_per_page_goal={goal} "
       "--records_per_page_delta={delta} "
       "--record_size_bytes={record_size_bytes} "
@@ -124,7 +128,7 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
     ),
     run="./preload.sh "
       "--workload_config=workloads/preload.yml "
-      "--custom_dataset=$TP_DATASET_PATH/{dataset_file} "
+      "--custom_dataset='$TP_DATASET_PATH/{dataset_file}' "
       "--records_per_page_goal={goal} "
       "--records_per_page_delta={delta} "
       "--record_size_bytes={record_size_bytes} "

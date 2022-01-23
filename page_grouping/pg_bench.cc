@@ -94,6 +94,10 @@ int main(int argc, char* argv[]) {
                                            FLAGS_record_size_bytes);
 
   if (!FLAGS_custom_dataset.empty()) {
+    if (FLAGS_verbose) {
+      std::cerr << "> Loading custom dataset: " << FLAGS_custom_dataset
+                << std::endl;
+    }
     std::vector<ycsbr::Request::Key> keys =
         llsm::bench::LoadDatasetFromTextFile(
             FLAGS_custom_dataset, /*warn_on_duplicates=*/FLAGS_verbose);
@@ -108,7 +112,6 @@ int main(int argc, char* argv[]) {
     fs::create_directory(FLAGS_db_path);
   }
   if (!fs::exists(FLAGS_output_path)) {
-    // Only create the output directory if we will take throughput samples.
     fs::create_directory(FLAGS_output_path);
   }
   const fs::path output_dir = fs::path(FLAGS_output_path);
@@ -116,6 +119,9 @@ int main(int argc, char* argv[]) {
   // Run benchmark.
   ycsbr::Session<llsm::pg::PageGroupingInterface> session(FLAGS_threads);
   const auto result = Run(session, *workload);
+  if (FLAGS_verbose) {
+    std::cerr << "> Done running workload." << std::endl;
+  }
   session.Terminate();
 
   // Overall performance results.

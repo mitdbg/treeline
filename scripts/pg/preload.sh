@@ -26,7 +26,7 @@ for val in "${orig_args[@]}"; do
   fi
 done
 
-if [[ -z $db_type || -z $checkpoint_name || -z $workload_path ]]; then
+if [[ -z $checkpoint_name || -z $workload_path ]]; then
   echo >&2 "Usage: $0 --checkpoint_name=<checkpoint name> --workload_config=<workload path> [other args passed to pg_bench]"
   exit 1
 fi
@@ -46,4 +46,5 @@ mkdir -p $DB_CHECKPOINT_PATH
   --workload_config=$workload_path \
   --seed=$SEED \
   --output_path=$COND_OUT \
+  --verbose \
   ${args[@]}
