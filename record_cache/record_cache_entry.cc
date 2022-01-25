@@ -42,32 +42,73 @@ bool RecordCacheEntry::IsDelete() {
   return (GetWriteType() == format::WriteType::kDelete);
 }
 
+uint8_t RecordCacheEntry::GetPriority() { return ExtractPriority(metadata_); }
+
+uint8_t RecordCacheEntry::ExtractPriority(uint8_t flags) {
+  return (flags & kPriorityMask);
+}
+
 bool RecordCacheEntry::SetPriorityTo(uint8_t priority) {
   if ((priority & ~kPriorityMask) != 0) {
     metadata_ |= kPriorityMask;  // Just set it to maximum.
     return false;
   }
-  metadata_ &= ~kPriorityMask;
-  metadata_ |= priority;
+
+  uint8_t old_metadata = metadata_.load();
+  uint8_t new_metadata;
+
+  do {
+    // For subsequent iterations, compare_exchange_weak() will have updated
+    // `old_metadata` appropriately when failing.
+    new_metadata = (old_metadata & ~kPriorityMask) | priority;
+  } while (metadata_.compare_exchange_weak(old_metadata, new_metadata));
+
   return true;
 }
-uint8_t RecordCacheEntry::GetPriority() { return (metadata_ & kPriorityMask); }
 
 uint8_t RecordCacheEntry::IncrementPriority(bool return_post) {
-  uint8_t old_priority = GetPriority();
-  if (old_priority != kPriorityMask) ++metadata_;
+  uint8_t old_metadata = metadata_.load();
+  uint8_t old_priority;
+  uint8_t new_metadata;
+
+  do {
+    // For subsequent iterations, compare_exchange_weak() will have updated
+    // `old_metadata` appropriately when failing.
+    old_priority = ExtractPriority(old_metadata);
+
+    // Check if already max. If so, do not update, so ignore `return_post`.
+    if (old_priority == kPriorityMask) return old_priority;
+
+    new_metadata = old_metadata + 1; // Priority is in the least-significant bits.
+  } while (metadata_.compare_exchange_weak(old_metadata, new_metadata));
+
+  // If we get here, we actually performed an increment.
   if (return_post) {
-    return GetPriority();
+    return old_priority + 1;
   } else {
     return old_priority;
   }
 }
 
 uint8_t RecordCacheEntry::DecrementPriority(bool return_post) {
-  uint8_t old_priority = GetPriority();
-  if (old_priority != 0) --metadata_;
+  uint8_t old_metadata = metadata_.load();
+  uint8_t old_priority;
+  uint8_t new_metadata;
+
+  do {
+    // For subsequent iterations, compare_exchange_weak() will have updated
+    // `old_metadata` appropriately when failing.
+    old_priority = ExtractPriority(old_metadata);
+
+    // Check if already min. If so, do not update, so ignore `return_post`.
+    if (old_priority == 0) return old_priority;
+
+    new_metadata = old_metadata - 1; // Priority is in the least-significant bits.
+  } while (metadata_.compare_exchange_weak(old_metadata, new_metadata));
+
+  // If we get here, we actually performed an increment.
   if (return_post) {
-    return GetPriority();
+    return old_priority - 1;
   } else {
     return old_priority;
   }
