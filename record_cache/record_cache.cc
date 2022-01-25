@@ -23,7 +23,7 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
                         format::WriteType write_type, uint8_t priority,
                         bool safe) {
   uint64_t index;
-  bool found = GetIndex(key, /*exclusive = */ true, &index, safe).ok();
+  bool found = GetCacheIndex(key, /*exclusive = */ true, &index, safe).ok();
   char* ptr = nullptr;
 
   if (!found) {
@@ -40,7 +40,7 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
 
   if (found && cache_entries[index].GetValue().size() >= value.size()) {
     ptr = const_cast<char*>(cache_entries[index].GetKey().data());
-  } else {  // New record or new value is larger.
+  } else {  // New record, or new value is larger.
     FreeIfValid(index);
     ptr = static_cast<char*>(malloc(key.size() + value.size()));
 
@@ -90,7 +90,7 @@ Status RecordCache::PutFromDelete(const Slice& key, uint8_t priority) {
              priority);
 }
 
-Status RecordCache::GetIndex(const Slice& key, bool exclusive,
+Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
                              uint64_t* index_out, bool safe) const {
   Key art_key;
   SliceToARTKey(key, art_key);

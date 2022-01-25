@@ -35,7 +35,7 @@ void RecordCacheRW_64MiB(benchmark::State& state, bool is_safe) {
     uint64_t index_out;
     for (const auto& record : dataset) {
       if (v[i++] < threshold) {
-        s = rc.GetIndex(record.key(), /*exclusive = */ false, &index_out,
+        s = rc.GetCacheIndex(record.key(), /*exclusive = */ false, &index_out,
                         is_safe);
         if (s.ok() && is_safe) rc.cache_entries[index_out].Unlock();
       } else {

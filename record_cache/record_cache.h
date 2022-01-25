@@ -60,8 +60,8 @@ class RecordCache {
   // Setting `safe = false` lets us switch to a thread-unsafe variant that does
   // not acquire locks upon lookup. It is intended purely for performance
   // benchmarking.
-  Status GetIndex(const Slice& key, bool exclusive, uint64_t* index_out,
-                  bool safe = true) const;
+  Status GetCacheIndex(const Slice& key, bool exclusive, uint64_t* index_out,
+                       bool safe = true) const;
 
  private:
   // Required by the ART constructor. Populates `key` with the key of the record
@@ -92,9 +92,10 @@ class RecordCache {
   // An index for the cache, using ART with optimistic lock coupling from
   // https://github.com/flode/ARTSynchronized/tree/master/OptimisticLockCoupling.
   //
-  // CAUTION: This implementation uses the value 0 to denote lookup misses, so
-  // any indexes referring to `cache_entries` are incremented by 1 to produce
-  // the corresponding ART TID.
+  // CAUTION: This ART implementation uses the value 0 to denote lookup misses,
+  // so any indexes referring to `cache_entries` are incremented by 1 to produce
+  // the corresponding ART TID. E.g. To indicate that a record is stored at
+  // index 3 in `cache_entries`, we would store the TID 4 in ART.
   std::unique_ptr<ART_OLC::Tree> tree_;
 };
 
