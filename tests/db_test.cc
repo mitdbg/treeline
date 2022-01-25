@@ -298,8 +298,8 @@ TEST_F(DBTest, DeferByEntries) {
   ASSERT_TRUE(status.IsNotFound());
 
   // Check that the flush never happened.
-  const char command_template[23] = "diff %s %s &>/dev/null";
-  char s[19 + source_file.string().length() + dest_file.string().length()];
+  const char command_template[22] = "diff %s %s >/dev/null";
+  char s[18 + source_file.string().length() + dest_file.string().length()];
   sprintf(s, command_template, source_file.string().data(), dest_file.string().data());
   ASSERT_EQ(system(s), 0);
 
@@ -377,8 +377,8 @@ TEST_F(DBTest, DeferByAttempts) {
   ASSERT_TRUE(status.IsNotFound());
 
   // Check that the flush never happened.
-  const char command_template[23] = "diff %s %s &>/dev/null";
-  char s[19 + source_file.string().length() + dest_file.string().length()];
+  const char command_template[22] = "diff %s %s >/dev/null";
+  char s[18 + source_file.string().length() + dest_file.string().length()];
   sprintf(s, command_template, source_file.string().data(), dest_file.string().data());
   ASSERT_EQ(system(s), 0);
 
