@@ -106,7 +106,7 @@ uint8_t RecordCacheEntry::DecrementPriority(bool return_post) {
     new_metadata = old_metadata - 1; // Priority is in the least-significant bits.
   } while (metadata_.compare_exchange_weak(old_metadata, new_metadata));
 
-  // If we get here, we actually performed an increment.
+  // If we get here, we actually performed an decrement.
   if (return_post) {
     return old_priority - 1;
   } else {
