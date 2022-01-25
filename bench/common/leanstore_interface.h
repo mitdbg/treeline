@@ -27,10 +27,19 @@ class LeanStoreInterface {
     // make their configuration assumptions compatible with our configuration
     // assumptions.
     FLAGS_ssd_path = FLAGS_db_path + "/leanstore/dbfile";
-    FLAGS_dram_gib = (2 * FLAGS_memtable_size_mib + FLAGS_cache_size_mib) / 1024.0;
+    FLAGS_dram_gib =
+        (2 * FLAGS_memtable_size_mib + FLAGS_cache_size_mib) / 1024.0;
     FLAGS_wal = !FLAGS_bypass_wal;
     FLAGS_pp_threads = FLAGS_bg_threads;
     FLAGS_falloc = 2;  // GiB
+    if (FLAGS_skip_load) {
+      FLAGS_recover = true;
+      FLAGS_recover_file = FLAGS_db_path + "/leanstore/leanstore.json";
+    } else {
+      FLAGS_persist = true;
+      FLAGS_persist_file = FLAGS_db_path + "/leanstore/leanstore.json";
+    }
+
     if (!std::filesystem::exists(FLAGS_ssd_path)) {
       std::filesystem::create_directory(FLAGS_db_path + "/leanstore");
       // LeanStore requires the on-disk file to actually exist before starting
@@ -38,7 +47,12 @@ class LeanStoreInterface {
       std::ofstream leanstore_file(FLAGS_ssd_path, std::ofstream::app);
     }
     db_ = new leanstore::LeanStore();
-    table_ = &db_->registerBTreeLL("btree");
+
+    if (FLAGS_skip_load) {
+      table_ = &db_->retrieveBTreeLL("btree");
+    } else {
+      table_ = &db_->registerBTreeLL("btree");
+    }
   }
 
   // Called once after the workload if `InitializeDatabase()` has been called.

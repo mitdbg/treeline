@@ -104,6 +104,9 @@ DECLARE_bool(rec_cache_batch_writeout);
 // requested.
 DECLARE_bool(optimistic_rec_caching);
 
+// If set to true, the workload runner will skip the initial data load.
+DECLARE_bool(skip_load);
+
 namespace llsm {
 namespace bench {
 

@@ -123,5 +123,16 @@ if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
   fi
 fi
 
-# LeanStore does not support "reopening" an existing persisted database. So we
-# do not preload it here.
+if [ $db_type == "leanstore" ] || [ $db_type == "all" ]; then
+  # Leanstore
+  ../../build/bench/run_custom \
+    --db=leanstore \
+    --db_path=$full_checkpoint_path \
+    --bg_threads=16 \
+    --bypass_wal=true \
+    --workload_config=$workload_path \
+    --seed=$SEED \
+    --verbose \
+    --persist \
+    ${args[@]}
+fi
