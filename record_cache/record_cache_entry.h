@@ -13,6 +13,14 @@ class RecordCacheEntry {
   RecordCacheEntry();
   ~RecordCacheEntry();
 
+  // Copy constructor/assignment
+  RecordCacheEntry(const RecordCacheEntry& other);
+  RecordCacheEntry& operator=(const RecordCacheEntry& other);
+
+  // Move contructor/assignment
+  RecordCacheEntry(RecordCacheEntry&& other) noexcept;
+  RecordCacheEntry& operator=(RecordCacheEntry&& other) noexcept;
+
   // Set/query the valid bit
   void SetValidTo(bool val);
   bool IsValid();

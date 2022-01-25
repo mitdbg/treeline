@@ -15,6 +15,55 @@ RecordCacheEntry::RecordCacheEntry() : metadata_(0) {
 
 RecordCacheEntry::~RecordCacheEntry() { pthread_rwlock_destroy(&rwlock_); }
 
+RecordCacheEntry::RecordCacheEntry(const RecordCacheEntry& other) {
+  pthread_rwlock_init(&rwlock_, nullptr);
+  metadata_ = other.metadata_.load();
+  key_ = Slice(other.GetKey());
+  value_ = Slice(other.GetValue());
+}
+
+RecordCacheEntry& RecordCacheEntry::operator=(const RecordCacheEntry& other) {
+  if (this != &other) {
+    pthread_rwlock_destroy(&rwlock_);
+
+    pthread_rwlock_init(&rwlock_, nullptr);
+    metadata_ = other.metadata_.load();
+    key_ = Slice(other.GetKey());
+    value_ = Slice(other.GetValue());
+  }
+  return *this;
+}
+
+RecordCacheEntry::RecordCacheEntry(RecordCacheEntry&& other) noexcept {
+  pthread_rwlock_init(&rwlock_, nullptr);
+  metadata_ = other.metadata_.load();
+  key_ = Slice(other.GetKey());
+  value_ = Slice(other.GetValue());
+
+  pthread_rwlock_destroy(&other.rwlock_);
+  other.metadata_ = 0;
+  other.SetKey(Slice(nullptr, 0));
+  other.SetValue(Slice(nullptr, 0));
+}
+
+RecordCacheEntry& RecordCacheEntry::operator=(
+    RecordCacheEntry&& other) noexcept {
+  if (this != &other) {
+    pthread_rwlock_destroy(&rwlock_);
+
+    pthread_rwlock_init(&rwlock_, nullptr);
+    metadata_ = other.metadata_.load();
+    key_ = Slice(other.GetKey());
+    value_ = Slice(other.GetValue());
+
+    pthread_rwlock_destroy(&other.rwlock_);
+    other.metadata_ = 0;
+    other.SetKey(Slice(nullptr, 0));
+    other.SetValue(Slice(nullptr, 0));
+  }
+  return *this;
+}
+
 void RecordCacheEntry::SetValidTo(bool val) {
   val ? (metadata_ |= kValidMask) : (metadata_ &= ~kValidMask);
 }
@@ -79,7 +128,7 @@ uint8_t RecordCacheEntry::IncrementPriority(bool return_post) {
     // Check if already max. If so, do not update, so ignore `return_post`.
     if (old_priority == kPriorityMask) return old_priority;
 
-    new_metadata = old_metadata + 1; // Priority is in the least-significant bits.
+    new_metadata = old_metadata + 1;  // Priority is in the LSBs.
   } while (metadata_.compare_exchange_weak(old_metadata, new_metadata));
 
   // If we get here, we actually performed an increment.
@@ -103,7 +152,7 @@ uint8_t RecordCacheEntry::DecrementPriority(bool return_post) {
     // Check if already min. If so, do not update, so ignore `return_post`.
     if (old_priority == 0) return old_priority;
 
-    new_metadata = old_metadata - 1; // Priority is in the least-significant bits.
+    new_metadata = old_metadata - 1;  // Priority is in the LSBs.
   } while (metadata_.compare_exchange_weak(old_metadata, new_metadata));
 
   // If we get here, we actually performed an decrement.
