@@ -62,3 +62,9 @@ group(
     for jobfile in JOBS
   ],
 )
+
+run_experiment(
+  name="read_rand_sweep",
+  run="../run_fio.sh",
+  args=["nvme_ssd_ext4", "psync-sweep"],
+)

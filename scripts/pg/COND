@@ -139,3 +139,11 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
         **config,
       ),
   )
+
+run_command(
+  name="ssd_data",
+  run="python3 process_fio.py",
+  deps=[
+    "//scripts/iochar/read:read_rand_sweep",
+  ],
+)
