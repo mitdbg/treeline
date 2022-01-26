@@ -20,36 +20,55 @@ RecordCache::~RecordCache() {
 }
 
 Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
-                        format::WriteType write_type, uint8_t priority) {
-  // Find entry and evict contents if necessary.
-  uint64_t index = SelectForEviction();
-  if (cache_entries[index].IsValid()) {
-    WriteOutIfDirty(index);
-    Key art_key;
-    TIDToARTKey(index + 1, art_key);
-    auto t1 = tree_->getThreadInfo();
-    tree_->remove(art_key, index + 1, t1);
+                        format::WriteType write_type, uint8_t priority,
+                        bool safe) {
+  uint64_t index;
+  bool found = GetCacheIndex(key, /*exclusive = */ true, &index, safe).ok();
+  char* ptr = nullptr;
+
+  if (!found) {
+    index = SelectForEviction();
+    if (safe) cache_entries[index].Lock(/*exclusive = */ true);
+    if (cache_entries[index].IsValid()) {
+      WriteOutIfDirty(index);
+      Key art_key;
+      TIDToARTKey(index + 1, art_key);
+      auto t1 = tree_->getThreadInfo();
+      tree_->remove(art_key, index + 1, t1);
+    }
   }
-  FreeIfValid(index);
 
-  // Overwrite metadata.
-  cache_entries[index].SetValidTo(true);
-  cache_entries[index].SetDirtyTo(is_dirty);
-  if (is_dirty) cache_entries[index].SetWriteType(write_type);
-  cache_entries[index].SetPriorityTo(priority);
+  if (found && cache_entries[index].GetValue().size() >= value.size()) {
+    ptr = const_cast<char*>(cache_entries[index].GetKey().data());
+  } else {  // New record, or new value is larger.
+    FreeIfValid(index);
+    ptr = static_cast<char*>(malloc(key.size() + value.size()));
 
-  // Overwrite record.
-  char* ptr = static_cast<char*>(malloc(key.size() + value.size()));
-  memcpy(ptr, key.data(), key.size());
+    // Overwrite metadata.
+    cache_entries[index].SetValidTo(true);
+    cache_entries[index].SetDirtyTo(
+        found ? (is_dirty || cache_entries[index].IsDirty()) : (is_dirty));
+    if (is_dirty) cache_entries[index].SetWriteType(write_type);
+    cache_entries[index].SetPriorityTo(priority);
+
+    // Update key.
+    memcpy(ptr, key.data(), key.size());
+    cache_entries[index].SetKey(Slice(ptr, key.size()));
+  }
+
+  // Update value.
   memcpy(ptr + key.size(), value.data(), value.size());
-  cache_entries[index].SetKey(Slice(ptr, key.size()));
   cache_entries[index].SetValue(Slice(ptr + key.size(), value.size()));
 
-  // Update ART
-  Key art_key;
-  TIDToARTKey(index + 1, art_key);
-  auto t2 = tree_->getThreadInfo();
-  tree_->insert(art_key, index + 1, t2);
+  // Update ART.
+  if (!found) {
+    Key art_key;
+    TIDToARTKey(index + 1, art_key);
+    auto t2 = tree_->getThreadInfo();
+    tree_->insert(art_key, index + 1, t2);
+  }
+
+  if (safe) cache_entries[index].Unlock();
 
   return Status::OK();
 }
@@ -71,13 +90,20 @@ Status RecordCache::PutFromDelete(const Slice& key, uint8_t priority) {
              priority);
 }
 
-Status RecordCache::GetIndex(const Slice& key, uint64_t* index_out) const {
+Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
+                             uint64_t* index_out, bool safe) const {
   Key art_key;
   SliceToARTKey(key, art_key);
   auto t = tree_->getThreadInfo();
-  TID tid = tree_->lookup(art_key, t);
 
-  if (tid == 0) return Status::NotFound("Key not in cache");
+  bool locked_successfully = false;
+  TID tid;
+
+  do {
+    tid = tree_->lookup(art_key, t);
+    if (tid == 0) return Status::NotFound("Key not in cache");
+    if (safe) locked_successfully = cache_entries[tid - 1].TryLock(exclusive);
+  } while (!locked_successfully && safe);
 
   *index_out = tid - 1;
   cache_entries[*index_out].IncrementPriority();
@@ -116,8 +142,12 @@ bool RecordCache::WriteOutIfDirty(uint64_t index) {
 
 bool RecordCache::FreeIfValid(uint64_t index) {
   if (cache_entries[index].IsValid()) {
-    // The value is stored contiguously in the same allocated chunk.
-    free(const_cast<char*>(cache_entries[index].GetKey().data()));
+    auto ptr = const_cast<char*>(cache_entries[index].GetKey().data());
+    if (ptr != nullptr) {
+      free(ptr);  // The value is stored contiguously in the same chunk.
+      cache_entries[index].SetKey(Slice(nullptr, 0));
+      cache_entries[index].SetValue(Slice(nullptr, 0));
+    }
     return true;
   } else {
     return false;

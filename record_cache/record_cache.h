@@ -30,9 +30,12 @@ class RecordCache {
   //
   // Also provided is the eviction `priority` of the tuple, i.e. the # of times
   // the record will be skipped by the CLOCK algorithm.
+  //
+  // Setting `safe = false` lets us switch to a thread-unsafe variant that does
+  // not acquire locks. It is intended purely for performance benchmarking.
   Status Put(const Slice& key, const Slice& value, bool is_dirty = false,
              format::WriteType write_type = format::WriteType::kWrite,
-             uint8_t priority = 4);
+             uint8_t priority = 4, bool safe = true);
 
   // Cache the pair `key`-`value`, originating from a write. This is a
   // convenience method that calls `Put()` with `is_dirty` set to true and
@@ -50,10 +53,15 @@ class RecordCache {
   // with `is_dirty` set to false and `EntryType::kDelete`.
   Status PutFromDelete(const Slice& key, uint8_t priority = 4);
 
-  // Retrieve the index of the cache entry associated with `key`, if any. If an
-  // entry is found, either method will return an OK status; otherwise, a
-  // Status::NotFound() will be returned.
-  Status GetIndex(const Slice& key, uint64_t* index_out) const;
+  // Retrieve the index of the cache entry associated with `key`, if any, and
+  // lock it for reading or writing based on `exclusive`. If an entry is found,
+  // returns an OK status; otherwise, a Status::NotFound() is returned.
+  //
+  // Setting `safe = false` lets us switch to a thread-unsafe variant that does
+  // not acquire locks upon lookup. It is intended purely for performance
+  // benchmarking.
+  Status GetCacheIndex(const Slice& key, bool exclusive, uint64_t* index_out,
+                       bool safe = true) const;
 
  private:
   // Required by the ART constructor. Populates `key` with the key of the record
@@ -84,9 +92,10 @@ class RecordCache {
   // An index for the cache, using ART with optimistic lock coupling from
   // https://github.com/flode/ARTSynchronized/tree/master/OptimisticLockCoupling.
   //
-  // CAUTION: This implementation uses the value 0 to denote lookup misses, so
-  // any indexes referring to `cache_entries` are incremented by 1 to produce
-  // the corresponding ART TID.
+  // CAUTION: This ART implementation uses the value 0 to denote lookup misses,
+  // so any indexes referring to `cache_entries` are incremented by 1 to produce
+  // the corresponding ART TID. E.g. To indicate that a record is stored at
+  // index 3 in `cache_entries`, we would store the TID 4 in ART.
   std::unique_ptr<ART_OLC::Tree> tree_;
 };
 
