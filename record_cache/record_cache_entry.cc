@@ -15,32 +15,12 @@ RecordCacheEntry::RecordCacheEntry() : metadata_(0) {
 
 RecordCacheEntry::~RecordCacheEntry() { pthread_rwlock_destroy(&rwlock_); }
 
-RecordCacheEntry::RecordCacheEntry(const RecordCacheEntry& other) {
-  pthread_rwlock_init(&rwlock_, nullptr);
-  metadata_ = other.metadata_.load();
-  key_ = Slice(other.GetKey());
-  value_ = Slice(other.GetValue());
-}
-
-RecordCacheEntry& RecordCacheEntry::operator=(const RecordCacheEntry& other) {
-  if (this != &other) {
-    pthread_rwlock_destroy(&rwlock_);
-
-    pthread_rwlock_init(&rwlock_, nullptr);
-    metadata_ = other.metadata_.load();
-    key_ = Slice(other.GetKey());
-    value_ = Slice(other.GetValue());
-  }
-  return *this;
-}
-
 RecordCacheEntry::RecordCacheEntry(RecordCacheEntry&& other) noexcept {
   pthread_rwlock_init(&rwlock_, nullptr);
   metadata_ = other.metadata_.load();
   key_ = Slice(other.GetKey());
   value_ = Slice(other.GetValue());
 
-  pthread_rwlock_destroy(&other.rwlock_);
   other.metadata_ = 0;
   other.SetKey(Slice(nullptr, 0));
   other.SetValue(Slice(nullptr, 0));
@@ -56,7 +36,6 @@ RecordCacheEntry& RecordCacheEntry::operator=(
     key_ = Slice(other.GetKey());
     value_ = Slice(other.GetValue());
 
-    pthread_rwlock_destroy(&other.rwlock_);
     other.metadata_ = 0;
     other.SetKey(Slice(nullptr, 0));
     other.SetValue(Slice(nullptr, 0));

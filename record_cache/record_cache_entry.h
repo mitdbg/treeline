@@ -13,11 +13,15 @@ class RecordCacheEntry {
   RecordCacheEntry();
   ~RecordCacheEntry();
 
-  // Copy constructor/assignment
-  RecordCacheEntry(const RecordCacheEntry& other);
-  RecordCacheEntry& operator=(const RecordCacheEntry& other);
+  // Copy constructor/assignment - not permitted.
+  RecordCacheEntry(const RecordCacheEntry& other) = delete;
+  RecordCacheEntry& operator=(const RecordCacheEntry& other) = delete;
 
-  // Move contructor/assignment
+  // Move contructor/assignment - required by std::vector.
+  //
+  // Move can be implemented safely because the vector of cache entries is only
+  // resized during initialization, not during execution, when it might have
+  // been accessed by multiple threads.
   RecordCacheEntry(RecordCacheEntry&& other) noexcept;
   RecordCacheEntry& operator=(RecordCacheEntry&& other) noexcept;
 
