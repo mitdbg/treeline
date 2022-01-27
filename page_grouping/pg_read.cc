@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <numeric>
 #include <random>
@@ -30,6 +31,7 @@ DEFINE_uint32(size_mib, 10240, "Size of the file to read.");
 DEFINE_uint32(iterations, 100000, "Number of page reads to make.");
 DEFINE_uint32(warmup, 1000, "Number of warmup page reads to make.");
 DEFINE_string(mode, "all", "Set to one of {all, power_two, single}.");
+DEFINE_string(out_path, ".", "Where to write the output files.");
 
 namespace {
 
@@ -65,7 +67,7 @@ int OpenAndInitializeFile(void* buffer) {
                   open(FLAGS_file.c_str(), O_CREAT | O_RDWR | O_SYNC | O_DIRECT,
                        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH));
 
-  const size_t file_size_bytes = FLAGS_size_mib * 1024 * 1024;
+  const size_t file_size_bytes = FLAGS_size_mib * 1024ULL * 1024ULL;
   if (fs::file_size(FLAGS_file) < file_size_bytes) {
     std::cerr << "> Initializing the file (" << FLAGS_size_mib << " MiB)..."
               << std::endl;
@@ -140,15 +142,23 @@ int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Run a randomized read microbenchmark.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
 
+  if (FLAGS_file.empty() || FLAGS_out_path.empty()) {
+    std::cerr << "ERROR: --file and --out_path both must be set." << std::endl;
+    return 1;
+  }
+
   void* const buffer = aligned_alloc(kAlignment, kBufferSize);
   assert(buffer != nullptr);
 
   const int file_fd = OpenAndInitializeFile(buffer);
 
-  std::cout << "pages_read,elapsed_time_ns" << std::endl;
+  const auto out_dir = fs::path(FLAGS_out_path);
+  std::ofstream out(out_dir / "results.csv");
+
+  out << "pages_read,elapsed_time_ns" << std::endl;
   for (uint32_t i = 0; i < FLAGS_trials; ++i) {
     const auto [pages_read, time_ns] = RunBenchmark(buffer, file_fd);
-    std::cout << pages_read << "," << time_ns.count() << std::endl;
+    out << pages_read << "," << time_ns.count() << std::endl;
   }
 
   close(file_fd);
