@@ -8,7 +8,7 @@ READ_PAGES = 25000000  # 25 million
 SIZE_MIB = 40960  # 40 GiB
 WARMUP = 1000
 
-OUT_FILE = "/flash1/geoffxy/pg_read_test"
+OUT_FILE = "/flash1/geoffxy/pg_read_test_rand"
 
 run_experiment_group(
   name="simple",
@@ -24,6 +24,7 @@ run_experiment_group(
         "file": OUT_FILE,
         "seed": 42,
         "trials": 1,
+        "rand_init": True,
       },
     )
     for mode in MODES

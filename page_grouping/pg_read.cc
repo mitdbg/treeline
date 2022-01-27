@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cstring>
@@ -32,6 +33,7 @@ DEFINE_uint32(iterations, 100000, "Number of page reads to make.");
 DEFINE_uint32(warmup, 1000, "Number of warmup page reads to make.");
 DEFINE_string(mode, "all", "Set to one of {all, power_two, single}.");
 DEFINE_string(out_path, ".", "Where to write the output files.");
+DEFINE_bool(rand_init, false, "If set, initialize the file in random order.");
 
 namespace {
 
@@ -72,10 +74,36 @@ int OpenAndInitializeFile(void* buffer) {
     std::cerr << "> Initializing the file (" << FLAGS_size_mib << " MiB)..."
               << std::endl;
     FillBuffer(buffer);
-    const size_t num_writes = file_size_bytes / kBufferSize;
-    CHECK_ERROR(lseek(fd, 0, SEEK_SET));
-    for (size_t i = 0; i < num_writes; ++i) {
-      CHECK_ERROR(write(fd, buffer, kBufferSize));
+    if (FLAGS_rand_init) {
+      const size_t num_writes = file_size_bytes / kPageSize;
+      // Generate a "random" initialization order.
+      std::vector<size_t> page_write_order;
+      page_write_order.resize(num_writes);
+      std::iota(page_write_order.begin(), page_write_order.end(), 0);
+      std::mt19937 prng(FLAGS_seed + 2);
+      std::shuffle(page_write_order.begin(), page_write_order.end(), prng);
+      CHECK_ERROR(fallocate(fd, 0, 0, file_size_bytes));
+
+      // `buffer` is filled with random data and is 16 pages long. We "randomly"
+      // select a chunk of data in the buffer to write to the offset.
+      //
+      // N.B. This allocation pattern also does not exactly mimic page grouping
+      // because all the pages in a logically contiguous segments are always
+      // allocated together.
+      std::uniform_int_distribution<uint32_t> buffer_slot(0, 15);
+      uint8_t* buf = reinterpret_cast<uint8_t*>(buffer);
+      for (const auto& page_offset : page_write_order) {
+        const uint32_t buffer_slot_idx = buffer_slot(prng);
+        CHECK_ERROR(pwrite(fd, buf + buffer_slot_idx * kPageSize, kPageSize,
+                           page_offset * kPageSize));
+      }
+
+    } else {
+      const size_t num_writes = file_size_bytes / kBufferSize;
+      CHECK_ERROR(lseek(fd, 0, SEEK_SET));
+      for (size_t i = 0; i < num_writes; ++i) {
+        CHECK_ERROR(write(fd, buffer, kBufferSize));
+      }
     }
     std::cerr << "> Done initializing the file." << std::endl;
   } else {
@@ -100,7 +128,8 @@ auto RunBenchmark(void* buffer, const int fd) {
     }
   })();
 
-  const size_t num_pages_in_file = FLAGS_size_mib * 1024ULL * 1024ULL / kPageSize;
+  const size_t num_pages_in_file =
+      FLAGS_size_mib * 1024ULL * 1024ULL / kPageSize;
   auto run_read_workload = [&page_sizes, &prng, buffer, num_pages_in_file,
                             fd](const uint32_t pages_to_read) {
     std::uniform_int_distribution<uint32_t> num_pages_dist(
