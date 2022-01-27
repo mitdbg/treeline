@@ -5,7 +5,7 @@ MODES = [
 ]
 
 READ_PAGES = 10000000  # 10 million
-SIZE_MIB = 10240  # 10 GiB
+SIZE_MIB = 40960  # 40 GiB
 WARMUP = 1000
 
 OUT_FILE = "/flash1/geoffxy/pg_read_test"
