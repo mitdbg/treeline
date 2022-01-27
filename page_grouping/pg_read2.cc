@@ -58,7 +58,7 @@ class SegmentFile {
 
   SegmentFile(fs::path name, uint32_t pages_in_segment)
       : fd_(-1), pages_in_segment_(pages_in_segment), name_(std::move(name)) {
-    CHECK_ERROR(fd_ = open(name.c_str(), O_CREAT | O_RDWR | O_SYNC | O_DIRECT,
+    CHECK_ERROR(fd_ = open(name_.c_str(), O_CREAT | O_RDWR | O_SYNC | O_DIRECT,
                            S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH));
   }
 
@@ -117,7 +117,7 @@ size_t PagesPerFile() { return BytesPerFile() / kPageSize; }
 
 std::vector<SegmentFile> OpenAndInitializeFiles(void* buffer) {
   fs::path write_path(FLAGS_write_path);
-  fs::create_directory(write_path);
+  fs::create_directories(write_path);
 
   std::vector<SegmentFile> files;
   for (uint32_t i = 0; i < kNumFiles; ++i) {
@@ -239,7 +239,7 @@ auto RunAllBenchmark(void* buffer, const std::vector<SegmentFile>& files) {
   }
   std::vector<Dist> seg_pages_dists;  // Select the number of pages to read.
   for (const auto& file : files) {
-    seg_offset_dists.emplace_back(1, file.pages_in_segment());
+    seg_pages_dists.emplace_back(1, file.pages_in_segment());
   }
 
   std::mt19937 prng(FLAGS_seed + 1);
