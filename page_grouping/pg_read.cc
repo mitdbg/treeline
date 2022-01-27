@@ -100,7 +100,7 @@ auto RunBenchmark(void* buffer, const int fd) {
     }
   })();
 
-  const size_t num_pages_in_file = FLAGS_size_mib * 1024 * 1024 / kPageSize;
+  const size_t num_pages_in_file = FLAGS_size_mib * 1024ULL * 1024ULL / kPageSize;
   auto run_read_workload = [&page_sizes, &prng, buffer, num_pages_in_file,
                             fd](const uint32_t pages_to_read) {
     std::uniform_int_distribution<uint32_t> num_pages_dist(
