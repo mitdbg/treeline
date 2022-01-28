@@ -19,6 +19,8 @@ RecordCache::~RecordCache() {
   cache_entries.clear();
 }
 
+// TODO: when admitting keys from the pages, they should not override newer
+// values for the same keys that are present in the record cache.
 Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
                         format::WriteType write_type, uint8_t priority,
                         bool safe) {
@@ -91,7 +93,7 @@ Status RecordCache::PutFromDelete(const Slice& key, uint8_t priority) {
 }
 
 Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
-                             uint64_t* index_out, bool safe) const {
+                                  uint64_t* index_out, bool safe) const {
   Key art_key;
   SliceToARTKey(key, art_key);
   auto t = tree_->getThreadInfo();
