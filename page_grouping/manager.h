@@ -43,8 +43,20 @@ class Manager {
 
   Status Get(const Key& key, std::string* value_out);
   Status PutBatch(const std::vector<std::pair<Key, Slice>>& records);
+
+  // Will read partial segments.
+  Status ScanWithEstimates(
+      const Key& start_key, const size_t amount,
+      std::vector<std::pair<Key, std::string>>* values_out);
+
+  // Only reads whole segments.
+  Status ScanWhole(const Key& start_key, const size_t amount,
+                   std::vector<std::pair<Key, std::string>>* values_out);
+
   Status Scan(const Key& start_key, const size_t amount,
-              std::vector<std::pair<Key, std::string>>* values_out);
+              std::vector<std::pair<Key, std::string>>* values_out) {
+    return ScanWhole(start_key, amount, values_out);
+  }
 
   // Benchmark statistics.
   const std::vector<size_t>& GetReadCounts() const { return w_.read_counts(); }
@@ -63,8 +75,7 @@ class Manager {
  private:
   Manager(std::filesystem::path db_path,
           std::vector<std::pair<Key, SegmentInfo>> boundaries,
-          std::vector<SegmentFile> segment_files,
-          Options options);
+          std::vector<SegmentFile> segment_files, Options options);
 
   static Manager BulkLoadIntoSegments(
       const std::filesystem::path& db_path,
