@@ -122,7 +122,6 @@ Status DBImpl::Initialize() {
             ? 0
             : options_.deferred_io_max_deferrals - 1;
     mtable_ = std::make_shared<MemTable>(moptions);
-    stats_.last_memtable_creation_ = std::chrono::steady_clock::now();
 
     // Set up the record cache.
     rec_cache_ = std::make_unique<RecordCache>(options_.record_cache_capacity);
@@ -308,72 +307,38 @@ DBImpl::~DBImpl() {
   Logger::Shutdown();
 }
 
-// Reading a value consists of up to four steps:
+// Reading a value consists of up to two steps:
 //
-// 1. Make copies of the memtable pointers so that we can search them without
-//     holding the `mtable_mutex_`.
-//
-// 2. Search the active memtable (`mtable_`).
-//    - We do not need to hold the `mtable_mutex_` because the memtable's
-//      underlying data structure (a skip list) supports concurrent reads during
-//      a write.
-//    - If the memtable contains a `EntryType::kDelete` entry for `key`, we can
-//      safely return `Status::NotFound()` because the key was recently deleted.
-//    - If the memtable contains a `EntryType::kWrite` entry for `key`, we can
-//      return the value directly.
+// 1. Search the record cache (`rec_cache_`).
+//    - If the record cache contains a `EntryType::kDelete` entry for `key`, we
+//    can safely return `Status::NotFound()` because the key was recently
+//    deleted.
+//    - If the record cache contains a `EntryType::kWrite` entry for `key`, we
+//    can return the value directly.
 //    - If no entry was found, we move on to the next step.
 //
-// 3. Search the currently-being-flushed memtable (`im_mtable_`), if it exists.
-//    - We do not need to hold the `mtable_mutex_` during the search because the
-//      currently-being-flushed memtable is immutable.
-//    - We use the same search protocol as specified in step 2.
-//
-// 4. Search the on-disk page that should store the data associated with `key`,
+// 2. Search the on-disk page that should store the data associated with `key`,
 //    based on the key to page model.
-//    - We do not need to hold the `mtable_mutex_` during the search because the
-//      buffer manager manages the mutual exclusion for us.
 //
 // We carry out these steps in this order to ensure we always return the latest
-// value associated with a key (i.e., writes always go to the memtable first).
+// value associated with a key (i.e., writes always go to the record cache
+// first).
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
                    std::string* value_out) {
-  std::shared_ptr<MemTable> local_mtable = nullptr;
-  std::shared_ptr<MemTable> local_im_mtable = nullptr;
-
-  // 1. Get copies of the memtable pointers so we can search them without
-  //    holding the database lock.
-  {
-    std::unique_lock<std::mutex> mtable_lock(mtable_mutex_);
-    local_mtable = mtable_;
-    local_im_mtable = im_mtable_;
-  }
-
-  // 2. Search the active memtable.
-  format::WriteType write_type;
-  Status status = local_mtable->Get(key, &write_type, value_out);
+  // 1. Search the record cache.
+  uint64_t cache_index;
+  Status status =
+      rec_cache_->GetCacheIndex(key, /*exclusive = */ false, &cache_index);
   if (status.ok()) {
-    ++stats_.temp_user_reads_memtable_hits_records_;
+    ++stats_.temp_user_reads_cache_hits_records_;
 
-    if (write_type == format::WriteType::kDelete) {
+    if (RecordCache::cache_entries[cache_index].IsDelete()) {
       return Status::NotFound("Key not found.");
     }
     return Status::OK();
   }
 
-  // 3. Check the immutable memtable, if it exists.
-  if (local_im_mtable != nullptr) {
-    status = local_im_mtable->Get(key, &write_type, value_out);
-    if (status.ok()) {
-      ++stats_.temp_user_reads_memtable_hits_records_;
-
-      if (write_type == format::WriteType::kDelete) {
-        return Status::NotFound("Key not found.");
-      }
-      return Status::OK();
-    }
-  }
-
-  // 4. Check the on-disk page(s) by following the relevant overflow chain.
+  // 2. Check the on-disk page(s) by following the relevant overflow chain.
   bool next_link_exists = true;
   PhysicalPageId page_id;
   BufferFrame* bf;
@@ -597,15 +562,14 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
   //
   // clang-format on
   if (options_.deferral_autotuning) {
-    const auto memtable_fill_duration_ns =
-        std::chrono::steady_clock::now() - stats_.last_memtable_creation_;
+    
     const auto bufmgr_miss_latency_ns = buf_mgr_->BufMgrMissLatency();
 
     foptions.deferred_io_batch_size =
         options_.batch_scaling_factor *
         sqrt(Page::kSize * options_.memtable_flush_threshold *
              bufmgr_miss_latency_ns.count() /
-             memtable_fill_duration_ns.count());
+             1); // TODO: eliminate
 
     Logger::Log("Autotuned deferred I/O batch size: %zu bytes",
                 foptions.deferred_io_batch_size);
@@ -653,7 +617,7 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
   if (options_.memory_autotuning) {
     // Find read percentage.
     size_t user_total_reads_records =
-        stats_.temp_user_reads_memtable_hits_records_ +
+        stats_.temp_user_reads_cache_hits_records_ +
         stats_.temp_user_reads_bufmgr_hits_records_ +
         stats_.temp_user_reads_single_bufmgr_misses_records_ +
         stats_.temp_user_reads_multi_bufmgr_misses_records_;
