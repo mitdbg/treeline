@@ -477,25 +477,16 @@ bool DBImpl::FlushInProgress(const std::unique_lock<std::mutex>& lock) const {
 
 Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
                          const Slice& value, format::WriteType write_type) {
-  std::unique_lock<std::mutex> lock(mutex_);
-  WriterWaitIfNeeded(lock);
-  if (ActiveMemTableFull(lock)) {
-    ScheduleMemTableFlush(lock, /*disable_deferred_io = */ false);
-  }
+  
   if (!options.bypass_wal) {
     Status log_result = wal_.LogWrite(options, key, value, write_type);
     if (!log_result.ok()) {
-      NotifyWaitingWriterIfNeeded(lock);
       return log_result;
     }
   }
-  // NOTE: We do not need to acquire `mtable_mutex_` here even though we read
-  // the `mtable_` pointer because only a writing thread can modify `mtable_`.
-  // Since we are currently holding `mutex_`, no other writing thread can
-  // concurrently modify `mtable_`.
-  Status write_result = mtable_->Add(key, value, write_type);
+  
+  Status write_result = rec_cache_->Put(key, value, /*is_dirty = */ true, write_type);
   if (write_result.ok()) ++stats_.temp_user_writes_records_;
-  NotifyWaitingWriterIfNeeded(lock);
   return write_result;
 }
 
