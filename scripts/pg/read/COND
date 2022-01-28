@@ -46,6 +46,7 @@ run_experiment_group(
         "write_path": WRITE_PATH,
         "seed": 42,
         "trials": 1,
+        "interleave_alloc": True,
       },
     )
     for mode in MODES

@@ -33,6 +33,8 @@ DEFINE_uint32(iterations, 100000, "Number of page reads to make.");
 DEFINE_uint32(warmup, 1000, "Number of warmup page reads to make.");
 DEFINE_string(mode, "all", "Set to one of {all, power_two, single}.");
 DEFINE_string(out_path, ".", "Where to write the output files.");
+DEFINE_bool(interleave_alloc, false,
+            "Set to true to allocate the files in an interleaved fashion.");
 
 namespace {
 
@@ -126,22 +128,54 @@ std::vector<SegmentFile> OpenAndInitializeFiles(void* buffer) {
 
   const size_t bytes_per_file = BytesPerFile();
 
-  // Simple sequential initialization.
   FillBuffer(buffer);
-  for (const auto& sf : files) {
-    if (sf.size() >= bytes_per_file) {
-      std::cerr << "> " << sf.path().filename()
-                << " is already large enough. Skipping initialization."
+  if (FLAGS_interleave_alloc) {
+    if (std::all_of(files.begin(), files.end(),
+                    [bytes_per_file](const SegmentFile& sf) {
+                      return sf.size() >= bytes_per_file;
+                    })) {
+      std::cerr << "> Files are already large enough. Skipping initialization."
                 << std::endl;
-      continue;
-    }
-    std::cerr << "> Initializing " << sf.path().filename() << std::endl;
+    } else {
+      std::cerr << "> Performing interleaved initialization." << std::endl;
+      std::mt19937 prng(FLAGS_seed + 2);
+      size_t total_segments = 0;
+      std::vector<size_t> file_segment_counts;
+      for (const auto& sf : files) {
+        const size_t segments_in_file = PagesPerFile() / sf.pages_in_segment();
+        CHECK_ERROR(lseek(sf.fd(), 0, SEEK_SET));
+        file_segment_counts.push_back(segments_in_file);
+        total_segments += segments_in_file;
+      }
+      while (total_segments > 0) {
+        std::discrete_distribution<size_t> file_dist(
+            file_segment_counts.begin(), file_segment_counts.end());
+        const size_t next_file = file_dist(prng);
+        assert(file_segment_counts[next_file] > 0);
 
-    const uint32_t pages_in_segment = sf.pages_in_segment();
-    const size_t num_writes = PagesPerFile() / pages_in_segment;
-    CHECK_ERROR(lseek(sf.fd(), 0, SEEK_SET));
-    for (size_t i = 0; i < num_writes; ++i) {
-      CHECK_ERROR(write(sf.fd(), buffer, pages_in_segment * kPageSize));
+        const SegmentFile& sf = files[next_file];
+        CHECK_ERROR(write(sf.fd(), buffer, sf.pages_in_segment() * kPageSize));
+        --file_segment_counts[next_file];
+        --total_segments;
+      }
+    }
+  } else {
+    // Simple sequential initialization.
+    for (const auto& sf : files) {
+      if (sf.size() >= bytes_per_file) {
+        std::cerr << "> " << sf.path().filename()
+                  << " is already large enough. Skipping initialization."
+                  << std::endl;
+        continue;
+      }
+      std::cerr << "> Initializing " << sf.path().filename() << std::endl;
+
+      const uint32_t pages_in_segment = sf.pages_in_segment();
+      const size_t num_writes = PagesPerFile() / pages_in_segment;
+      CHECK_ERROR(lseek(sf.fd(), 0, SEEK_SET));
+      for (size_t i = 0; i < num_writes; ++i) {
+        CHECK_ERROR(write(sf.fd(), buffer, pages_in_segment * kPageSize));
+      }
     }
   }
 
