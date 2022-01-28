@@ -4,7 +4,7 @@ MODES = [
   "single",
 ]
 
-READ_PAGES = 25000000  # 25 million
+READ_PAGES = 10000000  # 10 million
 SIZE_MIB = 40960  # 40 GiB
 WARMUP = 1000
 
