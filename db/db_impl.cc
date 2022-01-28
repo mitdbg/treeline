@@ -78,6 +78,7 @@ DBImpl::DBImpl(const Options options, const fs::path db_path)
       buf_mgr_(nullptr),
       model_(nullptr),
       workers_(nullptr),
+      rec_cache_(nullptr),
       mtable_(nullptr),
       im_mtable_(nullptr),
       all_memtables_full_(false),
@@ -122,6 +123,9 @@ Status DBImpl::Initialize() {
             : options_.deferred_io_max_deferrals - 1;
     mtable_ = std::make_shared<MemTable>(moptions);
     stats_.last_memtable_creation_ = std::chrono::steady_clock::now();
+
+    // Set up the record cache.
+    rec_cache_ = std::make_unique<RecordCache>(options_.record_cache_capacity);
 
     // Finish initializing the DB based on whether we are creating a completely
     // new DB or if we are opening an existing DB.
@@ -224,6 +228,7 @@ Status DBImpl::InitializeExistingDB() {
   if (!s.ok()) return s;
 
   // Make sure any "leftover" WAL writes are persisted.
+  // TODO: does this need to be adapted in the face of the record cache?
   if (mtable_->HasEntries()) {
     s = FlushMemTable(/*disable_deferred_io = */ true);
     if (!s.ok()) return s;
@@ -261,6 +266,10 @@ DBImpl::~DBImpl() {
       pending_flush = last_flush_;
       assert(pending_flush.valid());
     }
+
+    // Any data in the record cache should be flushed to persistent storage. The
+    // `RecordCache` destructor will take care of that.
+    rec_cache_.reset();
 
     // Not absolutely needed because there should not be any additional writers.
     // But either way, this method should be paired with `WriterWaitIfNeeded()`

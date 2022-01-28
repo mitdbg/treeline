@@ -14,6 +14,7 @@
 #include "llsm/db.h"
 #include "llsm/statistics.h"
 #include "model/model.h"
+#include "record_cache/record_cache.h"
 #include "util/thread_pool.h"
 #include "wal/manager.h"
 
@@ -139,6 +140,7 @@ class DBImpl : public DB {
   std::unique_ptr<BufferManager> buf_mgr_;
   std::unique_ptr<Model> model_;
   std::unique_ptr<ThreadPool> workers_;
+  std::unique_ptr<RecordCache> rec_cache_;
 
   // The memory budget (in bytes) currently available for both memtables
   // cumulatively. Defined by the user upon creation but can be adjusted if
