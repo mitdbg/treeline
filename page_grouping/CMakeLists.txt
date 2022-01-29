@@ -58,3 +58,6 @@ target_link_libraries(pg_read PRIVATE gflags)
 
 add_executable(pg_read2 pg_read2.cc)
 target_link_libraries(pg_read2 PRIVATE gflags)
+
+add_executable(pg_shuffle tools/shuffle_pages.cc)
+target_link_libraries(pg_shuffle PRIVATE gflags)
