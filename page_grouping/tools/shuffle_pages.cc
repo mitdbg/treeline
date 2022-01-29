@@ -31,9 +31,10 @@ size_t FindAllocatedSize(int fd, const size_t pages_per_segment) {
   // Retrieve the file's size.
   struct stat file_status;
   CHECK_ERROR(fstat(fd, &file_status));
-  assert(file_status.st_size > 0);
+  assert(file_status.st_size >= 0);
 
   const size_t file_size = file_status.st_size;
+  if (file_size == 0) return 0;
 
   // This assumes that segments are allocated contiguously and there are no
   // "holes".
@@ -72,6 +73,11 @@ void Shuffle(const fs::path& file, const size_t pages_per_segment) {
   CHECK_ERROR(fd = open(file.c_str(), O_RDWR));
 
   const size_t logical_size = FindAllocatedSize(fd, pages_per_segment);
+  if (logical_size == 0) {
+    std::cerr << "> File is empty." << std::endl;
+    return;
+  }
+
   const size_t segment_size_bytes = pages_per_segment * FLAGS_page_size;
   assert(logical_size % segment_size_bytes == 0);
   const size_t num_segments_in_file = logical_size / segment_size_bytes;
@@ -83,6 +89,10 @@ void Shuffle(const fs::path& file, const size_t pages_per_segment) {
   // Fisher-Yates shuffle at the granularity of segments.
   std::mt19937 prng(FLAGS_seed + pages_per_segment);
   for (size_t i = 0; i < num_segments_in_file; ++i) {
+    if (i % 100000 == 0) {
+      std::cerr << "> Progress: " << i << "/" << num_segments_in_file
+                << std::endl;
+    }
     std::uniform_int_distribution<size_t> dist(i, num_segments_in_file - 1);
     const size_t swap_idx = dist(prng);
     // Perform a swap.
@@ -125,7 +135,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "> Shuffling " << segment_file.filename() << "..."
               << std::endl;
     Shuffle(segment_file, pages_per_segment);
-    std::cerr << "Done!" << std::endl;
+    std::cerr << "> Done!" << std::endl;
   }
 
   return 0;
