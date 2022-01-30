@@ -41,6 +41,8 @@ fi
 
 mkdir -p $DB_CHECKPOINT_PATH
 
+echo >&2 "Creating the database..."
+
 ../../build/page_grouping/pg_bench \
   --db_path=$full_checkpoint_path \
   --workload_config=$workload_path \
@@ -48,3 +50,9 @@ mkdir -p $DB_CHECKPOINT_PATH
   --output_path=$COND_OUT \
   --verbose \
   ${args[@]}
+
+echo >&2 "Done loading. Shuffling the pages now..."
+
+../../build/page_grouping/tools/pg_shuffle \
+  --db_path=$full_checkpoint_path \
+  --seed=$SEED
