@@ -55,7 +55,7 @@ class Manager {
 
   Status Scan(const Key& start_key, const size_t amount,
               std::vector<std::pair<Key, std::string>>* values_out) {
-    return ScanWhole(start_key, amount, values_out);
+    return ScanWithEstimates(start_key, amount, values_out);
   }
 
   // Benchmark statistics.
