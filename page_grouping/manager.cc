@@ -19,8 +19,8 @@ namespace fs = std::filesystem;
 namespace {
 
 const std::string kSegmentFilePrefix = "sf-";
-const std::string kSegmentDetailCsvFileName = "loaded_segments.csv";
-const std::string kPageDetailCsvFileName = "page_bounds.csv";
+const std::string kSegmentSummaryCsvFileName = "segment_summary.csv";
+const std::string kDebugDirName = "debug";
 
 Status LoadIntoPage(PageBuffer& buf, size_t page_idx, Key lower, Key upper,
                     const std::vector<std::pair<Key, Slice>>& records,
@@ -41,6 +41,7 @@ Status LoadIntoPage(PageBuffer& buf, size_t page_idx, Key lower, Key upper,
   return Status::OK();
 }
 
+// Unused, but kept in case it is useful for debugging later on.
 void PrintSegmentsAsCSV(std::ostream& out,
                         const std::vector<Segment>& segments) {
   out << "segment_page_count,num_records,model_slope,model_intercept"
@@ -53,6 +54,21 @@ void PrintSegmentsAsCSV(std::ostream& out,
     } else {
       out << "," << std::endl;
     }
+  }
+}
+
+void PrintSegmentSummaryAsCsv(std::ostream& out, const std::vector<Segment>& segments) {
+  std::vector<size_t> num_segments;
+  num_segments.resize(SegmentBuilder::kSegmentPageCounts.size());
+  for (const auto& seg : segments) {
+    const auto it = SegmentBuilder::kPageCountToSegment.find(seg.page_count);
+    assert(it != SegmentBuilder::kPageCountToSegment.end());
+    ++num_segments[it->second];
+  }
+
+  out << "segment_page_count,num_segments" << std::endl;
+  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
+    out << (1ULL << i) << "," << num_segments[i] << std::endl;
   }
 }
 
@@ -84,13 +100,11 @@ Manager Manager::BulkLoadIntoSegments(
   SegmentBuilder builder(options.records_per_page_goal,
                          options.records_per_page_delta);
   const auto segments = builder.Build(records);
-  std::optional<std::ofstream> page_details;
   if (options.write_debug_info) {
-    std::ofstream segment_details(db_path / kSegmentDetailCsvFileName);
-    PrintSegmentsAsCSV(segment_details, segments);
-
-    page_details = std::ofstream(db_path / kPageDetailCsvFileName);
-    (*page_details) << "num_records,min_key,max_key" << std::endl;
+    const auto debug_path = db_path / kDebugDirName;
+    fs::create_directories(debug_path);
+    std::ofstream segment_summary(debug_path / kSegmentSummaryCsvFileName);
+    PrintSegmentSummaryAsCsv(segment_summary, segments);
   }
 
   // 2. Load the data into pages on disk.
@@ -117,11 +131,6 @@ Manager Manager::BulkLoadIntoSegments(
               /*upper_key=*/rec.first, records,
               /*start_idx=*/curr_page_first_record_idx, /*end_idx=*/i);
           assert(result.ok());
-          if (page_details.has_value()) {
-            (*page_details) << (i - curr_page_first_record_idx) << ","
-                            << records[curr_page_first_record_idx].first << ","
-                            << rec.first << std::endl;
-          }
           curr_page = assigned_page;
           curr_page_first_record_idx = i;
         }
@@ -139,11 +148,6 @@ Manager Manager::BulkLoadIntoSegments(
                        /*upper=*/upper_key, records, curr_page_first_record_idx,
                        seg.end_idx);
       assert(result.ok());
-      if (page_details.has_value()) {
-        (*page_details) << (seg.end_idx - curr_page_first_record_idx) << ","
-                        << records[curr_page_first_record_idx].first << ","
-                        << upper_key << std::endl;
-      }
 
       // Write model into the first page (for deserialization).
       pg::Page first_page(buf.get());
