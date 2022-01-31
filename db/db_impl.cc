@@ -73,12 +73,7 @@ DBImpl::DBImpl(const Options options, const fs::path db_path)
       model_(nullptr),
       workers_(nullptr),
       rec_cache_(nullptr),
-      mtable_(nullptr),
-      im_mtable_(nullptr),
-      all_memtables_full_(false),
-      wal_(db_path_ / kWALDirName),
-      mem_budget_memtables_(2 * options_.memtable_flush_threshold),
-      mem_budget_(options_.buffer_pool_size + mem_budget_memtables_) {}
+      wal_(db_path_ / kWALDirName) {}
 
 Status DBImpl::Initialize() {
   const Status validate = ValidateOptions(options_);
@@ -211,48 +206,18 @@ Status DBImpl::InitializeExistingDB() {
       });
   if (!s.ok()) return s;
 
-  // Make sure any "leftover" WAL writes are persisted.
-  // TODO: does this need to be adapted in the face of the record cache?
-  // if (mtable_->HasEntries()) {
-  //   s = FlushMemTable(/*disable_deferred_io = */ true);
-  //   if (!s.ok()) return s;
-  // } else {
-  //   // Wait for the in-progress background flush to complete if needed.
-  //   std::unique_lock<std::mutex> lock(mutex_);
-  //   if (FlushInProgress(lock)) {
-  //     assert(last_flush_.valid());
-  //     std::shared_future<void> local_flush = last_flush_;
-  //     lock.unlock();
-  //     local_flush.get();
-  //   }
-  // }
+  // Make sure any "leftover" WAL writes are persisted
+  s = FlushRecordCache(/*disable_deferred_io = */ true);
+  if (!s.ok()) return s;
+  buf_mgr_->FlushDirty();
 
   return wal_.PrepareForWrite(/*discard_existing_logs=*/true);
 }
 
 DBImpl::~DBImpl() {
-  std::shared_future<void> pending_flush;
-
-  // Once the destructor is called, no further application threads are allowed
-  // to call the `DBImpl`'s public methods.
-  {
-    std::unique_lock<std::mutex> lock(mutex_);
-    // Must wait for any earlier writers to get a chance to apply their writes.
-    WriterWaitIfNeeded(lock);
-
-    // We must be the last writing thread since no additional public methods can
-    // be called.
-    assert(waiting_writers_.empty());
-
-    // Any data in the record cache should be flushed to persistent storage. The
-    // `RecordCache` destructor will take care of that.
-    rec_cache_.reset();
-
-    // Not absolutely needed because there should not be any additional writers.
-    // But either way, this method should be paired with `WriterWaitIfNeeded()`
-    // to keep its usage in the code consistent.
-    NotifyWaitingWriterIfNeeded(lock);
-  }
+  // Any data in the record cache should be flushed to persistent storage. The
+  // `RecordCache` destructor will take care of that.
+  rec_cache_.reset();
 
   // Deleting the thread pool will block the current thread until the workers
   // have completed all their queued tasks.
@@ -420,13 +385,7 @@ Status DBImpl::BulkLoad(
 size_t DBImpl::GetNumIndexedPages() const { return model_->GetNumPages(); }
 
 Status DBImpl::FlushRecordCache(const bool disable_deferred_io) {
-  std::shared_future<void> local_last_flush;
-  {
-    std::unique_lock<std::mutex> lock(mutex_);
-    WriterWaitIfNeeded(lock);
-    rec_cache_->WriteOutDirty();
-    NotifyWaitingWriterIfNeeded(lock);
-  }
+  rec_cache_->WriteOutDirty();
   return Status::OK();
 }
 
@@ -498,60 +457,6 @@ DBImpl::OverflowChain DBImpl::FixOverflowChain(
   }
 
   return frames;
-}
-
-class DBImpl::WaitingWriter {
- public:
-  // Called by the writer thread to wait until it can proceed.
-  // REQUIRES: `mutex_` is held.
-  void Wait(std::unique_lock<std::mutex>& lock) {
-    cv_.wait(lock, [this]() { return can_proceed_; });
-  }
-
-  // Called by a different thread to notify the waiting writer that it can
-  // proceed.
-  // REQUIRES: `mutex_` is held.
-  void Notify(const std::unique_lock<std::mutex>& lock) {
-    assert(lock.owns_lock());
-    can_proceed_ = true;
-    cv_.notify_one();
-  }
-
- private:
-  // The waiting writer thread waits on this condition variable until it is
-  // notified to proceed by a different thread.
-  std::condition_variable cv_;
-  // Needed to handle spurious wakeup.
-  bool can_proceed_ = false;
-};
-
-void DBImpl::WriterWaitIfNeeded(std::unique_lock<std::mutex>& lock) {
-  assert(lock.owns_lock());
-  if (!all_memtables_full_) {
-    return;
-  }
-
-  // All the memtables are full, so we need to wait in line before we can make
-  // any modifications.
-  WaitingWriter this_writer;
-  waiting_writers_.push(&this_writer);
-  this_writer.Wait(lock);
-  assert(waiting_writers_.front() == &this_writer);
-  waiting_writers_.pop();
-}
-
-void DBImpl::NotifyWaitingWriterIfNeeded(
-    const std::unique_lock<std::mutex>& lock) {
-  assert(lock.owns_lock());
-  if (!waiting_writers_.empty()) {
-    // The next writer can proceed.
-    waiting_writers_.front()->Notify(lock);
-
-  } else {
-    // There are no additional waiting writers. We need to ensure that the
-    // `all_memtables_full_` flag is lowered now.
-    all_memtables_full_ = false;
-  }
 }
 
 }  // namespace llsm

@@ -87,16 +87,6 @@ class DBImpl : public DB {
   void MergeBatches(RecordBatch& old_records, const FlushBatch& records,
                     FlushBatch* merged);
 
-  // All writing threads must call this method "on entry" to ensure they wait if
-  // needed (when the memtables are all full).
-  // REQUIRES: `mutex_` is held.
-  void WriterWaitIfNeeded(std::unique_lock<std::mutex>& lock);
-
-  // A writing thread that has finished its work should call this method "before
-  // exiting" to wake up the next waiting writer thread, if any.
-  // REQUIRES: `mutex_` is held.
-  void NotifyWaitingWriterIfNeeded(const std::unique_lock<std::mutex>& lock);
-
   // Will not be changed after `Initialize()` returns. The objects below are
   // thread safe; no additional mutual exclusion is required.
   Options options_;
@@ -107,57 +97,8 @@ class DBImpl : public DB {
   std::unique_ptr<ThreadPool> workers_;
   std::unique_ptr<RecordCache> rec_cache_;
 
-  // The memory budget (in bytes) currently available for both memtables
-  // cumulatively. Defined by the user upon creation but can be adjusted if
-  // autotuning is enabled.
-  std::atomic<size_t> mem_budget_memtables_;
-
-  // The user-specified total memory budget (in bytes) across the buffer pool
-  // and the two memtables.
-  const size_t mem_budget_;
-
   // Remaining database state protected by `mutex_`.
   std::mutex mutex_;
-
-  // Protects the `mtable_` and `im_mtable_` pointers only.
-  // If this mutex needs to be acquired with `mutex_` above, always acquire
-  // `mutex_` first to prevent circular waits.
-  std::mutex mtable_mutex_;
-
-  // Active memtable that may accept writes. After `Initialize()` returns,
-  // this pointer will never be null.
-  // REQUIRES:
-  //  Writing Thread:
-  //   - `mutex_` is held when writing to the memtable itself
-  //   - `mtable_mutex_` is held when writing to the pointer
-  //  Reading Thread:
-  //   - `mtable_mutex_` is held when reading the pointer (making a copy)
-  std::shared_ptr<MemTable> mtable_;
-
-  // Immutable memtable currently being flushed, if not null. Writes to this
-  // table are not allowed. Reads of this table can occur concurrently iff the
-  // reading thread has its own copy of the shared pointer.
-  // REQUIRES: `mtable_mutex_` is held for read/write/copy of the *pointer*
-  // only.
-  std::shared_ptr<MemTable> im_mtable_;
-
-  // Is set to true when both `mtable_` and `im_mtable_` are full (i.e.,
-  // `mtable_` is full and `im_mtable_` is still being flushed).
-  // REQUIRES: `mutex_` is held (for read/write).
-  bool all_memtables_full_;
-
-  // A `future` used to wait for the most recent flush to complete. Waiting on
-  // the future can be safely done without holding any locks as long as a copy
-  // is made. This future is guaranteed to be valid after
-  // `ScheduleMemTableFlush()` has executed once.
-  // REQUIRES: `mutex_` is held when reading/modifying this future.
-  std::shared_future<void> last_flush_;
-
-  class WaitingWriter;
-  // Queue used to "hold" writing threads that need to wait because all the
-  // memtables are full.
-  // REQUIRES: `mutex_` is held (for read/write).
-  std::queue<WaitingWriter*> waiting_writers_;
 
   // Handles reading from and writing to the write-ahead log.
   // REQUIRES: `mutex_` is held when using the manager.
