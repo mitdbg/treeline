@@ -13,8 +13,10 @@ RecordCache::RecordCache(uint64_t capacity) : capacity_(capacity) {
 RecordCache::~RecordCache() {
   tree_.reset();  // Delete ART before freeing anything.
   for (auto i = 0; i < capacity_; ++i) {
+    cache_entries[i].Lock(/*exclusive = */ false);
     WriteOutIfDirty(i);
     FreeIfValid(i);
+    cache_entries[i].Unlock();
   }
   cache_entries.clear();
 }
@@ -111,6 +113,18 @@ Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
   cache_entries[*index_out].IncrementPriority();
 
   return Status::OK();
+}
+
+uint64_t RecordCache::WriteOutDirty() {
+  uint64_t count = 0;
+  for (auto i = 0; i < capacity_; ++i) {
+    if (!cache_entries[i].IsDirty()) continue;
+    
+    cache_entries[i].Lock(/*exclusive = */ false);
+    count += WriteOutIfDirty(i);
+    cache_entries[i].Unlock();;
+  }
+  return count;
 }
 
 void RecordCache::TIDToARTKey(TID tid, Key& key) {

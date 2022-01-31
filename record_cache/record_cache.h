@@ -63,6 +63,10 @@ class RecordCache {
   Status GetCacheIndex(const Slice& key, bool exclusive, uint64_t* index_out,
                        bool safe = true) const;
 
+  // Writes out all dirty cache entries to the appropriate longer-term data
+  // structure. Returns the number of dirty cache entries that were written out.
+  uint64_t WriteOutDirty();
+
  private:
   // Required by the ART constructor. Populates `key` with the key of the record
   // stored at `tid` - 1 within the record cache. See note below.
@@ -77,6 +81,9 @@ class RecordCache {
 
   // Writes out the cache entry at `index`, if dirty, to the appropriate
   // longer-term data structure. Returns true if the entry was dirty.
+  //
+  // The caller should ensure that it owns the mutex for the entry in question
+  // (at least in non-exclusive mode).
   bool WriteOutIfDirty(uint64_t index);
 
   // Frees the cache-owned copy of the record stored in the cache entry at
