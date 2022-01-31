@@ -121,6 +121,9 @@ class RecordCache {
 // Next() proceeds to the next record cache entry in key order, unlocking the
 // currently-pointed-to entry. Depending on the value of `exclusive`, the next
 // entry can be locked for reading or writing.
+//
+// Close() should be called when done with the iterator, in order to release the
+// lock on the last-pointed-to cache entry.
 class RecordCache::Iterator {
  public:
   // Returns true iff the iterator is positioned at a valid entry.
@@ -137,6 +140,9 @@ class RecordCache::Iterator {
   // Position at the first entry in list and acquire a, possibly `exclusive`,
   // lock. Final state of iterator is `Valid()` iff list is not empty.
   void SeekToFirst(bool exclusive = false);
+  // Closes the iterator by unlocking the currently-pointed-to entry, if any,
+  // and making ensuring the iterator is no longer Valid().
+  void Close();
 
  private:
   bool valid_ = false;

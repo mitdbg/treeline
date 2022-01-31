@@ -198,4 +198,9 @@ void RecordCache::Iterator::SeekToFirst(bool exclusive) {
   valid_ = true;
 }
 
+void RecordCache::Iterator::Close() {
+  // TODO
+  valid_ = false;
+}
+
 }  // namespace llsm
