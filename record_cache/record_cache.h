@@ -2,7 +2,9 @@
 #include <memory>
 
 #include "art_olc/Tree.h"
+#include "bufmgr/buffer_manager.h"
 #include "llsm/status.h"
+#include "model/model.h"
 #include "record_cache_entry.h"
 
 namespace llsm {
@@ -13,8 +15,11 @@ class RecordCache {
   // Must be static to work with the ART implementation.
   static std::vector<RecordCacheEntry> cache_entries;
 
-  // Initializes a record cache that can hold `capacity` records.
-  RecordCache(uint64_t capacity);
+  // Initializes a record cache that can hold `capacity` records. The underlying
+  // system uses `model` to determine the appropriate page for each key and
+  // `buf_mgr` to bring in pages from disk.
+  RecordCache(uint64_t capacity, std::shared_ptr<Model> model,
+              std::shared_ptr<BufferManager> buf_mgr);
 
   // Destroys the record cache, after writing back any dirty records.
   ~RecordCache();
@@ -100,13 +105,22 @@ class RecordCache {
   // The index of the next cache entry to be considered for eviction.
   std::atomic<uint64_t> clock_;
 
+  // A pointer to the buffer manager of the  underlying system, used for
+  // flushing dirty record cache entries.
+  std::shared_ptr<BufferManager> buf_mgr_;
+
+  // A pointer to the model of the underlying system, used for finding the right
+  // page for flushing dirty record cache entries.
+  std::shared_ptr<Model> model_;
+
   // An index for the cache, using ART with optimistic lock coupling from
   // https://github.com/flode/ARTSynchronized/tree/master/OptimisticLockCoupling.
   //
-  // CAUTION: This ART implementation uses the value 0 to denote lookup misses,
-  // so any indexes referring to `cache_entries` are incremented by 1 to produce
-  // the corresponding ART TID. E.g. To indicate that a record is stored at
-  // index 3 in `cache_entries`, we would store the TID 4 in ART.
+  // CAUTION: This ART implementation uses the value 0 to denote lookup
+  // misses, so any indexes referring to `cache_entries` are incremented
+  // by 1 to produce the corresponding ART TID. E.g. To indicate that a
+  // record is stored at index 3 in `cache_entries`, we would store the
+  // TID 4 in ART.
   std::unique_ptr<ART_OLC::Tree> tree_;
 };
 

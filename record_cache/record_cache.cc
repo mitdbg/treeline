@@ -4,7 +4,9 @@ namespace llsm {
 
 std::vector<RecordCacheEntry> RecordCache::cache_entries{};
 
-RecordCache::RecordCache(uint64_t capacity) : capacity_(capacity) {
+RecordCache::RecordCache(uint64_t capacity, std::shared_ptr<Model> model,
+                         std::shared_ptr<BufferManager> buf_mgr)
+    : capacity_(capacity), model_(model), buf_mgr_(buf_mgr_) {
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
   cache_entries.resize(capacity_);
   clock_ = 0;
@@ -152,6 +154,7 @@ bool RecordCache::WriteOutIfDirty(uint64_t index) {
   bool was_dirty = cache_entries[index].IsDirty();
 
   // Writeout unimplemented - requires LLSM integration.
+  // Should consider synchronization with reorganization code.
 
   return was_dirty;
 }

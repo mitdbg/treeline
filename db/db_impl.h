@@ -92,8 +92,8 @@ class DBImpl : public DB {
   Options options_;
   Statistics stats_;
   const std::filesystem::path db_path_;
-  std::unique_ptr<BufferManager> buf_mgr_;
-  std::unique_ptr<Model> model_;
+  std::shared_ptr<BufferManager> buf_mgr_;
+  std::shared_ptr<Model> model_;
   std::unique_ptr<ThreadPool> workers_;
   std::unique_ptr<RecordCache> rec_cache_;
 

@@ -103,9 +103,6 @@ Status DBImpl::Initialize() {
       workers_ = std::make_unique<ThreadPool>(options_.background_threads);
     }
 
-    // Set up the record cache.
-    rec_cache_ = std::make_unique<RecordCache>(options_.record_cache_capacity);
-
     // Finish initializing the DB based on whether we are creating a completely
     // new DB or if we are opening an existing DB.
     return db_exists ? InitializeExistingDB() : InitializeNewDB();
@@ -130,12 +127,14 @@ Status DBImpl::InitializeNewDB() {
     BufMgrOptions bm_options(options_);
     bm_options.num_segments = options_.background_threads;
 
+    buf_mgr_ = std::make_shared<BufferManager>(bm_options, db_path_);
     if (options_.use_alex) {
-      model_ = std::make_unique<ALEXModel>();
+      model_ = std::make_shared<ALEXModel>();
     } else {
-      model_ = std::make_unique<BTreeModel>();
+      model_ = std::make_shared<BTreeModel>();
     }
-    buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
+    rec_cache_ = std::make_unique<RecordCache>(options_.record_cache_capacity,
+                                               model_, buf_mgr_);
 
     model_->PreallocateAndInitialize(buf_mgr_, records,
                                      options_.key_hints.records_per_page());
@@ -173,12 +172,14 @@ Status DBImpl::InitializeExistingDB() {
   BufMgrOptions bm_options(options_);
   bm_options.num_segments = manifest->num_segments();
 
-  buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
+  buf_mgr_ = std::make_shared<BufferManager>(bm_options, db_path_);
   if (options_.use_alex) {
-    model_ = std::make_unique<ALEXModel>();
+    model_ = std::make_shared<ALEXModel>();
   } else {
-    model_ = std::make_unique<BTreeModel>();
+    model_ = std::make_shared<BTreeModel>();
   }
+  rec_cache_ = std::make_unique<RecordCache>(options_.record_cache_capacity,
+                                             model_, buf_mgr_);
 
   model_->ScanFilesAndInitialize(buf_mgr_);
   buf_mgr_->ClearStats();
