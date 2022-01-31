@@ -9,18 +9,15 @@ namespace llsm {
 // Notes on concurrent operations during reorganization
 //
 // Concurrent writers:
-//     --  Only FlushWorker() writes to pages, which uses FixOverflowChain() to
-//         get an OverflowChain. That call of FixOverflowChain() will serialize
-//         with our own call to FixOverflowChain(), since exactly one of the
-//         calls will manage to lock the first chain link first.
-//     --  If FlushWorker()'s call goes first, we'll block until the flush
-//         completes and follow afterwards.
-//     --  If our call goes first, FlushWorker()'s call will block until we are
-//         done reorganizing and then see that the number of model pages changed
-//         (see DBImpl::FixOverflowChain()). At that point it will return
-//         nullptr and force FlushWorker() to fall back to ReinsertionWorker() -
-//         which is necessary because we're no longer sure that `records` all go
-//         to the same page.
+//     --  Only RecordCache::WriteOutIfDirty() writes to pages, which uses
+//         FixOverflowChain() to get an OverflowChain. That call of
+//         FixOverflowChain() will serialize with this function's call to
+//         FixOverflowChain(), since exactly one of the calls will manage to
+//         lock the first chain link first.
+//     --  If RecordCache::WriteOutIfDirty()'s call goes first, we'll block
+//         until the flush completes and follow afterwards.
+//     --  If our call goes first, RecordCache::WriteOutIfDirty()'s call will
+//         block until we are done reorganizing and then re-query the model.
 //
 // Concurrent readers:
 //     --  Any readers that already had a non-exclusive lock on some
@@ -29,10 +26,10 @@ namespace llsm {
 //     --  Any readers that haven't fixed the first link of the chain yet will
 //         block in FixPage() until we are done and then re-consult the model,
 //         where they might discover that they need to try again (see
-//         DBImpl::Get() step 4).
+//         DBImpl::Get() step 2).
 //
 //
-// N.B.: Some of the assumptions about space usage below will need to be thought
+// TODO: Some of the assumptions about space usage below will need to be thought
 // out more carefully for dealing with variable-sized records and deletions.
 //
 Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
