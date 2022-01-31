@@ -152,23 +152,42 @@ Status Page::Delete(const Slice& key) {
   return Status::OK();
 }
 
-// Retrieve the stored `overflow` page id for this page.
+bool Page::HasOverflow() { return GetOverflow().IsValid(); }
+
+// Page scratch space: 24 bytes. The scratch space is used differently depending
+// on the page's role in a segment. The caller needs to ensure they use these
+// metadata getter/setters consistently with the page's role.
+//
+// Single-page Segments:
+// - Overflow page ID  (8 B)
+// - Sequence number   (4 B)
+//
+// Multi-page Segments (First Page)
+// - Overflow page ID  (8 B)
+// - Model             (16 B)
+//
+// Multi-page Segments (Middle Pages)
+// - Overflow page ID  (8 B)
+//
+// Multi-page Segments (Last Page)
+// - Overflow page ID  (8 B)
+// - Sequence number   (4 B)
+// - Segment checksum  (4 B)
+
 SegmentId Page::GetOverflow() const {
-  size_t* vals = reinterpret_cast<size_t*>(AsMapPtr(data_)->GetScratch());
+  const size_t* vals = reinterpret_cast<const size_t*>(AsMapPtr(data_)->GetScratch());
+  static_assert(sizeof(size_t) == sizeof(uint64_t));
   return SegmentId(vals[0]);
 }
 
-// Set the stored overflow page id for this page to `overflow`.
 void Page::SetOverflow(SegmentId overflow) {
-  uint64_t* vals = reinterpret_cast<uint64_t*>(AsMapPtr(data_)->GetScratch());
+  size_t* vals = reinterpret_cast<size_t*>(AsMapPtr(data_)->GetScratch());
   vals[0] = overflow.value();
 }
 
-// Determine whether this page has an overflow page.
-bool Page::HasOverflow() { return GetOverflow().IsValid(); }
-
 plr::Line64 Page::GetModel() const {
-  double* vals = reinterpret_cast<double*>(AsMapPtr(data_)->GetScratch());
+  const double* vals = reinterpret_cast<const double*>(AsMapPtr(data_)->GetScratch());
+  static_assert(sizeof(uint64_t) == sizeof(double));
   return plr::Line64(vals[1], vals[2]);
 }
 
@@ -176,6 +195,27 @@ void Page::SetModel(const plr::Line64& model) {
   double* vals = reinterpret_cast<double*>(AsMapPtr(data_)->GetScratch());
   vals[1] = model.slope();
   vals[2] = model.intercept();
+}
+
+uint32_t Page::GetSequenceNumber() const {
+  const uint32_t* seq_nums = reinterpret_cast<const uint32_t*>(AsMapPtr(data_)->GetScratch());
+  static_assert(sizeof(SegmentId) == 2 * sizeof(uint32_t));
+  return seq_nums[2];
+}
+
+void Page::SetSequenceNumber(const uint32_t sequence) {
+  uint32_t* seq_nums = reinterpret_cast<uint32_t*>(AsMapPtr(data_)->GetScratch());
+  seq_nums[2] = sequence;
+}
+
+uint32_t Page::GetChecksum() const {
+  const uint32_t* checksums = reinterpret_cast<const uint32_t*>(AsMapPtr(data_)->GetScratch());
+  return checksums[3];
+}
+
+void Page::SetChecksum(uint32_t checksum) {
+  uint32_t* checksums = reinterpret_cast<uint32_t*>(AsMapPtr(data_)->GetScratch());
+  checksums[3] = checksum;
 }
 
 // Check whether this is a valid Page (as opposed to a Page-sized

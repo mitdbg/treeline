@@ -78,19 +78,6 @@ class Page {
   Status Get(const Slice& key, std::string* value_out);
   Status Delete(const Slice& key);
 
-  // Retrieve the stored `overflow` page id for this page.
-  SegmentId GetOverflow() const;
-
-  // Set the stored overflow page id for this page to `overflow`.
-  void SetOverflow(SegmentId overflow);
-
-  // Determine whether this page has an overflow page.
-  bool HasOverflow();
-
-  // Retrieve the model associated with this page.
-  plr::Line64 GetModel() const;
-  void SetModel(const plr::Line64& model);
-
   // Check whether this is a valid Page (as opposed to a Page-sized
   // block of 0s).
   const bool IsValid() const;
@@ -102,6 +89,30 @@ class Page {
   const bool IsOverflow() const;
   void MakeOverflow();
   void UnmakeOverflow();
+
+  // Retrieve the stored `overflow` page id for this page.
+  SegmentId GetOverflow() const;
+
+  // Set the stored overflow page id for this page to `overflow`.
+  void SetOverflow(SegmentId overflow);
+
+  // Determine whether this page has an overflow page.
+  bool HasOverflow();
+
+  // Retrieve/update the model associated with this page.
+  // VALID FOR: First page in a multi-page segment only.
+  plr::Line64 GetModel() const;
+  void SetModel(const plr::Line64& model);
+
+  // Retrieve/update the segment's sequence number.
+  // VALID FOR: Last page in a segment only (single and multi-page segments).
+  uint32_t GetSequenceNumber() const;
+  void SetSequenceNumber(uint32_t sequence);
+
+  // Retrieve/update the segment's checksum.
+  // VALID FOR: Last page in a multi-page segment only.
+  uint32_t GetChecksum() const;
+  void SetChecksum(uint32_t checksum);
 
   class Iterator;
   friend class Iterator;
