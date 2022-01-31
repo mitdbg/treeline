@@ -13,6 +13,7 @@
 #include "segment_info.h"
 #include "tlx/btree_map.h"
 #include "workspace.h"
+#include "free_list.h"
 
 namespace llsm {
 namespace pg {
@@ -33,11 +34,6 @@ class Manager {
 
     // If set to false, direct I/O will be disabled (used for end-to-end tests).
     bool use_direct_io = true;
-
-    // Maximum number of overflow pages allowed in a chain. This count excludes
-    // the initial page in the segment (e.g., a maximum length of 1 means at
-    // most one overflow page allocated in any chain).
-    uint32_t max_overflow_chain_length = 1;
   };
   static Manager LoadIntoNew(const std::filesystem::path& db,
                              const std::vector<std::pair<Key, Slice>>& records,
@@ -80,7 +76,8 @@ class Manager {
  private:
   Manager(std::filesystem::path db_path,
           std::vector<std::pair<Key, SegmentInfo>> boundaries,
-          std::vector<SegmentFile> segment_files, Options options);
+          std::vector<SegmentFile> segment_files, Options options,
+          uint32_t next_sequence_number, FreeList free);
 
   static Manager BulkLoadIntoSegments(
       const std::filesystem::path& db_path,
@@ -95,6 +92,8 @@ class Manager {
   std::filesystem::path db_path_;
   tlx::btree_map<Key, SegmentInfo> index_;
   std::vector<SegmentFile> segment_files_;
+  uint32_t next_sequence_number_;
+  FreeList free_;
 
   // Options passed in when the `Manager` was created.
   Options options_;

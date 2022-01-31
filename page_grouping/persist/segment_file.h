@@ -58,9 +58,9 @@ class SegmentFile {
     assert(file_status.st_size >= 0);
     file_size_ = file_status.st_size;
 
-    // If the file already existed, compute next_page_allocation_offset_. Note
-    // that this assumes that segments are allocated contiguously.
-    // TODO: This approach is temporary and will change to accomodate recovery.
+    // If the file already existed, compute next_page_allocation_offset_. All
+    // segments before this offset have been "allocated" (they are either valid
+    // or they are "free" segments).
     if (file_size_ > 0) {
       PageBuffer page_data = PageMemoryAllocator::Allocate(/*num_pages=*/1);
       Page temp_page(page_data.get());
@@ -120,9 +120,9 @@ class SegmentFile {
     return *this;
   }
 
-  // The number of allocated segments in this file.
-  // TODO: This will change when we implement proper recovery.
-  size_t NumSegments() const {
+  // The number of allocated segments in this file. Some segments may be
+  // invalid; these represent "free" segments that can be reused.
+  size_t NumAllocatedSegments() const {
     return next_page_allocation_offset_ / (pages_per_segment_ * Page::kSize);
   }
 

@@ -9,6 +9,7 @@
 #include "key.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
+#include "persist/segment_wrap.h"
 #include "segment_builder.h"
 #include "util/key.h"
 
@@ -57,7 +58,8 @@ void PrintSegmentsAsCSV(std::ostream& out,
   }
 }
 
-void PrintSegmentSummaryAsCsv(std::ostream& out, const std::vector<Segment>& segments) {
+void PrintSegmentSummaryAsCsv(std::ostream& out,
+                              const std::vector<Segment>& segments) {
   std::vector<size_t> num_segments;
   num_segments.resize(SegmentBuilder::kSegmentPageCounts.size());
   for (const auto& seg : segments) {
@@ -167,7 +169,12 @@ Manager Manager::BulkLoadIntoSegments(
       assert(result.ok());
     }
 
-    // 2. Write it to disk.
+    // 2. Set the checksum and sequence number.
+    SegmentWrap sw(buf.get(), seg.page_count);
+    sw.SetSequenceNumber(0);
+    sw.ComputeAndSetChecksum();
+
+    // 3. Write the segment to disk.
     const size_t segment_idx =
         SegmentBuilder::kPageCountToSegment.find(seg.page_count)->second;
     SegmentFile& sf = segment_files[segment_idx];
@@ -184,7 +191,8 @@ Manager Manager::BulkLoadIntoSegments(
   }
 
   return Manager(db_path, std::move(segment_boundaries),
-                 std::move(segment_files), options);
+                 std::move(segment_files), options, /*next_sequence_number=*/1,
+                 FreeList());
 }
 
 Manager Manager::BulkLoadIntoPages(
@@ -209,6 +217,9 @@ Manager Manager::BulkLoadIntoPages(
                                page_start_idx, page_end_idx);
     assert(result.ok());
 
+    SegmentWrap sw(buf.get(), 1);
+    sw.SetSequenceNumber(0);
+
     // Write page to disk.
     const size_t byte_offset = sf.AllocateSegment();
     sf.WritePages(byte_offset, buf.get(), /*num_pages=*/1);
@@ -231,6 +242,9 @@ Manager Manager::BulkLoadIntoPages(
                                page_start_idx, records.size());
     assert(result.ok());
 
+    SegmentWrap sw(buf.get(), 1);
+    sw.SetSequenceNumber(0);
+
     // Write page to disk.
     const size_t byte_offset = sf.AllocateSegment();
     sf.WritePages(byte_offset, buf.get(), /*num_pages=*/1);
@@ -244,14 +258,17 @@ Manager Manager::BulkLoadIntoPages(
   }
 
   return Manager(db, std::move(segment_boundaries), std::move(segment_files),
-                 options);
+                 options, /*next_sequence_number=*/1, FreeList());
 }
 
 Manager::Manager(fs::path db_path,
                  std::vector<std::pair<Key, SegmentInfo>> boundaries,
-                 std::vector<SegmentFile> segment_files, Options options)
+                 std::vector<SegmentFile> segment_files, Options options,
+                 uint32_t next_sequence_number, FreeList free)
     : db_path_(std::move(db_path)),
       segment_files_(std::move(segment_files)),
+      next_sequence_number_(next_sequence_number),
+      free_(std::move(free)),
       options_(std::move(options)) {
   index_.bulk_load(boundaries.begin(), boundaries.end());
 }
@@ -271,11 +288,13 @@ Manager Manager::LoadIntoNew(const fs::path& db,
 Manager Manager::Reopen(const fs::path& db, const Options& options) {
   // Figure out if there are segments in this DB.
   const bool uses_segments = fs::exists(db / (kSegmentFilePrefix + "1"));
-  PageBuffer buf = PageMemoryAllocator::Allocate(/*num_pages=*/1);
+  PageBuffer buf = PageMemoryAllocator::Allocate(/*num_pages=*/2);
   Page page(buf.get());
 
   std::vector<SegmentFile> segment_files;
   std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
+  FreeList free;
+  uint32_t max_sequence = 0;
 
   for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
     if (i > 0 && !uses_segments) break;
@@ -284,15 +303,26 @@ Manager Manager::Reopen(const fs::path& db, const Options& options) {
                                options.use_direct_io, pages_per_segment);
     SegmentFile& sf = segment_files.back();
 
-    const size_t num_segments = sf.NumSegments();
+    const size_t num_segments = sf.NumAllocatedSegments();
     const size_t bytes_per_segment = pages_per_segment * Page::kSize;
     for (size_t seg_idx = 0; seg_idx < num_segments; ++seg_idx) {
-      sf.ReadPages(seg_idx * bytes_per_segment, buf.get(), /*num_pages=*/1);
-      if (!page.IsValid() || page.IsOverflow()) {
+      // Offset in `id` is the page offset.
+      SegmentId id(i, seg_idx * pages_per_segment);
+      // TODO: We should also validate the checksum (part of recovery).
+      if (pages_per_segment == 1) {
+        sf.ReadPages(seg_idx * bytes_per_segment, buf.get(), /*num_pages=*/1);
+      } else {
+        sf.ReadPages(seg_idx * bytes_per_segment, buf.get(), /*num_pages=*/2);
+      }
+      if (!page.IsValid()) {
+        // This segment is a "hole" in the file and can be reused.
+        free.Add(id);
         continue;
       }
-      SegmentId id(i,
-                   seg_idx * pages_per_segment);  // Offset is the page offset.
+      if (page.IsOverflow()) {
+        continue;
+      }
+
       const Key base_key = key_utils::ExtractHead64(page.GetLowerBoundary());
       if (pages_per_segment == 1) {
         segment_boundaries.emplace_back(
@@ -301,6 +331,10 @@ Manager Manager::Reopen(const fs::path& db, const Options& options) {
         segment_boundaries.emplace_back(base_key,
                                         SegmentInfo(id, page.GetModel()));
       }
+
+      // Extract the sequence number.
+      SegmentWrap sw(buf.get(), pages_per_segment);
+      max_sequence = std::max(max_sequence, sw.GetSequenceNumber());
     }
   }
 
@@ -311,7 +345,8 @@ Manager Manager::Reopen(const fs::path& db, const Options& options) {
             });
 
   return Manager(db, std::move(segment_boundaries), std::move(segment_files),
-                 options);
+                 options, /*next_segment_index=*/max_sequence + 1,
+                 std::move(free));
 }
 
 Status Manager::Get(const Key& key, std::string* value_out) {

@@ -166,13 +166,14 @@ bool Page::HasOverflow() { return GetOverflow().IsValid(); }
 // - Overflow page ID  (8 B)
 // - Model             (16 B)
 //
-// Multi-page Segments (Middle Pages)
-// - Overflow page ID  (8 B)
-//
-// Multi-page Segments (Last Page)
+// Multi-page Segments (Second Page)
 // - Overflow page ID  (8 B)
 // - Sequence number   (4 B)
 // - Segment checksum  (4 B)
+//
+// Multi-page Segments (Other Pages)
+// - Overflow page ID  (8 B)
+
 
 SegmentId Page::GetOverflow() const {
   const size_t* vals = reinterpret_cast<const size_t*>(AsMapPtr(data_)->GetScratch());

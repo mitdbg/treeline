@@ -4,8 +4,12 @@ target_sources(pg PRIVATE
   persist/page.h
   persist/segment_id.cc
   persist/segment_id.h
+  persist/segment_wrap.cc
+  persist/segment_wrap.h
   plr/data.h
   plr/greedy.h
+  free_list.cc
+  free_list.h
   key.h
   manager.cc
   manager.h
@@ -25,6 +29,7 @@ target_include_directories(pg
     ${PROJECT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/include
 )
+target_link_libraries(pg PRIVATE crc32c)
 
 add_executable(pg_bench
   config.cc
