@@ -392,6 +392,171 @@ Status Manager::Get(const Key& key, std::string* value_out) {
 }
 
 Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {
+  if (records.empty()) return Status::OK();
+  // TODO: Support deletes.
+
+  const auto start_it = SegmentForKey(records.front().first);
+  size_t start_idx = 0;
+  Key curr_base = start_it->first;
+  SegmentInfo curr_sinfo = start_it->second;
+
+  for (size_t i = 1; i < records.size(); ++i) {
+    // TODO: We query the index for each key in the batch. This may be
+    // expensive, but this is also the approach we took in the original LLSM
+    // implementation. We can make this batching strategy fancier if this is a
+    // bottleneck.
+    const auto it = SegmentForKey(records[i].first);
+    if (it->first != curr_base) {
+      // The records in [start_idx, i) belong to the same segment.
+      // Write out segment
+      const auto status =
+          WriteToSegment(curr_base, curr_sinfo, records, start_idx, i);
+      if (!status.ok()) {
+        return status;
+      }
+      curr_base = it->first;
+      curr_sinfo = it->second;
+      start_idx = i;
+    }
+  }
+
+  WriteToSegment(curr_base, curr_sinfo, records, start_idx, records.size());
+  return Status::OK();
+}
+
+Status Manager::WriteToSegment(
+    Key segment_base, const SegmentInfo& sinfo,
+    const std::vector<std::pair<Key, Slice>>& records, size_t start_idx,
+    size_t end_idx) {
+  // TODO: Need to lock the segment and pages.
+
+  // Simplifying assumptions:
+  // - If the number of writes is past a certain threshold
+  //   (`record_per_page_goal` x `pages_in_segment` x 2), we don't attempt to
+  //   make the writes. We immediately trigger a segment reorg.
+  // - Records are the same size.
+  // - No deletes. So it's always safe to call `Put()` on the page.
+  // - As soon as we try to insert into a full overflow page, we trigger a
+  //   segment reorg.
+
+  const size_t reorg_threshold =
+      options_.records_per_page_goal * sinfo.page_count() * 2ULL;
+  if (end_idx - start_idx > reorg_threshold) {
+    // TODO: Immediately trigger reorg.
+    return Status::NotSupported("Requires segment reorg.");
+  }
+
+  void* orig_page_buf = w_.buffer().get();
+  void* overflow_page_buf = w_.buffer().get() + pg::Page::kSize;
+  pg::Page orig_page(orig_page_buf);
+  pg::Page overflow_page(overflow_page_buf);
+
+  size_t curr_page_idx =
+      sinfo.PageForKey(segment_base, records[start_idx].first);
+  const SegmentFile& sf = segment_files_[sinfo.id().GetFileId()];
+  sf.ReadPages((sinfo.id().GetOffset() + curr_page_idx) * Page::kSize,
+               w_.buffer().get(), /*num_pages=*/1);
+
+  SegmentId overflow_page_id;
+  bool orig_page_dirty = false;
+  bool overflow_page_dirty = false;
+
+  pg::Page* curr_page = &orig_page;
+  bool* curr_page_dirty = &orig_page_dirty;
+
+  auto write_page = [this](const SegmentId& seg_id, size_t page_idx,
+                           void* buffer) {
+    assert(seg_id.Valid());
+    const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
+    sf.WritePages((seg_id.GetOffset() + page_idx) * Page::kSize, buffer,
+                  /*num_pages=*/1);
+  };
+  auto write_dirty_pages = [&]() {
+    // Write out overflow first to avoid dangling pointers.
+    if (overflow_page_dirty) {
+      write_page(overflow_page_id, 0, overflow_page_buf);
+    }
+    if (curr_page_dirty) {
+      write_page(sinfo.id(), 0, orig_page_buf);
+    }
+  };
+  auto write_record_to_chain = [&](Key key, const Slice& value) {
+    key_utils::IntKeyAsSlice key_slice(key);
+    auto status = curr_page->Put(key_slice.as<Slice>(), value);
+    if (status.ok()) {
+      *curr_page_dirty = true;
+      return true;
+    }
+
+    // `curr_page` is full. Create/load an overflow page if possible.
+    if (curr_page == &overflow_page) {
+      // Cannot allocate another overflow (reached max length)
+      return false;
+    }
+
+    // Load the overflow page.
+    if (curr_page->HasOverflow()) {
+      overflow_page_id = curr_page->GetOverflow();
+      const SegmentFile& sf = segment_files_[overflow_page_id.GetFileId()];
+      sf.ReadPages(overflow_page_id.GetOffset() * pg::Page::kSize,
+                   overflow_page_buf, 1);
+      curr_page = &overflow_page;
+      curr_page_dirty = &overflow_page_dirty;
+
+    } else {
+      // Allocate a new page.
+      const auto maybe_free_page = free_.Get(/*page_count=*/1);
+      if (maybe_free_page.has_value()) {
+        overflow_page_id = *maybe_free_page;
+      } else {
+        // Allocate a new free page.
+        const size_t byte_offset = segment_files_[0].AllocateSegment();
+        overflow_page_id = SegmentId(0, byte_offset / pg::Page::kSize);
+      }
+
+      memset(overflow_page_buf, 0, pg::Page::kSize);
+      overflow_page.MakeOverflow();
+      overflow_page_dirty = true;
+      curr_page = &overflow_page;
+      curr_page_dirty = &overflow_page_dirty;
+    }
+
+    // Attempt to write to the overflow page.
+    status = curr_page->Put(key_slice.as<Slice>(), value);
+    if (status.ok()) {
+      *curr_page_dirty = true;
+      return true;
+    } else {
+      // Overflow is full too.
+      return false;
+    }
+  };
+
+  for (size_t i = start_idx; i < end_idx; ++i) {
+    const size_t page_idx = sinfo.PageForKey(segment_base, records[i].first);
+    if (page_idx != curr_page_idx) {
+      write_dirty_pages();
+      // Update state.
+      curr_page_idx = page_idx;
+      sf.ReadPages((sinfo.id().GetOffset() + curr_page_idx) * Page::kSize,
+                   orig_page_buf, /*num_pages=*/1);
+      overflow_page_id = SegmentId();
+      orig_page_dirty = false;
+      overflow_page_dirty = false;
+      curr_page = &orig_page;
+      curr_page_dirty = &orig_page_dirty;
+    }
+
+    const bool succeeded =
+        write_record_to_chain(records[i].first, records[i].second);
+    if (!succeeded) {
+      write_dirty_pages();
+      // TODO: Trigger segment reorganization here (also include the records
+      //       in range [i, end_idx)).
+      return Status::NotSupported("Requires segment reorg.");
+    }
+  }
+
   return Status::OK();
 }
 

@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "free_list.h"
 #include "key.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
@@ -13,7 +14,6 @@
 #include "segment_info.h"
 #include "tlx/btree_map.h"
 #include "workspace.h"
-#include "free_list.h"
 
 namespace llsm {
 namespace pg {
@@ -43,6 +43,8 @@ class Manager {
                         const Options& options);
 
   Status Get(const Key& key, std::string* value_out);
+
+  // Pre-condition: The batch is sorted in ascending order by key.
   Status PutBatch(const std::vector<std::pair<Key, Slice>>& records);
 
   // Will read partial segments.
@@ -88,6 +90,27 @@ class Manager {
       const std::filesystem::path& db,
       const std::vector<std::pair<Key, Slice>>& records,
       const Manager::Options& options);
+
+  // Write the range [start_idx, end_idx) into the given segment.
+  Status WriteToSegment(Key segment_base, const SegmentInfo& sinfo,
+                        const std::vector<std::pair<Key, Slice>>& records,
+                        size_t start_idx, size_t end_idx);
+
+  auto SegmentForKey(Key key) {
+    auto it = index_.upper_bound(key);
+    if (it != index_.begin()) {
+      --it;
+    }
+    return it;
+  }
+
+  auto SegmentForKey(Key key) const {
+    auto it = index_.upper_bound(key);
+    if (it != index_.begin()) {
+      --it;
+    }
+    return it;
+  }
 
   std::filesystem::path db_path_;
   tlx::btree_map<Key, SegmentInfo> index_;
