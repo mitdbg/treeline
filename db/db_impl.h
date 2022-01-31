@@ -38,7 +38,7 @@ class DBImpl : public DB {
   Status GetRange(const ReadOptions& options, const Slice& start_key,
                   size_t num_records, RecordBatch* results_out) override;
   Status Delete(const WriteOptions& options, const Slice& key) override;
-  Status FlushMemTable(const bool disable_deferred_io) override;
+  Status FlushRecordCache(const bool disable_deferred_io) override;
 
   // Must be called exactly once after `DBImpl` is constructed to initialize the
   // database's internal state. Other public `DBImpl` methods can be called
@@ -61,36 +61,6 @@ class DBImpl : public DB {
   // This method is thread safe.
   Status WriteImpl(const WriteOptions& options, const Slice& key,
                    const Slice& value, format::WriteType write_type);
-
-  // Schedules a flush of the active memtable in the background. The active
-  // memtable will be made immutable and a new active memtable will be
-  // constructed.
-  //
-  // Only one flush can be pending at any time. If a flush is currently already
-  // in progress, this method will block and wait until that flush completes
-  // before scheduling the next flush.
-  //
-  // REQUIRES: `mutex_` is held.
-  // REQUIRES: The thread has already called `WriterWaitIfNeeded()`.
-  void ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
-                             const bool disable_deferred_io);
-
-  // Returns true iff `mtable_` is "full".
-  // REQUIRES: `mutex_` is held.
-  bool ActiveMemTableFull(const std::unique_lock<std::mutex>& lock) const;
-
-  // Returns true iff `im_mtable_` is being flushed.
-  // REQUIRES: `mutex_` is held.
-  bool FlushInProgress(const std::unique_lock<std::mutex>& lock) const;
-
-  bool ShouldFlush(const FlushOptions& foptions, size_t batch_size,
-                   size_t num_deferrals) const;
-
-  // Code run by a worker thread to write out `records` to the page held by
-  // `bf`.
-  void FlushWorker(const FlushBatch& records,
-                   std::future<OverflowChain>& bf_future,
-                   size_t current_page_deferral_count, size_t batch_size);
 
   // Fixes the page chain starting with the page at `page_id`. The returned page
   // frames can optionally be unlocked before returning. Returns `nullptr` if it
@@ -116,11 +86,6 @@ class DBImpl : public DB {
   // in `records` is given precendence.
   void MergeBatches(RecordBatch& old_records, const FlushBatch& records,
                     FlushBatch* merged);
-
-  // Code run by a worker thread to reinsert `records` into the now-active
-  // memtable if their flush was deferred.
-  void ReinsertionWorker(const FlushBatch& records,
-                         size_t current_page_deferral_count);
 
   // All writing threads must call this method "on entry" to ensure they wait if
   // needed (when the memtables are all full).
