@@ -368,8 +368,26 @@ Status Manager::Get(const Key& key, std::string* value_out) {
   w_.BumpReadCount(1);
 
   // 4. Search for the record on the page.
+  // TODO: Lock the page.
   pg::Page page(w_.buffer().get());
   key_utils::IntKeyAsSlice key_slice(key);
+  auto status = page.Get(key_slice.as<Slice>(), value_out);
+  if (status.ok()) {
+    return status;
+  }
+
+  // 5. Check the overflow page if it exists.
+  // TODO: We always assume at most 1 overflow page.
+  if (!page.HasOverflow()) {
+    return Status::NotFound("Record does not exist.");
+  }
+  const SegmentId overflow_id = page.GetOverflow();
+  // All overflow pages are single pages.
+  assert(overflow_id.GetFileId() == 0);
+  const SegmentFile& osf = segment_files_[overflow_id.GetFileId()];
+  osf.ReadPages(overflow_id.GetOffset() * pg::Page::kSize, w_.buffer().get(),
+                /*num_pages=*/1);
+  w_.BumpReadCount(1);
   return page.Get(key_slice.as<Slice>(), value_out);
 }
 
