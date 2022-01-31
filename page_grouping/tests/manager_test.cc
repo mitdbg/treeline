@@ -347,3 +347,233 @@ TEST_F(ManagerTest, ScanPages) {
     ValidateScanResults(start_idx, scan_amount, dataset, scanned);
   }
 }
+
+TEST_F(ManagerTest, BatchedUpdateSegments) {
+  Manager::Options options;
+  options.records_per_page_goal = 15;
+  options.records_per_page_delta = 5;
+  options.use_segments = true;
+  options.write_debug_info = false;
+  options.use_direct_io = false;
+
+  std::vector<std::pair<uint64_t, Slice>> dataset =
+      BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
+
+  // Select 20 "random" dataset indices to update and read.
+  std::vector<size_t> to_read;
+  to_read.reserve(20);
+  std::uniform_int_distribution<size_t> dist(0, dataset.size() - 1);
+  std::mt19937 prng(42);
+  for (size_t i = 0; i < 20; ++i) {
+    to_read.push_back(dist(prng));
+  }
+
+  // Create updates.
+  const std::string new_value = u8"08-bytes";
+  std::vector<std::pair<uint64_t, Slice>> updates;
+  updates.reserve(to_read.size());
+  for (const auto& idx : to_read) {
+    const std::pair<uint64_t, Slice>& rec = dataset[idx];
+    updates.emplace_back(rec.first, new_value);
+  }
+
+  {
+    Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 5);
+
+    // Read from newly loaded dataset.
+    std::string out;
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(Slice(out)), 0);
+    }
+
+    // Make the updates.
+    ASSERT_TRUE(m.PutBatch(updates).ok());
+
+    // Reading again should produce the new value.
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(Slice(out).compare(new_value), 0);
+    }
+  }
+
+  // Read from reopened DB.
+  {
+    Manager m = Manager::Reopen(kDBDir, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 5);
+
+    std::string out;
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(Slice(out).compare(new_value), 0);
+    }
+  }
+}
+
+TEST_F(ManagerTest, BatchedUpdatePages) {
+  Manager::Options options;
+  options.records_per_page_goal = 15;
+  options.records_per_page_delta = 5;
+  options.use_segments = false;
+  options.write_debug_info = false;
+  options.use_direct_io = false;
+
+  std::vector<std::pair<uint64_t, Slice>> dataset =
+      BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
+
+  // Select 20 "random" dataset indices to update and read.
+  std::vector<size_t> to_read;
+  to_read.reserve(20);
+  std::uniform_int_distribution<size_t> dist(0, dataset.size() - 1);
+  std::mt19937 prng(42);
+  for (size_t i = 0; i < 20; ++i) {
+    to_read.push_back(dist(prng));
+  }
+
+  // Create updates.
+  const std::string new_value = u8"08-bytes";
+  std::vector<std::pair<uint64_t, Slice>> updates;
+  updates.reserve(to_read.size());
+  for (const auto& idx : to_read) {
+    const std::pair<uint64_t, Slice>& rec = dataset[idx];
+    updates.emplace_back(rec.first, new_value);
+  }
+
+  {
+    Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 1);
+
+    // Read from newly loaded dataset.
+    std::string out;
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(Slice(out)), 0);
+    }
+
+    // Make the updates.
+    ASSERT_TRUE(m.PutBatch(updates).ok());
+
+    // Reading again should produce the new value.
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(Slice(out).compare(new_value), 0);
+    }
+  }
+
+  // Read from reopened DB.
+  {
+    Manager m = Manager::Reopen(kDBDir, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 1);
+
+    std::string out;
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(Slice(out).compare(new_value), 0);
+    }
+  }
+}
+
+TEST_F(ManagerTest, InsertOverflowSegments) {
+  Manager::Options options;
+  options.records_per_page_goal = 4;
+  options.records_per_page_delta = 1;
+  options.use_segments = true;
+  options.write_debug_info = false;
+  options.use_direct_io = false;
+
+  // 512 B string.
+  std::string value;
+  value.resize(512);
+
+  std::vector<std::pair<uint64_t, Slice>> dataset = {
+      {0, value}, {1, value}, {2, value}, {3, value},
+      {4, value}, {5, value}, {6, value}};
+
+  std::vector<std::pair<uint64_t, Slice>> inserts = {
+      {7, value}, {8, value}, {9, value}, {10, value},
+      {11, value}, {12, value}};
+
+  {
+    Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 5);
+
+    // Make the inserts. These should go on the last page and should create an
+    // overflow.
+    ASSERT_TRUE(m.PutBatch(inserts).ok());
+
+    // Make sure we can read the inserted records.
+    std::string out;
+    for (const auto& rec : inserts) {
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(value), 0);
+    }
+  }
+
+  // Read from reopened DB.
+  {
+    Manager m = Manager::Reopen(kDBDir, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 5);
+
+    std::string out;
+    for (const auto& rec : inserts) {
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(value), 0);
+    }
+  }
+}
+
+TEST_F(ManagerTest, InsertOverflowPages) {
+  Manager::Options options;
+  options.records_per_page_goal = 4;
+  options.records_per_page_delta = 1;
+  options.use_segments = false;
+  options.write_debug_info = false;
+  options.use_direct_io = false;
+
+  // 512 B string.
+  std::string value;
+  value.resize(512);
+
+  std::vector<std::pair<uint64_t, Slice>> dataset = {
+      {0, value}, {1, value}, {2, value}, {3, value},
+      {4, value}, {5, value}, {6, value}};
+
+  std::vector<std::pair<uint64_t, Slice>> inserts = {
+      {7, value}, {8, value}, {9, value}, {10, value},
+      {11, value}, {12, value}};
+
+  {
+    Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 1);
+
+    // Make the inserts. These should go on the last page and should create an
+    // overflow.
+    ASSERT_TRUE(m.PutBatch(inserts).ok());
+
+    // Make sure we can read the inserted records.
+    std::string out;
+    for (const auto& rec : inserts) {
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(value), 0);
+    }
+  }
+
+  // Read from reopened DB.
+  {
+    Manager m = Manager::Reopen(kDBDir, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 1);
+
+    std::string out;
+    for (const auto& rec : inserts) {
+      ASSERT_TRUE(m.Get(rec.first, &out).ok());
+      ASSERT_EQ(rec.second.compare(value), 0);
+    }
+  }
+}

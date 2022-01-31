@@ -545,6 +545,8 @@ Status Manager::WriteToSegment(
     }
   }
 
+  write_dirty_pages();
+
   return Status::OK();
 }
 
