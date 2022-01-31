@@ -96,6 +96,10 @@ class Manager {
                         const std::vector<std::pair<Key, Slice>>& records,
                         size_t start_idx, size_t end_idx);
 
+  // Helpers for convenience.
+  void ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer);
+  void WritePage(const SegmentId& seg_id, size_t page_idx, void* buffer);
+
   auto SegmentForKey(Key key) {
     auto it = index_.upper_bound(key);
     if (it != index_.begin()) {

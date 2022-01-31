@@ -453,9 +453,7 @@ Status Manager::WriteToSegment(
 
   size_t curr_page_idx =
       sinfo.PageForKey(segment_base, records[start_idx].first);
-  const SegmentFile& sf = segment_files_[sinfo.id().GetFileId()];
-  sf.ReadPages((sinfo.id().GetOffset() + curr_page_idx) * Page::kSize,
-               w_.buffer().get(), /*num_pages=*/1);
+  ReadPage(sinfo.id(), curr_page_idx, orig_page_buf);
 
   SegmentId overflow_page_id;
   bool orig_page_dirty = false;
@@ -464,20 +462,13 @@ Status Manager::WriteToSegment(
   pg::Page* curr_page = &orig_page;
   bool* curr_page_dirty = &orig_page_dirty;
 
-  auto write_page = [this](const SegmentId& seg_id, size_t page_idx,
-                           void* buffer) {
-    assert(seg_id.Valid());
-    const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
-    sf.WritePages((seg_id.GetOffset() + page_idx) * Page::kSize, buffer,
-                  /*num_pages=*/1);
-  };
   auto write_dirty_pages = [&]() {
-    // Write out overflow first to avoid dangling pointers.
+    // Write out overflow first to avoid dangling overflow pointers.
     if (overflow_page_dirty) {
-      write_page(overflow_page_id, 0, overflow_page_buf);
+      WritePage(overflow_page_id, 0, overflow_page_buf);
     }
     if (curr_page_dirty) {
-      write_page(sinfo.id(), 0, orig_page_buf);
+      WritePage(sinfo.id(), curr_page_idx, orig_page_buf);
     }
   };
   auto write_record_to_chain = [&](Key key, const Slice& value) {
@@ -497,9 +488,7 @@ Status Manager::WriteToSegment(
     // Load the overflow page.
     if (curr_page->HasOverflow()) {
       overflow_page_id = curr_page->GetOverflow();
-      const SegmentFile& sf = segment_files_[overflow_page_id.GetFileId()];
-      sf.ReadPages(overflow_page_id.GetOffset() * pg::Page::kSize,
-                   overflow_page_buf, 1);
+      ReadPage(overflow_page_id, 0, overflow_page_buf);
       curr_page = &overflow_page;
       curr_page_dirty = &overflow_page_dirty;
 
@@ -536,10 +525,9 @@ Status Manager::WriteToSegment(
     const size_t page_idx = sinfo.PageForKey(segment_base, records[i].first);
     if (page_idx != curr_page_idx) {
       write_dirty_pages();
-      // Update state.
+      // Update the current page.
       curr_page_idx = page_idx;
-      sf.ReadPages((sinfo.id().GetOffset() + curr_page_idx) * Page::kSize,
-                   orig_page_buf, /*num_pages=*/1);
+      ReadPage(sinfo.id(), curr_page_idx, orig_page_buf);
       overflow_page_id = SegmentId();
       orig_page_dirty = false;
       overflow_page_dirty = false;
@@ -787,6 +775,22 @@ Status Manager::ScanWhole(
   }
 
   return Status::OK();
+}
+
+void Manager::ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer) {
+  assert(seg_id.IsValid());
+  const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
+  sf.ReadPages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
+               /*num_pages=*/1);
+  w_.BumpReadCount(1);
+}
+
+void Manager::WritePage(const SegmentId& seg_id, size_t page_idx,
+                        void* buffer) {
+  assert(seg_id.IsValid());
+  const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
+  sf.WritePages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
+                /*num_pages=*/1);
 }
 
 }  // namespace pg
