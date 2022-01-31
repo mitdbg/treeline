@@ -4,11 +4,11 @@
 #include <utility>
 #include <vector>
 
+#include "../key.h"
+#include "../segment_builder.h"
 #include "bench/common/load_data.h"
 #include "gflags/gflags.h"
-#include "key.h"
 #include "llsm/slice.h"
-#include "segment_builder.h"
 
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
 DEFINE_uint32(goal, 45, "Records per page goal.");

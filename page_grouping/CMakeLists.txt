@@ -38,13 +38,6 @@ add_executable(pg_bench
 )
 target_link_libraries(pg_bench PRIVATE pg gflags ycsbr-gen Threads::Threads)
 
-add_executable(pg_standalone
-  pg_standalone.cc
-  ../bench/common/load_data.cc
-  ../bench/common/load_data.h
-)
-target_link_libraries(pg_standalone PRIVATE pg gflags)
-
 add_executable(pg_test
   tests/datasets.cc
   tests/datasets.h
@@ -53,11 +46,19 @@ add_executable(pg_test
 )
 target_link_libraries(pg_test PRIVATE pg gtest gtest_main)
 
-add_executable(pg_read pg_read.cc)
-target_link_libraries(pg_read PRIVATE gflags)
-
-add_executable(pg_read2 pg_read2.cc)
-target_link_libraries(pg_read2 PRIVATE gflags)
-
 add_executable(pg_shuffle tools/shuffle_pages.cc)
 target_link_libraries(pg_shuffle PRIVATE gflags)
+
+add_subdirectory(debug)
+
+if(NOT TARGET pg_all)
+  add_custom_target(pg_all)
+  add_dependencies(pg_all
+    pg_bench
+    pg_test
+    pg_shuffle
+    pg_read
+    pg_read2
+    pg_standalone
+  )
+endif()
