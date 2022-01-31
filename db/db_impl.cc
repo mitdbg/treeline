@@ -108,15 +108,6 @@ Status DBImpl::Initialize() {
       workers_ = std::make_unique<ThreadPool>(options_.background_threads);
     }
 
-    // Set up the active memtable.
-    MemTableOptions moptions;
-    moptions.flush_threshold = mem_budget_memtables_ >> 1;
-    moptions.deferral_granularity =
-        (options_.deferred_io_max_deferrals == 0)
-            ? 0
-            : options_.deferred_io_max_deferrals - 1;
-    mtable_ = std::make_shared<MemTable>(moptions);
-
     // Set up the record cache.
     rec_cache_ = std::make_unique<RecordCache>(options_.record_cache_capacity);
 
@@ -253,13 +244,6 @@ DBImpl::~DBImpl() {
     // be called.
     assert(waiting_writers_.empty());
 
-    // Any data in the active memtable should be flushed to persistent storage.
-    if (mtable_ && mtable_->HasEntries()) {
-      ScheduleMemTableFlush(lock, /* disable_deferred_io = */ true);
-      pending_flush = last_flush_;
-      assert(pending_flush.valid());
-    }
-
     // Any data in the record cache should be flushed to persistent storage. The
     // `RecordCache` destructor will take care of that.
     rec_cache_.reset();
@@ -268,14 +252,6 @@ DBImpl::~DBImpl() {
     // But either way, this method should be paired with `WriterWaitIfNeeded()`
     // to keep its usage in the code consistent.
     NotifyWaitingWriterIfNeeded(lock);
-  }
-
-  // If we dispatched a memtable flush above, we need to wait for the flush to
-  // finish before proceeding. This is because the flush occurs in the
-  // background and will schedule more work on the thread pool; we cannot delete
-  // the thread pool until that work has been scheduled.
-  if (pending_flush.valid()) {
-    pending_flush.get();
   }
 
   // Deleting the thread pool will block the current thread until the workers
@@ -512,15 +488,6 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
   foptions.deferred_io_max_deferrals = options_.deferred_io_max_deferrals;
   foptions.deferred_io_batch_size = options_.deferred_io_batch_size;
 
-  // Mark the active memtable as immutable and create a new active memtable.
-  MemTableOptions moptions;
-  moptions.flush_threshold = mem_budget_memtables_ >> 1;
-  {
-    std::unique_lock<std::mutex> mtable_lock(mtable_mutex_);
-    im_mtable_ = std::move(mtable_);
-    mtable_ = std::make_shared<MemTable>(moptions);
-  }
-
   stats_.MoveTempToTotalAndClearTemp();
 
   // Increment the log version and get the log version associated with the
@@ -626,12 +593,6 @@ void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
     // Wait for all page updates to complete.
     for (auto& future : page_write_futures) {
       future.get();
-    }
-
-    // Flush is complete. We no longer need the immutable memtable.
-    {
-      std::unique_lock<std::mutex> mtable_lock(mtable_mutex_);
-      im_mtable_.reset();
     }
 
     // Schedule the log version for deletion in the background, if able. Log
