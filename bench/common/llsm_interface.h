@@ -72,7 +72,7 @@ class LLSMInterface {
         throw std::runtime_error("Failed to bulk load a record!");
       }
     }
-    db_->FlushMemTable(/*disable_deferred_io = */ true);
+    db_->FlushRecordCache(/*disable_deferred_io = */ true);
   }
 
   // Update the value at the specified key. Return true if the update succeeded.
