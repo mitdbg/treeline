@@ -32,10 +32,13 @@ Status ValidateOptions(const Options& options) {
         "KeyDistHints::page_fill_pct must be a value between 1 and 100 "
         "inclusive.");
   }
-  if (options.buffer_pool_size < Page::kSize) {
+  if (options.buffer_pool_size < options.max_reorg_fanout * Page::kSize) {
     return Status::InvalidArgument(
         "Options::buffer_pool_size is too small. It must be at least " +
-        std::to_string(Page::kSize) + " bytes.");
+        std::to_string(Page::kSize) + " (Page::kSize) * " +
+        std::to_string(options.max_reorg_fanout) +
+        " (options.max_reorg_fanout) = " +
+        std::to_string(options.max_reorg_fanout * Page::kSize) + " bytes.");
   }
   if (options.background_threads < 2) {
     return Status::InvalidArgument(
@@ -44,15 +47,6 @@ Status ValidateOptions(const Options& options) {
   if (options.reorg_length < 2) {
     return Status::InvalidArgument("Options::reorg_length must be at least 2");
   }
-  size_t min_memory_budget = Page::kSize * (options.max_reorg_fanout + 2);
-  size_t given_memory_budget =
-      options.memtable_flush_threshold * 2 + options.buffer_pool_size;
-  if (given_memory_budget < min_memory_budget) {
-    return Status::InvalidArgument(
-        "Total memory budget must be at least Page::kSize * "
-        "(options.max_reorg_fanout + 2)");
-  }
-
   return Status::OK();
 }
 
@@ -477,15 +471,15 @@ bool DBImpl::FlushInProgress(const std::unique_lock<std::mutex>& lock) const {
 
 Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
                          const Slice& value, format::WriteType write_type) {
-  
   if (!options.bypass_wal) {
     Status log_result = wal_.LogWrite(options, key, value, write_type);
     if (!log_result.ok()) {
       return log_result;
     }
   }
-  
-  Status write_result = rec_cache_->Put(key, value, /*is_dirty = */ true, write_type);
+
+  Status write_result =
+      rec_cache_->Put(key, value, /*is_dirty = */ true, write_type);
   if (write_result.ok()) ++stats_.temp_user_writes_records_;
   return write_result;
 }
