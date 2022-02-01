@@ -21,9 +21,10 @@ const std::unordered_map<size_t, size_t> SegmentBuilder::kPageCountToSegment = {
 static const size_t kMaxSegmentSize =
     llsm::pg::SegmentBuilder::kSegmentPageCounts.back();
 
-Segment Segment::MultiPage(size_t page_count, size_t start_idx, size_t end_idx,
-                           plr::BoundedLine64 model) {
-  Segment s;
+DatasetSegment DatasetSegment::MultiPage(size_t page_count, size_t start_idx,
+                                         size_t end_idx,
+                                         plr::BoundedLine64 model) {
+  DatasetSegment s;
   s.page_count = page_count;
   s.start_idx = start_idx;
   s.end_idx = end_idx;
@@ -31,8 +32,8 @@ Segment Segment::MultiPage(size_t page_count, size_t start_idx, size_t end_idx,
   return s;
 }
 
-Segment Segment::SinglePage(size_t start_idx, size_t end_idx) {
-  Segment s;
+DatasetSegment DatasetSegment::SinglePage(size_t start_idx, size_t end_idx) {
+  DatasetSegment s;
   s.page_count = 1;
   s.start_idx = start_idx;
   s.end_idx = end_idx;
@@ -53,12 +54,12 @@ SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
   }
 }
 
-std::vector<Segment> SegmentBuilder::Build(
-    const std::vector<std::pair<Key, Slice>>& dataset) {
+std::vector<DatasetSegment> SegmentBuilder::BuildFromDataset(
+    const std::vector<std::pair<Key, Slice>>& dataset) const {
   // Precondition: The dataset is sorted by key in ascending order.
   size_t next_idx = 0;
   std::vector<size_t> records_processed;
-  std::vector<Segment> segments;
+  std::vector<DatasetSegment> segments;
   records_processed.reserve(allowed_records_per_segment_.back());
 
   while (next_idx < dataset.size()) {
@@ -97,8 +98,8 @@ std::vector<Segment> SegmentBuilder::Build(
       if (!maybe_line.has_value()) {
         // This should only happen when there is a single record left.
         assert(records_processed.size() == 1);
-        segments.push_back(Segment::SinglePage(records_processed.front(),
-                                               records_processed.back() + 1));
+        segments.push_back(DatasetSegment::SinglePage(
+            records_processed.front(), records_processed.back() + 1));
         continue;
       }
     }
@@ -141,8 +142,8 @@ std::vector<Segment> SegmentBuilder::Build(
           --extra_keys;
         }
       }
-      segments.push_back(Segment::SinglePage(records_processed.front(),
-                                             records_processed.back() + 1));
+      segments.push_back(DatasetSegment::SinglePage(
+          records_processed.front(), records_processed.back() + 1));
       continue;
     }
 
@@ -175,7 +176,7 @@ std::vector<Segment> SegmentBuilder::Build(
     if (next_idx < dataset.size()) {
       last_key = dataset[next_idx].first;
     }
-    segments.push_back(Segment::MultiPage(
+    segments.push_back(DatasetSegment::MultiPage(
         segment_size, records_processed.front(), records_processed.back() + 1,
         plr::BoundedLine64(maybe_line->line().Rescale(records_per_page_goal_),
                            /*start_x=*/0, /*end_x=*/last_key - base_key)));

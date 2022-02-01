@@ -45,7 +45,7 @@ Status LoadIntoPage(PageBuffer& buf, size_t page_idx, Key lower, Key upper,
 
 // Unused, but kept in case it is useful for debugging later on.
 void PrintSegmentsAsCSV(std::ostream& out,
-                        const std::vector<Segment>& segments) {
+                        const std::vector<DatasetSegment>& segments) {
   out << "segment_page_count,num_records,model_slope,model_intercept"
       << std::endl;
   for (const auto& seg : segments) {
@@ -60,7 +60,7 @@ void PrintSegmentsAsCSV(std::ostream& out,
 }
 
 void PrintSegmentSummaryAsCsv(std::ostream& out,
-                              const std::vector<Segment>& segments) {
+                              const std::vector<DatasetSegment>& segments) {
   std::vector<size_t> num_segments;
   num_segments.resize(SegmentBuilder::kSegmentPageCounts.size());
   for (const auto& seg : segments) {
@@ -102,7 +102,7 @@ Manager Manager::BulkLoadIntoSegments(
   // 1. Generate the segments.
   SegmentBuilder builder(options.records_per_page_goal,
                          options.records_per_page_delta);
-  const auto segments = builder.Build(records);
+  const auto segments = builder.BuildFromDataset(records);
   if (options.write_debug_info) {
     const auto debug_path = db_path / kDebugDirName;
     fs::create_directories(debug_path);

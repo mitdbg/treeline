@@ -59,8 +59,8 @@ TEST(PLRTest, Uniform) {
 }
 
 void CheckSegments(const std::vector<uint64_t>& dataset,
-                   const std::vector<Segment>& segments, const size_t goal,
-                   const size_t delta) {
+                   const std::vector<DatasetSegment>& segments,
+                   const size_t goal, const size_t delta) {
   ASSERT_FALSE(segments.empty());
 
   for (size_t i = 0; i < segments.size(); ++i) {
@@ -118,7 +118,7 @@ TEST(SegmentBuilderTest, Sequential_45_5) {
   const size_t goal = 45;
   const size_t delta = 5;
   SegmentBuilder builder(goal, delta);
-  const auto segments = builder.Build(records);
+  const auto segments = builder.BuildFromDataset(records);
 
   CheckSegments(Datasets::kSequentialKeys, segments, goal, delta);
 }
@@ -133,7 +133,7 @@ TEST(SegmentBuilderTest, Sequential_15_5) {
   const size_t goal = 15;
   const size_t delta = 5;
   SegmentBuilder builder(goal, delta);
-  const auto segments = builder.Build(records);
+  const auto segments = builder.BuildFromDataset(records);
 
   CheckSegments(Datasets::kSequentialKeys, segments, goal, delta);
 }
@@ -148,7 +148,7 @@ TEST(SegmentBuilderTest, Uniform_45_5) {
   const size_t goal = 45;
   const size_t delta = 5;
   SegmentBuilder builder(goal, delta);
-  const auto segments = builder.Build(records);
+  const auto segments = builder.BuildFromDataset(records);
 
   CheckSegments(Datasets::kUniformKeys, segments, goal, delta);
 }
@@ -163,7 +163,7 @@ TEST(SegmentBuilderTest, Uniform_15_5) {
   const size_t goal = 15;
   const size_t delta = 5;
   SegmentBuilder builder(goal, delta);
-  const auto segments = builder.Build(records);
+  const auto segments = builder.BuildFromDataset(records);
 
   CheckSegments(Datasets::kUniformKeys, segments, goal, delta);
 }
