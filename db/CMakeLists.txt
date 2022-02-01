@@ -12,6 +12,8 @@ target_sources(llsm PRIVATE
   memtable.h
   options.cc
   options.h
+  overflow_chain.cc
+  overflow_chain.h
   page.cc
   page.h
   posix_logger.h
