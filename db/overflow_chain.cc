@@ -19,6 +19,13 @@ OverflowChain FixOverflowChain(PhysicalPageId page_id, bool exclusive,
     return nullptr;
   }
 
+  // TODO: this should happen
+  /* if (bf->IsNewlyFixed()) {
+    ++stats->temp_flush_bufmgr_misses_pages_;
+  } else {
+    ++stats->temp_flush_bufmgr_hits_pages_;
+  } */
+
   OverflowChain frames = std::make_unique<std::vector<BufferFrame*>>();
   frames->push_back(bf);
 
@@ -43,6 +50,13 @@ OverflowChain FixOverflowChain(PhysicalPageId page_id, bool exclusive,
       // Retry from the beginning of the chain.
       continue;
     }
+
+    // TODO: this should happen
+    /* if (bf->IsNewlyFixed()) {
+      ++stats->temp_flush_bufmgr_misses_pages_;
+    } else {
+      ++stats->temp_flush_bufmgr_hits_pages_;
+    } */
     frames->push_back(bf);
   }
 
