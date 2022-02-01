@@ -152,7 +152,7 @@ Status Page::Delete(const Slice& key) {
   return Status::OK();
 }
 
-bool Page::HasOverflow() { return GetOverflow().IsValid(); }
+bool Page::HasOverflow() const { return GetOverflow().IsValid(); }
 
 // Page scratch space: 24 bytes. The scratch space is used differently depending
 // on the page's role in a segment. The caller needs to ensure they use these

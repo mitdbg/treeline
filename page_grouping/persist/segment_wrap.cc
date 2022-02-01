@@ -62,5 +62,12 @@ uint32_t SegmentWrap::ComputeChecksum() const {
   return checksum;
 }
 
+void SegmentWrap::ClearAllOverflows() {
+  for (size_t i = 0; i < pages_in_segment_; ++i) {
+    Page page = PageAtIndex(i);
+    page.SetOverflow(SegmentId());
+  }
+}
+
 }  // namespace pg
 }  // namespace llsm

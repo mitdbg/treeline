@@ -526,6 +526,17 @@ TEST_F(ManagerTest, InsertOverflowSegments) {
       ASSERT_TRUE(m.Get(rec.first, &out).ok());
       ASSERT_EQ(rec.second.compare(value), 0);
     }
+
+    // Scan and check combined.
+    std::vector<std::pair<uint64_t, Slice>> combined;
+    combined.reserve(dataset.size() + inserts.size());
+    combined.insert(combined.end(), dataset.begin(), dataset.end());
+    combined.insert(combined.end(), inserts.begin(), inserts.end());
+
+    std::vector<std::pair<uint64_t, std::string>> scan_out;
+    ASSERT_TRUE(m.Scan(0, 15, &scan_out).ok());
+    ASSERT_EQ(scan_out.size(), combined.size());
+    ValidateScanResults(0, combined.size(), combined, scan_out);
   }
 }
 
@@ -575,5 +586,16 @@ TEST_F(ManagerTest, InsertOverflowPages) {
       ASSERT_TRUE(m.Get(rec.first, &out).ok());
       ASSERT_EQ(rec.second.compare(value), 0);
     }
+
+    // Scan and check combined.
+    std::vector<std::pair<uint64_t, Slice>> combined;
+    combined.reserve(dataset.size() + inserts.size());
+    combined.insert(combined.end(), dataset.begin(), dataset.end());
+    combined.insert(combined.end(), inserts.begin(), inserts.end());
+
+    std::vector<std::pair<uint64_t, std::string>> scan_out;
+    ASSERT_TRUE(m.Scan(0, 15, &scan_out).ok());
+    ASSERT_EQ(scan_out.size(), combined.size());
+    ValidateScanResults(0, combined.size(), combined, scan_out);
   }
 }

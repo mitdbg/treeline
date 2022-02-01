@@ -18,6 +18,9 @@ class SegmentWrap {
   bool CheckChecksum() const;
   void ComputeAndSetChecksum();
 
+  // Sets all overflow values to "invalid" (indicating no overflow).
+  void ClearAllOverflows();
+
  private:
   Page PageAtIndex(size_t index) const;
   uint32_t ComputeChecksum() const;

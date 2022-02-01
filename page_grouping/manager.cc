@@ -7,6 +7,7 @@
 
 #include "bufmgr/page_memory_allocator.h"
 #include "key.h"
+#include "persist/merge_iterator.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
 #include "persist/segment_wrap.h"
@@ -173,6 +174,7 @@ Manager Manager::BulkLoadIntoSegments(
     SegmentWrap sw(buf.get(), seg.page_count);
     sw.SetSequenceNumber(0);
     sw.ComputeAndSetChecksum();
+    sw.ClearAllOverflows();
 
     // 3. Write the segment to disk.
     const size_t segment_idx =
@@ -219,6 +221,7 @@ Manager Manager::BulkLoadIntoPages(
 
     SegmentWrap sw(buf.get(), 1);
     sw.SetSequenceNumber(0);
+    sw.ClearAllOverflows();
 
     // Write page to disk.
     const size_t byte_offset = sf.AllocateSegment();
@@ -244,6 +247,7 @@ Manager Manager::BulkLoadIntoPages(
 
     SegmentWrap sw(buf.get(), 1);
     sw.SetSequenceNumber(0);
+    sw.ClearAllOverflows();
 
     // Write page to disk.
     const size_t byte_offset = sf.AllocateSegment();
@@ -504,8 +508,14 @@ Status Manager::WriteToSegment(
       }
 
       memset(overflow_page_buf, 0, pg::Page::kSize);
+      overflow_page = Page(overflow_page_buf, orig_page);
       overflow_page.MakeOverflow();
+      overflow_page.SetOverflow(SegmentId());
       overflow_page_dirty = true;
+
+      orig_page.SetOverflow(overflow_page_id);
+      orig_page_dirty = true;
+
       curr_page = &overflow_page;
       curr_page_dirty = &overflow_page_dirty;
     }
@@ -616,22 +626,40 @@ Status Manager::ScanWithEstimates(
                w_.buffer().get(), est_start_pages_to_read);
   w_.BumpReadCount(est_start_pages_to_read);
 
+  // The workspace buffer has one extra page at the end for use as the overflow.
+  void* overflow_buf =
+      w_.buffer().get() +
+      (SegmentBuilder::kSegmentPageCounts.back()) * pg::Page::kSize;
+  Page overflow_page(overflow_buf);
+
   // Scan the first page.
   Page first_page(w_.buffer().get());
-  auto page_it = first_page.GetIterator();
-  key_utils::IntKeyAsSlice start_key_slice(start_key);
-  page_it.Seek(start_key_slice.as<Slice>());
-  for (; records_left > 0 && page_it.Valid(); --records_left, page_it.Next()) {
-    values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
-                             page_it.value().ToString());
+  std::vector<Page::Iterator> page_its = {first_page.GetIterator()};
+  if (first_page.HasOverflow()) {
+    ReadPage(first_page.GetOverflow(), 0, overflow_buf);
+    page_its.push_back(overflow_page.GetIterator());
+  }
+  key_utils::IntKeyAsSlice start_key_slice_helper(start_key);
+  Slice start_key_slice = start_key_slice_helper.as<Slice>();
+  PageMergeIterator pmi(std::move(page_its), &start_key_slice);
+  for (; records_left > 0 && pmi.Valid(); --records_left, pmi.Next()) {
+    values_out->emplace_back(key_utils::ExtractHead64(pmi.key()),
+                             pmi.value().ToString());
   }
 
   // Common code used to scan a whole page.
-  const auto scan_page = [&records_left, values_out](const Page& page) {
-    for (auto page_it = page.GetIterator(); records_left > 0 && page_it.Valid();
-         --records_left, page_it.Next()) {
-      values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
-                               page_it.value().ToString());
+  const auto scan_page = [this, &records_left, &overflow_page, overflow_buf,
+                          values_out](const Page& page) {
+    std::vector<Page::Iterator> page_its = {page.GetIterator()};
+    if (page.HasOverflow()) {
+      ReadPage(page.GetOverflow(), 0, overflow_buf);
+      page_its.push_back(overflow_page.GetIterator());
+    }
+
+    PageMergeIterator pmi(std::move(page_its));
+    for (; records_left > 0 && pmi.Valid(); --records_left, pmi.Next()) {
+      values_out->emplace_back(key_utils::ExtractHead64(pmi.key()),
+                               pmi.value().ToString());
     }
   };
 

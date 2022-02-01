@@ -17,8 +17,9 @@ class Workspace {
 
   PageBuffer& buffer() {
     if (buf_ != nullptr) return buf_;
+    // Add one for the overflow page.
     buf_ = PageMemoryAllocator::Allocate(
-        /*num_pages=*/SegmentBuilder::kSegmentPageCounts.back());
+        /*num_pages=*/SegmentBuilder::kSegmentPageCounts.back() + 1);
     return buf_;
   }
 

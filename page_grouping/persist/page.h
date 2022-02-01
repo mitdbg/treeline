@@ -97,7 +97,7 @@ class Page {
   void SetOverflow(SegmentId overflow);
 
   // Determine whether this page has an overflow page.
-  bool HasOverflow();
+  bool HasOverflow() const;
 
   // Retrieve/update the model associated with this page.
   // VALID FOR: First page in a multi-page segment only.
