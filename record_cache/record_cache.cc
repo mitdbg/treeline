@@ -6,14 +6,19 @@ std::vector<RecordCacheEntry> RecordCache::cache_entries{};
 
 RecordCache::RecordCache(uint64_t capacity, std::shared_ptr<Model> model,
                          std::shared_ptr<BufferManager> buf_mgr)
-    : capacity_(capacity), model_(model), buf_mgr_(buf_mgr_) {
+    : capacity_(capacity) {
+  model_ = (model != nullptr) ? model : std::optional<std::shared_ptr<Model>>();
+  buf_mgr_ = (buf_mgr != nullptr)
+                 ? buf_mgr
+                 : std::optional<std::shared_ptr<BufferManager>>();
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
   cache_entries.resize(capacity_);
   clock_ = 0;
 }
 
 RecordCache::~RecordCache() {
-  tree_.reset();  // Delete ART before freeing anything.
+  tree_.reset();  // Delete ART before freeing anything, so that entries are
+                  // inaccessible while freeing.
   for (auto i = 0; i < capacity_; ++i) {
     cache_entries[i].Lock(/*exclusive = */ false);
     WriteOutIfDirty(i);
@@ -152,6 +157,7 @@ uint64_t RecordCache::SelectForEviction() {
 
 bool RecordCache::WriteOutIfDirty(uint64_t index) {
   bool was_dirty = cache_entries[index].IsDirty();
+  if (!buf_mgr_.has_value() || !model_.has_value()) return was_dirty;
 
   // Writeout unimplemented - requires LLSM integration.
   // Should consider synchronization with reorganization code.

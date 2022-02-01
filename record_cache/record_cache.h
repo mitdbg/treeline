@@ -1,5 +1,8 @@
+#pragma once
+
 #include <atomic>
 #include <memory>
+#include <optional>
 
 #include "art_olc/Tree.h"
 #include "bufmgr/buffer_manager.h"
@@ -18,8 +21,12 @@ class RecordCache {
   // Initializes a record cache that can hold `capacity` records. The underlying
   // system uses `model` to determine the appropriate page for each key and
   // `buf_mgr` to bring in pages from disk.
-  RecordCache(uint64_t capacity, std::shared_ptr<Model> model,
-              std::shared_ptr<BufferManager> buf_mgr);
+  //
+  // The last two arguments can optionally be omitted when using a standalone
+  // RecordCache. In that case, no persistence guarantees are provided, and data
+  // will be lost when exceeding the size of the record cache.
+  RecordCache(uint64_t capacity, std::shared_ptr<Model> model = nullptr,
+              std::shared_ptr<BufferManager> buf_mgr = nullptr);
 
   // Destroys the record cache, after writing back any dirty records.
   ~RecordCache();
@@ -107,11 +114,11 @@ class RecordCache {
 
   // A pointer to the buffer manager of the  underlying system, used for
   // flushing dirty record cache entries.
-  std::shared_ptr<BufferManager> buf_mgr_;
+  std::optional<std::shared_ptr<BufferManager>> buf_mgr_;
 
   // A pointer to the model of the underlying system, used for finding the right
   // page for flushing dirty record cache entries.
-  std::shared_ptr<Model> model_;
+  std::optional<std::shared_ptr<Model>> model_;
 
   // An index for the cache, using ART with optimistic lock coupling from
   // https://github.com/flode/ARTSynchronized/tree/master/OptimisticLockCoupling.
