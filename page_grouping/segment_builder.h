@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cstdlib>
+#include <deque>
 #include <utility>
 #include <vector>
 
 #include "key.h"
 #include "llsm/slice.h"
 #include "plr/data.h"
+#include "plr/greedy.h"
 
 namespace llsm {
 namespace pg {
@@ -28,6 +30,15 @@ struct DatasetSegment {
   std::optional<plr::BoundedLine64> model;
 };
 
+struct Segment {
+ public:
+  size_t page_count;
+  // The records in the segment in sorted order.
+  std::vector<std::pair<Key, Slice>> records;
+  // Will be empty when `page_count == 1`.
+  std::optional<plr::BoundedLine64> model;
+};
+
 class SegmentBuilder {
  public:
   SegmentBuilder(const size_t records_per_page_goal,
@@ -40,6 +51,11 @@ class SegmentBuilder {
   std::vector<DatasetSegment> BuildFromDataset(
       const std::vector<std::pair<Key, Slice>>& dataset) const;
 
+  // Stream-based builder interface. Offer the builder one record at a time.
+  std::vector<Segment> Offer(std::pair<Key, Slice> record);
+  std::vector<Segment> Finish();
+  void ResetStream();
+
   // The number of pages in each segment.
   // The index of the vector represents the segment "type", and its value
   // represents the number of pages in the segment.
@@ -49,9 +65,22 @@ class SegmentBuilder {
   static const std::unordered_map<size_t, size_t> kPageCountToSegment;
 
  private:
+  // Helper methods used by the stream-based builder interface.
+  std::vector<Segment> DrainRemainingRecordsAndReset(
+      std::vector<Segment> to_return, std::pair<Key, Slice> record);
+  std::vector<Segment> DrainRemainingRecordsAndReset(
+      std::vector<Segment> to_return);
+
   size_t records_per_page_goal_, records_per_page_delta_;
   size_t max_records_in_segment_;
   std::vector<size_t> allowed_records_per_segment_;
+
+  // Used by the stream-based builder.
+  enum class State { kNeedBase, kHasBase, kFillingSinglePage };
+  State state_;
+  std::optional<plr::GreedyPLRBuilder64> plr_;
+  Key base_key_;
+  std::deque<std::pair<Key, Slice>> processed_records_;
 };
 
 }  // namespace pg
