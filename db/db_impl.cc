@@ -409,9 +409,9 @@ Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
   return write_result;
 }
 
-DBImpl::OverflowChain DBImpl::FixOverflowChain(
-    const PhysicalPageId page_id, const bool exclusive,
-    const bool unlock_before_returning) {
+OverflowChain DBImpl::FixOverflowChain(const PhysicalPageId page_id,
+                                       const bool exclusive,
+                                       const bool unlock_before_returning) {
   BufferFrame* bf;
   PhysicalPageId local_page_id = page_id;
 

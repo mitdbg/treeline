@@ -48,7 +48,6 @@ class DBImpl : public DB {
   // Gets the number of pages indexed by the model (for debugging).
   size_t GetNumIndexedPages() const;
 
-  using OverflowChain = std::shared_ptr<std::vector<BufferFrame*>>;
   using FlushBatch = std::vector<
       std::tuple<const Slice, const Slice, const format::WriteType>>;
 
