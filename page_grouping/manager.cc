@@ -752,23 +752,41 @@ Status Manager::ScanWhole(
   sf.ReadPages(segment_byte_offset, w_.buffer().get(), first_segment_size);
   w_.BumpReadCount(first_segment_size);
 
+  // The workspace buffer has one extra page at the end for use as the overflow.
+  void* overflow_buf =
+      w_.buffer().get() +
+      (SegmentBuilder::kSegmentPageCounts.back()) * pg::Page::kSize;
+  Page overflow_page(overflow_buf);
+
   // 3. Scan the first matching page in the segment.
   size_t start_segment_page_idx = it->second.PageForKey(it->first, start_key);
   Page first_page(w_.buffer().get() + start_segment_page_idx * Page::kSize);
-  auto page_it = first_page.GetIterator();
-  key_utils::IntKeyAsSlice start_key_slice(start_key);
-  page_it.Seek(start_key_slice.as<Slice>());
-  for (; page_it.Valid() && records_left > 0; page_it.Next(), --records_left) {
-    values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
-                             page_it.value().ToString());
+  std::vector<Page::Iterator> page_its = {first_page.GetIterator()};
+  if (first_page.HasOverflow()) {
+    ReadPage(first_page.GetOverflow(), 0, overflow_buf);
+    page_its.push_back(overflow_page.GetIterator());
+  }
+  key_utils::IntKeyAsSlice start_key_slice_helper(start_key);
+  Slice start_key_slice = start_key_slice_helper.as<Slice>();
+  PageMergeIterator pmi(std::move(page_its), &start_key_slice);
+  for (; pmi.Valid() && records_left > 0; pmi.Next(), --records_left) {
+    values_out->emplace_back(key_utils::ExtractHead64(pmi.key()),
+                             pmi.value().ToString());
   }
 
   // Common code used to scan a whole page.
-  const auto scan_page = [&records_left, values_out](const Page& page) {
-    for (auto page_it = page.GetIterator(); records_left > 0 && page_it.Valid();
-         --records_left, page_it.Next()) {
-      values_out->emplace_back(key_utils::ExtractHead64(page_it.key()),
-                               page_it.value().ToString());
+  const auto scan_page = [this, &records_left, &overflow_page, overflow_buf,
+                          values_out](const Page& page) {
+    std::vector<Page::Iterator> page_its = {page.GetIterator()};
+    if (page.HasOverflow()) {
+      ReadPage(page.GetOverflow(), 0, overflow_buf);
+      page_its.push_back(overflow_page.GetIterator());
+    }
+
+    PageMergeIterator pmi(std::move(page_its));
+    for (; records_left > 0 && pmi.Valid(); --records_left, pmi.Next()) {
+      values_out->emplace_back(key_utils::ExtractHead64(pmi.key()),
+                               pmi.value().ToString());
     }
   };
 
