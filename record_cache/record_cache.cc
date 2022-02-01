@@ -55,13 +55,6 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
     FreeIfValid(index);
     ptr = static_cast<char*>(malloc(key.size() + value.size()));
 
-    // Overwrite metadata.
-    cache_entries[index].SetValidTo(true);
-    cache_entries[index].SetDirtyTo(
-        found ? (is_dirty || cache_entries[index].IsDirty()) : (is_dirty));
-    if (is_dirty) cache_entries[index].SetWriteType(write_type);
-    cache_entries[index].SetPriorityTo(priority);
-
     // Update key.
     memcpy(ptr, key.data(), key.size());
     cache_entries[index].SetKey(Slice(ptr, key.size()));
@@ -70,6 +63,13 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
   // Update value.
   memcpy(ptr + key.size(), value.data(), value.size());
   cache_entries[index].SetValue(Slice(ptr + key.size(), value.size()));
+
+  // Update metadata.
+  cache_entries[index].SetValidTo(true);
+  cache_entries[index].SetDirtyTo(
+      found ? (is_dirty || cache_entries[index].IsDirty()) : (is_dirty));
+  if (is_dirty) cache_entries[index].SetWriteType(write_type);
+  cache_entries[index].SetPriorityTo(priority);
 
   // Update ART.
   if (!found) {
