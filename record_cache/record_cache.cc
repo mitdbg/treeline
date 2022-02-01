@@ -156,11 +156,77 @@ uint64_t RecordCache::SelectForEviction() {
 }
 
 bool RecordCache::WriteOutIfDirty(uint64_t index) {
-  bool was_dirty = cache_entries[index].IsDirty();
-  if (!buf_mgr_.has_value() || !model_.has_value()) return was_dirty;
+  // Do nothing if not dirty, or if using a standalone record cache.
+  auto entry = &cache_entries[index];
+  bool was_dirty = entry->IsDirty();
+  if (!was_dirty || !buf_mgr_.has_value() || !model_.has_value())
+    return was_dirty;
 
-  // Writeout unimplemented - requires LLSM integration.
-  // Should consider synchronization with reorganization code.
+  Slice key = entry->GetKey();
+  Slice value = entry->GetValue();
+
+  // Retry until you can fix the chain.
+  PhysicalPageId page_id;
+  OverflowChain chain = nullptr;
+  while (chain == nullptr) {
+    page_id = model_.value()->KeyToPageId(key);
+    chain = FixOverflowChain(page_id, /* exclusive = */ true,
+                             /* unlock_before_returning = */ false,
+                             buf_mgr_.value(), model_.value());
+  }
+
+  // Flush the entry to the page.
+  Status s;
+  if (entry->IsWrite()) {  // INSERTION
+    // Try to update/insert into existing page in chain
+    for (auto& bf : *chain) {
+      if (bf->GetPage().HasOverflow()) {
+        // Not the last page in the chain; only update or remove.
+        s = bf->GetPage().UpdateOrRemove(key, value);
+        if (s.ok()) break;
+      } else {
+        // Last page in the chain; try inserting.
+        s = bf->GetPage().Put(key, value);
+        if (s.ok()) break;
+
+        // Must allocate a new page
+        PhysicalPageId new_page_id = buf_mgr_.value()->GetFileManager()->AllocatePage();
+        auto new_bf = &(buf_mgr_.value()->FixPage(new_page_id, /* exclusive = */ true,
+                                          /*is_newly_allocated = */ true));
+        Page new_page(new_bf->GetData(), bf->GetPage());
+        new_page.MakeOverflow();
+        bf->GetPage().SetOverflow(new_page_id);
+        chain->push_back(new_bf);
+
+        // Insert into the new page
+        s = new_page.Put(key, value);
+        if (!s.ok()) {  // Should never get here.
+          std::cerr << "ERROR: Failed to insert into overflow page. Aborting."
+                    << std::endl;
+          exit(1);
+        }
+      }
+    }
+
+  } else {  // DELETION
+    for (auto& bf : *chain) {
+      s = bf->GetPage().Delete(key);
+      if (s.ok()) break;
+    }
+  }
+
+  // If chain got too long, trigger reorganization
+  // TODO: where to do this?
+  // if (chain->size() >= options_.reorg_length) {
+  //   workers_->SubmitNoWait([this, page_id = chain->at(0)->GetPageId()]() {
+  //     ReorganizeOverflowChain(page_id, options_.key_hints.page_fill_pct);
+  //   });
+  // }
+
+  // Unfix all
+  for (auto& bf : *chain) {
+    buf_mgr_.value()->UnfixPage(*bf, /* is_dirty = */ true);
+  }
 
   return was_dirty;
 }
