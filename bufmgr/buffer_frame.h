@@ -92,7 +92,4 @@ class BufferFrame {
   std::atomic<size_t> fix_count_;
 };
 
-// Helper definition for vectors of BufferFrames.
-using OverflowChain = std::shared_ptr<std::vector<BufferFrame*>>;
-
 }  // namespace llsm

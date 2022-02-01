@@ -37,7 +37,8 @@ Status DBImpl::ReorganizeOverflowChain(PhysicalPageId page_id,
   OverflowChain chain = nullptr;
   while (chain == nullptr) {
     chain = FixOverflowChain(page_id, /* exclusive = */ true,
-                             /* unlock_before_returning = */ false);
+                             /* unlock_before_returning = */ false, buf_mgr_,
+                             model_);
   }
 
   // Avoid accidental extra work if we scheduled the reorganization twice.

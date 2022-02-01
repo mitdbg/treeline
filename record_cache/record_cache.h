@@ -6,6 +6,7 @@
 
 #include "art_olc/Tree.h"
 #include "bufmgr/buffer_manager.h"
+#include "db/overflow_chain.h"
 #include "llsm/status.h"
 #include "model/model.h"
 #include "record_cache_entry.h"

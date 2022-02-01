@@ -22,8 +22,9 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
     OverflowChain prev_page_chain(std::move(curr_page_chain));
 
     while (curr_page_id.IsValid()) {
-      curr_page_chain = FixOverflowChain(curr_page_id, /*exclusive=*/false,
-                                         /*unlock_before_returning=*/false);
+      curr_page_chain =
+          FixOverflowChain(curr_page_id, /*exclusive=*/false,
+                           /*unlock_before_returning=*/false, buf_mgr_, model_);
       if (curr_page_chain != nullptr) break;
 
       // Query the model for the page ID again because it may have changed due

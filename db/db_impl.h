@@ -14,6 +14,7 @@
 #include "llsm/db.h"
 #include "llsm/statistics.h"
 #include "model/model.h"
+#include "overflow_chain.h"
 #include "record_cache/record_cache.h"
 #include "util/thread_pool.h"
 #include "wal/manager.h"
@@ -60,12 +61,6 @@ class DBImpl : public DB {
   // This method is thread safe.
   Status WriteImpl(const WriteOptions& options, const Slice& key,
                    const Slice& value, format::WriteType write_type);
-
-  // Fixes the page chain starting with the page at `page_id`. The returned page
-  // frames can optionally be unlocked before returning. Returns `nullptr` if it
-  // detected a reorganization while fixing the first chain link.
-  OverflowChain FixOverflowChain(PhysicalPageId page_id, bool exclusive,
-                                 bool unlock_before_returning);
 
   // Reorganizes the page chain starting with the page at `page_id` by promoting
   // overflow pages.
