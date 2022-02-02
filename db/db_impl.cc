@@ -98,9 +98,9 @@ Status DBImpl::Initialize() {
         core_map.push_back(core_id);
       }
       workers_ =
-          std::make_unique<ThreadPool>(options_.background_threads, core_map);
+          std::make_shared<ThreadPool>(options_.background_threads, core_map);
     } else {
-      workers_ = std::make_unique<ThreadPool>(options_.background_threads);
+      workers_ = std::make_shared<ThreadPool>(options_.background_threads);
     }
 
     // Finish initializing the DB based on whether we are creating a completely
@@ -133,8 +133,8 @@ Status DBImpl::InitializeNewDB() {
     } else {
       model_ = std::make_shared<BTreeModel>();
     }
-    rec_cache_ = std::make_unique<RecordCache>(options_.record_cache_capacity,
-                                               model_, buf_mgr_);
+    rec_cache_ = std::make_unique<RecordCache>(&options_, &stats_, model_,
+                                               buf_mgr_, workers_);
 
     model_->PreallocateAndInitialize(buf_mgr_, records,
                                      options_.key_hints.records_per_page());
@@ -178,8 +178,8 @@ Status DBImpl::InitializeExistingDB() {
   } else {
     model_ = std::make_shared<BTreeModel>();
   }
-  rec_cache_ = std::make_unique<RecordCache>(options_.record_cache_capacity,
-                                             model_, buf_mgr_);
+  rec_cache_ = std::make_unique<RecordCache>(&options_, &stats_, model_,
+                                             buf_mgr_, workers_);
 
   model_->ScanFilesAndInitialize(buf_mgr_);
   buf_mgr_->ClearStats();
@@ -390,7 +390,8 @@ Status DBImpl::BulkLoad(
 size_t DBImpl::GetNumIndexedPages() const { return model_->GetNumPages(); }
 
 Status DBImpl::FlushRecordCache(const bool disable_deferred_io) {
-  rec_cache_->WriteOutDirty();
+  rec_cache_->WriteOutDirty(options_.reorg_length,
+                            options_.key_hints.page_fill_pct);
   return Status::OK();
 }
 
@@ -403,9 +404,13 @@ Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
     }
   }
 
+  PhysicalPageId chain_to_reorg;
+  uint64_t chain_size = 0;
   Status write_result =
-      rec_cache_->Put(key, value, /*is_dirty = */ true, write_type);
+      rec_cache_->Put(key, value, /*is_dirty = */ true, write_type, 4, true,
+                      options_.reorg_length, options_.key_hints.page_fill_pct);
   if (write_result.ok()) ++stats_.temp_user_writes_records_;
+
   return write_result;
 }
 
