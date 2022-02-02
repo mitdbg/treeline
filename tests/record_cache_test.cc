@@ -7,7 +7,10 @@ namespace {
 using namespace llsm;
 
 TEST(RecordCacheTest, SimplePutGet) {
-  auto rc = RecordCache(5);
+  Options options;
+  options.record_cache_capacity = 5;
+  Statistics stats;
+  auto rc = RecordCache(&options, &stats);
   Slice key = "aaa";
   Slice value = "bbb";
 
@@ -20,7 +23,10 @@ TEST(RecordCacheTest, SimplePutGet) {
 }
 
 TEST(RecordCacheTest, SimpleMiss) {
-  auto rc = RecordCache(5);
+  Options options;
+  options.record_cache_capacity = 5;
+  Statistics stats;
+  auto rc = RecordCache(&options, &stats);
   Slice key = "aaa";
 
   uint64_t index_out;
@@ -28,7 +34,10 @@ TEST(RecordCacheTest, SimpleMiss) {
 }
 
 TEST(RecordCacheTest, PutVariants) {
-  auto rc = RecordCache(5);
+  Options options;
+  options.record_cache_capacity = 5;
+  Statistics stats;
+  auto rc = RecordCache(&options, &stats);
   Slice key1 = "aa1";
   Slice key2 = "aa2";
   Slice key3 = "aa3";
@@ -60,7 +69,10 @@ TEST(RecordCacheTest, PutVariants) {
 }
 
 TEST(RecordCacheTest, MultiPutGet) {
-  auto rc = RecordCache(10);
+  Options options;
+  options.record_cache_capacity = 10;
+  Statistics stats;
+  auto rc = RecordCache(&options, &stats);
 
   for (auto i = 100; i < 200; ++i) {
     std::string key_s = "a" + std::to_string(i);
