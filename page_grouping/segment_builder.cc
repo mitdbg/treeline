@@ -189,6 +189,8 @@ std::vector<DatasetSegment> SegmentBuilder::BuildFromDataset(
 
 std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
   static const std::vector<Segment> kNoSegments = {};
+  static const std::optional<plr::BoundedLine64> kNoModel =
+      std::optional<plr::BoundedLine64>();
 
   // Precondition: The records are offered in sorted order (sorted by key in
   // ascending order).
@@ -225,31 +227,16 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
         // a degenerate case that occurs when `max_records_in_segment_ == 1`.
         assert(processed_records_.size() == 1);
         assert(max_records_in_segment_ == 1);
-        std::vector<Segment> results;
-        Segment& seg = results.emplace_back();
-        seg.page_count = 1;
-        seg.records.push_back(std::move(processed_records_.front()));
-        processed_records_.pop_front();
+        std::vector<Segment> results = {CreateSegmentUsing(kNoModel,
+                                                           /*page_count=*/1,
+                                                           /*num_records=*/1)};
         return DrainRemainingRecordsAndReset(std::move(results),
                                              std::move(record));
       }
     }
 
-    // According to the generated model, how many records have we processed when
-    // we hit the last key?
-    const double last_record_size =
-        1.0 + std::max(0.0, line->line()(processed_records_.back().first -
-                                         base_key_));
-
-    // Find the largest possible segment we can make.
-    // `allowed_records_per_segment_` contains the ideal size for each segment.
-    // We want to find the index of the *largest* value that is less than or
-    // equal to `last_record_size`.
-    const auto segment_size_idx_it =
-        std::upper_bound(allowed_records_per_segment_.begin(),
-                         allowed_records_per_segment_.end(), last_record_size);
-    const int segment_size_idx =
-        (segment_size_idx_it - allowed_records_per_segment_.begin()) - 1;
+    // Figure out how big of a segment we can make, according to the model.
+    const int segment_size_idx = ComputeSegmentSizeIndex(*line);
 
     if (segment_size_idx <= 0) {
       // One of two cases:
@@ -265,51 +252,23 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
       }
 
       // Build a segment result from the records collected up to here.
-      std::vector<Segment> results;
-      Segment& seg = results.emplace_back();
-      seg.page_count = 1;
-      seg.records.reserve(target_size);
-      for (size_t i = 0; i < target_size; ++i) {
-        seg.records.push_back(std::move(processed_records_.front()));
-        processed_records_.pop_front();
-      }
+      std::vector<Segment> results = {
+          CreateSegmentUsing(kNoModel, /*page_count=*/1, target_size)};
       return DrainRemainingRecordsAndReset(std::move(results),
                                            std::move(record));
     }
 
     const size_t segment_size = kSegmentPageCounts[segment_size_idx];
-    assert(segment_size > 1);
-
-    const size_t records_in_segment =
-        allowed_records_per_segment_[segment_size_idx];
-
-    // Use the model to determine how many records to place in the segment,
-    // based on the desired goal. We use binary search against the model to
-    // minimize the effect of precision errors.
-    const auto cutoff_it =
-        std::lower_bound(processed_records_.begin(), processed_records_.end(),
-                         records_in_segment,
-                         [this, &line](const std::pair<Key, Slice>& rec,
-                                       const size_t recs_in_segment) {
-                           const Key key_a = rec.first;
-                           const auto pos_a = line->line()(key_a - base_key_);
-                           return pos_a < recs_in_segment;
-                         });
-    assert(cutoff_it != processed_records_.begin());
     const size_t actual_records_in_segment =
-        cutoff_it - processed_records_.begin();
+        ComputeNumRecordsInSegment(*line, segment_size_idx);
 
-    std::vector<Segment> segments;
-    Segment& seg = segments.emplace_back();
-    seg.page_count = segment_size;
-    // start/end are unused, so we set dummy values here.
-    seg.model = plr::BoundedLine64(line->line().Rescale(records_per_page_goal_),
-                                   /*start_x=*/0, /*end_x=*/1);
-    seg.records.reserve(actual_records_in_segment);
-    for (size_t i = 0; i < actual_records_in_segment; ++i) {
-      seg.records.push_back(std::move(processed_records_.front()));
-      processed_records_.pop_front();
-    }
+    // start_x/end_x are unused, so we put dummy values.
+    auto model =
+        plr::BoundedLine64(line->line().Rescale(records_per_page_goal_),
+                           /*start_x=*/0, /*end_x=*/1);
+    std::vector<Segment> segments = {
+        CreateSegmentUsing(std::move(model), /*page_count=*/segment_size,
+                           actual_records_in_segment)};
     return DrainRemainingRecordsAndReset(std::move(segments),
                                          std::move(record));
 
@@ -319,14 +278,8 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
       processed_records_.push_back(std::move(record));
       return kNoSegments;
     }
-    std::vector<Segment> results;
-    Segment& seg = results.emplace_back();
-    seg.page_count = 1;
-    seg.records.reserve(target_size);
-    for (size_t i = 0; i < target_size; ++i) {
-      seg.records.push_back(std::move(processed_records_.front()));
-      processed_records_.pop_front();
-    }
+    std::vector<Segment> results = {
+        CreateSegmentUsing(kNoModel, /*page_count=*/1, target_size)};
     return DrainRemainingRecordsAndReset(std::move(results), std::move(record));
 
   } else {
@@ -336,6 +289,9 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
 }
 
 std::vector<Segment> SegmentBuilder::Finish() {
+  static const std::optional<plr::BoundedLine64> kNoModel =
+      std::optional<plr::BoundedLine64>();
+
   if (state_ == State::kNeedBase) {
     // No additional segments.
     ResetStream();
@@ -346,85 +302,41 @@ std::vector<Segment> SegmentBuilder::Finish() {
     if (!line.has_value()) {
       // Only one record.
       assert(processed_records_.size() == 1);
-      std::vector<Segment> results;
-      Segment& seg = results.emplace_back();
-      seg.page_count = 1;
-      seg.records.push_back(std::move(processed_records_.front()));
+      std::vector<Segment> results = {
+          CreateSegmentUsing(kNoModel, /*page_count=*/1, /*num_records=*/1)};
       ResetStream();
       return results;
     }
 
-    // According to the generated model, how many records have we processed
-    // when we hit the last key?
-    const double last_record_size =
-        1.0 + std::max(0.0, line->line()(processed_records_.back().first -
-                                         base_key_));
-
-    // Find the largest possible segment we can make.
-    // `allowed_records_per_segment_` contains the ideal size for each
-    // segment. We want to find the index of the *largest* value that is less
-    // than or equal to `last_record_size`.
-    const auto segment_size_idx_it =
-        std::upper_bound(allowed_records_per_segment_.begin(),
-                         allowed_records_per_segment_.end(), last_record_size);
-    const int segment_size_idx =
-        (segment_size_idx_it - allowed_records_per_segment_.begin()) - 1;
-
+    const int segment_size_idx = ComputeSegmentSizeIndex(*line);
     if (segment_size_idx <= 0) {
       // Fill one page and omit the model.
       const size_t target_size = allowed_records_per_segment_[0];
 
       // Build a segment result from the records collected up to here.
-      std::vector<Segment> results;
-      Segment& seg = results.emplace_back();
-      seg.page_count = 1;
-      seg.records.reserve(target_size);
-      for (size_t i = 0; i < target_size; ++i) {
-        seg.records.push_back(std::move(processed_records_.front()));
-        processed_records_.pop_front();
-      }
+      std::vector<Segment> results = {
+          CreateSegmentUsing(kNoModel, /*page_count=*/1, target_size)};
 
       // Recursively finish processing any leftover records.
       results = DrainRemainingRecordsAndReset(std::move(results));
       auto additional_segments = Finish();
-      results.insert(results.end(), additional_segments.begin(),
-                     additional_segments.end());
+      results.insert(results.end(),
+                     std::make_move_iterator(additional_segments.begin()),
+                     std::make_move_iterator(additional_segments.end()));
       return results;
     }
 
     const size_t segment_size = kSegmentPageCounts[segment_size_idx];
-    assert(segment_size > 1);
-
-    const size_t records_in_segment =
-        allowed_records_per_segment_[segment_size_idx];
-
-    // Use the model to determine how many records to place in the segment,
-    // based on the desired goal. We use binary search against the model to
-    // minimize the effect of precision errors.
-    const auto cutoff_it =
-        std::lower_bound(processed_records_.begin(), processed_records_.end(),
-                         records_in_segment,
-                         [this, &line](const std::pair<Key, Slice>& rec,
-                                       const size_t recs_in_segment) {
-                           const Key key_a = rec.first;
-                           const auto pos_a = line->line()(key_a - base_key_);
-                           return pos_a < recs_in_segment;
-                         });
-    assert(cutoff_it != processed_records_.begin());
     const size_t actual_records_in_segment =
-        cutoff_it - processed_records_.begin();
+        ComputeNumRecordsInSegment(*line, segment_size_idx);
 
-    std::vector<Segment> segments;
-    Segment& seg = segments.emplace_back();
-    seg.page_count = segment_size;
-    // start/end are unused, so we set dummy values here.
-    seg.model = plr::BoundedLine64(line->line().Rescale(records_per_page_goal_),
-                                   /*start_x=*/0, /*end_x=*/1);
-    seg.records.reserve(actual_records_in_segment);
-    for (size_t i = 0; i < actual_records_in_segment; ++i) {
-      seg.records.push_back(std::move(processed_records_.front()));
-      processed_records_.pop_front();
-    }
+    // start_x/end_x are unused, so we put dummy values.
+    auto model =
+        plr::BoundedLine64(line->line().Rescale(records_per_page_goal_),
+                           /*start_x=*/0, /*end_x=*/1);
+    std::vector<Segment> segments = {CreateSegmentUsing(
+        std::move(model),
+        /*page_count=*/segment_size, actual_records_in_segment)};
 
     // Recursively finish processing any leftover records.
     segments = DrainRemainingRecordsAndReset(std::move(segments));
@@ -436,14 +348,8 @@ std::vector<Segment> SegmentBuilder::Finish() {
   } else if (state_ == State::kFillingSinglePage) {
     const size_t target_size = allowed_records_per_segment_[0];
     assert(processed_records_.size() <= target_size);
-    std::vector<Segment> results;
-    Segment& seg = results.emplace_back();
-    seg.page_count = 1;
-    seg.records.reserve(processed_records_.size());
-    for (size_t i = 0; i < target_size; ++i) {
-      seg.records.push_back(std::move(processed_records_.front()));
-      processed_records_.pop_front();
-    }
+    std::vector<Segment> results = {
+        CreateSegmentUsing(kNoModel, /*page_count=*/1, target_size)};
     ResetStream();
     return results;
 
@@ -479,6 +385,67 @@ std::vector<Segment> SegmentBuilder::DrainRemainingRecordsAndReset(
                      std::make_move_iterator(res.end()));
   }
   return to_return;
+}
+
+int SegmentBuilder::ComputeSegmentSizeIndex(
+    const plr::BoundedLine64& model) const {
+  // According to the generated model, how many records have we processed
+  // when we hit the last key?
+  const double last_record_size =
+      1.0 +
+      std::max(0.0, model.line()(processed_records_.back().first - base_key_));
+
+  // Find the largest possible segment we can make.
+  // `allowed_records_per_segment_` contains the ideal size for each
+  // segment. We want to find the index of the *largest* value that is less
+  // than or equal to `last_record_size`.
+  const auto segment_size_idx_it =
+      std::upper_bound(allowed_records_per_segment_.begin(),
+                       allowed_records_per_segment_.end(), last_record_size);
+  const int segment_size_idx =
+      (segment_size_idx_it - allowed_records_per_segment_.begin()) - 1;
+  return segment_size_idx;
+}
+
+size_t SegmentBuilder::ComputeNumRecordsInSegment(
+    const plr::BoundedLine64& model, const int segment_size_idx) const {
+  // Compute how many records can we actually fit in the segment based on the
+  // model.
+  const size_t segment_size = kSegmentPageCounts[segment_size_idx];
+  assert(segment_size > 1);
+
+  const size_t records_in_segment =
+      allowed_records_per_segment_[segment_size_idx];
+
+  // Use the model to determine how many records to place in the segment,
+  // based on the desired goal. We use binary search against the model to
+  // minimize the effect of precision errors.
+  const auto cutoff_it = std::lower_bound(
+      processed_records_.begin(), processed_records_.end(), records_in_segment,
+      [this, &model](const std::pair<Key, Slice>& rec,
+                     const size_t recs_in_segment) {
+        const Key key_a = rec.first;
+        const auto pos_a = model.line()(key_a - base_key_);
+        return pos_a < recs_in_segment;
+      });
+  assert(cutoff_it != processed_records_.begin());
+  const size_t actual_records_in_segment =
+      cutoff_it - processed_records_.begin();
+  return actual_records_in_segment;
+}
+
+Segment SegmentBuilder::CreateSegmentUsing(
+    std::optional<plr::BoundedLine64> model, size_t page_count,
+    size_t num_records) {
+  Segment s;
+  s.page_count = page_count;
+  s.model = std::move(model);
+  s.records.reserve(std::min(num_records, processed_records_.size()));
+  for (size_t i = 0; i < num_records && !processed_records_.empty(); ++i) {
+    s.records.push_back(std::move(processed_records_.front()));
+    processed_records_.pop_front();
+  }
+  return s;
 }
 
 void SegmentBuilder::ResetStream() {

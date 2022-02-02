@@ -70,6 +70,11 @@ class SegmentBuilder {
       std::vector<Segment> to_return, std::pair<Key, Slice> record);
   std::vector<Segment> DrainRemainingRecordsAndReset(
       std::vector<Segment> to_return);
+  int ComputeSegmentSizeIndex(const plr::BoundedLine64& model) const;
+  size_t ComputeNumRecordsInSegment(const plr::BoundedLine64& model,
+                                    const int segment_size_idx) const;
+  Segment CreateSegmentUsing(std::optional<plr::BoundedLine64> model,
+                             size_t page_count, size_t num_records);
 
   size_t records_per_page_goal_, records_per_page_delta_;
   size_t max_records_in_segment_;
