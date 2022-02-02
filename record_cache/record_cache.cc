@@ -74,7 +74,7 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
 
   // Update metadata.
   cache_entries[index].SetValidTo(true);
-  cache_entries[index].SetDirtyTo(  // TODO: This shoudl be reset somewhere.
+  cache_entries[index].SetDirtyTo(
       found ? (is_dirty || cache_entries[index].IsDirty()) : (is_dirty));
   if (is_dirty) cache_entries[index].SetWriteType(write_type);
   cache_entries[index].SetPriorityTo(priority);
@@ -242,6 +242,7 @@ bool RecordCache::WriteOutIfDirty(uint64_t index, size_t reorg_length,
     buf_mgr_.value()->UnfixPage(*bf, /* is_dirty = */ true);
   }
 
+  entry->SetDirtyTo(false);
   return was_dirty;
 }
 
