@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
   }
 
   SegmentBuilder builder(FLAGS_goal, FLAGS_delta);
-  const auto segments = builder.Build(dataset);
+  const auto segments = builder.BuildFromDataset(dataset);
 
   // Assign records to "pages" and validate the fill proportion.
   for (size_t seg_id = 0; seg_id < segments.size(); ++seg_id) {
