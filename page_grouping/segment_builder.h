@@ -49,7 +49,7 @@ class SegmentBuilder {
   // fundamentally, the algorithm does not require the entire dataset to be
   // materialized in memory (e.g., it could operate on a stream of sorted keys).
   std::vector<DatasetSegment> BuildFromDataset(
-      const std::vector<std::pair<Key, Slice>>& dataset) const;
+      const std::vector<std::pair<Key, Slice>>& dataset);
 
   // Stream-based builder interface. Offer the builder one record at a time.
   std::vector<Segment> Offer(std::pair<Key, Slice> record);

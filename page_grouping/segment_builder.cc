@@ -57,133 +57,45 @@ SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
 }
 
 std::vector<DatasetSegment> SegmentBuilder::BuildFromDataset(
-    const std::vector<std::pair<Key, Slice>>& dataset) const {
+    const std::vector<std::pair<Key, Slice>>& dataset) {
   // Precondition: The dataset is sorted by key in ascending order.
-  size_t next_idx = 0;
-  std::vector<size_t> records_processed;
-  std::vector<DatasetSegment> segments;
-  records_processed.reserve(allowed_records_per_segment_.back());
-
-  while (next_idx < dataset.size()) {
-    records_processed.clear();
-
-    const Record& base = dataset[next_idx];
-    const Key base_key = base.first;
-    records_processed.push_back(next_idx);
-    next_idx++;
-
-    auto plr = plr::GreedyPLRBuilder64(records_per_page_delta_);
-    auto maybe_line = plr.Offer(plr::Point64(0, 0));
-    // Only one point.
-    assert(!maybe_line.has_value());
-
-    // Attempt to build a model covering as much data as possible.
-    while (next_idx < dataset.size() &&
-           records_processed.size() < max_records_in_segment_) {
-      const Record& next = dataset[next_idx];
-      const Key diff = next.first - base_key;
-      // This algorithm assumes equally sized keys. So we give each record
-      // equal weight; a straightfoward approach is just to count up by 1.
-      maybe_line = plr.Offer(plr::Point64(diff, records_processed.size()));
-      if (maybe_line.has_value()) {
-        // We cannot extend the model further to include this record.
-        break;
-      }
-      records_processed.push_back(next_idx);
-      next_idx++;
-    }
-
-    if (!maybe_line.has_value()) {
-      // We exited the loop because we exceeded the number of records per
-      // segment, or ran out of records in the dataset.
-      maybe_line = plr.Finish();
-      if (!maybe_line.has_value()) {
-        // This should only happen when there is a single record left.
-        assert(records_processed.size() == 1);
-        segments.push_back(DatasetSegment::SinglePage(
-            records_processed.front(), records_processed.back() + 1));
-        continue;
-      }
-    }
-
-    // According to the generated model, how many records have we processed when
-    // we hit the last key?
-    const double last_record_size =
-        1.0 +
-        std::max(0.0, maybe_line->line()(
-                          dataset[records_processed.back()].first - base_key));
-
-    // Find the largest possible segment we can make.
-    // `allowed_records_per_segment_` contains the ideal size for each segment.
-    // We want to find the index of the *largest* value that is less than or
-    // equal to `last_record_size`.
-    const auto segment_size_idx_it =
-        std::upper_bound(allowed_records_per_segment_.begin(),
-                         allowed_records_per_segment_.end(), last_record_size);
-    const int segment_size_idx =
-        (segment_size_idx_it - allowed_records_per_segment_.begin()) - 1;
-
-    if (segment_size_idx <= 0) {
-      // One of two cases:
-      // - Could not build a model that "covers" one full page
-      // - Could not build a model that "covers" more than one page
-      // So we just fill one page regardless and omit the model.
-      const size_t target_size = allowed_records_per_segment_[0];
-      if (target_size > records_processed.size()) {
-        // Can add more records.
-        while (records_processed.size() < target_size &&
-               next_idx < dataset.size()) {
-          records_processed.push_back(next_idx++);
-        }
-      } else if (target_size < records_processed.size()) {
-        // Have too many records.
-        size_t extra_keys = records_processed.size() - target_size;
-        while (extra_keys > 0) {
-          records_processed.pop_back();
-          --next_idx;
-          --extra_keys;
-        }
-      }
-      segments.push_back(DatasetSegment::SinglePage(
-          records_processed.front(), records_processed.back() + 1));
-      continue;
-    }
-
-    const size_t segment_size = kSegmentPageCounts[segment_size_idx];
-    assert(segment_size > 1);
-
-    const size_t records_in_segment =
-        allowed_records_per_segment_[segment_size_idx];
-
-    // Use the model to determine how many records to place in the segment,
-    // based on the desired goal. We use binary search against the model to
-    // minimize the effect of precision errors.
-    const auto cutoff_it = std::lower_bound(
-        records_processed.begin(), records_processed.end(), records_in_segment,
-        [&dataset, &maybe_line, &base_key](const size_t rec_idx_a,
-                                           const size_t recs_in_segment) {
-          const Key key_a = dataset[rec_idx_a].first;
-          const auto pos_a = maybe_line->line()(key_a - base_key);
-          return pos_a < recs_in_segment;
-        });
-    assert(cutoff_it != records_processed.begin());
-    size_t extra_keys = records_processed.end() - cutoff_it;
-    while (extra_keys > 0) {
-      records_processed.pop_back();
-      extra_keys--;
-      next_idx--;
-    }
-
-    Key last_key = std::numeric_limits<Key>::max();
-    if (next_idx < dataset.size()) {
-      last_key = dataset[next_idx].first;
-    }
-    segments.push_back(DatasetSegment::MultiPage(
-        segment_size, records_processed.front(), records_processed.back() + 1,
-        plr::BoundedLine64(maybe_line->line().Rescale(records_per_page_goal_),
-                           /*start_x=*/0, /*end_x=*/last_key - base_key)));
+  std::vector<Segment> segments_internal;
+  ResetStream();
+  for (const auto& rec : dataset) {
+    auto segs = Offer(rec);
+    segments_internal.insert(segments_internal.end(),
+                             std::make_move_iterator(segs.begin()),
+                             std::make_move_iterator(segs.end()));
   }
+  auto segs = Finish();
+  segments_internal.insert(segments_internal.end(),
+                           std::make_move_iterator(segs.begin()),
+                           std::make_move_iterator(segs.end()));
 
+  std::vector<DatasetSegment> segments;
+  segments.reserve(segments_internal.size());
+
+  size_t dataset_start_idx = 0;
+  for (auto& seg : segments_internal) {
+    const size_t next_start_idx = dataset_start_idx + seg.records.size();
+    if (seg.page_count == 1) {
+      segments.push_back(
+          DatasetSegment::SinglePage(dataset_start_idx, next_start_idx));
+    } else {
+      segments.push_back(
+          DatasetSegment::MultiPage(seg.page_count, dataset_start_idx,
+                                    next_start_idx, std::move(*(seg.model))));
+    }
+    // Used to help check the correctness of the stream-based builder API. This
+    // loop will be removed by the compiler when assertions are disabled (e.g.,
+    // when compiled in release mode).
+    for (size_t i = 0; i < seg.records.size(); ++i) {
+      const size_t dataset_idx = dataset_start_idx + i;
+      assert(dataset_idx < dataset.size());
+      assert(dataset[dataset_idx] == seg.records[i]);
+    }
+    dataset_start_idx = next_start_idx;
+  }
   return segments;
 }
 
