@@ -129,6 +129,8 @@ class Manager {
   // This is static for convenience (to use `thread_local`). So for correctness
   // there can only be one active `Manager` in a process at any time.
   static thread_local Workspace w_;
+
+  static const std::string kSegmentFilePrefix;
 };
 
 }  // namespace pg

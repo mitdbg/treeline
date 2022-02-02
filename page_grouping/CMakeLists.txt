@@ -11,6 +11,8 @@ target_sources(pg PRIVATE
   free_list.cc
   free_list.h
   key.h
+  manager_load.cc
+  manager_scan.cc
   manager.cc
   manager.h
   segment_builder.cc
