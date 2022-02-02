@@ -49,9 +49,6 @@ class DBImpl : public DB {
   // Gets the number of pages indexed by the model (for debugging).
   size_t GetNumIndexedPages() const;
 
-  using FlushBatch = std::vector<
-      std::tuple<const Slice, const Slice, const format::WriteType>>;
-
  private:
   Status InitializeNewDB();
   Status InitializeExistingDB();
@@ -62,34 +59,17 @@ class DBImpl : public DB {
   Status WriteImpl(const WriteOptions& options, const Slice& key,
                    const Slice& value, format::WriteType write_type);
 
-  // Reorganizes the page chain starting with the page at `page_id` by promoting
-  // overflow pages.
-  Status ReorganizeOverflowChain(PhysicalPageId page_id,
-                                 uint32_t page_fill_pct);
-
-  // Reorganizes the page chain `chain` so as to efficiently insert `records`.
-  Status PreorganizeOverflowChain(const FlushBatch& records,
-                                  OverflowChain chain, uint32_t page_fill_pct);
-
-  // Fill `old_records` with copies of all the records in `chain`.
-  void ExtractOldRecords(OverflowChain chain, RecordBatch* old_records);
-
-  // Merge the records in `old_records` and `records` to create a single
-  // FlushBatch with the union of their records in ascending order. Whenever
-  // the same key exists in both colections, the value (or deletion marker)
-  // in `records` is given precendence.
-  void MergeBatches(RecordBatch& old_records, const FlushBatch& records,
-                    FlushBatch* merged);
-
   // Will not be changed after `Initialize()` returns. The objects below are
   // thread safe; no additional mutual exclusion is required.
   Options options_;
   Statistics stats_;
   const std::filesystem::path db_path_;
+  std::unique_ptr<RecordCache> rec_cache_;
+  
+  // The pointers to the structures below are shared with the record cache.
   std::shared_ptr<BufferManager> buf_mgr_;
   std::shared_ptr<Model> model_;
-  std::unique_ptr<ThreadPool> workers_;
-  std::unique_ptr<RecordCache> rec_cache_;
+  std::shared_ptr<ThreadPool> workers_;
 
   // Remaining database state protected by `mutex_`.
   std::mutex mutex_;
