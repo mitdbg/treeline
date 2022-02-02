@@ -12,6 +12,7 @@ target_sources(pg PRIVATE
   free_list.h
   key.h
   manager_load.cc
+  manager_rewrite.cc
   manager_scan.cc
   manager.cc
   manager.h

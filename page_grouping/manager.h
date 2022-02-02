@@ -96,6 +96,17 @@ class Manager {
                         const std::vector<std::pair<Key, Slice>>& records,
                         size_t start_idx, size_t end_idx);
 
+  // Rewrite the segment specified by `segment_base` (merge in the overflows)
+  // while also adding in additional records.
+  //
+  // If `consider_adjacent` is true, this method will also rewrite all logically
+  // neighboring segments that also have overflows.
+  void RewriteSegments(
+      Key segment_base,
+      const std::vector<std::pair<Key, Slice>>& additional_records,
+      size_t record_start_idx, size_t record_end_idx,
+      bool consider_neighbors = true);
+
   // Helpers for convenience.
   void ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer);
   void WritePage(const SegmentId& seg_id, size_t page_idx, void* buffer);
