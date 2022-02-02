@@ -92,7 +92,7 @@ class Manager {
       const Manager::Options& options);
 
   // Write the range [start_idx, end_idx) into the given segment.
-  Status WriteToSegment(Key segment_base, const SegmentInfo& sinfo,
+  Status WriteToSegment(Key segment_base, SegmentInfo* sinfo,
                         const std::vector<std::pair<Key, Slice>>& records,
                         size_t start_idx, size_t end_idx);
 

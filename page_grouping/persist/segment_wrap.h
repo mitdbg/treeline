@@ -21,6 +21,9 @@ class SegmentWrap {
   // Sets all overflow values to "invalid" (indicating no overflow).
   void ClearAllOverflows();
 
+  // Returns true if there exists one page in the segment that has an overflow.
+  bool HasOverflow() const;
+
  private:
   Page PageAtIndex(size_t index) const;
   uint32_t ComputeChecksum() const;
