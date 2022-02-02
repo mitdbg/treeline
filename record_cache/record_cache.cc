@@ -4,13 +4,20 @@ namespace llsm {
 
 std::vector<RecordCacheEntry> RecordCache::cache_entries{};
 
-RecordCache::RecordCache(uint64_t capacity, std::shared_ptr<Model> model,
-                         std::shared_ptr<BufferManager> buf_mgr)
-    : capacity_(capacity) {
+RecordCache::RecordCache(Options* options, Statistics* stats,
+                         std::shared_ptr<Model> model,
+                         std::shared_ptr<BufferManager> buf_mgr,
+                         std::shared_ptr<ThreadPool> workers)
+    : options_(options),
+      stats_(stats),
+      capacity_(options->record_cache_capacity) {
   model_ = (model != nullptr) ? model : std::optional<std::shared_ptr<Model>>();
   buf_mgr_ = (buf_mgr != nullptr)
                  ? buf_mgr
                  : std::optional<std::shared_ptr<BufferManager>>();
+  workers_ = (workers != nullptr)
+                 ? workers
+                 : std::optional<std::shared_ptr<ThreadPool>>();
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
   cache_entries.resize(capacity_);
   clock_ = 0;
@@ -21,7 +28,7 @@ RecordCache::~RecordCache() {
                   // inaccessible while freeing.
   for (auto i = 0; i < capacity_; ++i) {
     cache_entries[i].Lock(/*exclusive = */ false);
-    WriteOutIfDirty(i);
+    WriteOutIfDirty(i, kDefaultReorgLength, kDefaultFillPct);
     FreeIfValid(i);
     cache_entries[i].Unlock();
   }
@@ -32,7 +39,8 @@ RecordCache::~RecordCache() {
 // values for the same keys that are present in the record cache.
 Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
                         format::WriteType write_type, uint8_t priority,
-                        bool safe) {
+                        bool safe, size_t reorg_length,
+                        uint32_t page_fill_pct) {
   uint64_t index;
   bool found = GetCacheIndex(key, /*exclusive = */ true, &index, safe).ok();
   char* ptr = nullptr;
@@ -41,7 +49,7 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
     index = SelectForEviction();
     if (safe) cache_entries[index].Lock(/*exclusive = */ true);
     if (cache_entries[index].IsValid()) {
-      WriteOutIfDirty(index);
+      WriteOutIfDirty(index, reorg_length, page_fill_pct);
       Key art_key;
       TIDToARTKey(index + 1, art_key);
       auto t1 = tree_->getThreadInfo();
@@ -66,7 +74,7 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
 
   // Update metadata.
   cache_entries[index].SetValidTo(true);
-  cache_entries[index].SetDirtyTo(
+  cache_entries[index].SetDirtyTo(  // TODO: This shoudl be reset somewhere.
       found ? (is_dirty || cache_entries[index].IsDirty()) : (is_dirty));
   if (is_dirty) cache_entries[index].SetWriteType(write_type);
   cache_entries[index].SetPriorityTo(priority);
@@ -122,13 +130,14 @@ Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
   return Status::OK();
 }
 
-uint64_t RecordCache::WriteOutDirty() {
+uint64_t RecordCache::WriteOutDirty(size_t reorg_length,
+                                    uint32_t page_fill_pct) {
   uint64_t count = 0;
   for (auto i = 0; i < capacity_; ++i) {
     if (!cache_entries[i].IsDirty()) continue;
 
     cache_entries[i].Lock(/*exclusive = */ false);
-    count += WriteOutIfDirty(i);
+    count += WriteOutIfDirty(i, reorg_length, page_fill_pct);
     cache_entries[i].Unlock();
   }
   return count;
@@ -155,12 +164,12 @@ uint64_t RecordCache::SelectForEviction() {
   return local_clock;
 }
 
-bool RecordCache::WriteOutIfDirty(uint64_t index) {
+bool RecordCache::WriteOutIfDirty(uint64_t index, size_t reorg_length,
+                                  uint32_t page_fill_pct) {
   // Do nothing if not dirty, or if using a standalone record cache.
   auto entry = &cache_entries[index];
   bool was_dirty = entry->IsDirty();
-  if (!was_dirty || !buf_mgr_.has_value() || !model_.has_value())
-    return was_dirty;
+  if (!was_dirty || !buf_mgr_.has_value() || !model_.has_value()) return false;
 
   Slice key = entry->GetKey();
   Slice value = entry->GetValue();
@@ -172,7 +181,7 @@ bool RecordCache::WriteOutIfDirty(uint64_t index) {
     page_id = model_.value()->KeyToPageId(key);
     chain = FixOverflowChain(page_id, /* exclusive = */ true,
                              /* unlock_before_returning = */ false,
-                             buf_mgr_.value(), model_.value());
+                             buf_mgr_.value(), model_.value(), stats_);
   }
 
   // Flush the entry to the page.
@@ -190,9 +199,11 @@ bool RecordCache::WriteOutIfDirty(uint64_t index) {
         if (s.ok()) break;
 
         // Must allocate a new page
-        PhysicalPageId new_page_id = buf_mgr_.value()->GetFileManager()->AllocatePage();
-        auto new_bf = &(buf_mgr_.value()->FixPage(new_page_id, /* exclusive = */ true,
-                                          /*is_newly_allocated = */ true));
+        PhysicalPageId new_page_id =
+            buf_mgr_.value()->GetFileManager()->AllocatePage();
+        auto new_bf =
+            &(buf_mgr_.value()->FixPage(new_page_id, /* exclusive = */ true,
+                                        /*is_newly_allocated = */ true));
         Page new_page(new_bf->GetData(), bf->GetPage());
         new_page.MakeOverflow();
         bf->GetPage().SetOverflow(new_page_id);
@@ -215,13 +226,16 @@ bool RecordCache::WriteOutIfDirty(uint64_t index) {
     }
   }
 
-  // If chain got too long, trigger reorganization
-  // TODO: where to do this?
-  // if (chain->size() >= options_.reorg_length) {
-  //   workers_->SubmitNoWait([this, page_id = chain->at(0)->GetPageId()]() {
-  //     ReorganizeOverflowChain(page_id, options_.key_hints.page_fill_pct);
-  //   });
-  // }
+  // Trigger a reorg if the insertion created a long overflow chain.
+  if (workers_.has_value() && chain->size() >= reorg_length) {
+    workers_.value()->SubmitNoWait(
+        [this, page_id = page_id, page_fill_pct = page_fill_pct,
+         buf_mgr = buf_mgr_.value(), model = model_.value(), options = options_,
+         stats = stats_]() {
+          ReorganizeOverflowChain(page_id, page_fill_pct, buf_mgr, model,
+                                  options, stats);
+        });
+  }
 
   // Unfix all
   for (auto& bf : *chain) {
