@@ -11,6 +11,9 @@ namespace pg {
 
 class PageMergeIterator {
  public:
+  // Represents an empty iterator.
+  PageMergeIterator() : merged_iterators_(&PageMergeIterator::Compare) {}
+
   explicit PageMergeIterator(std::vector<Page::Iterator> iterators,
                              const Slice* start_key = nullptr)
       : page_iterators_(std::move(iterators)),

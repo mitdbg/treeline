@@ -13,6 +13,7 @@
 #include "persist/segment_file.h"
 #include "segment_info.h"
 #include "tlx/btree_map.h"
+#include "util/thread_pool.h"
 #include "workspace.h"
 
 namespace llsm {
@@ -34,6 +35,9 @@ class Manager {
 
     // If set to false, direct I/O will be disabled (used for end-to-end tests).
     bool use_direct_io = true;
+
+    // If set to 0, no background threads will be used.
+    size_t num_bg_threads = 16;
   };
   static Manager LoadIntoNew(const std::filesystem::path& db,
                              const std::vector<std::pair<Key, Slice>>& records,
@@ -108,8 +112,12 @@ class Manager {
       bool consider_neighbors = true);
 
   // Helpers for convenience.
-  void ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer);
-  void WritePage(const SegmentId& seg_id, size_t page_idx, void* buffer);
+  void ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer) const;
+  void WritePage(const SegmentId& seg_id, size_t page_idx, void* buffer) const;
+  // Reads the given segment into this thread's workspace buffer.
+  void ReadSegment(const SegmentId& seg_id) const;
+  void ReadOverflows(
+      const std::vector<std::pair<SegmentId, void*>>& overflows_to_read) const;
 
   auto SegmentForKey(Key key) {
     auto it = index_.upper_bound(key);
@@ -132,6 +140,7 @@ class Manager {
   std::vector<SegmentFile> segment_files_;
   uint32_t next_sequence_number_;
   FreeList free_;
+  std::unique_ptr<ThreadPool> bg_threads_;
 
   // Options passed in when the `Manager` was created.
   Options options_;

@@ -8,6 +8,7 @@ target_sources(pg PRIVATE
   persist/segment_wrap.h
   plr/data.h
   plr/greedy.h
+  circular_page_buffer.h
   free_list.cc
   free_list.h
   key.h
@@ -26,6 +27,7 @@ target_sources(pg PRIVATE
   ../tlx/core.cc
   ../tlx/core.h
   ../util/status.cc
+  ../util/thread_pool.cc
 )
 target_include_directories(pg
   PUBLIC

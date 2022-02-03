@@ -32,6 +32,9 @@ Manager::Manager(fs::path db_path,
       free_(std::move(free)),
       options_(std::move(options)) {
   index_.bulk_load(boundaries.begin(), boundaries.end());
+  if (options_.num_bg_threads > 0) {
+    bg_threads_ = std::make_unique<ThreadPool>(options_.num_bg_threads);
+  }
 }
 
 Manager Manager::LoadIntoNew(const fs::path& db,
@@ -319,7 +322,8 @@ Status Manager::WriteToSegment(
   return Status::OK();
 }
 
-void Manager::ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer) {
+void Manager::ReadPage(const SegmentId& seg_id, size_t page_idx,
+                       void* buffer) const {
   assert(seg_id.IsValid());
   const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
   sf.ReadPages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
@@ -328,11 +332,39 @@ void Manager::ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer) {
 }
 
 void Manager::WritePage(const SegmentId& seg_id, size_t page_idx,
-                        void* buffer) {
+                        void* buffer) const {
   assert(seg_id.IsValid());
   const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
   sf.WritePages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
                 /*num_pages=*/1);
+}
+
+void Manager::ReadSegment(const SegmentId& seg_id) const {
+  assert(seg_id.IsValid());
+  const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
+  sf.ReadPages(seg_id.GetOffset() * pg::Page::kSize, w_.buffer().get(),
+               sf.PagesPerSegment());
+  w_.BumpReadCount(sf.PagesPerSegment());
+}
+
+void Manager::ReadOverflows(
+    const std::vector<std::pair<SegmentId, void*>>& overflows_to_read) const {
+  if (bg_threads_ != nullptr) {
+    std::vector<std::future<void>> futures;
+    futures.reserve(overflows_to_read.size());
+    for (const auto& otr : overflows_to_read) {
+      futures.push_back(bg_threads_->Submit(
+          [this, &otr]() { ReadPage(otr.first, 0, otr.second); }));
+    }
+    for (auto& f : futures) {
+      f.get();
+    }
+
+  } else {
+    for (const auto& otr : overflows_to_read) {
+      ReadPage(otr.first, 0, otr.second);
+    }
+  }
 }
 
 }  // namespace pg

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "page.h"
 #include <cstdint>
+
+#include "page.h"
 
 namespace llsm {
 namespace pg {
@@ -23,6 +24,16 @@ class SegmentWrap {
 
   // Returns true if there exists one page in the segment that has an overflow.
   bool HasOverflow() const;
+
+  // Returns the number of pages in this segment that have an overflow.
+  size_t NumOverflows() const;
+
+  template <class Callable>
+  void ForEachPage(const Callable& callable) {
+    for (size_t i = 0; i < pages_in_segment_; ++i) {
+      callable(PageAtIndex(i));
+    }
+  }
 
  private:
   Page PageAtIndex(size_t index) const;

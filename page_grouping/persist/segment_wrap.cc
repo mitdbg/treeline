@@ -79,5 +79,16 @@ bool SegmentWrap::HasOverflow() const {
   return false;
 }
 
+size_t SegmentWrap::NumOverflows() const {
+  size_t num_overflows = 0;
+  for (size_t i = 0; i < pages_in_segment_; ++i) {
+    Page page = PageAtIndex(i);
+    if (page.HasOverflow()) {
+      ++num_overflows;
+    }
+  }
+  return num_overflows;
+}
+
 }  // namespace pg
 }  // namespace llsm
