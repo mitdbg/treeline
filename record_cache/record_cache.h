@@ -21,6 +21,13 @@ class RecordCache {
   static const uint32_t kDefaultFillPct = 50;
 
  public:
+  // Default priority when caching records that were genuinely requested .
+  static const uint8_t kDefaultPriority = 4;
+
+  // Default priority for records cached optimistically due to being near
+  // genuinely requested records.
+  static const uint8_t kDefaultOptimisticPriority = 1;
+
   // A collection of cached records.
   // Must be static to work with the ART implementation.
   static std::vector<RecordCacheEntry> cache_entries;
@@ -59,25 +66,15 @@ class RecordCache {
   // not acquire locks. It is intended purely for performance benchmarking.
   Status Put(const Slice& key, const Slice& value, bool is_dirty = false,
              format::WriteType write_type = format::WriteType::kWrite,
-             uint8_t priority = 4, bool safe = true,
+             uint8_t priority = kDefaultPriority, bool safe = true,
              size_t reorg_length = kDefaultReorgLength,
              uint32_t page_fill_pct = kDefaultFillPct);
-
-  // Cache the pair `key`-`value`, originating from a write. This is a
-  // convenience method that calls `Put()` with `is_dirty` set to true and
-  // `EntryType::kWrite`.
-  Status PutFromWrite(const Slice& key, const Slice& value,
-                      uint8_t priority = 4);
 
   // Cache the pair `key`-`value`, originating from a read. This is a
   // convenience method that calls `Put()` with `is_dirty` set to false and
   // `EntryType::kWrite`.
   Status PutFromRead(const Slice& key, const Slice& value,
-                     uint8_t priority = 4);
-
-  // Cache a delete of `key`. This is a convenience method that calls `Put()`
-  // with `is_dirty` set to false and `EntryType::kDelete`.
-  Status PutFromDelete(const Slice& key, uint8_t priority = 4);
+                     uint8_t priority = kDefaultOptimisticPriority);
 
   // Retrieve the index of the cache entry associated with `key`, if any, and
   // lock it for reading or writing based on `exclusive`. If an entry is found,

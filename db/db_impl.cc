@@ -412,7 +412,8 @@ Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
   PhysicalPageId chain_to_reorg;
   uint64_t chain_size = 0;
   Status write_result =
-      rec_cache_->Put(key, value, /*is_dirty = */ true, write_type, 4, true,
+      rec_cache_->Put(key, value, /*is_dirty = */ true, write_type,
+                      RecordCache::kDefaultPriority, /* safe = */ true,
                       options_.reorg_length, options_.key_hints.page_fill_pct);
   if (write_result.ok()) ++stats_.temp_user_writes_records_;
 

@@ -99,21 +99,10 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
   return Status::OK();
 }
 
-Status RecordCache::PutFromWrite(const Slice& key, const Slice& value,
-                                 uint8_t priority) {
-  return Put(key, value, /*is_dirty = */ true, format::WriteType::kWrite,
-             priority);
-}
-
 Status RecordCache::PutFromRead(const Slice& key, const Slice& value,
                                 uint8_t priority) {
   return Put(key, value, /*is_dirty = */ false,
              /*** ignored */ format::WriteType::kWrite /***/, priority);
-}
-
-Status RecordCache::PutFromDelete(const Slice& key, uint8_t priority) {
-  return Put(key, Slice(), /*is_dirty = */ true, format::WriteType::kDelete,
-             priority);
 }
 
 Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,

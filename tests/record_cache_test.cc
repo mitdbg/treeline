@@ -33,39 +33,24 @@ TEST(RecordCacheTest, SimpleMiss) {
   ASSERT_TRUE(rc.GetCacheIndex(key, false, &index_out).IsNotFound());
 }
 
-TEST(RecordCacheTest, PutVariants) {
+TEST(RecordCacheTest, PutFromRead) {
   Options options;
   options.record_cache_capacity = 5;
   Statistics stats;
   auto rc = RecordCache(&options, &stats);
-  Slice key1 = "aa1";
-  Slice key2 = "aa2";
-  Slice key3 = "aa3";
+  Slice key = "aaa";
   Slice value = "bbb";
 
-  rc.PutFromWrite(key1, value);
+  rc.PutFromRead(key, value);
 
   uint64_t index_out;
-  ASSERT_TRUE(rc.GetCacheIndex(key1, false, &index_out).ok());
-  ASSERT_EQ(value.compare(rc.cache_entries[index_out].GetValue()), 0);
-  ASSERT_TRUE(rc.cache_entries[index_out].IsDirty());
-  ASSERT_TRUE(rc.cache_entries[index_out].IsWrite());
-  rc.cache_entries[index_out].Unlock();
 
-  rc.PutFromRead(key2, value);
-
-  ASSERT_TRUE(rc.GetCacheIndex(key2, false, &index_out).ok());
+  ASSERT_TRUE(rc.GetCacheIndex(key, false, &index_out).ok());
   ASSERT_EQ(value.compare(rc.cache_entries[index_out].GetValue()), 0);
   ASSERT_FALSE(rc.cache_entries[index_out].IsDirty());
   rc.cache_entries[index_out].Unlock();
 
-  rc.PutFromDelete(key3);
-
-  ASSERT_TRUE(rc.GetCacheIndex(key3, false, &index_out).ok());
-  ASSERT_EQ(Slice().compare(rc.cache_entries[index_out].GetValue()), 0);
-  ASSERT_TRUE(rc.cache_entries[index_out].IsDirty());
-  ASSERT_TRUE(rc.cache_entries[index_out].IsDelete());
-  rc.cache_entries[index_out].Unlock();
+  
 }
 
 TEST(RecordCacheTest, MultiPutGet) {
