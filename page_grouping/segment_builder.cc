@@ -58,6 +58,7 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
   // Precondition: The records are offered in sorted order (sorted by key in
   // ascending order).
   if (state_ == State::kNeedBase) {
+    assert(processed_records_.empty());
     base_key_ = record.first;
     plr_ = plr::GreedyPLRBuilder64(records_per_page_delta_);
     auto maybe_line = plr_->Offer(plr::Point64(0, 0));
@@ -301,10 +302,14 @@ Segment SegmentBuilder::CreateSegmentUsing(
     std::optional<plr::BoundedLine64> model, size_t page_count,
     size_t num_records) {
   Segment s;
+  s.base_key = base_key_;
   s.page_count = page_count;
   s.model = std::move(model);
   s.records.reserve(std::min(num_records, processed_records_.size()));
   for (size_t i = 0; i < num_records && !processed_records_.empty(); ++i) {
+    if (i == 0) {
+      assert(processed_records_.front().first == base_key_);
+    }
     s.records.push_back(std::move(processed_records_.front()));
     processed_records_.pop_front();
   }
@@ -316,6 +321,15 @@ void SegmentBuilder::ResetStream() {
   state_ = State::kNeedBase;
   plr_.reset();
   base_key_ = 0;
+}
+
+std::optional<Key> SegmentBuilder::CurrentBaseKey() const {
+  if (state_ == State::kNeedBase) {
+    return std::optional<Key>();
+  }
+  assert(!processed_records_.empty());
+  assert(processed_records_.front().first == base_key_);
+  return base_key_;
 }
 
 }  // namespace pg

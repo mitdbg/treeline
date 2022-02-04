@@ -39,6 +39,34 @@ class PageChain {
     }
   }
 
+  size_t NumPages() const { return overflow_page_ == nullptr ? 1 : 2; }
+
+  // Returns the largest key in the chain. If the chain is empty, there is no
+  // largest key.
+  std::optional<Key> LargestKey() const {
+    std::optional<Key> largest;
+    auto main_it = main().GetIterator();
+    main_it.SeekToLast();
+    if (!main_it.Valid() && overflow_page_ == nullptr) {
+      // The chain is empty. There is no largest key.
+      return largest;
+    }
+    if (main_it.Valid()) {
+      largest = key_utils::ExtractHead64(main_it.key());
+    }
+    if (overflow_page_ != nullptr) {
+      auto overflow_it = overflow()->GetIterator();
+      overflow_it.SeekToLast();
+      if (overflow_it.Valid()) {
+        const Key overflow_largest = key_utils::ExtractHead64(overflow_it.key());
+        if (!largest.has_value() || overflow_largest > *largest) {
+          largest = overflow_largest;
+        }
+      }
+    }
+    return largest;
+  }
+
  private:
   PageChain(void* main, void* overflow)
       : main_page_(main), overflow_page_(overflow) {}
@@ -190,10 +218,80 @@ void Manager::RewriteSegments(
   // - The rewrite sequence number: `sequence_number`
   // - A list of all the segments involved in the rewrite
 
+  const auto load_into_segments_and_free_pages =
+      [this, &pages_processed, &rewritten_segments, &seg_builder, &page_buf,
+       sequence_number](const std::vector<Segment>& segments) {
+        // Load records into the new segments and write them to disk.
+        for (size_t i = 0; i < segments.size(); ++i) {
+          const Segment& seg = segments[i];
+          // The upper bound is used for the page format (for computing shared
+          // key prefixes).
+          Key upper_bound;
+          if (i < segments.size() - 1) {
+            upper_bound = segments[i + 1].base_key;
+          } else {
+            const auto maybe_key = seg_builder.CurrentBaseKey();
+            if (maybe_key.has_value()) {
+              upper_bound = *maybe_key;
+            } else {
+              // NOTE: We could do slightly better here by querying the index to
+              // find the left boundary of the next segment (if it exists). But
+              // this adds more code complexity. The upper boundary key is used
+              // by the page format for computing shared key prefixes, so
+              // "overestimating" and using the maximum key doesn't limit us
+              // here.
+              upper_bound = std::numeric_limits<Key>::max();
+            }
+          }
+          rewritten_segments.emplace_back(
+              LoadIntoNewSegment(sequence_number, seg, upper_bound));
+        }
+
+        // "Remove" no longer needed pages from memory.
+        // All processed page chains storing keys before this key are no longer
+        // needed.
+        const auto maybe_key = seg_builder.CurrentBaseKey();
+        if (maybe_key.has_value()) {
+          const Key next_key = *maybe_key;
+          // Check page chains one by one.
+          while (!pages_processed.empty()) {
+            // Check if it is safe to remove the page chain from memory.
+            const auto largest_key = pages_processed.front().LargestKey();
+            if (largest_key.has_value() && largest_key >= next_key) {
+              // This page chain and the ones following it contain keys that
+              // have not been written out.
+              break;
+            }
+            // Safe to deallocate this page chain.
+            const size_t num_pages = pages_processed.front().NumPages();
+            for (size_t i = 0; i < num_pages; ++i) {
+              page_buf.Free();
+            }
+            pages_processed.pop_front();
+          }
+
+        } else {
+          // All processed page chains can be removed (the segment builder is
+          // empty).
+          while (!pages_processed.empty()) {
+            const size_t num_pages = pages_processed.front().NumPages();
+            for (size_t i = 0; i < num_pages; ++i) {
+              page_buf.Free();
+            }
+            pages_processed.pop_front();
+          }
+        }
+      };
+
   for (const auto& seg_to_rewrite : segments_to_rewrite) {
     const size_t segment_pages = seg_to_rewrite.second->page_count();
     if (segment_pages > page_buf.NumFreePages()) {
-      // TODO: Out of memory. Finalize existing segment and clear pages.
+      // Not enough memory to read the next segment. Flush the
+      // currently-being-built segment to disk.
+      const auto segments = seg_builder.Finish();
+      assert(segments.size() > 0);
+      load_into_segments_and_free_pages(segments);
+      assert(segment_pages <= page_buf.NumFreePages());
     }
 
     // Load the segment and check for overflows.
@@ -201,7 +299,12 @@ void Manager::RewriteSegments(
     SegmentWrap sw(w_.buffer().get(), seg_to_rewrite.second->page_count());
     const size_t num_overflows = sw.NumOverflows();
     if (segment_pages + num_overflows > page_buf.NumFreePages()) {
-      // TODO: Out of memory. Finalize existing segment and clear pages.
+      // Not enough memory to read the next segment's overflows. Flush the
+      // currently-being-built segment to disk.
+      const auto segments = seg_builder.Finish();
+      assert(segments.size() > 0);
+      load_into_segments_and_free_pages(segments);
+      assert(segment_pages + num_overflows <= page_buf.NumFreePages());
     }
 
     // Copy the segment pages into the buffer, leaving room for overflows as
@@ -240,8 +343,7 @@ void Manager::RewriteSegments(
       while (pm.HasPageRecords()) {
         auto segments = seg_builder.Offer(pm.GetNext());
         if (segments.size() == 0) continue;
-        // TODO - Write segments to disk, remove pages from `pages_processed`,
-        // free pages from the page buffer.
+        load_into_segments_and_free_pages(segments);
       }
 
       // Done with this page chain.
@@ -256,15 +358,13 @@ void Manager::RewriteSegments(
   while (pm.HasRecords()) {
     auto segments = seg_builder.Offer(pm.GetNext());
     if (segments.size() == 0) continue;
-    // TODO - Write segments to disk, remove pages from `pages_processed`,
-    // free pages from the page buffer.
+    load_into_segments_and_free_pages(segments);
   }
 
   // Handle any leftover segments.
   auto segments = seg_builder.Finish();
   if (segments.size() > 0) {
-    // TODO - Write segments to disk, remove pages from `pages_processed`,
-    // free pages from the page buffer.
+    load_into_segments_and_free_pages(segments);
   }
 
   // 3. Update the free list and mark the old segments as invalid. To do this we
@@ -273,18 +373,19 @@ void Manager::RewriteSegments(
   memset(zero, 0, pg::Page::kSize);
   std::vector<std::future<void>> write_futures;
   if (bg_threads_ != nullptr) {
-    write_futures.reserve(segments_to_rewrite.size() + overflows_to_clear.size());
+    write_futures.reserve(segments_to_rewrite.size() +
+                          overflows_to_clear.size());
     for (const auto& seg_to_rewrite : segments_to_rewrite) {
       const SegmentId seg_id = seg_to_rewrite.second->id();
-      write_futures.push_back(bg_threads_->Submit([this, seg_id, zero]() {
-        WritePage(seg_id, 0, zero);
-      }));
+      write_futures.push_back(bg_threads_->Submit(
+          [this, seg_id, zero]() { WritePage(seg_id, 0, zero); }));
       free_.Add(seg_id);
     }
     for (const auto& overflow_to_clear : overflows_to_clear) {
-      write_futures.push_back(bg_threads_->Submit([this, overflow_to_clear, zero]() {
-        WritePage(overflow_to_clear, 0, zero);
-      }));
+      write_futures.push_back(
+          bg_threads_->Submit([this, overflow_to_clear, zero]() {
+            WritePage(overflow_to_clear, 0, zero);
+          }));
       free_.Add(overflow_to_clear);
     }
     // Important that the page at `zero` is not modified until after we wait on

@@ -152,6 +152,10 @@ class Page::Iterator {
   // this method returns.
   void Seek(const Slice& key);
 
+  // Move the iterator to the last record in the page. As long as the page is
+  // non-empty, `Valid()` will return true after this method returns.
+  void SeekToLast();
+
   // Move to the next record.
   // REQUIRES: `Valid()` is true.
   void Next();

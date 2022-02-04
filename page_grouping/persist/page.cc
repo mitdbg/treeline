@@ -252,6 +252,16 @@ void Page::Iterator::Seek(const Slice& key) {
   key_buffer_valid_ = false;
 }
 
+void Page::Iterator::SeekToLast() {
+  const size_t num_records = AsMapPtr(data_)->GetNumRecords();
+  if (num_records > 0) {
+    current_slot_ = num_records - 1;
+  } else {
+    current_slot_ = 0;
+  }
+  key_buffer_valid_ = false;
+}
+
 void Page::Iterator::Next() {
   ++current_slot_;
   key_buffer_valid_ = false;

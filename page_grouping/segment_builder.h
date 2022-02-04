@@ -15,7 +15,7 @@ namespace pg {
 
 // Stores information about the built segments.
 struct Segment {
- public:
+  Key base_key;
   size_t page_count;
   // The records in the segment in sorted order.
   std::vector<std::pair<Key, Slice>> records;
@@ -29,13 +29,14 @@ class SegmentBuilder {
                  const size_t records_per_page_delta);
 
   // Build segments when the entire dataset can fit in memory.
-  std::vector<Segment> BuildFromDataset(
-      const std::vector<std::pair<Key, Slice>>& dataset);
+  std::vector<Segment> BuildFromDataset(const std::vector<Record>& dataset);
 
   // Stream-based builder interface. Offer the builder one record at a time.
   std::vector<Segment> Offer(std::pair<Key, Slice> record);
   std::vector<Segment> Finish();
   void ResetStream();
+  // Returns the smallest key in the next segment to be emitted by this builder.
+  std::optional<Key> CurrentBaseKey() const;
 
   // The number of pages in each segment.
   // The index of the vector represents the segment "type", and its value
