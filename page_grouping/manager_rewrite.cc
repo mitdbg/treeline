@@ -133,8 +133,7 @@ namespace pg {
 
 void Manager::RewriteSegments(
     Key segment_base, std::vector<Record>::const_iterator addtl_rec_begin,
-    std::vector<Record>::const_iterator addtl_rec_end,
-    bool consider_neighbors) {
+    std::vector<Record>::const_iterator addtl_rec_end) {
   // TODO: Multi-threading concerns.
   std::vector<std::pair<Key, SegmentInfo*>> segments_to_rewrite;
   std::vector<std::pair<Key, SegmentInfo>> rewritten_segments;
@@ -145,7 +144,7 @@ void Manager::RewriteSegments(
   segments_to_rewrite.emplace_back(segment_base, &(it->second));
 
   // 1. Look up neighboring segments that can benefit from a rewrite.
-  if (consider_neighbors) {
+  if (options_.consider_neighbors_during_rewrite) {
     // Scan backward.
     if (it != index_.begin()) {
       auto prev_it(it);

@@ -38,6 +38,9 @@ class Manager {
 
     // If set to 0, no background threads will be used.
     size_t num_bg_threads = 16;
+
+    // If set to false, only the segment that is "full" will be rewritten.
+    bool consider_neighbors_during_rewrite = true;
   };
   static Manager LoadIntoNew(const std::filesystem::path& db,
                              const std::vector<std::pair<Key, Slice>>& records,
@@ -109,8 +112,7 @@ class Manager {
   // neighboring segments that also have overflows.
   void RewriteSegments(Key segment_base,
                        std::vector<Record>::const_iterator addtl_rec_begin,
-                       std::vector<Record>::const_iterator addtl_rec_end,
-                       bool consider_neighbors = true);
+                       std::vector<Record>::const_iterator addtl_rec_end);
 
   // Helpers for convenience.
   void ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer) const;

@@ -209,8 +209,10 @@ Status Manager::WriteToSegment(
   const size_t reorg_threshold =
       options_.records_per_page_goal * sinfo->page_count() * 2ULL;
   if (end_idx - start_idx > reorg_threshold) {
-    // TODO: Immediately trigger reorg.
-    return Status::NotSupported("Requires segment reorg.");
+    // Immediately trigger a segment rewrite that merges in the records.
+    RewriteSegments(segment_base, records.begin() + start_idx,
+                    records.end() + end_idx);
+    return Status::OK();
   }
 
   void* orig_page_buf = w_.buffer().get();
@@ -313,9 +315,9 @@ Status Manager::WriteToSegment(
         write_record_to_chain(records[i].first, records[i].second);
     if (!succeeded) {
       write_dirty_pages();
-      // TODO: Trigger segment reorganization here (also include the records
-      //       in range [i, end_idx)).
-      return Status::NotSupported("Requires segment reorg.");
+      // The segment is full. We need to rewrite it in order to merge in the writes.
+      RewriteSegments(segment_base, records.begin() + i, records.begin() + end_idx);
+      return Status::OK();
     }
   }
 
