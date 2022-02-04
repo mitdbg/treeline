@@ -279,37 +279,4 @@ bool RecordCache::FreeIfValid(uint64_t index) {
   }
 }
 
-// Iterator-related functions follow below.
-
-RecordCache::Iterator RecordCache::GetIterator() const {
-  return RecordCache::Iterator();
-}
-
-bool RecordCache::Iterator::Valid() const { return valid_; }
-
-uint64_t RecordCache::Iterator::Index() const {
-  assert(Valid());
-  return 0;  // TODO
-}
-
-void RecordCache::Iterator::Next(bool exclusive) {
-  assert(Valid());
-  // TODO
-}
-
-void RecordCache::Iterator::Seek(const Slice& target, bool exclusive) {
-  // TODO
-  valid_ = true;
-}
-
-void RecordCache::Iterator::SeekToFirst(bool exclusive) {
-  // TODO
-  valid_ = true;
-}
-
-void RecordCache::Iterator::Close() {
-  // TODO
-  valid_ = false;
-}
-
 }  // namespace llsm

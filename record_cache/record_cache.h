@@ -103,10 +103,6 @@ class RecordCache {
   // were written out.
   uint64_t WriteOutDirty(size_t reorg_length, uint32_t page_fill_pct);
 
-  // Declare iterator.
-  class Iterator;
-  Iterator GetIterator() const;
-
  private:
   // Required by the ART constructor. Populates `key` with the key of the record
   // stored at `tid` - 1 within the record cache. See note below.
@@ -167,45 +163,6 @@ class RecordCache {
   // record is stored at index 3 in `cache_entries`, we would store the
   // TID 4 in ART.
   std::unique_ptr<ART_OLC::Tree> tree_;
-};
-
-// An iterator for the RecordCache.
-//
-// To get an instance, call `GetIterator()` on a `RecordCache`. One of the Seek
-// methods must be called first before `Next()` can be called.
-//
-// When `Valid()` returns `true`, the `Index()` method returns the index within
-// cache_entries that holds the record the iterator currently "points" to.
-//
-// Next() proceeds to the next record cache entry in key order, unlocking the
-// currently-pointed-to entry. Depending on the value of `exclusive`, the next
-// entry can be locked for reading or writing.
-//
-// Close() should be called when done with the iterator, in order to release the
-// lock on the last-pointed-to cache entry.
-class RecordCache::Iterator {
- public:
-  // Returns true iff the iterator is positioned at a valid entry.
-  bool Valid() const;
-  // Returns the index into `cache_entries` associated with the current
-  // position. REQUIRES: `Valid()`
-  uint64_t Index() const;
-  // Advances to the next position and acquires a, possibly `exclusive`, lock.
-  // REQUIRES: Valid()
-  void Next(bool exclusive = false);
-  // Advance to the first entry with a key >= target and acquire a, possibly
-  // `exclusive`, lock.
-  void Seek(const Slice& target, bool exclusive = false);
-  // Position at the first entry in list and acquire a, possibly `exclusive`,
-  // lock. Final state of iterator is `Valid()` iff list is not empty.
-  void SeekToFirst(bool exclusive = false);
-  // Closes the iterator by unlocking the currently-pointed-to entry, if any,
-  // and making ensuring the iterator is no longer Valid().
-  void Close();
-
- private:
-  bool valid_ = false;
-  friend class RecordCache;
 };
 
 }  // namespace llsm
