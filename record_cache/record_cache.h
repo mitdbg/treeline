@@ -89,6 +89,13 @@ class RecordCache {
   Status GetCacheIndex(const Slice& key, bool exclusive, uint64_t* index_out,
                        bool safe = true) const;
 
+  // Retrieve an ascending range of at most `num_records` records, starting from
+  // the smallest record whose key is greater than or equal to `start_key`. The
+  // cache indices holding the records are return in `indices_out`, while the
+  // actual number of retrieved records is in `num_found`.
+  Status GetRange(const Slice& start_key, size_t num_records,
+                  uint64_t indices_out[], size_t& num_found) const;
+
   // Writes out all dirty cache entries to the appropriate longer-term data
   // structure. If this process creates overflow chains of length at least
   // `reorg_length`, reorganization will be triggered, whereby new pages are

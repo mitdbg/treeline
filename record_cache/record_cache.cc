@@ -130,6 +130,25 @@ Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
   return Status::OK();
 }
 
+Status RecordCache::GetRange(const Slice& start_key, size_t num_records,
+                             uint64_t indices_out[], size_t& num_found) const {
+  Key art_key;
+  SliceToARTKey(start_key, art_key);
+  auto t = tree_->getThreadInfo();
+
+  TID results_out[num_records];
+
+  // Retrieve & lock in ART.
+  tree_->lookupRange(art_key, &cache_entries, results_out, num_records,
+                     num_found, t);
+
+  for (uint64_t i = 0; i < num_found; ++i) {
+    indices_out[i] = results_out[i] - 1;
+  }
+
+  return Status::OK();
+}
+
 uint64_t RecordCache::WriteOutDirty(size_t reorg_length,
                                     uint32_t page_fill_pct) {
   uint64_t count = 0;

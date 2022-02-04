@@ -97,4 +97,44 @@ TEST(RecordCacheTest, MultiPutGet) {
   }
 }
 
+TEST(RecordCacheTest, RangeScan) {
+  Options options;
+  options.record_cache_capacity = 100;
+  Statistics stats;
+  auto rc = RecordCache(&options, &stats);
+
+  for (auto i = 100; i < 200; ++i) {
+    std::string key_s = "a" + std::to_string(i);
+    std::string val_s = "b" + std::to_string(i);
+    rc.Put(Slice(key_s), Slice(val_s));
+  }
+
+  uint64_t index_out;
+  uint64_t scan_length = 10;
+  uint64_t results[scan_length];
+
+  for (auto i = 100; i < 200; ++i) {
+    std::string start_key_s = "a" + std::to_string(i);
+
+    uint64_t scanned_recs;
+
+    ASSERT_TRUE(
+        rc.GetRange(Slice(start_key_s), scan_length, results, scanned_recs)
+            .ok());
+    ASSERT_EQ(scanned_recs, i < 200 - scan_length ? scan_length : 200 - i);
+
+    for (auto j = 0; j < scanned_recs; ++j) {
+      std::string key_s = "a" + std::to_string(i + j);
+      std::string val_s = "b" + std::to_string(i + j);
+
+      auto entry = &rc.cache_entries[results[j]];
+
+      ASSERT_EQ(Slice(key_s).compare(entry->GetKey()), 0);
+      ASSERT_EQ(Slice(val_s).compare(entry->GetValue()), 0);
+
+      entry->Unlock();
+    }
+  }
+}
+
 }  // namespace
