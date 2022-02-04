@@ -100,7 +100,7 @@ struct Options {
   size_t max_reorg_fanout = 50;
 
   // The capacity of the record cache in records.
-  size_t record_cache_capacity = 20000;
+  size_t record_cache_capacity = 1024 * 1024;
 };
 
 struct ReadOptions {};
