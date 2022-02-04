@@ -403,12 +403,22 @@ void Manager::RewriteSegments(
     }
   }
 
-  // 4. Update in-memory index with the new segments - TODO.
+  // 4. Update in-memory index with the new segments.
+  for (const auto& to_remove : segments_to_rewrite) {
+    const auto num_removed = index_.erase(to_remove.first);
+    assert(num_removed == 1);
+  }
+  for (const auto& new_segment : rewritten_segments) {
+    index_.insert(new_segment);
+  }
 
   // 5. Wait on any write futures.
   for (auto& f : write_futures) {
     f.get();
   }
+
+  // TODO: Log that the rewrite has finished (this log record does not need to
+  // be forced to disk for crash consistency).
 }
 
 }  // namespace pg
