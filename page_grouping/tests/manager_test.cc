@@ -43,6 +43,7 @@ TEST_F(ManagerTest, CreateReopenSegments) {
   options.use_segments = true;
   options.write_debug_info = false;
   options.use_direct_io = false;
+  options.num_bg_threads = 0;
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -82,6 +83,7 @@ TEST_F(ManagerTest, CreateReopenPages) {
   options.use_direct_io = false;
   options.write_debug_info = false;
   options.use_segments = false;
+  options.num_bg_threads = 0;
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -121,6 +123,7 @@ TEST_F(ManagerTest, PointReadSegments) {
   options.use_segments = true;
   options.write_debug_info = false;
   options.use_direct_io = false;
+  options.num_bg_threads = 0;
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -168,6 +171,7 @@ TEST_F(ManagerTest, PointReadPages) {
   options.use_segments = false;
   options.write_debug_info = false;
   options.use_direct_io = false;
+  options.num_bg_threads = 0;
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -215,6 +219,7 @@ TEST_F(ManagerTest, PointReadSegmentsSequential) {
   options.use_segments = true;
   options.write_debug_info = false;
   options.use_direct_io = false;
+  options.num_bg_threads = 0;
 
   // Use the sequential dataset instead of the uniform one.
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -292,6 +297,7 @@ TEST_F(ManagerTest, ScanSegments) {
   options.use_segments = true;
   options.write_debug_info = false;
   options.use_direct_io = false;
+  options.num_bg_threads = 0;
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -334,6 +340,7 @@ TEST_F(ManagerTest, ScanPages) {
   options.use_segments = false;
   options.write_debug_info = false;
   options.use_direct_io = false;
+  options.num_bg_threads = 0;
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -355,6 +362,7 @@ TEST_F(ManagerTest, BatchedUpdateSegments) {
   options.use_segments = true;
   options.write_debug_info = false;
   options.use_direct_io = false;
+  options.num_bg_threads = 0;
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -421,6 +429,7 @@ TEST_F(ManagerTest, BatchedUpdatePages) {
   options.use_segments = false;
   options.write_debug_info = false;
   options.use_direct_io = false;
+  options.num_bg_threads = 0;
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -487,6 +496,7 @@ TEST_F(ManagerTest, InsertOverflowSegments) {
   options.use_segments = true;
   options.write_debug_info = false;
   options.use_direct_io = false;
+  options.num_bg_threads = 0;
 
   // 512 B string.
   std::string value;
@@ -547,6 +557,7 @@ TEST_F(ManagerTest, InsertOverflowPages) {
   options.use_segments = false;
   options.write_debug_info = false;
   options.use_direct_io = false;
+  options.num_bg_threads = 0;
 
   // 512 B string.
   std::string value;

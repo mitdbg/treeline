@@ -8,8 +8,6 @@
 namespace llsm {
 namespace pg {
 
-using Record = std::pair<llsm::pg::Key, const llsm::Slice>;
-
 // The number of pages in each segment. If you change this, change
 // `kPageCountToSegment` too.
 const std::vector<size_t> SegmentBuilder::kSegmentPageCounts = {1, 2, 4, 8, 16};

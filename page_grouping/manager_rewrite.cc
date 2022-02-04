@@ -47,15 +47,66 @@ class PageChain {
   void* overflow_page_;
 };
 
+class PagePlusRecordMerger {
+ public:
+  PagePlusRecordMerger(std::vector<Record>::const_iterator rec_begin,
+                       std::vector<Record>::const_iterator rec_end)
+      : it_(rec_begin), it_end_(rec_end) {}
+
+  bool HasPageRecords() const { return pmi_.Valid(); }
+  bool HasRecords() const { return HasPageRecords() || it_ != it_end_; }
+
+  Record GetNext() {
+    assert(HasRecords());
+    // Simple case - one of the iterators is empty.
+    if (!HasPageRecords()) {
+      assert(it_ != it_end_);
+      const Record r = *it_;
+      ++it_;
+      return r;
+    } else if (it_ == it_end_) {
+      const Key k = key_utils::ExtractHead64(pmi_.key());
+      const Record r(k, pmi_.value());
+      pmi_.Next();
+      return r;
+    }
+
+    // Merge case. Select the smaller key. Prefer the in memory record if the
+    // keys are equal.
+    const Key pmi_key = key_utils::ExtractHead64(pmi_.key());
+    const Key it_key = it_->first;
+    if (it_key <= pmi_key) {
+      const Record r = *it_;
+      ++it_;
+      if (it_key == pmi_key) {
+        pmi_.Next();
+      }
+      return r;
+    } else {
+      // it_key > pmi_key
+      const Record r(pmi_key, pmi_.value());
+      pmi_.Next();
+      return r;
+    }
+  }
+
+  void UpdatePageIterator(PageMergeIterator pmi) { pmi_ = pmi; }
+
+ private:
+  PageMergeIterator pmi_;
+  std::vector<Record>::const_iterator it_;
+  std::vector<Record>::const_iterator it_end_;
+};
+
 }  // namespace
 
 namespace llsm {
 namespace pg {
 
 void Manager::RewriteSegments(
-    Key segment_base,
-    const std::vector<std::pair<Key, Slice>>& additional_records,
-    size_t record_start_idx, size_t record_end_idx, bool consider_neighbors) {
+    Key segment_base, std::vector<Record>::const_iterator addtl_rec_begin,
+    std::vector<Record>::const_iterator addtl_rec_end,
+    bool consider_neighbors) {
   // TODO: Multi-threading concerns.
   std::vector<std::pair<Key, SegmentInfo*>> segments_to_rewrite;
   const auto it = index_.lower_bound(segment_base);
@@ -129,12 +180,12 @@ void Manager::RewriteSegments(
   // (because their records have not yet been written to new segments).
   std::deque<PageChain> pages_to_process, pages_processed;
 
-  size_t next_record_idx = record_start_idx;
+  PagePlusRecordMerger pm(addtl_rec_begin, addtl_rec_end);
 
   for (const auto& seg_to_rewrite : segments_to_rewrite) {
     const size_t segment_pages = seg_to_rewrite.second->page_count();
     if (segment_pages > page_buf.NumFreePages()) {
-      // TODO - finalize existing segment and clear pages.
+      // TODO: Out of memory. Finalize existing segment and clear pages.
     }
 
     // Load the segment and check for overflows.
@@ -142,7 +193,7 @@ void Manager::RewriteSegments(
     SegmentWrap sw(w_.buffer().get(), seg_to_rewrite.second->page_count());
     const size_t num_overflows = sw.NumOverflows();
     if (segment_pages + num_overflows > page_buf.NumFreePages()) {
-      // TODO - finalize existing segment and clear pages.
+      // TODO: Out of memory. Finalize existing segment and clear pages.
     }
 
     // Copy the segment pages into the buffer, leaving room for overflows as
@@ -175,51 +226,60 @@ void Manager::RewriteSegments(
     // Process the pages in the deque.
     while (!pages_to_process.empty()) {
       const PageChain& pc = pages_to_process.front();
-      PageMergeIterator pmi = pc.GetIterator();
+      pm.UpdatePageIterator(pc.GetIterator());
 
-      while (pmi.Valid()) {
-        // We merge the records on the page with additional records in memory.
-        // The records in memory may duplicate the records on disk. If that
-        // happens, they should get priority since they represent a rewrite.
-        //
-        // This code below implements this logic (essentially another iterator,
-        // but inlined here).
-        bool extract_from_pmi = true;
-        bool skip_pmi_value = false;
-        Key pmi_key = key_utils::ExtractHead64(pmi.key());
-        // Check if the in-memory record should come first.
-        if (next_record_idx < record_end_idx) {
-          Key rec_key = additional_records[next_record_idx].first;
-          extract_from_pmi = pmi_key < rec_key;
-          // This happens if the in-memory record is an update of an existing
-          // record stored on disk.
-          skip_pmi_value = pmi_key == rec_key;
-        }
-
-        std::pair<Key, Slice> record =
-            extract_from_pmi ? std::pair<Key, Slice>(pmi_key, pmi.value())
-                             : additional_records[next_record_idx];
-
-        auto segments = seg_builder.Offer(std::move(record));
-        if (segments.size() > 0) {
-          // TODO - Write segments to disk, remove pages from `pages_processed`,
-          // free pages from the page buffer.
-        }
-
-        if (extract_from_pmi) {
-          pmi.Next();
-        } else {
-          ++next_record_idx;
-          if (skip_pmi_value) {
-            pmi.Next();
-          }
-        }
+      while (pm.HasPageRecords()) {
+        auto segments = seg_builder.Offer(pm.GetNext());
+        if (segments.size() == 0) continue;
+        // TODO - Write segments to disk, remove pages from `pages_processed`,
+        // free pages from the page buffer.
       }
 
       // Done with this page chain.
       pages_processed.push_back(pages_to_process.front());
       pages_to_process.pop_front();
     }
+  }
+
+  assert(!pm.HasPageRecords());
+
+  // Handle any leftover in-memory records.
+  while (pm.HasRecords()) {
+    auto segments = seg_builder.Offer(pm.GetNext());
+    if (segments.size() == 0) continue;
+    // TODO - Write segments to disk, remove pages from `pages_processed`,
+    // free pages from the page buffer.
+  }
+
+  // Handle any leftover segments.
+  auto segments = seg_builder.Finish();
+  if (segments.size() > 0) {
+    // TODO - Write segments to disk, remove pages from `pages_processed`,
+    // free pages from the page buffer.
+  }
+
+  // 3. Update the free list and mark the old segments as invalid. To do this we
+  // zero out the first page in each segment.
+  void* zero = w_.buffer().get();
+  memset(zero, 0, pg::Page::kSize);
+  std::vector<std::future<void>> write_futures;
+  for (const auto& seg_to_rewrite : segments_to_rewrite) {
+    const SegmentId seg_id = seg_to_rewrite.second->id();
+    if (bg_threads_ != nullptr) {
+      write_futures.push_back(bg_threads_->Submit([this, seg_id, zero]() {
+        WritePage(seg_id, 0, zero);
+      }));
+    } else {
+      WritePage(seg_id, 0, zero);
+    }
+    free_.Add(seg_id);
+  }
+
+  // 4. Update in-memory index with the new segments - TODO.
+
+  // 5. Wait on any write futures.
+  for (auto& f : write_futures) {
+    f.get();
   }
 }
 

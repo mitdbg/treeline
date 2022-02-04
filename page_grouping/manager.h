@@ -105,11 +105,10 @@ class Manager {
   //
   // If `consider_adjacent` is true, this method will also rewrite all logically
   // neighboring segments that also have overflows.
-  void RewriteSegments(
-      Key segment_base,
-      const std::vector<std::pair<Key, Slice>>& additional_records,
-      size_t record_start_idx, size_t record_end_idx,
-      bool consider_neighbors = true);
+  void RewriteSegments(Key segment_base,
+                       std::vector<Record>::const_iterator addtl_rec_begin,
+                       std::vector<Record>::const_iterator addtl_rec_end,
+                       bool consider_neighbors = true);
 
   // Helpers for convenience.
   void ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer) const;
