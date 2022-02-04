@@ -27,8 +27,7 @@ class LLSMInterface {
   void InitializeDatabase() {
     const std::string dbname = FLAGS_db_path + "/llsm";
     llsm::Options options = llsm::bench::BuildLLSMOptions();
-    options.key_hints.num_keys = num_keys_;
-    options.key_hints.min_key = min_key_;
+    options.key_hints.num_keys = 0;  // Needs to be empty to use bulk load.
     if (num_keys_ <= 1) {
       // We set the step size to at least 1 to ensure any code that relies on
       // the step size to generate values does not end up in an infinite loop.
@@ -67,10 +66,22 @@ class LLSMInterface {
 
   // Load the records into the database.
   void BulkLoad(const ycsbr::BulkLoadTrace& load) {
+    std::vector<std::pair<const llsm::Slice, const llsm::Slice>> records;
+
     for (const auto& req : load) {
-      if (!Insert(req.key, req.value, req.value_size)) {
-        throw std::runtime_error("Failed to bulk load a record!");
-      }
+      const llsm::key_utils::IntKeyAsSlice strkey(req.key);
+      records.push_back(
+          {strkey.as<llsm::Slice>(), llsm::Slice(req.value, req.value_size)});
+    }
+
+    llsm::WriteOptions options;
+    options.bypass_wal = FLAGS_bypass_wal;
+    options.sorted_load = true;
+
+    llsm::Status s = db_->BulkLoad(options, records);
+
+    if (!s.ok()) {
+      throw std::runtime_error("Failed to bulk load records!");
     }
     db_->FlushRecordCache(/*disable_deferred_io = */ true);
   }
