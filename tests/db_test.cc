@@ -1274,7 +1274,7 @@ TEST_F(DBTest, ReorgOverflowChain) {
   // This is because reads will block for as long as a reorganization on the
   // page they want to access (the only "old" non-overflow page in this context)
   // is going on.
-  ASSERT_EQ(db->GetNumIndexedPages(), kNumOverflows - 2); //TODO check again
+  ASSERT_EQ(db->GetNumIndexedPages(), kNumOverflows - 1);
 
   delete db;
   db = nullptr;

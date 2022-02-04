@@ -6,14 +6,17 @@ namespace llsm {
 
 Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
                         const size_t num_records, RecordBatch* results_out) {
-  RecordCache::Iterator rc_it = rec_cache_->GetIterator();
-
   results_out->clear();
   results_out->reserve(num_records);
 
   OverflowChain curr_page_chain = nullptr;
   PhysicalPageId curr_page_id = model_->KeyToPageId(start_key);
   bool is_first_page = true;
+
+  uint64_t indices_out[num_records];
+  size_t num_found = 0;
+  rec_cache_->GetRange(start_key, num_records, indices_out, num_found);
+  size_t curr = 0;
 
   while (results_out->size() < num_records && curr_page_id.IsValid()) {
     // If we had already fixed a chain previously, we want to keep it fixed
@@ -62,9 +65,9 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
 
     // Merge the record cache results with the page results, prioritizing the
     // record cache for records with the same key.
-    while (results_out->size() < num_records && rc_it.Valid() &&
+    while (results_out->size() < num_records && curr < num_found &&
            page_it.Valid()) {
-      auto rc_entry = &RecordCache::cache_entries[rc_it.Index()];
+      auto rc_entry = &RecordCache::cache_entries[indices_out[curr]];
       const int compare = rc_entry->GetKey().compare(page_it.key());
       if (compare <= 0) {
         // We only emit the record if it was a write, not a delete.
@@ -75,7 +78,8 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
         if (compare == 0) {
           page_it.Next();
         }
-        rc_it.Next();
+        ++curr;
+        rc_entry->Unlock();
       } else {
         // The page has the smaller record.
         results_out->emplace_back(page_it.key().ToString(),
@@ -84,7 +88,7 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
       }
     }
 
-    // This loop only runs if `rc_it` has no remaining records.
+    // This loop only runs if `indices_out` has no remaining records.
     while (results_out->size() < num_records && page_it.Valid()) {
       results_out->emplace_back(page_it.key().ToString(),
                                 page_it.value().ToString());
@@ -106,16 +110,21 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
 
   // No more pages to check. If we still need to read more records, read the
   // rest of the records in the record cache (if any are left).
-  while (results_out->size() < num_records && rc_it.Valid()) {
-    auto rc_entry = &RecordCache::cache_entries[rc_it.Index()];
+  while (results_out->size() < num_records && curr < num_found) {
+    auto rc_entry = &RecordCache::cache_entries[indices_out[curr]];
     if (rc_entry->IsWrite()) {
       results_out->emplace_back(rc_entry->GetKey().ToString(),
                                 rc_entry->GetValue().ToString());
     }
-    rc_it.Next();
+    ++curr;
+    rc_entry->Unlock();
   }
 
-  rc_it.Close();
+  // Unlock any potentially unprocessed record cache entries.
+  while (curr < num_found) {
+    RecordCache::cache_entries[indices_out[curr++]].Unlock();
+  }
+
   return Status::OK();
 }
 
