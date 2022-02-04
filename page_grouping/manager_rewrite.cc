@@ -109,6 +109,9 @@ void Manager::RewriteSegments(
     bool consider_neighbors) {
   // TODO: Multi-threading concerns.
   std::vector<std::pair<Key, SegmentInfo*>> segments_to_rewrite;
+  std::vector<std::pair<Key, SegmentInfo>> rewritten_segments;
+  std::vector<SegmentId> overflows_to_clear;
+
   const auto it = index_.lower_bound(segment_base);
   assert(it != index_.end());
   segments_to_rewrite.emplace_back(segment_base, &(it->second));
@@ -182,6 +185,11 @@ void Manager::RewriteSegments(
 
   PagePlusRecordMerger pm(addtl_rec_begin, addtl_rec_end);
 
+  // TODO: Before starting the rewrite, we should log (and force to stable
+  // storage) the following:
+  // - The rewrite sequence number: `sequence_number`
+  // - A list of all the segments involved in the rewrite
+
   for (const auto& seg_to_rewrite : segments_to_rewrite) {
     const size_t segment_pages = seg_to_rewrite.second->page_count();
     if (segment_pages > page_buf.NumFreePages()) {
@@ -208,6 +216,7 @@ void Manager::RewriteSegments(
         chains_in_segment.push_back(
             PageChain::WithOverflow(main_page, overflow_page));
         overflows_to_load.emplace_back(page.GetOverflow(), overflow_page);
+        overflows_to_clear.emplace_back(page.GetOverflow());
 
       } else {
         void* main_page = page_buf.Allocate();
@@ -263,16 +272,34 @@ void Manager::RewriteSegments(
   void* zero = w_.buffer().get();
   memset(zero, 0, pg::Page::kSize);
   std::vector<std::future<void>> write_futures;
-  for (const auto& seg_to_rewrite : segments_to_rewrite) {
-    const SegmentId seg_id = seg_to_rewrite.second->id();
-    if (bg_threads_ != nullptr) {
+  if (bg_threads_ != nullptr) {
+    write_futures.reserve(segments_to_rewrite.size() + overflows_to_clear.size());
+    for (const auto& seg_to_rewrite : segments_to_rewrite) {
+      const SegmentId seg_id = seg_to_rewrite.second->id();
       write_futures.push_back(bg_threads_->Submit([this, seg_id, zero]() {
         WritePage(seg_id, 0, zero);
       }));
-    } else {
-      WritePage(seg_id, 0, zero);
+      free_.Add(seg_id);
     }
-    free_.Add(seg_id);
+    for (const auto& overflow_to_clear : overflows_to_clear) {
+      write_futures.push_back(bg_threads_->Submit([this, overflow_to_clear, zero]() {
+        WritePage(overflow_to_clear, 0, zero);
+      }));
+      free_.Add(overflow_to_clear);
+    }
+    // Important that the page at `zero` is not modified until after we wait on
+    // the futures.
+  } else {
+    // Synchronously clear the segments and overflows.
+    for (const auto& seg_to_rewrite : segments_to_rewrite) {
+      const SegmentId seg_id = seg_to_rewrite.second->id();
+      WritePage(seg_id, 0, zero);
+      free_.Add(seg_id);
+    }
+    for (const auto& overflow_to_clear : overflows_to_clear) {
+      WritePage(overflow_to_clear, 0, zero);
+      free_.Add(overflow_to_clear);
+    }
   }
 
   // 4. Update in-memory index with the new segments - TODO.
