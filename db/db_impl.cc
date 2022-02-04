@@ -318,6 +318,11 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     ++stats_.temp_user_reads_bufmgr_hits_records_;
   }
 
+  // If found, add to record cache for future lookups.
+  if (status.ok()) {
+    rec_cache_->PutFromRead(key, Slice(*value_out));
+  }
+
   return status;
 }
 

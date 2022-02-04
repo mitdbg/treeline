@@ -45,6 +45,7 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
   bool found = GetCacheIndex(key, /*exclusive = */ true, &index, safe).ok();
   char* ptr = nullptr;
 
+  // If this key is not cached, need to make room by evicting first.
   if (!found) {
     index = SelectForEviction();
     if (safe) cache_entries[index].Lock(/*exclusive = */ true);
@@ -57,9 +58,15 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
     }
   }
 
+  // If this key is already cached, it is already at least as fresh as any
+  // non-dirty copy we might try to overwrite it with.
+  if (found && !is_dirty) return Status::OK();
+
+  // Do we need to allocate memory? Only if record is newly-cached, or if the
+  // new value is larger.
   if (found && cache_entries[index].GetValue().size() >= value.size()) {
     ptr = const_cast<char*>(cache_entries[index].GetKey().data());
-  } else {  // New record, or new value is larger.
+  } else {
     FreeIfValid(index);
     ptr = static_cast<char*>(malloc(key.size() + value.size()));
 
