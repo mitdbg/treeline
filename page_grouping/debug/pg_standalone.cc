@@ -42,11 +42,10 @@ int main(int argc, char* argv[]) {
     const auto& seg = segments[seg_id];
     if (seg.page_count == 1) continue;
 
-    const auto base_key = dataset[seg.start_idx].first;
+    const auto base_key = seg.records.front().first;
     size_t curr_page = 0;
     size_t recs_in_page = 0;
-    for (size_t i = seg.start_idx; i < seg.end_idx; ++i) {
-      const auto& rec = dataset[i];
+    for (const auto& rec : seg.records) {
       const size_t assigned_page =
           PageForKey(base_key, seg.model->line(), seg.page_count, rec.first);
       if (assigned_page == curr_page) {
