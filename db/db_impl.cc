@@ -343,7 +343,7 @@ Status DBImpl::BulkLoad(
   KeyDistHints dist;
   dist.num_keys = records.size();
   dist.key_size = records[0].first.size();  // Assume records are same size.
-  dist.record_size = records[0].second.size();
+  dist.record_size = dist.key_size + records[0].second.size();
 
   const size_t needed_pages = dist.num_pages();
   const size_t records_per_page = dist.records_per_page();
