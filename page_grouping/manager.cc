@@ -31,7 +31,9 @@ Manager::Manager(fs::path db_path,
       next_sequence_number_(next_sequence_number),
       free_(std::move(free)),
       options_(std::move(options)) {
-  index_.bulk_load(boundaries.begin(), boundaries.end());
+  if (!boundaries.empty()) {
+    index_.bulk_load(boundaries.begin(), boundaries.end());
+  }
   if (options_.num_bg_threads > 0) {
     bg_threads_ = std::make_unique<ThreadPool>(options_.num_bg_threads);
   }

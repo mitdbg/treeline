@@ -13,23 +13,7 @@
 namespace llsm {
 namespace pg {
 
-// Stores information about the built segments. The indices in this struct refer
-// to the dataset passed in to `SegmentBuilder::BuildFromDataset()`.
-struct DatasetSegment {
- public:
-  static DatasetSegment MultiPage(size_t page_count, size_t start_idx,
-                                  size_t end_idx, plr::BoundedLine64 model);
-  static DatasetSegment SinglePage(size_t start_idx, size_t end_idx);
-
-  size_t page_count;
-  // Start and end index (relative to the dataset) of the records that should be
-  // included in this segment. The start index is inclusive, the end index is
-  // exclusive.
-  size_t start_idx, end_idx;
-  // Will be empty when `page_count == 1`.
-  std::optional<plr::BoundedLine64> model;
-};
-
+// Stores information about the built segments.
 struct Segment {
  public:
   size_t page_count;
@@ -44,11 +28,8 @@ class SegmentBuilder {
   SegmentBuilder(const size_t records_per_page_goal,
                  const size_t records_per_page_delta);
 
-  // A first-pass greedy segment builder implementation. For simplicity, this
-  // implementation assumes the key dataset can fit in memory. But
-  // fundamentally, the algorithm does not require the entire dataset to be
-  // materialized in memory (e.g., it could operate on a stream of sorted keys).
-  std::vector<DatasetSegment> BuildFromDataset(
+  // Build segments when the entire dataset can fit in memory.
+  std::vector<Segment> BuildFromDataset(
       const std::vector<std::pair<Key, Slice>>& dataset);
 
   // Stream-based builder interface. Offer the builder one record at a time.

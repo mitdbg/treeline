@@ -59,8 +59,8 @@ TEST(PLRTest, Uniform) {
 }
 
 void CheckSegments(const std::vector<uint64_t>& dataset,
-                   const std::vector<DatasetSegment>& segments,
-                   const size_t goal, const size_t delta) {
+                   const std::vector<Segment>& segments, const size_t goal,
+                   const size_t delta) {
   ASSERT_FALSE(segments.empty());
 
   for (size_t i = 0; i < segments.size(); ++i) {
@@ -73,7 +73,7 @@ void CheckSegments(const std::vector<uint64_t>& dataset,
 
     const size_t max_records_in_segment = seg.page_count * (goal + delta);
     const size_t min_records_in_segment = seg.page_count * (goal - delta);
-    const size_t num_records = seg.end_idx - seg.start_idx;
+    const size_t num_records = seg.records.size();
     ASSERT_LE(num_records, max_records_in_segment);
     if (i != segments.size() - 1) {
       ASSERT_GE(num_records, min_records_in_segment);
@@ -88,10 +88,10 @@ void CheckSegments(const std::vector<uint64_t>& dataset,
       page_counts.push_back(0);
     }
 
-    const Key base_key = dataset[seg.start_idx];
-    for (size_t j = seg.start_idx; j < seg.end_idx; ++j) {
+    const Key base_key = seg.records.front().first;
+    for (const auto& rec : seg.records) {
       const size_t page_idx =
-          PageForKey(base_key, seg.model->line(), seg.page_count, dataset[j]);
+          PageForKey(base_key, seg.model->line(), seg.page_count, rec.first);
       ++page_counts[page_idx];
     }
 
@@ -104,6 +104,16 @@ void CheckSegments(const std::vector<uint64_t>& dataset,
       if (!(i == segments.size() - 1 && j == seg.page_count - 1)) {
         ASSERT_GE(page_counts[j], min_records_in_page);
       }
+    }
+  }
+
+  // Check that all records in the dataset are present in the segments (and are
+  // in order).
+  size_t dataset_idx = 0;
+  for (const auto& seg : segments) {
+    for (const auto& rec : seg.records) {
+      ASSERT_EQ(dataset[dataset_idx], rec.first);
+      ++dataset_idx;
     }
   }
 }

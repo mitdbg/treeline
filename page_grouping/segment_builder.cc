@@ -19,26 +19,6 @@ const std::unordered_map<size_t, size_t> SegmentBuilder::kPageCountToSegment = {
 static const size_t kMaxSegmentSize =
     llsm::pg::SegmentBuilder::kSegmentPageCounts.back();
 
-DatasetSegment DatasetSegment::MultiPage(size_t page_count, size_t start_idx,
-                                         size_t end_idx,
-                                         plr::BoundedLine64 model) {
-  DatasetSegment s;
-  s.page_count = page_count;
-  s.start_idx = start_idx;
-  s.end_idx = end_idx;
-  s.model = model;
-  return s;
-}
-
-DatasetSegment DatasetSegment::SinglePage(size_t start_idx, size_t end_idx) {
-  DatasetSegment s;
-  s.page_count = 1;
-  s.start_idx = start_idx;
-  s.end_idx = end_idx;
-  s.model = std::optional<plr::BoundedLine64>();
-  return s;
-}
-
 SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
                                const size_t records_per_page_delta)
     : records_per_page_goal_(records_per_page_goal),
@@ -54,46 +34,19 @@ SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
   }
 }
 
-std::vector<DatasetSegment> SegmentBuilder::BuildFromDataset(
+std::vector<Segment> SegmentBuilder::BuildFromDataset(
     const std::vector<std::pair<Key, Slice>>& dataset) {
   // Precondition: The dataset is sorted by key in ascending order.
-  std::vector<Segment> segments_internal;
+  std::vector<Segment> segments;
   ResetStream();
   for (const auto& rec : dataset) {
     auto segs = Offer(rec);
-    segments_internal.insert(segments_internal.end(),
-                             std::make_move_iterator(segs.begin()),
-                             std::make_move_iterator(segs.end()));
+    segments.insert(segments.end(), std::make_move_iterator(segs.begin()),
+                    std::make_move_iterator(segs.end()));
   }
   auto segs = Finish();
-  segments_internal.insert(segments_internal.end(),
-                           std::make_move_iterator(segs.begin()),
-                           std::make_move_iterator(segs.end()));
-
-  std::vector<DatasetSegment> segments;
-  segments.reserve(segments_internal.size());
-
-  size_t dataset_start_idx = 0;
-  for (auto& seg : segments_internal) {
-    const size_t next_start_idx = dataset_start_idx + seg.records.size();
-    if (seg.page_count == 1) {
-      segments.push_back(
-          DatasetSegment::SinglePage(dataset_start_idx, next_start_idx));
-    } else {
-      segments.push_back(
-          DatasetSegment::MultiPage(seg.page_count, dataset_start_idx,
-                                    next_start_idx, std::move(*(seg.model))));
-    }
-    // Used to help check the correctness of the stream-based builder API. This
-    // loop will be removed by the compiler when assertions are disabled (e.g.,
-    // when compiled in release mode).
-    for (size_t i = 0; i < seg.records.size(); ++i) {
-      const size_t dataset_idx = dataset_start_idx + i;
-      assert(dataset_idx < dataset.size());
-      assert(dataset[dataset_idx] == seg.records[i]);
-    }
-    dataset_start_idx = next_start_idx;
-  }
+  segments.insert(segments.end(), std::make_move_iterator(segs.begin()),
+                  std::make_move_iterator(segs.end()));
   return segments;
 }
 

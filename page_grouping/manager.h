@@ -89,11 +89,13 @@ class Manager {
       const std::filesystem::path& db_path,
       const std::vector<std::pair<Key, Slice>>& records,
       const Manager::Options& options);
+  void BulkLoadIntoSegmentsImpl(const std::vector<Record>& records);
 
   static Manager BulkLoadIntoPages(
       const std::filesystem::path& db,
       const std::vector<std::pair<Key, Slice>>& records,
       const Manager::Options& options);
+  void BulkLoadIntoPagesImpl(const std::vector<Record>& records);
 
   // Write the range [start_idx, end_idx) into the given segment.
   Status WriteToSegment(Key segment_base, SegmentInfo* sinfo,
@@ -117,6 +119,9 @@ class Manager {
   void ReadSegment(const SegmentId& seg_id) const;
   void ReadOverflows(
       const std::vector<std::pair<SegmentId, void*>>& overflows_to_read) const;
+
+  std::pair<Key, SegmentInfo> LoadIntoNewSegment(
+      uint32_t sequence_number, const Segment& segment, Key upper_bound);
 
   auto SegmentForKey(Key key) {
     auto it = index_.upper_bound(key);
