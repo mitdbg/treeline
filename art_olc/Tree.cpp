@@ -334,22 +334,23 @@ restart:
 }
 
 bool Tree::lookupRange(const Key& start,
-                       //std::vector<llsm::RecordCacheEntry>* cache_entries,
-                       bool exclusive, TID result[], std::size_t resultSize,
+                       std::vector<llsm::RecordCacheEntry>* cache_entries,
+                        TID result[], std::size_t resultSize,
                        std::size_t& resultsFound,
                        ThreadInfo& threadEpocheInfo) const {
   EpocheGuard epocheGuard(threadEpocheInfo);
   TID toContinue = 0;
   std::function<void(const N*)> copy = [&result, &resultSize, &resultsFound,
-                                        &toContinue, &copy, //cache_entries,
-                                        exclusive](const N* node) {
+                                        &toContinue, &copy, cache_entries
+                                        ](const N* node) {
     if (N::isLeaf(node)) {
       if (resultsFound == resultSize) {
         toContinue = N::getLeaf(node);
         return;
       }
       result[resultsFound] = N::getLeaf(node);
-      //cache_entries->at(result[resultsFound] - 1).Lock(exclusive);
+      cache_entries->at(result[resultsFound] - 1).Lock(/*exclusive = */ false);
+      cache_entries->at(result[resultsFound] - 1).IncrementPriority();
       resultsFound++;
     } else {
       std::tuple<uint8_t, N*> children[256];

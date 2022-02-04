@@ -113,6 +113,8 @@ TEST_F(ARTOLCTest, StartNumberScan) {
   }
 
   uint64_t scan_length = 100;
+  std::vector<llsm::RecordCacheEntry> cache_entries;
+  cache_entries.resize(kNumKeys);
 
   for (uint64_t i = 0; i < kNumKeys; i++) {
     Key start_key;
@@ -121,14 +123,15 @@ TEST_F(ARTOLCTest, StartNumberScan) {
     TID result[scan_length];
     uint64_t found;
 
-    auto val =
-        tree->lookupRange(start_key, false, result, scan_length, found, t);
+    auto val = tree->lookupRange(start_key, &cache_entries, result, scan_length,
+                                 found, t);
     bool found_is_correct =
         (i < kNumKeys - scan_length) ? scan_length : kNumKeys - i;
     ASSERT_TRUE(found_is_correct);
 
     for (uint64_t j = 0; j < found; ++j) {
       ASSERT_EQ(result[j], keys[i + j]);
+      cache_entries[result[j] - 1].Unlock();
     }
   }
 }

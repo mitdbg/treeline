@@ -5,7 +5,7 @@
 #ifndef ART_OPTIMISTICLOCK_COUPLING_N_H
 #define ART_OPTIMISTICLOCK_COUPLING_N_H
 #include "N.h"
-//#include "record_cache/record_cache_entry.h"
+#include "record_cache/record_cache_entry.h"
 
 using namespace ART;
 
@@ -73,8 +73,8 @@ class Tree {
                    ThreadInfo& threadEpocheInfo) const;
 
   bool lookupRange(const Key& start,
-                   //std::vector<llsm::RecordCacheEntry>* cache_entries,
-                   bool exclusive, TID result[], std::size_t resultLen,
+                   std::vector<llsm::RecordCacheEntry>* cache_entries,
+                   TID result[], std::size_t resultLen,
                    std::size_t& resultCount,
                    ThreadInfo& threadEpocheInfo) const;
 
