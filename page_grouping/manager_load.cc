@@ -109,7 +109,6 @@ void Manager::BulkLoadIntoSegmentsImpl(const std::vector<Record>& records) {
   const PageBuffer& buf = w_.buffer();
   for (size_t seg_idx = 0; seg_idx < segments.size(); ++seg_idx) {
     const auto& seg = segments[seg_idx];
-    // TODO - Call Load
     const Key upper_bound = seg_idx == segments.size() - 1
                                 ? std::numeric_limits<Key>::max()
                                 : segments[seg_idx + 1].records.front().first;
@@ -136,62 +135,10 @@ Manager Manager::BulkLoadIntoPages(
 }
 
 void Manager::BulkLoadIntoPagesImpl(const std::vector<Record>& records) {
-  SegmentFile& sf = segment_files_.front();
-
-  std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
-
-  size_t page_start_idx = 0;
-  size_t page_end_idx = options_.records_per_page_goal;
-  const PageBuffer& buf = w_.buffer();
-  while (page_end_idx <= records.size()) {
-    memset(buf.get(), 0, pg::Page::kSize);
-    auto result = LoadIntoPage(
-        buf, 0, records[page_start_idx].first, records[page_end_idx].first,
-        records.begin() + page_start_idx, records.begin() + page_end_idx);
-    assert(result.ok());
-
-    SegmentWrap sw(buf.get(), 1);
-    sw.SetSequenceNumber(0);
-    sw.ClearAllOverflows();
-
-    // Write page to disk.
-    const size_t byte_offset = sf.AllocateSegment();
-    sf.WritePages(byte_offset, buf.get(), /*num_pages=*/1);
-
-    // Record the page boundary.
-    SegmentId seg_id(/*file_id=*/0,
-                     /*page_offset=*/byte_offset / pg::Page::kSize);
-    segment_boundaries.emplace_back(
-        records[page_start_idx].first,
-        SegmentInfo(seg_id, std::optional<plr::Line64>()));
-
-    page_start_idx = page_end_idx;
-    page_end_idx = page_start_idx + options_.records_per_page_goal;
-  }
-  if (page_start_idx < records.size()) {
-    // Records that go on the last page.
-    memset(buf.get(), 0, pg::Page::kSize);
-    auto result = LoadIntoPage(buf, 0, records[page_start_idx].first,
-                               std::numeric_limits<uint64_t>::max(),
-                               records.begin() + page_start_idx, records.end());
-    assert(result.ok());
-
-    SegmentWrap sw(buf.get(), 1);
-    sw.SetSequenceNumber(0);
-    sw.ClearAllOverflows();
-
-    // Write page to disk.
-    const size_t byte_offset = sf.AllocateSegment();
-    sf.WritePages(byte_offset, buf.get(), /*num_pages=*/1);
-
-    // Record the page boundary.
-    SegmentId seg_id(/*file_id=*/0,
-                     /*page_offset=*/byte_offset / pg::Page::kSize);
-    segment_boundaries.emplace_back(
-        records[page_start_idx].first,
-        SegmentInfo(seg_id, std::optional<plr::Line64>()));
-  }
-
+  std::vector<std::pair<Key, SegmentInfo>> segment_boundaries =
+      LoadIntoNewPages(/*sequence_number=*/0, records.front().first,
+                       std::numeric_limits<Key>::max(), records.begin(),
+                       records.end());
   index_.bulk_load(segment_boundaries.begin(), segment_boundaries.end());
 }
 
@@ -272,6 +219,82 @@ std::pair<Key, SegmentInfo> Manager::LoadIntoNewSegment(
       base_key, SegmentInfo(seg_id, seg.model.has_value()
                                         ? seg.model->line()
                                         : std::optional<plr::Line64>()));
+}
+
+std::vector<std::pair<Key, SegmentInfo>> Manager::LoadIntoNewPages(
+    const uint32_t sequence_number, const Key lower_bound,
+    const Key upper_bound, const std::vector<Record>::const_iterator rec_begin,
+    const std::vector<Record>::const_iterator rec_end) {
+  SegmentFile& sf = segment_files_.front();
+  std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
+
+  size_t page_start_idx = 0;
+  size_t page_end_idx = options_.records_per_page_goal;
+  const size_t num_records = rec_end - rec_begin;
+
+  const PageBuffer& buf = w_.buffer();
+  while (page_end_idx <= num_records) {
+    memset(buf.get(), 0, pg::Page::kSize);
+    const auto page_begin = rec_begin + page_start_idx;
+    const auto page_end = rec_begin + page_end_idx;
+    const Key lower = page_start_idx == 0 ? lower_bound : page_begin->first;
+    const Key upper =
+        page_end_idx == num_records ? upper_bound : page_end->first;
+    auto result = LoadIntoPage(buf, 0, lower, upper, page_begin, page_end);
+    assert(result.ok());
+
+    SegmentWrap sw(buf.get(), 1);
+    sw.SetSequenceNumber(sequence_number);
+    sw.ClearAllOverflows();
+
+    // Write page to disk.
+    SegmentId seg_id;
+    const auto maybe_seg_id = free_.Get(/*page_count=*/1);
+    if (maybe_seg_id.has_value()) {
+      seg_id = *maybe_seg_id;
+    } else {
+      const size_t byte_offset = sf.AllocateSegment();
+      seg_id = SegmentId(/*file_id=*/0,
+                         /*page_offset=*/byte_offset / pg::Page::kSize);
+    }
+    sf.WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), /*num_pages=*/1);
+
+    // Record the page boundary.
+    segment_boundaries.emplace_back(
+        lower, SegmentInfo(seg_id, std::optional<plr::Line64>()));
+
+    page_start_idx = page_end_idx;
+    page_end_idx = page_start_idx + options_.records_per_page_goal;
+  }
+  if (page_start_idx < num_records) {
+    // Records that go on the last page.
+    memset(buf.get(), 0, pg::Page::kSize);
+    const auto page_begin = rec_begin + page_start_idx;
+    const Key lower = page_start_idx == 0 ? lower_bound : page_begin->first;
+    auto result = LoadIntoPage(buf, 0, lower, upper_bound, page_begin, rec_end);
+    assert(result.ok());
+
+    SegmentWrap sw(buf.get(), 1);
+    sw.SetSequenceNumber(0);
+    sw.ClearAllOverflows();
+
+    // Write page to disk.
+    SegmentId seg_id;
+    const auto maybe_seg_id = free_.Get(/*page_count=*/1);
+    if (maybe_seg_id.has_value()) {
+      seg_id = *maybe_seg_id;
+    } else {
+      const size_t byte_offset = sf.AllocateSegment();
+      seg_id = SegmentId(/*file_id=*/0,
+                         /*page_offset=*/byte_offset / pg::Page::kSize);
+    }
+    sf.WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), /*num_pages=*/1);
+
+    segment_boundaries.emplace_back(
+        lower, SegmentInfo(seg_id, std::optional<plr::Line64>()));
+  }
+
+  return segment_boundaries;
 }
 
 }  // namespace pg

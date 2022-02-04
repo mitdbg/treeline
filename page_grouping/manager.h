@@ -114,6 +114,12 @@ class Manager {
                        std::vector<Record>::const_iterator addtl_rec_begin,
                        std::vector<Record>::const_iterator addtl_rec_end);
 
+  // Flatten the given page chain and merge in the additional records (which
+  // must fall in the key space assigned to the given page chain).
+  void FlattenChain(Key base,
+                    std::vector<Record>::const_iterator addtl_rec_begin,
+                    std::vector<Record>::const_iterator addtl_rec_end);
+
   // Helpers for convenience.
   void ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer) const;
   void WritePage(const SegmentId& seg_id, size_t page_idx, void* buffer) const;
@@ -122,8 +128,16 @@ class Manager {
   void ReadOverflows(
       const std::vector<std::pair<SegmentId, void*>>& overflows_to_read) const;
 
-  std::pair<Key, SegmentInfo> LoadIntoNewSegment(
-      uint32_t sequence_number, const Segment& segment, Key upper_bound);
+  std::pair<Key, SegmentInfo> LoadIntoNewSegment(uint32_t sequence_number,
+                                                 const Segment& segment,
+                                                 Key upper_bound);
+
+  // Loads the records in `[rec_begin, rec_end)` into pages based on the page
+  // fill goal.
+  std::vector<std::pair<Key, SegmentInfo>> LoadIntoNewPages(
+      uint32_t sequence_number, Key lower_bound, Key upper_bound,
+      std::vector<Record>::const_iterator rec_begin,
+      std::vector<Record>::const_iterator rec_end);
 
   auto SegmentForKey(Key key) {
     auto it = index_.upper_bound(key);

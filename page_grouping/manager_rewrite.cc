@@ -58,7 +58,8 @@ class PageChain {
       auto overflow_it = overflow()->GetIterator();
       overflow_it.SeekToLast();
       if (overflow_it.Valid()) {
-        const Key overflow_largest = key_utils::ExtractHead64(overflow_it.key());
+        const Key overflow_largest =
+            key_utils::ExtractHead64(overflow_it.key());
         if (!largest.has_value() || overflow_largest > *largest) {
           largest = overflow_largest;
         }
@@ -418,6 +419,13 @@ void Manager::RewriteSegments(
 
   // TODO: Log that the rewrite has finished (this log record does not need to
   // be forced to disk for crash consistency).
+}
+
+void Manager::FlattenChain(Key base,
+                           std::vector<Record>::const_iterator addtl_rec_begin,
+                           std::vector<Record>::const_iterator addtl_rec_end) {
+  // TODO: Implement `RewriteSegments()` but for page chains (will primarily
+  // delegate to `LoadIntoNewPages()`).
 }
 
 }  // namespace pg
