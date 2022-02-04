@@ -358,7 +358,7 @@ void Manager::ReadOverflows(
     futures.reserve(overflows_to_read.size());
     for (const auto& otr : overflows_to_read) {
       futures.push_back(bg_threads_->Submit(
-          [this, &otr]() { ReadPage(otr.first, 0, otr.second); }));
+          [this, otr]() { ReadPage(otr.first, 0, otr.second); }));
     }
     for (auto& f : futures) {
       f.get();
