@@ -307,6 +307,25 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
       bf = &(buf_mgr_->FixPage(page_id, /*exclusive=*/false));
     }
 
+    // If found, add to record cache for future lookups.
+    if (status.ok()) {
+      rec_cache_->PutFromRead(key, Slice(*value_out),
+                              RecordCache::kDefaultPriority);
+
+      // Optionally, also cache records on the same page.
+      // TODO: records in other links of the same chain?
+      if (options_.optimistic_caching) {
+        auto it = page.GetIterator();
+        it.Seek(page.GetLowerBoundary());
+
+        while (it.Valid()) {
+          rec_cache_->PutFromRead(it.key(), it.value(),
+                                  RecordCache::kDefaultOptimisticPriority);
+          it.Next();
+        }
+      }
+    }
+
     buf_mgr_->UnfixPage(*old_bf, /*is_dirty=*/false);
   }
 
@@ -316,11 +335,6 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     ++stats_.temp_user_reads_single_bufmgr_misses_records_;
   } else {
     ++stats_.temp_user_reads_bufmgr_hits_records_;
-  }
-
-  // If found, add to record cache for future lookups.
-  if (status.ok()) {
-    rec_cache_->PutFromRead(key, Slice(*value_out));
   }
 
   return status;

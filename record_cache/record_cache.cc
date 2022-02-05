@@ -60,7 +60,10 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
 
   // If this key is already cached, it is already at least as fresh as any
   // non-dirty copy we might try to overwrite it with.
-  if (found && !is_dirty) return Status::OK();
+  if (found && !is_dirty) {
+    if (safe) cache_entries[index].Unlock();
+    return Status::OK();
+  }
 
   // Do we need to allocate memory? Only if record is newly-cached, or if the
   // new value is larger.

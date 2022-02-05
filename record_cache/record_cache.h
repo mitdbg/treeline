@@ -74,7 +74,7 @@ class RecordCache {
   // convenience method that calls `Put()` with `is_dirty` set to false and
   // `EntryType::kWrite`.
   Status PutFromRead(const Slice& key, const Slice& value,
-                     uint8_t priority = kDefaultOptimisticPriority);
+                     uint8_t priority = kDefaultPriority);
 
   // Retrieve the index of the cache entry associated with `key`, if any, and
   // lock it for reading or writing based on `exclusive`. If an entry is found,
