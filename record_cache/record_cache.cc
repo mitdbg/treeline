@@ -35,8 +35,6 @@ RecordCache::~RecordCache() {
   cache_entries.clear();
 }
 
-// TODO: when admitting keys from the pages, they should not override newer
-// values for the same keys that are present in the record cache.
 Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
                         format::WriteType write_type, uint8_t priority,
                         bool safe, size_t reorg_length,
