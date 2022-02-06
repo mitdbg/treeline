@@ -3,16 +3,14 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <random>
 #include <unordered_set>
 #include <vector>
 
-namespace {
-
 // Uniformly selects `num_samples` samples from the range [min_val, max_val]
 // without replacement.
-std::vector<uint64_t> FloydSample(const size_t num_samples, uint64_t min_val,
-                                  uint64_t max_val, std::mt19937& rng) {
+std::vector<uint64_t> Datasets::FloydSample(const size_t num_samples,
+                                            uint64_t min_val, uint64_t max_val,
+                                            std::mt19937& rng) {
   std::unordered_set<uint64_t> samples;
   samples.reserve(num_samples);
   for (uint64_t curr = max_val - num_samples + 1; curr <= max_val; ++curr) {
@@ -27,8 +25,6 @@ std::vector<uint64_t> FloydSample(const size_t num_samples, uint64_t min_val,
   return std::vector<uint64_t>(samples.begin(), samples.end());
 }
 
-}  // namespace
-
 const std::vector<uint64_t> Datasets::kSequentialKeys =
     ([](const size_t range) {
       std::vector<uint64_t> results;
@@ -42,7 +38,7 @@ const std::vector<uint64_t> Datasets::kSequentialKeys =
 const std::vector<uint64_t> Datasets::kUniformKeys =
     ([](const size_t num_samples, uint64_t min_val, uint64_t max_val) {
       std::mt19937 prng(42);
-      auto res = FloydSample(num_samples, min_val, max_val, prng);
+      auto res = Datasets::FloydSample(num_samples, min_val, max_val, prng);
       std::sort(res.begin(), res.end());
       return res;
     })(1000, 0, 1000000);
