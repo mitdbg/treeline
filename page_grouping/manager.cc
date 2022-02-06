@@ -212,10 +212,10 @@ Status Manager::WriteToSegment(
     // Immediately trigger a segment rewrite that merges in the records.
     if (options_.use_segments) {
       RewriteSegments(segment_base, records.begin() + start_idx,
-                      records.end() + end_idx);
+                      records.begin() + end_idx);
     } else {
       FlattenChain(segment_base, records.begin() + start_idx,
-                   records.end() + end_idx);
+                   records.begin() + end_idx);
     }
     return Status::OK();
   }
