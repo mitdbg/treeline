@@ -51,6 +51,7 @@ target_link_libraries(pg_bench PRIVATE pg gflags ycsbr-gen Threads::Threads)
 add_executable(pg_test
   tests/datasets.cc
   tests/datasets.h
+  tests/manager_rewrite_test.cc
   tests/manager_test.cc
   tests/segment_test.cc
 )

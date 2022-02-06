@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <queue>
 #include <vector>
 
@@ -12,16 +13,22 @@ namespace pg {
 class PageMergeIterator {
  public:
   // Represents an empty iterator.
-  PageMergeIterator() : merged_iterators_(&PageMergeIterator::Compare) {}
+  PageMergeIterator()
+      : merged_iterators_(std::bind(&PageMergeIterator::Compare, this,
+                                    std::placeholders::_1,
+                                    std::placeholders::_2)) {}
 
   explicit PageMergeIterator(std::vector<Page::Iterator> iterators,
                              const Slice* start_key = nullptr)
       : page_iterators_(std::move(iterators)),
-        merged_iterators_(&PageMergeIterator::Compare) {
-    for (auto& it : page_iterators_) {
+        merged_iterators_(std::bind(&PageMergeIterator::Compare, this,
+                                    std::placeholders::_1,
+                                    std::placeholders::_2)) {
+    for (size_t i = 0; i < page_iterators_.size(); ++i) {
+      auto& it = page_iterators_[i];
       if (start_key != nullptr) it.Seek(*start_key);
       if (!it.Valid()) continue;
-      merged_iterators_.push(&it);
+      merged_iterators_.push(i);
     }
   }
 
@@ -30,25 +37,30 @@ class PageMergeIterator {
   // REQUIRES: `Valid()` is true.
   void Next() {
     assert(Valid());
-    Page::Iterator* const it = merged_iterators_.top();
+    const size_t it_idx = merged_iterators_.top();
     merged_iterators_.pop();
 
-    assert(it->Valid());
-    it->Next();
-    if (!it->Valid()) return;
-    merged_iterators_.push(it);
+    auto& it = page_iterators_[it_idx];
+    assert(it.Valid());
+    it.Next();
+    if (!it.Valid()) return;
+    merged_iterators_.push(it_idx);
   }
 
   // REQUIRES: `Valid()` is true.
   Slice key() const {
-    assert(Valid() && merged_iterators_.top()->Valid());
-    return merged_iterators_.top()->key();
+    const size_t it_idx = merged_iterators_.top();
+    const auto& it = page_iterators_[it_idx];
+    assert(Valid() && it.Valid());
+    return it.key();
   }
 
   // REQUIRES: `Valid()` is true.
   Slice value() const {
-    assert(Valid() && merged_iterators_.top()->Valid());
-    return merged_iterators_.top()->value();
+    const size_t it_idx = merged_iterators_.top();
+    const auto& it = page_iterators_[it_idx];
+    assert(Valid() && it.Valid());
+    return it.value();
   }
 
   size_t RecordsLeft() const {
@@ -66,15 +78,17 @@ class PageMergeIterator {
   // we want to return the smallest items first. So we return true here if
   // `left` is strictly larger than `right` to ensure the smallest records are
   // returned first.
-  static bool Compare(const Page::Iterator* left, const Page::Iterator* right) {
-    assert(left->Valid() && right->Valid());
-    // Evaluates to true iff `left->key()` is greater than `right->key()`.
-    return left->key().compare(right->key()) > 0;
+  bool Compare(const size_t left_it_idx, const size_t right_it_idx) {
+    const auto& left = page_iterators_[left_it_idx];
+    const auto& right = page_iterators_[right_it_idx];
+    assert(left.Valid() && right.Valid());
+    // Evaluates to true iff `left.key()` is greater than `right.key()`.
+    return left.key().compare(right.key()) > 0;
   }
 
   std::vector<Page::Iterator> page_iterators_;
-  std::priority_queue<Page::Iterator*, std::vector<Page::Iterator*>,
-                      decltype(&PageMergeIterator::Compare)>
+  std::priority_queue<size_t, std::vector<size_t>,
+                      std::function<bool(size_t, size_t)>>
       merged_iterators_;
 };
 
