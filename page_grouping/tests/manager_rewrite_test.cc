@@ -180,14 +180,14 @@ TEST_F(ManagerRewriteTest, InsertMiddleSegments) {
 
   // Create the insert keys.
   std::mt19937 prng(1337);
-  const size_t num_inserts = 100;
+  const size_t num_inserts = 800;
   std::vector<uint64_t> keys_to_insert;
   keys_to_insert.reserve(num_inserts);
   const size_t mid = new_keys.size() / 2;
   const std::vector<uint64_t> left =
-      Datasets::FloydSample(50, new_keys[mid - 1] + 1, new_keys[mid] - 1, prng);
+      Datasets::FloydSample(400, new_keys[mid - 50] + 1, new_keys[mid - 49] - 1, prng);
   const std::vector<uint64_t> right =
-      Datasets::FloydSample(50, new_keys[mid] + 1, new_keys[mid + 1] - 1, prng);
+      Datasets::FloydSample(400, new_keys[mid + 50] + 1, new_keys[mid + 51] - 1, prng);
   keys_to_insert.insert(keys_to_insert.end(), left.begin(), left.end());
   keys_to_insert.insert(keys_to_insert.end(), right.begin(), right.end());
 
@@ -270,9 +270,9 @@ TEST_F(ManagerRewriteTest, InsertMiddlePages) {
   keys_to_insert.reserve(num_inserts);
   const size_t mid = new_keys.size() / 2;
   const std::vector<uint64_t> left =
-      Datasets::FloydSample(50, new_keys[mid - 1] + 1, new_keys[mid] - 1, prng);
+      Datasets::FloydSample(50, new_keys[mid - 50] + 1, new_keys[mid - 49] - 1, prng);
   const std::vector<uint64_t> right =
-      Datasets::FloydSample(50, new_keys[mid] + 1, new_keys[mid + 1] - 1, prng);
+      Datasets::FloydSample(50, new_keys[mid + 50] + 1, new_keys[mid + 51] - 1, prng);
   keys_to_insert.insert(keys_to_insert.end(), left.begin(), left.end());
   keys_to_insert.insert(keys_to_insert.end(), right.begin(), right.end());
 
