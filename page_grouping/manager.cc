@@ -210,8 +210,13 @@ Status Manager::WriteToSegment(
       options_.records_per_page_goal * sinfo->page_count() * 2ULL;
   if (end_idx - start_idx > reorg_threshold) {
     // Immediately trigger a segment rewrite that merges in the records.
-    RewriteSegments(segment_base, records.begin() + start_idx,
-                    records.end() + end_idx);
+    if (options_.use_segments) {
+      RewriteSegments(segment_base, records.begin() + start_idx,
+                      records.end() + end_idx);
+    } else {
+      FlattenChain(segment_base, records.begin() + start_idx,
+                   records.end() + end_idx);
+    }
     return Status::OK();
   }
 
@@ -315,8 +320,15 @@ Status Manager::WriteToSegment(
         write_record_to_chain(records[i].first, records[i].second);
     if (!succeeded) {
       write_dirty_pages();
-      // The segment is full. We need to rewrite it in order to merge in the writes.
-      RewriteSegments(segment_base, records.begin() + i, records.begin() + end_idx);
+      // The segment is full. We need to rewrite it in order to merge in the
+      // writes.
+      if (options_.use_segments) {
+        RewriteSegments(segment_base, records.begin() + i,
+                        records.begin() + end_idx);
+      } else {
+        FlattenChain(segment_base, records.begin() + i,
+                     records.begin() + end_idx);
+      }
       return Status::OK();
     }
   }

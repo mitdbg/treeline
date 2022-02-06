@@ -51,6 +51,14 @@ class PageMergeIterator {
     return merged_iterators_.top()->value();
   }
 
+  size_t RecordsLeft() const {
+    size_t records_left = 0;
+    for (auto& it : page_iterators_) {
+      records_left += it.RecordsLeft();
+    }
+    return records_left;
+  }
+
  private:
   // This is a comparison function for the priority queue. This function is
   // supposed to return true if `left` is strictly smaller than `right`.

@@ -421,11 +421,106 @@ void Manager::RewriteSegments(
   // be forced to disk for crash consistency).
 }
 
-void Manager::FlattenChain(Key base,
-                           std::vector<Record>::const_iterator addtl_rec_begin,
-                           std::vector<Record>::const_iterator addtl_rec_end) {
-  // TODO: Implement `RewriteSegments()` but for page chains (will primarily
-  // delegate to `LoadIntoNewPages()`).
+void Manager::FlattenChain(
+    const Key base, const std::vector<Record>::const_iterator addtl_rec_begin,
+    const std::vector<Record>::const_iterator addtl_rec_end) {
+  auto it = index_.lower_bound(base);
+  assert(it != index_.end());
+  assert(base == it->first);
+  assert(it->second.page_count() == 1);
+  const SegmentId main_page_id = it->second.id();
+
+  // Retrieve the upper bound.
+  ++it;
+  Key upper = std::numeric_limits<Key>::max();
+  if (it != index_.end()) {
+    upper = it->first;
+  }
+
+  // Load the existing page(s).
+  PageBuffer buf = PageMemoryAllocator::Allocate(/*num_pages=*/2);
+  ReadPage(main_page_id, 0, buf.get());
+  pg::Page main(buf.get());
+  const SegmentId overflow_page_id = main.GetOverflow();
+  if (overflow_page_id.IsValid()) {
+    // Read the overflow too.
+    ReadPage(overflow_page_id, 0, buf.get() + pg::Page::kSize);
+  }
+  const PageChain pc =
+      main.HasOverflow()
+          ? PageChain::WithOverflow(buf.get(), buf.get() + pg::Page::kSize)
+          : PageChain::SingleOnly(buf.get());
+  PageMergeIterator pmi = pc.GetIterator();
+
+  // Merge the records in the chain with those in memory. If two records have
+  // the same key, we prefer the in-memory one (it is a more recent write).
+  std::vector<Record> records;
+  records.reserve(pmi.RecordsLeft() + (addtl_rec_end - addtl_rec_begin));
+  auto rec_it = addtl_rec_begin;
+  while (pmi.Valid() && rec_it != addtl_rec_end) {
+    const Key pmi_key = key_utils::ExtractHead64(pmi.key());
+    if (pmi_key == rec_it->first) {
+      records.push_back(*rec_it);
+      ++rec_it;
+      pmi.Next();
+    } else if (pmi_key < rec_it->first) {
+      records.emplace_back(pmi_key, pmi.value());
+      pmi.Next();
+    } else {
+      // `pmi_key > rec_it->first`
+      records.push_back(*rec_it);
+      ++rec_it;
+    }
+  }
+  while (pmi.Valid()) {
+    const Key pmi_key = key_utils::ExtractHead64(pmi.key());
+    records.emplace_back(pmi_key, pmi.value());
+    pmi.Next();
+  }
+  while (rec_it != addtl_rec_end) {
+    records.push_back(*rec_it);
+    ++rec_it;
+  }
+
+  const uint32_t sequence_number = next_sequence_number_++;
+
+  // TODO: Log that we're running a page chain rewrite (include the sequence
+  // number and the segment ID).
+  const auto new_pages = LoadIntoNewPages(sequence_number, base, upper,
+                                          records.begin(), records.end());
+
+  // Update the free list and mark the old pages as invalid.
+  void* const zero = buf.get();
+  memset(zero, 0, pg::Page::kSize);
+  std::vector<std::future<void>> write_futures;
+  if (bg_threads_ != nullptr) {
+    write_futures.push_back(bg_threads_->Submit(
+        [this, main_page_id, zero]() { WritePage(main_page_id, 0, zero); }));
+    free_.Add(main_page_id);
+    if (overflow_page_id.IsValid()) {
+      write_futures.push_back(
+          bg_threads_->Submit([this, overflow_page_id, zero]() {
+            WritePage(overflow_page_id, 0, zero);
+          }));
+      free_.Add(overflow_page_id);
+    }
+
+  } else {
+    WritePage(main_page_id, 0, buf.get());
+    free_.Add(main_page_id);
+    if (overflow_page_id.IsValid()) {
+      WritePage(overflow_page_id, 0, buf.get());
+      free_.Add(overflow_page_id);
+    }
+  }
+
+  // Remove the old segment info and replace it with the new pages.
+  index_.erase(base);
+  index_.insert(new_pages.begin(), new_pages.end());
+
+  for (auto& f : write_futures) {
+    f.get();
+  }
 }
 
 }  // namespace pg
