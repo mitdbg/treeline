@@ -181,8 +181,12 @@ Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {
       if (!status.ok()) {
         return status;
       }
-      curr_base = it->first;
-      curr_sinfo = &(it->second);
+
+      // Important to redo the lookup since `WriteToSegment()` might have
+      // modified the index.
+      const auto it2 = SegmentForKey(records[i].first);
+      curr_base = it2->first;
+      curr_sinfo = &(it2->second);
       start_idx = i;
     }
   }
