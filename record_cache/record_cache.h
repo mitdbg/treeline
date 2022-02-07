@@ -131,7 +131,7 @@ class RecordCache {
   // The number of cache entries.
   const uint64_t capacity_;
 
-  // The options of the unedlying database.
+  // The options of the underlying database.
   Options* options_;
 
   // The statistics of the underlying database.
