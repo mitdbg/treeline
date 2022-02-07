@@ -33,8 +33,10 @@ class Manager {
     // for debug purposes.
     bool write_debug_info = true;
 
-    // If set to false, direct I/O will be disabled (used for end-to-end tests).
-    bool use_direct_io = true;
+    // If set to true, direct I/O will be disabled and synchronous writes will
+    // also be disabled. (This is used for the automated tests and for when not
+    // running benchmarks).
+    bool use_buffered_io = false;
 
     // If set to 0, no background threads will be used.
     size_t num_bg_threads = 16;

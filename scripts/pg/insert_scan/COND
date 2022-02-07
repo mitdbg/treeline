@@ -7,12 +7,13 @@ CONFIGS = [
     "delta": 5,
     "record_size_bytes": 64,
   },
+  # Skipped for speed
   # Represents 1024 B records, 2048 bytes per page +/- (2 * 1024) bytes
-  {
-    "goal": 2,
-    "delta": 1,
-    "record_size_bytes": 1024,
-  },
+  #{
+  #  "goal": 2,
+  #  "delta": 1,
+  #  "record_size_bytes": 1024,
+  #},
 ]
 
 CUSTOM_DATASETS = [
@@ -81,7 +82,7 @@ group(
 for config in CONFIGS:
   run_command(
     name="preload-uniform-{record_size_bytes}-{goal}-{delta}-segs".format(**config),
-    run="../preload.sh "
+    run="../preload_insert_scan.sh "
       "--workload_config=workloads/preload-uniform-insert.yml "
       "--records_per_page_goal={goal} "
       "--records_per_page_delta={delta} "
@@ -92,7 +93,7 @@ for config in CONFIGS:
 
   run_command(
     name="preload-uniform-{record_size_bytes}-{goal}-{delta}-pages".format(**config),
-    run="../preload.sh "
+    run="../preload_insert_scan.sh "
       "--workload_config=workloads/preload-uniform-insert.yml "
       "--records_per_page_goal={goal} "
       "--records_per_page_delta={delta} "
@@ -108,7 +109,7 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
       dataset=dataset["name"],
       **config,
     ),
-    run="../preload.sh "
+    run="../preload_insert_scan.sh "
       "--workload_config=workloads/preload-{dataset}-insert.yml "
       "--custom_dataset='$TP_DATASET_PATH/{dataset_file}' "
       "--records_per_page_goal={goal} "
@@ -127,7 +128,7 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
       dataset=dataset["name"],
       **config,
     ),
-    run="../preload.sh "
+    run="../preload_insert_scan.sh "
       "--workload_config=workloads/preload-{dataset}-insert.yml "
       "--custom_dataset='$TP_DATASET_PATH/{dataset_file}' "
       "--records_per_page_goal={goal} "

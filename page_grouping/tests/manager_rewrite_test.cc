@@ -38,13 +38,20 @@ std::vector<std::pair<uint64_t, Slice>> BuildRecords(
   return records;
 }
 
-TEST_F(ManagerRewriteTest, AppendSegments) {
+Manager::Options GetOptions(size_t goal, size_t delta, bool use_segments) {
   Manager::Options options;
-  options.records_per_page_goal = 15;
-  options.records_per_page_delta = 5;
-  options.use_segments = true;
+  options.records_per_page_goal = goal;
+  options.records_per_page_delta = delta;
+  options.use_segments = use_segments;
   options.write_debug_info = false;
-  options.use_direct_io = false;
+  options.use_buffered_io = true;
+  options.num_bg_threads = 0;
+  return options;
+}
+
+TEST_F(ManagerRewriteTest, AppendSegments) {
+  Manager::Options options =
+      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
   options.num_bg_threads = 2;
 
   // Insert sequential records.
@@ -100,12 +107,8 @@ TEST_F(ManagerRewriteTest, AppendSegments) {
 }
 
 TEST_F(ManagerRewriteTest, AppendPages) {
-  Manager::Options options;
-  options.records_per_page_goal = 15;
-  options.records_per_page_delta = 5;
-  options.use_segments = false;
-  options.write_debug_info = false;
-  options.use_direct_io = false;
+  Manager::Options options =
+      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
   options.num_bg_threads = 2;
 
   // Insert sequential records.
@@ -161,12 +164,8 @@ TEST_F(ManagerRewriteTest, AppendPages) {
 }
 
 TEST_F(ManagerRewriteTest, InsertMiddleSegments) {
-  Manager::Options options;
-  options.records_per_page_goal = 15;
-  options.records_per_page_delta = 5;
-  options.use_segments = true;
-  options.write_debug_info = false;
-  options.use_direct_io = false;
+  Manager::Options options =
+      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
   options.num_bg_threads = 2;
 
   // Create a new dataset by multiplying each sequential key by 1000.
@@ -184,10 +183,10 @@ TEST_F(ManagerRewriteTest, InsertMiddleSegments) {
   std::vector<uint64_t> keys_to_insert;
   keys_to_insert.reserve(num_inserts);
   const size_t mid = new_keys.size() / 2;
-  const std::vector<uint64_t> left =
-      Datasets::FloydSample(400, new_keys[mid - 50] + 1, new_keys[mid - 49] - 1, prng);
-  const std::vector<uint64_t> right =
-      Datasets::FloydSample(400, new_keys[mid + 50] + 1, new_keys[mid + 51] - 1, prng);
+  const std::vector<uint64_t> left = Datasets::FloydSample(
+      400, new_keys[mid - 50] + 1, new_keys[mid - 49] - 1, prng);
+  const std::vector<uint64_t> right = Datasets::FloydSample(
+      400, new_keys[mid + 50] + 1, new_keys[mid + 51] - 1, prng);
   keys_to_insert.insert(keys_to_insert.end(), left.begin(), left.end());
   keys_to_insert.insert(keys_to_insert.end(), right.begin(), right.end());
 
@@ -246,12 +245,8 @@ TEST_F(ManagerRewriteTest, InsertMiddleSegments) {
 }
 
 TEST_F(ManagerRewriteTest, InsertMiddlePages) {
-  Manager::Options options;
-  options.records_per_page_goal = 15;
-  options.records_per_page_delta = 5;
-  options.use_segments = false;
-  options.write_debug_info = false;
-  options.use_direct_io = false;
+  Manager::Options options =
+      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
   options.num_bg_threads = 2;
 
   // Create a new dataset by multiplying each sequential key by 1000.
@@ -269,10 +264,10 @@ TEST_F(ManagerRewriteTest, InsertMiddlePages) {
   std::vector<uint64_t> keys_to_insert;
   keys_to_insert.reserve(num_inserts);
   const size_t mid = new_keys.size() / 2;
-  const std::vector<uint64_t> left =
-      Datasets::FloydSample(50, new_keys[mid - 50] + 1, new_keys[mid - 49] - 1, prng);
-  const std::vector<uint64_t> right =
-      Datasets::FloydSample(50, new_keys[mid + 50] + 1, new_keys[mid + 51] - 1, prng);
+  const std::vector<uint64_t> left = Datasets::FloydSample(
+      50, new_keys[mid - 50] + 1, new_keys[mid - 49] - 1, prng);
+  const std::vector<uint64_t> right = Datasets::FloydSample(
+      50, new_keys[mid + 50] + 1, new_keys[mid + 51] - 1, prng);
   keys_to_insert.insert(keys_to_insert.end(), left.begin(), left.end());
   keys_to_insert.insert(keys_to_insert.end(), right.begin(), right.end());
 

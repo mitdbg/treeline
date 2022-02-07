@@ -10,3 +10,6 @@ DEFINE_uint32(
     "The number of records on a page can vary by +/- two times this value.");
 DEFINE_uint32(bg_threads, 16,
               "The number of background threads to use (for I/O).");
+DEFINE_bool(use_buffered_io, false,
+            "Set to use buffered I/O. This should NOT be set when running "
+            "actual performance benchmarks.");

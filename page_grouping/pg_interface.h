@@ -136,6 +136,7 @@ class PageGroupingInterface {
     options.records_per_page_delta = FLAGS_records_per_page_delta;
     options.use_segments = !FLAGS_disable_segments;
     options.num_bg_threads = FLAGS_bg_threads;
+    options.use_buffered_io = FLAGS_use_buffered_io;
     return options;
   }
 

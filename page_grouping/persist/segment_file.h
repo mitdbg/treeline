@@ -40,17 +40,20 @@ class SegmentFile {
         next_page_allocation_offset_(0),
         pages_per_segment_(0) {}
 
-  SegmentFile(const std::filesystem::path& name, bool use_direct_io,
-              size_t pages_per_segment)
+  SegmentFile(const std::filesystem::path& name, size_t pages_per_segment,
+              bool use_buffered_io = false)
       : fd_(-1),
         file_size_(0),
         next_page_allocation_offset_(0),
         pages_per_segment_(pages_per_segment) {
     assert(pages_per_segment > 0);
+    int flags = O_CREAT | O_RDWR;
+    if (!use_buffered_io) {
+      flags |= O_DIRECT;
+      flags |= O_SYNC;
+    }
     CHECK_ERROR(
-        fd_ = open(name.c_str(),
-                   O_CREAT | O_RDWR | O_SYNC | (use_direct_io ? O_DIRECT : 0),
-                   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH));
+        fd_ = open(name.c_str(), flags, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH));
 
     // Retrieve the file's size.
     struct stat file_status;
@@ -126,9 +129,7 @@ class SegmentFile {
     return next_page_allocation_offset_ / (pages_per_segment_ * Page::kSize);
   }
 
-  size_t PagesPerSegment() const {
-    return pages_per_segment_;
-  }
+  size_t PagesPerSegment() const { return pages_per_segment_; }
 
   Status ReadPages(size_t offset, void* data, size_t num_pages) const {
     if (offset >= next_page_allocation_offset_) {

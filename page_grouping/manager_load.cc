@@ -81,8 +81,8 @@ Manager Manager::BulkLoadIntoSegments(
   for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
     segment_files.emplace_back(
         db_path / (kSegmentFilePrefix + std::to_string(i)),
-        options.use_direct_io,
-        /*pages_per_segment=*/SegmentBuilder::kSegmentPageCounts[i]);
+        /*pages_per_segment=*/SegmentBuilder::kSegmentPageCounts[i],
+        options.use_buffered_io);
   }
 
   Manager m(db_path, {}, std::move(segment_files), options,
@@ -126,7 +126,7 @@ Manager Manager::BulkLoadIntoPages(
   // One single file containing 4 KiB pages.
   std::vector<SegmentFile> segment_files;
   segment_files.emplace_back(db / (kSegmentFilePrefix + "0"),
-                             options.use_direct_io, /*pages_per_segment=*/1);
+                             /*pages_per_segment=*/1, options.use_buffered_io);
 
   Manager m(db, {}, std::move(segment_files), options,
             /*next_sequence_number=*/0, FreeList());

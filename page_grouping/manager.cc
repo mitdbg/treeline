@@ -67,7 +67,7 @@ Manager Manager::Reopen(const fs::path& db, const Options& options) {
     if (i > 0 && !uses_segments) break;
     const size_t pages_per_segment = SegmentBuilder::kSegmentPageCounts[i];
     segment_files.emplace_back(db / (kSegmentFilePrefix + std::to_string(i)),
-                               options.use_direct_io, pages_per_segment);
+                               pages_per_segment, options.use_buffered_io);
     SegmentFile& sf = segment_files.back();
 
     const size_t num_segments = sf.NumAllocatedSegments();

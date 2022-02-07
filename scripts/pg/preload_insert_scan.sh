@@ -45,7 +45,7 @@ echo >&2 "Creating the database..."
 
 ../../build/page_grouping/pg_bench \
   --db_path=$full_checkpoint_path \
-  --workload_config=$workload_path \
+  --workload_config=workloads/preload.yml \
   --seed=$SEED \
   --output_path=$COND_OUT \
   --verbose \
@@ -54,6 +54,18 @@ echo >&2 "Creating the database..."
 
 echo >&2 "Done loading. Shuffling the pages now..."
 
-../../build/page_grouping/tools/pg_shuffle \
+../../build/page_grouping/pg_shuffle \
   --db_path=$full_checkpoint_path \
   --seed=$SEED
+
+echo >&2 "Done shuffling. Making the incremental writes now..."
+
+../../build/page_grouping/pg_bench \
+  --db_path=$full_checkpoint_path \
+  --workload_config=$workload_path \
+  --seed=$SEED \
+  --output_path=$COND_OUT \
+  --verbose \
+  --skip_load \
+  --use_buffered_io \
+  ${args[@]}
