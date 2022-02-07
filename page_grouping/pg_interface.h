@@ -64,7 +64,7 @@ class PageGroupingInterface {
     } else {
       // No-op. Will initialize during bulk load.
     }
-    write_batch_.reserve(kWriteBatchSize);
+    write_batch_.reserve(FLAGS_write_batch_size);
   }
 
   // Called once if `InitializeDatabase()` has been called.
@@ -106,7 +106,7 @@ class PageGroupingInterface {
   // Insert the specified key value pair. Return true if the insert succeeded.
   bool Insert(ycsbr::Request::Key key, const char* value, size_t value_size) {
     write_batch_.emplace_back(key, Slice(value, value_size));
-    if (write_batch_.size() >= kWriteBatchSize) {
+    if (write_batch_.size() >= FLAGS_write_batch_size) {
       SubmitWrites();
     }
     return true;
@@ -152,7 +152,6 @@ class PageGroupingInterface {
   std::filesystem::path db_path_;
   std::optional<Manager> pg_mgr_;
 
-  static constexpr size_t kWriteBatchSize = 10000;
   std::vector<std::pair<ycsbr::Request::Key, Slice>> write_batch_;
 
   // Combined read/write counts from all worker threads.

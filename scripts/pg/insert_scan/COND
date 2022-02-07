@@ -1,11 +1,14 @@
 from itertools import product
 
+BUFFER_SIZE_BYTES = 64 * 1024 * 1024
+
 CONFIGS = [
   # Represents 64 B records, 2880 bytes per page +/- (2 * 320) bytes
   {
     "goal": 45,
     "delta": 5,
     "record_size_bytes": 64,
+    "write_batch_size": BUFFER_SIZE_BYTES // 64,
   },
   # Skipped for speed
   # Represents 1024 B records, 2048 bytes per page +/- (2 * 1024) bytes
@@ -13,6 +16,7 @@ CONFIGS = [
   #  "goal": 2,
   #  "delta": 1,
   #  "record_size_bytes": 1024,
+  #  "write_batch_size": BUFFER_SIZE_BYTES // 1024,
   #},
 ]
 
@@ -88,6 +92,7 @@ for config in CONFIGS:
       "--records_per_page_delta={delta} "
       "--record_size_bytes={record_size_bytes} "
       "--checkpoint_name=uniform_insert-{record_size_bytes}-{goal}-{delta}-segs "
+      "--write_batch_size={write_batch_size} "
       "--disable_segments=false".format(**config),
   )
 
@@ -99,6 +104,7 @@ for config in CONFIGS:
       "--records_per_page_delta={delta} "
       "--record_size_bytes={record_size_bytes} "
       "--checkpoint_name=uniform_insert-{record_size_bytes}-{goal}-{delta}-pages "
+      "--write_batch_size={write_batch_size} "
       "--disable_segments=true".format(**config),
   )
 
@@ -116,6 +122,7 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
       "--records_per_page_delta={delta} "
       "--record_size_bytes={record_size_bytes} "
       "--checkpoint_name={dataset}_insert-{record_size_bytes}-{goal}-{delta}-segs "
+      "--write_batch_size={write_batch_size} "
       "--disable_segments=false".format(
         dataset=dataset["name"],
         dataset_file=dataset["file"],
@@ -135,6 +142,7 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
       "--records_per_page_delta={delta} "
       "--record_size_bytes={record_size_bytes} "
       "--checkpoint_name={dataset}_insert-{record_size_bytes}-{goal}-{delta}-pages "
+      "--write_batch_size={write_batch_size} "
       "--disable_segments=true".format(
         dataset=dataset["name"],
         dataset_file=dataset["file"],

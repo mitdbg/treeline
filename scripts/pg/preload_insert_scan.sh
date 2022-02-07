@@ -69,3 +69,8 @@ echo >&2 "Done shuffling. Making the incremental writes now..."
   --skip_load \
   --use_buffered_io \
   ${args[@]}
+
+# Store a copy of the database debug information if it exists.
+if [ -d "$full_checkpoint_path/debug" ]; then
+  cp -r $full_checkpoint_path/debug $COND_OUT
+fi

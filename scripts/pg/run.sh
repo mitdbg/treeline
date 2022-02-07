@@ -74,8 +74,11 @@ code=$?
 kill -s SIGINT -- $iostat_pid
 wait
 
-# Store the database size.
+# Store the database size and debug information.
 du -b $DB_PATH >$COND_OUT/db_space.log
+if [ -d "$DB_PATH/debug" ]; then
+  cp -r $DB_PATH/debug $COND_OUT
+fi
 
 # Report that the experiment failed if the `run_custom` exit code is not 0
 if [ $code -ne 0 ]; then

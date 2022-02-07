@@ -8,3 +8,4 @@ DECLARE_uint32(records_per_page_goal);
 DECLARE_uint32(records_per_page_delta);
 DECLARE_uint32(bg_threads);
 DECLARE_bool(use_buffered_io);
+DECLARE_uint32(write_batch_size);

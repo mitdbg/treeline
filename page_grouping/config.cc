@@ -13,3 +13,5 @@ DEFINE_uint32(bg_threads, 16,
 DEFINE_bool(use_buffered_io, false,
             "Set to use buffered I/O. This should NOT be set when running "
             "actual performance benchmarks.");
+DEFINE_uint32(write_batch_size, 1000000,
+              "The number of records to batch before initiating a write.");
