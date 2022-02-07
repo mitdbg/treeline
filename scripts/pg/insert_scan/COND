@@ -16,7 +16,8 @@ CONFIGS = [
 ]
 
 CUSTOM_DATASETS = [
-  {"name": "amzn", "file": "amazon_reviews.txt", "workload": "long_scan-amzn.yml"},
+# Skipped due to disk usage constraints
+# {"name": "amzn", "file": "amazon_reviews.txt", "workload": "long_scan-amzn.yml"},
   {"name": "osm", "file": "osm_ny.txt", "workload": "long_scan-osm.yml"},
 ]
 
@@ -91,7 +92,7 @@ for config in CONFIGS:
 
   run_command(
     name="preload-uniform-{record_size_bytes}-{goal}-{delta}-pages".format(**config),
-    run="./preload.sh "
+    run="../preload.sh "
       "--workload_config=workloads/preload-uniform-insert.yml "
       "--records_per_page_goal={goal} "
       "--records_per_page_delta={delta} "
@@ -107,7 +108,7 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
       dataset=dataset["name"],
       **config,
     ),
-    run="./preload.sh "
+    run="../preload.sh "
       "--workload_config=workloads/preload-{dataset}-insert.yml "
       "--custom_dataset='$TP_DATASET_PATH/{dataset_file}' "
       "--records_per_page_goal={goal} "
@@ -126,7 +127,7 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
       dataset=dataset["name"],
       **config,
     ),
-    run="./preload.sh "
+    run="../preload.sh "
       "--workload_config=workloads/preload-{dataset}-insert.yml "
       "--custom_dataset='$TP_DATASET_PATH/{dataset_file}' "
       "--records_per_page_goal={goal} "
@@ -139,11 +140,3 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
         **config,
       ),
   )
-
-run_command(
-  name="ssd_data",
-  run="python3 process_fio.py",
-  deps=[
-    "//scripts/iochar/read:read_rand_sweep",
-  ],
-)
