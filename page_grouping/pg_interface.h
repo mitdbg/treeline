@@ -64,11 +64,15 @@ class PageGroupingInterface {
     } else {
       // No-op. Will initialize during bulk load.
     }
+    write_batch_.reserve(kWriteBatchSize);
   }
 
   // Called once if `InitializeDatabase()` has been called.
   // Put any needed clean up code in here.
   void ShutdownDatabase() {
+    if (write_batch_.size() > 0) {
+      SubmitWrites();
+    }
     // Purposefully keep the `Manager` around for statistics aggregation in
     // `ShutdownWorker()`.
   }
@@ -101,7 +105,11 @@ class PageGroupingInterface {
 
   // Insert the specified key value pair. Return true if the insert succeeded.
   bool Insert(ycsbr::Request::Key key, const char* value, size_t value_size) {
-    return false;
+    write_batch_.emplace_back(key, Slice(value, value_size));
+    if (write_batch_.size() >= kWriteBatchSize) {
+      SubmitWrites();
+    }
+    return true;
   }
 
   // Read the value at the specified key. Return true if the read succeeded.
@@ -117,13 +125,9 @@ class PageGroupingInterface {
     return pg_mgr_->Scan(key, amount, scan_out).ok();
   }
 
-  const std::vector<size_t>& GetReadCounts() const {
-    return read_counts_;
-  }
+  const std::vector<size_t>& GetReadCounts() const { return read_counts_; }
 
-  const std::vector<size_t>& GetWriteCounts() const {
-    return write_counts_;
-  }
+  const std::vector<size_t>& GetWriteCounts() const { return write_counts_; }
 
  private:
   Manager::Options GetOptions() {
@@ -131,11 +135,24 @@ class PageGroupingInterface {
     options.records_per_page_goal = FLAGS_records_per_page_goal;
     options.records_per_page_delta = FLAGS_records_per_page_delta;
     options.use_segments = !FLAGS_disable_segments;
+    options.num_bg_threads = FLAGS_bg_threads;
     return options;
+  }
+
+  void SubmitWrites() {
+    std::sort(write_batch_.begin(), write_batch_.end(),
+              [](const auto& left, const auto& right) {
+                return left.first < right.first;
+              });
+    pg_mgr_->PutBatch(write_batch_);
+    write_batch_.clear();
   }
 
   std::filesystem::path db_path_;
   std::optional<Manager> pg_mgr_;
+
+  static constexpr size_t kWriteBatchSize = 10000;
+  std::vector<std::pair<ycsbr::Request::Key, Slice>> write_batch_;
 
   // Combined read/write counts from all worker threads.
   std::mutex mutex_;

@@ -8,3 +8,5 @@ DEFINE_uint32(records_per_page_goal, 45,
 DEFINE_uint32(
     records_per_page_delta, 5,
     "The number of records on a page can vary by +/- two times this value.");
+DEFINE_uint32(bg_threads, 16,
+              "The number of background threads to use (for I/O).");
