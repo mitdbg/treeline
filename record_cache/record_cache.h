@@ -88,10 +88,9 @@ class RecordCache {
 
   // Retrieve an ascending range of at most `num_records` records, starting from
   // the smallest record whose key is greater than or equal to `start_key`. The
-  // cache indices holding the records are return in `indices_out`, while the
-  // actual number of retrieved records is in `num_found`.
+  // cache indices holding the records are return in `indices_out`.
   Status GetRange(const Slice& start_key, size_t num_records,
-                  uint64_t indices_out[], size_t& num_found) const;
+                  std::vector<uint64_t>* indices_out) const;
 
   // Writes out all dirty cache entries to the appropriate longer-term data
   // structure. If this process creates overflow chains of length at least

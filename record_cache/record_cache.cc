@@ -128,7 +128,7 @@ Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
 }
 
 Status RecordCache::GetRange(const Slice& start_key, size_t num_records,
-                             uint64_t indices_out[], size_t& num_found) const {
+                             std::vector<uint64_t>* indices_out) const {
   Key art_key;
   SliceToARTKey(start_key, art_key);
   auto t = tree_->getThreadInfo();
@@ -136,11 +136,14 @@ Status RecordCache::GetRange(const Slice& start_key, size_t num_records,
   TID results_out[num_records];
 
   // Retrieve & lock in ART.
+  size_t num_found = 0;
   tree_->lookupRange(art_key, &cache_entries, results_out, num_records,
                      num_found, t);
 
+  // Place in vector.
+  indices_out->resize(num_found);
   for (uint64_t i = 0; i < num_found; ++i) {
-    indices_out[i] = results_out[i] - 1;
+    indices_out->at(i) = results_out[i] - 1;
   }
 
   return Status::OK();

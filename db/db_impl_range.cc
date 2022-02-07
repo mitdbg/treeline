@@ -13,9 +13,9 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
   PhysicalPageId curr_page_id = model_->KeyToPageId(start_key);
   bool is_first_page = true;
 
-  uint64_t indices_out[num_records];
-  size_t num_found = 0;
-  rec_cache_->GetRange(start_key, num_records, indices_out, num_found);
+  std::vector<uint64_t> indices_out;
+  rec_cache_->GetRange(start_key, num_records, &indices_out);
+  size_t num_found = indices_out.size();
   size_t curr = 0;
 
   while (results_out->size() < num_records && curr_page_id.IsValid()) {

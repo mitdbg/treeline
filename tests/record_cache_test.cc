@@ -49,8 +49,6 @@ TEST(RecordCacheTest, PutFromRead) {
   ASSERT_EQ(value.compare(rc.cache_entries[index_out].GetValue()), 0);
   ASSERT_FALSE(rc.cache_entries[index_out].IsDirty());
   rc.cache_entries[index_out].Unlock();
-
-  
 }
 
 TEST(RecordCacheTest, MultiPutGet) {
@@ -96,16 +94,13 @@ TEST(RecordCacheTest, RangeScan) {
 
   uint64_t index_out;
   uint64_t scan_length = 10;
-  uint64_t results[scan_length];
+  std::vector<uint64_t> results;
 
   for (auto i = 100; i < 200; ++i) {
     std::string start_key_s = "a" + std::to_string(i);
 
-    uint64_t scanned_recs;
-
-    ASSERT_TRUE(
-        rc.GetRange(Slice(start_key_s), scan_length, results, scanned_recs)
-            .ok());
+    ASSERT_TRUE(rc.GetRange(Slice(start_key_s), scan_length, &results).ok());
+    uint64_t scanned_recs = results.size();
     ASSERT_EQ(scanned_recs, i < 200 - scan_length ? scan_length : 200 - i);
 
     for (auto j = 0; j < scanned_recs; ++j) {
