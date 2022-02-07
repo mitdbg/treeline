@@ -10,19 +10,17 @@ CONFIGS = [
     "record_size_bytes": 64,
     "write_batch_size": BUFFER_SIZE_BYTES // 64,
   },
-  # Skipped for speed
   # Represents 1024 B records, 2048 bytes per page +/- (2 * 1024) bytes
-  #{
-  #  "goal": 2,
-  #  "delta": 1,
-  #  "record_size_bytes": 1024,
-  #  "write_batch_size": BUFFER_SIZE_BYTES // 1024,
-  #},
+  {
+    "goal": 2,
+    "delta": 1,
+    "record_size_bytes": 1024,
+    "write_batch_size": BUFFER_SIZE_BYTES // 1024,
+  },
 ]
 
 CUSTOM_DATASETS = [
-# Skipped due to disk usage constraints
-# {"name": "amzn", "file": "amazon_reviews.txt", "workload": "long_scan-amzn.yml"},
+  {"name": "amzn", "file": "amazon_reviews.txt", "workload": "long_scan-amzn.yml"},
   {"name": "osm", "file": "osm_ny.txt", "workload": "long_scan-osm.yml"},
 ]
 
