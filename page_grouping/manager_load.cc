@@ -215,6 +215,7 @@ std::pair<Key, SegmentInfo> Manager::LoadIntoNewSegment(
   }
 
   sf.WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), seg.page_count);
+  w_.BumpWriteCount(seg.page_count);
   return std::make_pair(
       base_key, SegmentInfo(seg_id, seg.model.has_value()
                                         ? seg.model->line()
@@ -258,6 +259,7 @@ std::vector<std::pair<Key, SegmentInfo>> Manager::LoadIntoNewPages(
                          /*page_offset=*/byte_offset / pg::Page::kSize);
     }
     sf.WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), /*num_pages=*/1);
+    w_.BumpWriteCount(1);
 
     // Record the page boundary.
     segment_boundaries.emplace_back(
@@ -289,6 +291,7 @@ std::vector<std::pair<Key, SegmentInfo>> Manager::LoadIntoNewPages(
                          /*page_offset=*/byte_offset / pg::Page::kSize);
     }
     sf.WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), /*num_pages=*/1);
+    w_.BumpWriteCount(1);
 
     segment_boundaries.emplace_back(
         lower, SegmentInfo(seg_id, std::optional<plr::Line64>()));

@@ -357,6 +357,7 @@ void Manager::WritePage(const SegmentId& seg_id, size_t page_idx,
   const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
   sf.WritePages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
                 /*num_pages=*/1);
+  w_.BumpWriteCount(1);
 }
 
 void Manager::ReadSegment(const SegmentId& seg_id) const {

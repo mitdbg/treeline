@@ -70,6 +70,7 @@ class Manager {
 
   // Benchmark statistics.
   const std::vector<size_t>& GetReadCounts() const { return w_.read_counts(); }
+  const std::vector<size_t>& GetWriteCounts() const { return w_.write_counts(); }
 
   Manager(const Manager&) = delete;
   Manager& operator=(const Manager&) = delete;

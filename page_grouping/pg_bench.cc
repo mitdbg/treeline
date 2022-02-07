@@ -140,5 +140,15 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  // Write I/O statistics.
+  {
+    const auto& write_counts = session.db().GetWriteCounts();
+    std::ofstream out(output_dir / "write_counts.csv");
+    out << "num_contiguous_pages,count" << std::endl;
+    for (size_t i = 0; i < write_counts.size(); ++i) {
+      out << (i + 1) << "," << write_counts[i] << std::endl;
+    }
+  }
+
   return 0;
 }

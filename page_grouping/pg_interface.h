@@ -41,6 +41,15 @@ class PageGroupingInterface {
         read_counts_[i] += local_read_counts[i];
       }
     }
+    if (write_counts_.empty()) {
+      write_counts_ = pg_mgr_->GetWriteCounts();
+    } else {
+      const auto& local_write_counts = pg_mgr_->GetWriteCounts();
+      assert(write_counts_.size() == local_write_counts.size());
+      for (size_t i = 0; i < local_write_counts.size(); ++i) {
+        write_counts_[i] += local_write_counts[i];
+      }
+    }
   }
 
   // Called once before the benchmark.
@@ -112,6 +121,10 @@ class PageGroupingInterface {
     return read_counts_;
   }
 
+  const std::vector<size_t>& GetWriteCounts() const {
+    return write_counts_;
+  }
+
  private:
   Manager::Options GetOptions() {
     Manager::Options options;
@@ -124,9 +137,9 @@ class PageGroupingInterface {
   std::filesystem::path db_path_;
   std::optional<Manager> pg_mgr_;
 
-  // Combined read counts from all worker threads.
+  // Combined read/write counts from all worker threads.
   std::mutex mutex_;
-  std::vector<size_t> read_counts_;
+  std::vector<size_t> read_counts_, write_counts_;
 };
 
 }  // namespace pg
