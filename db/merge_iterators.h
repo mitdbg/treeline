@@ -102,7 +102,7 @@ class MemTableMergeIterator {
 // iterators; all records will be returned (in ascending order).
 class PageMergeIterator {
  public:
-  explicit PageMergeIterator(const DBImpl::OverflowChain& page_chain,
+  explicit PageMergeIterator(const OverflowChain& page_chain,
                              const Slice* start_key = nullptr)
       : merged_iterators_(&PageMergeIterator::Compare) {
     page_iterators_.reserve(page_chain->size());

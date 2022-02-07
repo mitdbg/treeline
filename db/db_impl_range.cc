@@ -6,29 +6,17 @@ namespace llsm {
 
 Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
                         const size_t num_records, RecordBatch* results_out) {
-  // We need hold a copy of the memtable shared pointers to ensure the memtables
-  // do not get deleted while we do the scan.
-  std::shared_ptr<MemTable> local_mtable = nullptr;
-  std::shared_ptr<MemTable> local_im_mtable = nullptr;
-  {
-    std::unique_lock<std::mutex> mtable_lock(mtable_mutex_);
-    local_mtable = mtable_;
-    local_im_mtable = im_mtable_;
-  }
-
-  MemTable::Iterator active = local_mtable->GetIterator();
-  std::optional<MemTable::Iterator> immutable =
-      local_im_mtable != nullptr ? local_im_mtable->GetIterator()
-                                 : std::optional<MemTable::Iterator>();
-
-  MemTableMergeIterator mtable_it(local_mtable, local_im_mtable, start_key);
-
   results_out->clear();
   results_out->reserve(num_records);
 
   OverflowChain curr_page_chain = nullptr;
   PhysicalPageId curr_page_id = model_->KeyToPageId(start_key);
   bool is_first_page = true;
+
+  std::vector<uint64_t> indices_out;
+  rec_cache_->GetRange(start_key, num_records, &indices_out);
+  size_t num_found = indices_out.size();
+  size_t curr = 0;
 
   while (results_out->size() < num_records && curr_page_id.IsValid()) {
     // If we had already fixed a chain previously, we want to keep it fixed
@@ -38,7 +26,8 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
 
     while (curr_page_id.IsValid()) {
       curr_page_chain = FixOverflowChain(curr_page_id, /*exclusive=*/false,
-                                         /*unlock_before_returning=*/false);
+                                         /*unlock_before_returning=*/false,
+                                         buf_mgr_, model_, &stats_);
       if (curr_page_chain != nullptr) break;
 
       // Query the model for the page ID again because it may have changed due
@@ -72,26 +61,25 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
 
     PageMergeIterator page_it(curr_page_chain,
                               is_first_page ? &start_key : nullptr);
-    if (is_first_page) {
-      is_first_page = false;
-    }
+    is_first_page = false;
 
-    // Merge the memtable results with the page results, prioritizing the
-    // memtable(s) for records with the same key.
-    while (results_out->size() < num_records && mtable_it.Valid() &&
+    // Merge the record cache results with the page results, prioritizing the
+    // record cache for records with the same key.
+    while (results_out->size() < num_records && curr < num_found &&
            page_it.Valid()) {
-      const int compare = mtable_it.key().compare(page_it.key());
+      auto rc_entry = &RecordCache::cache_entries[indices_out[curr]];
+      const int compare = rc_entry->GetKey().compare(page_it.key());
       if (compare <= 0) {
-        // We do not emit the record if it was deleted.
-        if (mtable_it.type() == format::WriteType::kWrite) {
-          results_out->emplace_back(mtable_it.key().ToString(),
-                                    mtable_it.value().ToString());
+        // We only emit the record if it was a write, not a delete.
+        if (rc_entry->IsWrite()) {
+          results_out->emplace_back(rc_entry->GetKey().ToString(),
+                                    rc_entry->GetValue().ToString());
         }
         if (compare == 0) {
           page_it.Next();
         }
-        mtable_it.Next();
-
+        ++curr;
+        rc_entry->Unlock();
       } else {
         // The page has the smaller record.
         results_out->emplace_back(page_it.key().ToString(),
@@ -100,7 +88,7 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
       }
     }
 
-    // This loop only runs if `mtable_it` has no remaining records.
+    // This loop only runs if `indices_out` has no remaining records.
     while (results_out->size() < num_records && page_it.Valid()) {
       results_out->emplace_back(page_it.key().ToString(),
                                 page_it.value().ToString());
@@ -121,13 +109,20 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
   }
 
   // No more pages to check. If we still need to read more records, read the
-  // rest of the records in the memtable(s) (if any are left).
-  while (results_out->size() < num_records && mtable_it.Valid()) {
-    if (mtable_it.type() == format::WriteType::kWrite) {
-      results_out->emplace_back(mtable_it.key().ToString(),
-                                mtable_it.value().ToString());
+  // rest of the records in the record cache (if any are left).
+  while (results_out->size() < num_records && curr < num_found) {
+    auto rc_entry = &RecordCache::cache_entries[indices_out[curr]];
+    if (rc_entry->IsWrite()) {
+      results_out->emplace_back(rc_entry->GetKey().ToString(),
+                                rc_entry->GetValue().ToString());
     }
-    mtable_it.Next();
+    ++curr;
+    rc_entry->Unlock();
+  }
+
+  // Unlock any potentially unprocessed record cache entries.
+  while (curr < num_found) {
+    RecordCache::cache_entries[indices_out[curr++]].Unlock();
   }
 
   return Status::OK();

@@ -5,7 +5,7 @@
 namespace llsm {
 
 void Model::PreallocateAndInitialize(
-    const std::unique_ptr<BufferManager>& buf_mgr,
+    const std::shared_ptr<BufferManager>& buf_mgr,
     const std::vector<std::pair<Slice, Slice>>& records,
     const size_t records_per_page) {
   // Edge case: empty database. Allocate one page for the entire key range.
@@ -24,14 +24,12 @@ void Model::PreallocateAndInitialize(
     const PhysicalPageId page_id = buf_mgr->GetFileManager()->AllocatePage();
     auto& bf = buf_mgr->FixPage(page_id, /* exclusive = */ true,
                                 /* is_newly_allocated = */ true);
-    const Page page(
-        bf.GetData(),
-        (record_id == 0)
-            ? Slice(std::string(1, 0x00))
-            : records.at(record_id).first,
-        (record_id + records_per_page < records.size())
-            ? records.at(record_id + records_per_page).first
-            : Slice(""));
+    const Page page(bf.GetData(),
+                    (record_id == 0) ? Slice(std::string(1, 0x00))
+                                     : records.at(record_id).first,
+                    (record_id + records_per_page < records.size())
+                        ? records.at(record_id + records_per_page).first
+                        : Slice(""));
     buf_mgr->UnfixPage(bf, /*is_dirty = */ true);
     this->Insert(records.at(record_id).first, page_id);
   }
@@ -39,7 +37,7 @@ void Model::PreallocateAndInitialize(
 }
 
 void Model::ScanFilesAndInitialize(
-    const std::unique_ptr<BufferManager>& buf_mgr) {
+    const std::shared_ptr<BufferManager>& buf_mgr) {
   const size_t num_segments = buf_mgr->GetFileManager()->GetNumSegments();
   PageBuffer page_data = PageMemoryAllocator::Allocate(/*num_pages=*/1);
   Page temp_page(page_data.get());

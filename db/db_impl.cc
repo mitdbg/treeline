@@ -32,10 +32,13 @@ Status ValidateOptions(const Options& options) {
         "KeyDistHints::page_fill_pct must be a value between 1 and 100 "
         "inclusive.");
   }
-  if (options.buffer_pool_size < Page::kSize) {
+  if (options.buffer_pool_size < options.max_reorg_fanout * Page::kSize) {
     return Status::InvalidArgument(
         "Options::buffer_pool_size is too small. It must be at least " +
-        std::to_string(Page::kSize) + " bytes.");
+        std::to_string(Page::kSize) + " (Page::kSize) * " +
+        std::to_string(options.max_reorg_fanout) +
+        " (options.max_reorg_fanout) = " +
+        std::to_string(options.max_reorg_fanout * Page::kSize) + " bytes.");
   }
   if (options.background_threads < 2) {
     return Status::InvalidArgument(
@@ -44,15 +47,6 @@ Status ValidateOptions(const Options& options) {
   if (options.reorg_length < 2) {
     return Status::InvalidArgument("Options::reorg_length must be at least 2");
   }
-  size_t min_memory_budget = Page::kSize * (options.max_reorg_fanout + 2);
-  size_t given_memory_budget =
-      options.memtable_flush_threshold * 2 + options.buffer_pool_size;
-  if (given_memory_budget < min_memory_budget) {
-    return Status::InvalidArgument(
-        "Total memory budget must be at least Page::kSize * "
-        "(options.max_reorg_fanout + 2)");
-  }
-
   return Status::OK();
 }
 
@@ -78,12 +72,8 @@ DBImpl::DBImpl(const Options options, const fs::path db_path)
       buf_mgr_(nullptr),
       model_(nullptr),
       workers_(nullptr),
-      mtable_(nullptr),
-      im_mtable_(nullptr),
-      all_memtables_full_(false),
-      wal_(db_path_ / kWALDirName),
-      mem_budget_memtables_(2 * options_.memtable_flush_threshold),
-      mem_budget_(options_.buffer_pool_size + mem_budget_memtables_) {}
+      rec_cache_(nullptr),
+      wal_(db_path_ / kWALDirName) {}
 
 Status DBImpl::Initialize() {
   const Status validate = ValidateOptions(options_);
@@ -108,20 +98,10 @@ Status DBImpl::Initialize() {
         core_map.push_back(core_id);
       }
       workers_ =
-          std::make_unique<ThreadPool>(options_.background_threads, core_map);
+          std::make_shared<ThreadPool>(options_.background_threads, core_map);
     } else {
-      workers_ = std::make_unique<ThreadPool>(options_.background_threads);
+      workers_ = std::make_shared<ThreadPool>(options_.background_threads);
     }
-
-    // Set up the active memtable.
-    MemTableOptions moptions;
-    moptions.flush_threshold = mem_budget_memtables_ >> 1;
-    moptions.deferral_granularity =
-        (options_.deferred_io_max_deferrals == 0)
-            ? 0
-            : options_.deferred_io_max_deferrals - 1;
-    mtable_ = std::make_shared<MemTable>(moptions);
-    stats_.last_memtable_creation_ = std::chrono::steady_clock::now();
 
     // Finish initializing the DB based on whether we are creating a completely
     // new DB or if we are opening an existing DB.
@@ -147,12 +127,14 @@ Status DBImpl::InitializeNewDB() {
     BufMgrOptions bm_options(options_);
     bm_options.num_segments = options_.background_threads;
 
+    buf_mgr_ = std::make_shared<BufferManager>(bm_options, db_path_);
     if (options_.use_alex) {
-      model_ = std::make_unique<ALEXModel>();
+      model_ = std::make_shared<ALEXModel>();
     } else {
-      model_ = std::make_unique<BTreeModel>();
+      model_ = std::make_shared<BTreeModel>();
     }
-    buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
+    rec_cache_ = std::make_unique<RecordCache>(&options_, &stats_, model_,
+                                               buf_mgr_, workers_);
 
     model_->PreallocateAndInitialize(buf_mgr_, records,
                                      options_.key_hints.records_per_page());
@@ -190,12 +172,14 @@ Status DBImpl::InitializeExistingDB() {
   BufMgrOptions bm_options(options_);
   bm_options.num_segments = manifest->num_segments();
 
-  buf_mgr_ = std::make_unique<BufferManager>(bm_options, db_path_);
+  buf_mgr_ = std::make_shared<BufferManager>(bm_options, db_path_);
   if (options_.use_alex) {
-    model_ = std::make_unique<ALEXModel>();
+    model_ = std::make_shared<ALEXModel>();
   } else {
-    model_ = std::make_unique<BTreeModel>();
+    model_ = std::make_shared<BTreeModel>();
   }
+  rec_cache_ = std::make_unique<RecordCache>(&options_, &stats_, model_,
+                                             buf_mgr_, workers_);
 
   model_->ScanFilesAndInitialize(buf_mgr_);
   buf_mgr_->ClearStats();
@@ -223,58 +207,18 @@ Status DBImpl::InitializeExistingDB() {
       });
   if (!s.ok()) return s;
 
-  // Make sure any "leftover" WAL writes are persisted.
-  if (mtable_->HasEntries()) {
-    s = FlushMemTable(/*disable_deferred_io = */ true);
-    if (!s.ok()) return s;
-  } else {
-    // Wait for the in-progress background flush to complete if needed.
-    std::unique_lock<std::mutex> lock(mutex_);
-    if (FlushInProgress(lock)) {
-      assert(last_flush_.valid());
-      std::shared_future<void> local_flush = last_flush_;
-      lock.unlock();
-      local_flush.get();
-    }
-  }
+  // Make sure any "leftover" WAL writes are persisted
+  s = FlushRecordCache(/*disable_deferred_io = */ true);
+  if (!s.ok()) return s;
+  buf_mgr_->FlushDirty();
 
   return wal_.PrepareForWrite(/*discard_existing_logs=*/true);
 }
 
 DBImpl::~DBImpl() {
-  std::shared_future<void> pending_flush;
-
-  // Once the destructor is called, no further application threads are allowed
-  // to call the `DBImpl`'s public methods.
-  {
-    std::unique_lock<std::mutex> lock(mutex_);
-    // Must wait for any earlier writers to get a chance to apply their writes.
-    WriterWaitIfNeeded(lock);
-
-    // We must be the last writing thread since no additional public methods can
-    // be called.
-    assert(waiting_writers_.empty());
-
-    // Any data in the active memtable should be flushed to persistent storage.
-    if (mtable_ && mtable_->HasEntries()) {
-      ScheduleMemTableFlush(lock, /* disable_deferred_io = */ true);
-      pending_flush = last_flush_;
-      assert(pending_flush.valid());
-    }
-
-    // Not absolutely needed because there should not be any additional writers.
-    // But either way, this method should be paired with `WriterWaitIfNeeded()`
-    // to keep its usage in the code consistent.
-    NotifyWaitingWriterIfNeeded(lock);
-  }
-
-  // If we dispatched a memtable flush above, we need to wait for the flush to
-  // finish before proceeding. This is because the flush occurs in the
-  // background and will schedule more work on the thread pool; we cannot delete
-  // the thread pool until that work has been scheduled.
-  if (pending_flush.valid()) {
-    pending_flush.get();
-  }
+  // Any data in the record cache should be flushed to persistent storage. The
+  // `RecordCache` destructor will take care of that.
+  rec_cache_.reset();
 
   // Deleting the thread pool will block the current thread until the workers
   // have completed all their queued tasks.
@@ -299,72 +243,43 @@ DBImpl::~DBImpl() {
   Logger::Shutdown();
 }
 
-// Reading a value consists of up to four steps:
+// Reading a value consists of up to two steps:
 //
-// 1. Make copies of the memtable pointers so that we can search them without
-//     holding the `mtable_mutex_`.
-//
-// 2. Search the active memtable (`mtable_`).
-//    - We do not need to hold the `mtable_mutex_` because the memtable's
-//      underlying data structure (a skip list) supports concurrent reads during
-//      a write.
-//    - If the memtable contains a `EntryType::kDelete` entry for `key`, we can
-//      safely return `Status::NotFound()` because the key was recently deleted.
-//    - If the memtable contains a `EntryType::kWrite` entry for `key`, we can
-//      return the value directly.
+// 1. Search the record cache (`rec_cache_`).
+//    - If the record cache contains a `EntryType::kDelete` entry for `key`, we
+//    can safely return `Status::NotFound()` because the key was recently
+//    deleted.
+//    - If the record cache contains a `EntryType::kWrite` entry for `key`, we
+//    can return the value directly.
 //    - If no entry was found, we move on to the next step.
 //
-// 3. Search the currently-being-flushed memtable (`im_mtable_`), if it exists.
-//    - We do not need to hold the `mtable_mutex_` during the search because the
-//      currently-being-flushed memtable is immutable.
-//    - We use the same search protocol as specified in step 2.
-//
-// 4. Search the on-disk page that should store the data associated with `key`,
+// 2. Search the on-disk page that should store the data associated with `key`,
 //    based on the key to page model.
-//    - We do not need to hold the `mtable_mutex_` during the search because the
-//      buffer manager manages the mutual exclusion for us.
 //
 // We carry out these steps in this order to ensure we always return the latest
-// value associated with a key (i.e., writes always go to the memtable first).
+// value associated with a key (i.e., writes always go to the record cache
+// first).
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
                    std::string* value_out) {
-  std::shared_ptr<MemTable> local_mtable = nullptr;
-  std::shared_ptr<MemTable> local_im_mtable = nullptr;
-
-  // 1. Get copies of the memtable pointers so we can search them without
-  //    holding the database lock.
-  {
-    std::unique_lock<std::mutex> mtable_lock(mtable_mutex_);
-    local_mtable = mtable_;
-    local_im_mtable = im_mtable_;
-  }
-
-  // 2. Search the active memtable.
-  format::WriteType write_type;
-  Status status = local_mtable->Get(key, &write_type, value_out);
+  // 1. Search the record cache.
+  uint64_t cache_index;
+  Status status =
+      rec_cache_->GetCacheIndex(key, /*exclusive = */ false, &cache_index);
   if (status.ok()) {
-    ++stats_.temp_user_reads_memtable_hits_records_;
+    auto entry = &RecordCache::cache_entries[cache_index];
+    ++stats_.temp_user_reads_cache_hits_records_;
 
-    if (write_type == format::WriteType::kDelete) {
+    if (entry->IsDelete()) {
+      entry->Unlock();
       return Status::NotFound("Key not found.");
     }
+
+    value_out->assign(entry->GetValue().data(), entry->GetValue().size());
+    entry->Unlock();
     return Status::OK();
   }
 
-  // 3. Check the immutable memtable, if it exists.
-  if (local_im_mtable != nullptr) {
-    status = local_im_mtable->Get(key, &write_type, value_out);
-    if (status.ok()) {
-      ++stats_.temp_user_reads_memtable_hits_records_;
-
-      if (write_type == format::WriteType::kDelete) {
-        return Status::NotFound("Key not found.");
-      }
-      return Status::OK();
-    }
-  }
-
-  // 4. Check the on-disk page(s) by following the relevant overflow chain.
+  // 2. Check the on-disk page(s) by following the relevant overflow chain.
   bool next_link_exists = true;
   PhysicalPageId page_id;
   BufferFrame* bf;
@@ -391,6 +306,25 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
       page_id = page.GetOverflow();
       next_link_exists = true;
       bf = &(buf_mgr_->FixPage(page_id, /*exclusive=*/false));
+    }
+
+    // If found, add to record cache for future lookups.
+    if (status.ok()) {
+      rec_cache_->PutFromRead(key, Slice(*value_out),
+                              RecordCache::kDefaultPriority);
+
+      // Optionally, also cache records on the same page.
+      // TODO: records in other links of the same chain?
+      if (options_.optimistic_caching) {
+        auto it = page.GetIterator();
+        it.Seek(page.GetLowerBoundary());
+
+        while (it.Valid()) {
+          rec_cache_->PutFromRead(it.key(), it.value(),
+                                  RecordCache::kDefaultOptimisticPriority);
+          it.Next();
+        }
+      }
     }
 
     buf_mgr_->UnfixPage(*old_bf, /*is_dirty=*/false);
@@ -429,7 +363,7 @@ Status DBImpl::BulkLoad(
   KeyDistHints dist;
   dist.num_keys = records.size();
   dist.key_size = records[0].first.size();  // Assume records are same size.
-  dist.record_size = records[0].second.size();
+  dist.record_size = dist.key_size + records[0].second.size();
 
   const size_t needed_pages = dist.num_pages();
   const size_t records_per_page = dist.records_per_page();
@@ -475,605 +409,30 @@ Status DBImpl::BulkLoad(
 // Gets the number of pages indexed by the model.
 size_t DBImpl::GetNumIndexedPages() const { return model_->GetNumPages(); }
 
-Status DBImpl::FlushMemTable(const bool disable_deferred_io) {
-  std::shared_future<void> local_last_flush;
-  {
-    std::unique_lock<std::mutex> lock(mutex_);
-    WriterWaitIfNeeded(lock);
-    ScheduleMemTableFlush(lock, disable_deferred_io);
-    local_last_flush = last_flush_;
-    NotifyWaitingWriterIfNeeded(lock);
-  }
-  assert(local_last_flush.valid());
-  // Wait for the flush to complete before returning.
-  local_last_flush.get();
+Status DBImpl::FlushRecordCache(const bool disable_deferred_io) {
+  rec_cache_->WriteOutDirty(options_.reorg_length,
+                            options_.key_hints.page_fill_pct);
   return Status::OK();
-}
-
-bool DBImpl::ActiveMemTableFull(
-    const std::unique_lock<std::mutex>& lock) const {
-  assert(lock.owns_lock());
-  return mtable_->ApproximateMemoryUsage() >= mtable_->GetFlushThreshold();
-}
-
-bool DBImpl::FlushInProgress(const std::unique_lock<std::mutex>& lock) const {
-  assert(lock.owns_lock());
-  return im_mtable_ != nullptr;
 }
 
 Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
                          const Slice& value, format::WriteType write_type) {
-  std::unique_lock<std::mutex> lock(mutex_);
-  WriterWaitIfNeeded(lock);
-  if (ActiveMemTableFull(lock)) {
-    ScheduleMemTableFlush(lock, /*disable_deferred_io = */ false);
-  }
   if (!options.bypass_wal) {
     Status log_result = wal_.LogWrite(options, key, value, write_type);
     if (!log_result.ok()) {
-      NotifyWaitingWriterIfNeeded(lock);
       return log_result;
     }
   }
-  // NOTE: We do not need to acquire `mtable_mutex_` here even though we read
-  // the `mtable_` pointer because only a writing thread can modify `mtable_`.
-  // Since we are currently holding `mutex_`, no other writing thread can
-  // concurrently modify `mtable_`.
-  Status write_result = mtable_->Add(key, value, write_type);
+
+  PhysicalPageId chain_to_reorg;
+  uint64_t chain_size = 0;
+  Status write_result =
+      rec_cache_->Put(key, value, /*is_dirty = */ true, write_type,
+                      RecordCache::kDefaultPriority, /* safe = */ true,
+                      options_.reorg_length, options_.key_hints.page_fill_pct);
   if (write_result.ok()) ++stats_.temp_user_writes_records_;
-  NotifyWaitingWriterIfNeeded(lock);
+
   return write_result;
-}
-
-void DBImpl::ScheduleMemTableFlush(std::unique_lock<std::mutex>& lock,
-                                   const bool disable_deferred_io) {
-  assert(lock.owns_lock());
-
-  // If a flush is in progress, we need to wait for it to complete before we
-  // can schedule another flush. We need to set `all_memtables_full_` to true
-  // to ask additional incoming writer threads to wait in line as well.
-  if (FlushInProgress(lock)) {
-    all_memtables_full_ = true;
-    assert(last_flush_.valid());
-    std::shared_future<void> local_last_flush(last_flush_);
-    lock.unlock();
-    // Wait for the in progress flush to complete. We release the database
-    // lock to allow reads to proceed concurrently and to allow the flush
-    // thread to remove the immutable memtable when it is done. Because
-    // `all_memtables_full_` is now true, all additional writer threads will
-    // also wait on entry (except writes due to deferred I/O, which will
-    // proceed).
-    local_last_flush.get();
-    lock.lock();
-  }
-
-  // Initialize new options
-  FlushOptions foptions;
-  foptions.disable_deferred_io = disable_deferred_io;
-  foptions.deferred_io_max_deferrals = options_.deferred_io_max_deferrals;
-  foptions.deferred_io_batch_size = options_.deferred_io_batch_size;
-
-  // Autotune deferral, if appropriate.
-  //
-  // clang-format off
-  //
-  // The cost model here is based on the observation that the optimal batch
-  // size threshold is that, for which we are indifferent between the cost of
-  // incurring a buffer manager miss and the cost of deferring.
-  //
-  // The cost of a buffer manager miss (measured in ns) is taken to be the
-  // `bufmgr_miss_latency_ns`, multiplied by the write amplification between
-  // the batch size we are actually writing and the size of the page we need
-  // to bring in (since, to bring it in, we must evict another page):
-  //
-  //                                               Page::kSize
-  //     cost_of_miss = bufmgr_miss_latency_ns * ---------------
-  //                                               batch_size
-  //
-  // The cost of deferring (measured in ns) is taken to be the "lifetime" of
-  // the active memtable that we are expending by re-inserting the deferred
-  // batch, i.e. how much longer the active memtable would go before filling
-  // up if we don't re-insert the deferred batch:
-  //
-  //                                                             batch_size
-  //     cost_of_deferral = memtable_fill_duration_ns * ---------------------------- 
-  //                                                      memtable_flush_threshold
-  //
-  // Therefore, at the point where we become indifferent between the two costs
-  // we have:
-  //                    _____________________________________________________________________
-  //                   /  bufmgr_miss_latency_ns * Page::kSize * memtable_flush_threshold 
-  //     batch_size = / -------------------------------------------------------------------
-  //                 V                       memtable_fill_duration_ns
-  //
-  // clang-format on
-  if (options_.deferral_autotuning) {
-    const auto memtable_fill_duration_ns =
-        std::chrono::steady_clock::now() - stats_.last_memtable_creation_;
-    const auto bufmgr_miss_latency_ns = buf_mgr_->BufMgrMissLatency();
-
-    foptions.deferred_io_batch_size =
-        options_.batch_scaling_factor *
-        sqrt(Page::kSize * options_.memtable_flush_threshold *
-             bufmgr_miss_latency_ns.count() /
-             memtable_fill_duration_ns.count());
-
-    Logger::Log("Autotuned deferred I/O batch size: %zu bytes",
-                foptions.deferred_io_batch_size);
-  }
-
-  // Autotune memory budget, if appropriate.
-  //
-  // Note that this type of autotuning is more computationally expensive
-  // compared to deferral autotuning, because modifying the buffer pool size
-  // involves dynamic memory allocation and/or multiple page evictions and
-  // possibly flushes.
-  //
-  // As such, instead of adopting a fine-grained autotuning approach that could
-  // require frequent adjustments, possibly in response to insignificant shifts
-  // in the request distribution, we opt for autotuning based on a few broad
-  // "types" of workloads, as explained below.
-  //
-  // In the table below,
-  //   -- "Read %" refers to the number of user reads since the previous
-  //   memtable flush, as a percentage of total user reads/writes since the
-  //   previous memtable flush. TODO: add range scans into the mix.
-  //   -- "Memtable %" refers to the memtable flush threshold as a percentage of
-  //   the total memory budget. Remember that we need space for two memtables.
-  //   -- "Buffer pool %" refers to the buffer pool size as a percentage of the
-  //   total memory budget.
-  //
-  // We also have the following lower bounds on the sizes:
-  //   -- The buffer pool must be at least as large as the maximum number of
-  //   pages produced by reorganization, since these pages are all fixed
-  //   concurrently.
-  //   -- The memtable can be arbitrarily sized, but we set a lower bound at the
-  //   size of 1 page for convention.
-  //
-  // clang-format off
-  //
-  //   Type name   | Read % | Memtable %                      | Buffer pool %
-  // ----------------------------------------------------------------------------------------
-  //   Read-only   | >98    | Smallest                        | The remaining memory budget
-  //   Read-heavy  | 80-98  | 15                              | 70
-  //   Write-heavy | 20-80  | 35                              | 30
-  //   Write-only  | <20    | The remaining memory budget / 2 | Smallest
-  //
-  // clang-format on
-  //
-  if (options_.memory_autotuning) {
-    // Find read percentage.
-    size_t user_total_reads_records =
-        stats_.temp_user_reads_memtable_hits_records_ +
-        stats_.temp_user_reads_bufmgr_hits_records_ +
-        stats_.temp_user_reads_single_bufmgr_misses_records_ +
-        stats_.temp_user_reads_multi_bufmgr_misses_records_;
-    double read_percentage =
-        100.0 * user_total_reads_records /
-        (user_total_reads_records + stats_.temp_user_writes_records_);
-
-    // Calculate the ideal buffer pool size.
-    size_t buffer_pool_bytes_wanted;
-    const size_t buffer_pool_min_size_bytes =
-        Page::kSize * options_.max_reorg_fanout;
-
-    if (read_percentage > 98) {  // Read-only
-      Logger::Log("Memory autotuning: read-only");
-      buffer_pool_bytes_wanted =
-          mem_budget_ - 2 * (/* target memtable size = */ Page::kSize);
-    } else if (read_percentage > 80) {  // Read-heavy
-      Logger::Log("Memory autotuning: read-heavy");
-      buffer_pool_bytes_wanted = mem_budget_ * 70 / 100;
-    } else if (read_percentage > 20) {  // Write-heavy
-      Logger::Log("Memory autotuning: write-heavy");
-      buffer_pool_bytes_wanted = mem_budget_ * 30 / 100;
-    } else {  // Write-only
-      Logger::Log("Memory autotuning: write-only");
-      buffer_pool_bytes_wanted = buffer_pool_min_size_bytes;
-    }
-
-    // Adjust for lower bound and for pages actually allocated.
-    buffer_pool_bytes_wanted =
-        std::max(buffer_pool_bytes_wanted, buffer_pool_min_size_bytes);
-    int64_t buffer_pool_pages_added =
-        buf_mgr_->AdjustNumPages(buffer_pool_bytes_wanted / Page::kSize);
-
-    // Adjust memtable size accordingly.
-    mem_budget_memtables_ -= buffer_pool_pages_added * Page::kSize;
-    assert(mem_budget_memtables_ < mem_budget_);
-
-    // Log the tuned parameters.
-    Logger::Log("Buffer pool bytes wanted: %zu", buffer_pool_bytes_wanted);
-    Logger::Log("Buffer pool pages added: %zd", buffer_pool_pages_added);
-    Logger::Log(
-        "Memtable memory budget: %zu",
-        mem_budget_memtables_.load(std::memory_order::memory_order_relaxed));
-    Logger::Log("Buffer pool pages: %zu", buf_mgr_->GetNumPages());
-  }
-
-  // Mark the active memtable as immutable and create a new active memtable.
-  MemTableOptions moptions;
-  moptions.flush_threshold = mem_budget_memtables_ >> 1;
-  {
-    std::unique_lock<std::mutex> mtable_lock(mtable_mutex_);
-    im_mtable_ = std::move(mtable_);
-    mtable_ = std::make_shared<MemTable>(moptions);
-  }
-
-  stats_.MoveTempToTotalAndClearTemp();
-
-  // Increment the log version and get the log version associated with the
-  // to-be-flushed memtable.
-  const uint64_t flush_log_version = wal_.IncrementLogVersion();
-
-  // Schedule the flush to run in the background.
-  last_flush_ = workers_->Submit([this, foptions, flush_log_version]() {
-    PhysicalPageId current_page;
-    size_t current_page_deferral_count = 0;
-    bool current_page_dispatched_fixer = false;
-    std::vector<std::future<void>> page_write_futures;
-    std::future<OverflowChain> bf_future;
-    std::vector<std::tuple<const Slice, const Slice, const format::WriteType>>
-        records_for_page;
-    size_t bytes_for_page = 0;
-
-    // Iterate through the immutable memtable, aggregate entries into pages,
-    // and dispatch page updates.
-
-    // NOTE: We do not need to acquire `mtable_mutex_` here even though we
-    // read the `im_mtable_` pointer because only a writing thread modifies
-    // `im_mtable_` above. However no writing threads can run that
-    // modification code above until this flush completes.
-    auto it = im_mtable_->GetIterator();
-    for (it.SeekToFirst(); it.Valid(); it.Next()) {
-      const PhysicalPageId page_id = model_->KeyToPageId(it.key());
-      // The memtable is in sorted order - once we "pass" a page, we won't
-      // return to it.
-      if (page_id != current_page) {
-        if (current_page.IsValid()) {
-          if (ShouldFlush(foptions, bytes_for_page,
-                          current_page_deferral_count)) {
-            // Submit flush job to workers - this is not the "first" page.
-            page_write_futures.emplace_back(workers_->Submit(
-                [this, records_for_page = std::move(records_for_page),
-                 bf_future = std::move(bf_future), current_page_deferral_count,
-                 bytes_for_page]() mutable {
-                  FlushWorker(records_for_page, bf_future,
-                              current_page_deferral_count, bytes_for_page);
-                }));
-            records_for_page.clear();
-            bytes_for_page = 0;
-          } else {
-            // Submit re-insertion job to workers.
-            page_write_futures.emplace_back(workers_->Submit(
-                [this, records_for_page = std::move(records_for_page),
-                 current_page_deferral_count]() {
-                  ReinsertionWorker(records_for_page,
-                                    current_page_deferral_count);
-                }));
-            records_for_page.clear();
-            bytes_for_page = 0;
-          }
-        }
-        current_page = page_id;
-        current_page_deferral_count = 0;
-        current_page_dispatched_fixer = false;
-      }
-      records_for_page.emplace_back(
-          std::make_tuple(it.key(), it.value(), it.type()));
-      bytes_for_page += it.key().size() + it.value().size();
-
-      if (it.seq_num() < foptions.deferred_io_max_deferrals &&
-          (it.seq_num() + 1) > current_page_deferral_count)
-        current_page_deferral_count = it.seq_num() + 1;
-
-      // As soon as we are sure we will flush to this page, fix it in the
-      // background.
-      if (ShouldFlush(foptions, bytes_for_page, current_page_deferral_count) &&
-          !current_page_dispatched_fixer) {
-        bf_future = workers_->Submit([this, current_page]() mutable {
-          return FixOverflowChain(current_page,
-                                  /*exclusive=*/true,
-                                  /*unlock_before_returning=*/true);
-        });
-        current_page_dispatched_fixer = true;
-      }
-    }
-
-    // Flush entries in the last page.
-    if (ShouldFlush(foptions, bytes_for_page, current_page_deferral_count)) {
-      assert(current_page.IsValid());
-      page_write_futures.emplace_back(workers_->Submit(
-          [this, records_for_page = std::move(records_for_page),
-           bf_future = std::move(bf_future), current_page_deferral_count,
-           bytes_for_page]() mutable {
-            FlushWorker(records_for_page, bf_future,
-                        current_page_deferral_count, bytes_for_page);
-          }));
-      records_for_page.clear();
-      bytes_for_page = 0;
-    } else {
-      page_write_futures.emplace_back(workers_->Submit(
-          [this, records_for_page = std::move(records_for_page),
-           current_page_deferral_count]() {
-            ReinsertionWorker(records_for_page, current_page_deferral_count);
-          }));
-      records_for_page.clear();
-      bytes_for_page = 0;
-    }
-
-    // Wait for all page updates to complete.
-    for (auto& future : page_write_futures) {
-      future.get();
-    }
-
-    // Flush is complete. We no longer need the immutable memtable.
-    {
-      std::unique_lock<std::mutex> mtable_lock(mtable_mutex_);
-      im_mtable_.reset();
-    }
-
-    // Schedule the log version for deletion in the background, if able. Log
-    // version numbers start from 0. For example, if we defer a record at most
-    // once, a record written in log 0 must have been persisted after the next
-    // memtable flush (i.e., when we reach this code and `flush_log_version`
-    // is 1). Then we can delete log 0.
-    //
-    // TODO: Update this in the face of changing deferral parameters
-    if (flush_log_version >= foptions.deferred_io_max_deferrals) {
-      const uint64_t newest_log_eligible_for_removal =
-          flush_log_version - foptions.deferred_io_max_deferrals;
-      workers_->SubmitNoWait([this, newest_log_eligible_for_removal]() {
-        std::unique_lock<std::mutex> db_lock(mutex_);
-        wal_.DiscardOldest(newest_log_eligible_for_removal, &db_lock);
-      });
-    }
-  });
-
-  // At this point the active memtable has space for additional writes.
-  // However we do not lower the `all_memtables_full_` flag until all the
-  // waiting writers have a chance to complete their writes to ensure they
-  // proceed in FIFO order (and to avoid possible starvation of the waiting
-  // writers).
-}
-
-bool DBImpl::ShouldFlush(const FlushOptions& foptions, size_t batch_size,
-                         size_t num_deferrals) const {
-  return (foptions.disable_deferred_io ||
-          (batch_size >= foptions.deferred_io_batch_size) ||
-          (num_deferrals >= foptions.deferred_io_max_deferrals));
-}
-
-void DBImpl::FlushWorker(
-    const std::vector<
-        std::tuple<const Slice, const Slice, const format::WriteType>>& records,
-    std::future<OverflowChain>& bf_future, size_t current_page_deferral_count,
-    size_t batch_size) {
-  auto frames = bf_future.get();
-
-  if (frames == nullptr) {  // A reorg intervened, fall back to reinsertion
-    return ReinsertionWorker(records, current_page_deferral_count);
-  }
-
-  // Traverse overflow chain, update statistics if requested and lock frames
-  // again.
-  for (auto& bf : *frames) {
-    if (bf->IsNewlyFixed()) {
-      ++stats_.temp_flush_bufmgr_misses_pages_;
-    } else {
-      ++stats_.temp_flush_bufmgr_hits_pages_;
-    }
-
-    // Lock the frame again for use. This does not increment the fix count of
-    // the frame, i.e. there is no danger of "double-fixing".
-    bf->Lock(/*exclusive = */ true);
-  }
-
-  // Check whether this batch is so large that, most probably, reorg will be
-  // eventually needed.
-  const size_t total_fence_bytes =
-      frames->at(0)->GetPage().GetLowerBoundary().size() +
-      frames->at(0)->GetPage().GetUpperBoundary().size();
-  const size_t avg_full_record_size = batch_size / records.size();
-  const size_t avg_effective_record_size =
-      avg_full_record_size - frames->at(0)->GetPage().GetKeyPrefix().size();
-  const size_t
-      pages_needed =  // Assumption: existing are on avg as large as new.
-      Page::NumPagesNeeded(records.size(), avg_effective_record_size,
-                           total_fence_bytes);
-
-  if (pages_needed >= options_.reorg_length) {  // Can play around with this.
-    PreorganizeOverflowChain(records, frames, options_.key_hints.page_fill_pct);
-    return;
-  }
-
-  for (const auto& kv : records) {
-    Status s;
-    if (std::get<2>(kv) == format::WriteType::kWrite) {  // INSERTION
-      // Try to update/insert into existing page in chain
-      for (auto& bf : *frames) {
-        if (bf->GetPage().HasOverflow()) {
-          // Not the last page in the chain; only update or remove.
-          s = bf->GetPage().UpdateOrRemove(std::get<0>(kv), std::get<1>(kv));
-          if (s.ok()) break;
-        } else {
-          // Last page in the chain; try inserting.
-          s = bf->GetPage().Put(std::get<0>(kv), std::get<1>(kv));
-          if (s.ok()) break;
-
-          // Must allocate a new page
-          PhysicalPageId new_page_id =
-              buf_mgr_->GetFileManager()->AllocatePage();
-          auto new_bf = &(buf_mgr_->FixPage(new_page_id, /* exclusive = */ true,
-                                            /*is_newly_allocated = */ true));
-          Page new_page(new_bf->GetData(), bf->GetPage());
-          new_page.MakeOverflow();
-          bf->GetPage().SetOverflow(new_page_id);
-          frames->push_back(new_bf);
-
-          // Insert into the new page
-          s = new_page.Put(std::get<0>(kv), std::get<1>(kv));
-          if (!s.ok()) {  // Should never get here.
-            std::cerr << "ERROR: Failed to insert into overflow page. Aborting."
-                      << std::endl;
-            exit(1);
-          }
-        }
-      }
-
-    } else {  // DELETION
-      for (auto& bf : *frames) {
-        s = bf->GetPage().Delete(std::get<0>(kv));
-        if (s.ok()) break;
-      }
-    }
-  }
-
-  // If chain got too long, trigger reorganization
-  if (frames->size() >= options_.reorg_length) {
-    workers_->SubmitNoWait([this, page_id = frames->at(0)->GetPageId()]() {
-      ReorganizeOverflowChain(page_id, options_.key_hints.page_fill_pct);
-    });
-  }
-
-  // Unfix all
-  //
-  // TODO: we no longer flush here; wal code needs to be adapted.
-  for (auto& bf : *frames) {
-    buf_mgr_->UnfixPage(*bf, /* is_dirty = */ true);
-  }
-}
-
-DBImpl::OverflowChain DBImpl::FixOverflowChain(
-    const PhysicalPageId page_id, const bool exclusive,
-    const bool unlock_before_returning) {
-  BufferFrame* bf;
-  PhysicalPageId local_page_id = page_id;
-
-  // Fix first page and check for reorganization
-  const size_t pages_before = model_->GetNumPages();
-  bf = &(buf_mgr_->FixPage(local_page_id, exclusive));
-  const size_t pages_after = model_->GetNumPages();
-
-  if (pages_before != pages_after) {
-    buf_mgr_->UnfixPage(*bf, /*is_dirty=*/false);
-    return nullptr;
-  }
-
-  OverflowChain frames = std::make_unique<std::vector<BufferFrame*>>();
-  frames->push_back(bf);
-
-  // Fix all overflow pages in the chain, one by one. This loop will "back
-  // off" and retry if it finds out that there are not enough free frames in
-  // the buffer pool to fix all the pages in the chain.
-  //
-  // Note that it is still possible for this loop to cause a livelock if all
-  // threads end up fixing and unfixing their pages in unison.
-  while (frames->back()->GetPage().HasOverflow()) {
-    local_page_id = frames->back()->GetPage().GetOverflow();
-    bf = buf_mgr_->FixPageIfFrameAvailable(local_page_id, exclusive);
-    if (bf == nullptr) {
-      // No frames left. We should unfix all overflow pages in this chain
-      // (i.e., all pages except the first page in the chain) to give other
-      // workers a chance to fix their entire chain.
-      while (frames->size() > 1) {
-        buf_mgr_->UnfixPage(*(frames->back()), /*is_dirty=*/false);
-        frames->pop_back();
-      }
-      assert(frames->size() == 1);
-      // Retry from the beginning of the chain.
-      continue;
-    }
-    frames->push_back(bf);
-  }
-
-  if (unlock_before_returning) {
-    for (auto& bf : *frames) {
-      // Unlock the frame so that it can be "handed over" to the caller. This
-      // does not decrement the fix count of the frame, i.e. there's no danger
-      // of eviction before we can use it.
-      bf->Unlock();
-    }
-  }
-
-  return frames;
-}
-
-void DBImpl::ReinsertionWorker(
-    const std::vector<
-        std::tuple<const Slice, const Slice, const format::WriteType>>& records,
-    size_t current_page_deferral_count) {
-  // NOTE: We do not need to acquire `mtable_mutex_` here even though we read
-  // the `mtable_` pointer because this code runs as part of the memtable
-  // flush. Until this worker completes, no other threads are able to modify
-  // `mtable_`. Acquiring `mutex_` ensures writes to the memtable do not occur
-  // concurrently.
-  ++stats_.temp_flush_deferred_pages_;
-  stats_.temp_flush_deferred_records_ += records.size();
-
-  std::unique_lock<std::mutex> lock(mutex_);
-  for (auto& kv : records) {
-    // This add will proceed even if mtable_ appears full to regular writers.
-    Status s =
-        mtable_->Add(std::get<0>(kv), std::get<1>(kv), std::get<2>(kv),
-                     /* from_deferral = */ true,
-                     /* injected_sequence_num = */ current_page_deferral_count);
-    assert(s.ok());
-  }
-}
-
-class DBImpl::WaitingWriter {
- public:
-  // Called by the writer thread to wait until it can proceed.
-  // REQUIRES: `mutex_` is held.
-  void Wait(std::unique_lock<std::mutex>& lock) {
-    cv_.wait(lock, [this]() { return can_proceed_; });
-  }
-
-  // Called by a different thread to notify the waiting writer that it can
-  // proceed.
-  // REQUIRES: `mutex_` is held.
-  void Notify(const std::unique_lock<std::mutex>& lock) {
-    assert(lock.owns_lock());
-    can_proceed_ = true;
-    cv_.notify_one();
-  }
-
- private:
-  // The waiting writer thread waits on this condition variable until it is
-  // notified to proceed by a different thread.
-  std::condition_variable cv_;
-  // Needed to handle spurious wakeup.
-  bool can_proceed_ = false;
-};
-
-void DBImpl::WriterWaitIfNeeded(std::unique_lock<std::mutex>& lock) {
-  assert(lock.owns_lock());
-  if (!all_memtables_full_) {
-    return;
-  }
-
-  // All the memtables are full, so we need to wait in line before we can make
-  // any modifications.
-  WaitingWriter this_writer;
-  waiting_writers_.push(&this_writer);
-  this_writer.Wait(lock);
-  assert(waiting_writers_.front() == &this_writer);
-  waiting_writers_.pop();
-}
-
-void DBImpl::NotifyWaitingWriterIfNeeded(
-    const std::unique_lock<std::mutex>& lock) {
-  assert(lock.owns_lock());
-  if (!waiting_writers_.empty()) {
-    // The next writer can proceed.
-    waiting_writers_.front()->Notify(lock);
-
-  } else {
-    // There are no additional waiting writers. We need to ensure that the
-    // `all_memtables_full_` flag is lowered now.
-    all_memtables_full_ = false;
-  }
 }
 
 }  // namespace llsm

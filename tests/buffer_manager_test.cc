@@ -40,8 +40,8 @@ TEST(BufferManagerTest, WriteReadSequential) {
   BufMgrOptions bm_options;
 
   const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
-  const std::unique_ptr<BufferManager> buffer_manager =
-      std::make_unique<BufferManager>(bm_options, dbname);
+  const std::shared_ptr<BufferManager> buffer_manager =
+      std::make_shared<BufferManager>(bm_options, dbname);
   model->PreallocateAndInitialize(buffer_manager, records,
                                   key_hints.records_per_page());
 
@@ -82,8 +82,8 @@ TEST(BufferManagerTest, FlushDirty) {
   BufMgrOptions bm_options;
 
   const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
-  const std::unique_ptr<BufferManager> buffer_manager =
-      std::make_unique<BufferManager>(bm_options, dbname);
+  const std::shared_ptr<BufferManager> buffer_manager =
+      std::make_shared<BufferManager>(bm_options, dbname);
   model->PreallocateAndInitialize(buffer_manager, records,
                                   key_hints.records_per_page());
 
@@ -133,8 +133,8 @@ TEST(BufferManagerTest, Contains) {
   BufMgrOptions bm_options;
   bm_options.buffer_pool_size = 3 * Page::kSize;
   const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
-  const std::unique_ptr<BufferManager> buffer_manager =
-      std::make_unique<BufferManager>(bm_options, dbname);
+  const std::shared_ptr<BufferManager> buffer_manager =
+      std::make_shared<BufferManager>(bm_options, dbname);
   model->PreallocateAndInitialize(buffer_manager, records,
                                   key_hints.records_per_page());
 
@@ -180,8 +180,8 @@ TEST(BufferManagerTest, IncreaseNumPages) {
   // Create buffer manager with 3 pages.
   BufMgrOptions bm_options;
   bm_options.buffer_pool_size = 3 * Page::kSize;
-  const std::unique_ptr<BufferManager> buffer_manager =
-      std::make_unique<BufferManager>(bm_options, dbname);
+  const std::shared_ptr<BufferManager> buffer_manager =
+      std::make_shared<BufferManager>(bm_options, dbname);
   model->PreallocateAndInitialize(buffer_manager, records,
                                   key_hints.records_per_page());
 
@@ -197,7 +197,7 @@ TEST(BufferManagerTest, IncreaseNumPages) {
 
   // Expand cache by 2 pages.
   ASSERT_EQ(buffer_manager->GetNumPages(), 3);
-  ASSERT_EQ(buffer_manager->AdjustNumPages(5),2);
+  ASSERT_EQ(buffer_manager->AdjustNumPages(5), 2);
   ASSERT_EQ(buffer_manager->GetNumPages(), 5);
 
   // Fix another 2 pages; could not have succeeded with the old cache size.
@@ -233,8 +233,8 @@ TEST(BufferManagerTest, DecreaseNumPages) {
   // Create buffer manager with 4 pages.
   BufMgrOptions bm_options;
   bm_options.buffer_pool_size = 4 * Page::kSize;
-  const std::unique_ptr<BufferManager> buffer_manager =
-      std::make_unique<BufferManager>(bm_options, dbname);
+  const std::shared_ptr<BufferManager> buffer_manager =
+      std::make_shared<BufferManager>(bm_options, dbname);
   model->PreallocateAndInitialize(buffer_manager, records,
                                   key_hints.records_per_page());
 
@@ -291,22 +291,26 @@ TEST(BufferManagerTest, FixPageIfFrameAvailable) {
   bm_options.buffer_pool_size = 2 * Page::kSize;
   std::unique_ptr<BufferManager> buffer_manager =
       std::make_unique<BufferManager>(bm_options, dbname);
-  
+
   const auto pg1 = buffer_manager->GetFileManager()->AllocatePage();
   const auto pg2 = buffer_manager->GetFileManager()->AllocatePage();
   const auto pg3 = buffer_manager->GetFileManager()->AllocatePage();
 
-  BufferFrame* const frame1 = buffer_manager->FixPageIfFrameAvailable(pg1, /*exclusive=*/false);
+  BufferFrame* const frame1 =
+      buffer_manager->FixPageIfFrameAvailable(pg1, /*exclusive=*/false);
   ASSERT_NE(frame1, nullptr);
 
-  BufferFrame* const frame2 = buffer_manager->FixPageIfFrameAvailable(pg2, /*exclusive=*/false);
+  BufferFrame* const frame2 =
+      buffer_manager->FixPageIfFrameAvailable(pg2, /*exclusive=*/false);
   ASSERT_NE(frame2, nullptr);
 
-  BufferFrame* const frame3 = buffer_manager->FixPageIfFrameAvailable(pg3, /*exclusive=*/false);
+  BufferFrame* const frame3 =
+      buffer_manager->FixPageIfFrameAvailable(pg3, /*exclusive=*/false);
   ASSERT_EQ(frame3, nullptr);
 
   buffer_manager->UnfixPage(*frame2, /*is_dirty=*/false);
-  BufferFrame* const frame4 = buffer_manager->FixPageIfFrameAvailable(pg3, /*exclusive=*/false);
+  BufferFrame* const frame4 =
+      buffer_manager->FixPageIfFrameAvailable(pg3, /*exclusive=*/false);
   ASSERT_NE(frame4, nullptr);
 
   buffer_manager->UnfixPage(*frame1, /*is_dirty=*/false);

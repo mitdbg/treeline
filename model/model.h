@@ -39,12 +39,12 @@ class Model {
   // Initializes the model based on new files, allocated according to `records`
   // and `records_per_page` and accessed through `buf_mgr`.
   void PreallocateAndInitialize(
-      const std::unique_ptr<BufferManager>& buf_mgr,
+      const std::shared_ptr<BufferManager>& buf_mgr,
       const std::vector<std::pair<Slice, Slice>>& records,
       const size_t records_per_page);
 
   // Initalizes the model based on existing files, accessed through `buf_mgr`.
-  void ScanFilesAndInitialize(const std::unique_ptr<BufferManager>& buf_mgr);
+  void ScanFilesAndInitialize(const std::shared_ptr<BufferManager>& buf_mgr);
 };
 
 }  // namespace llsm

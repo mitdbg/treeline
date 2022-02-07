@@ -3,6 +3,7 @@ include(GoogleTest)
 add_executable(tester)
 target_sources(tester
   PRIVATE
+    art_olc_test.cc
     buffer_manager_test.cc
     coding_test.cc
     db_test.cc

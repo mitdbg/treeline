@@ -1,6 +1,5 @@
 target_sources(llsm PRIVATE
   db_impl_range.cc
-  db_impl_reorg.cc
   db_impl.cc
   db_impl.h
   format.h
@@ -12,6 +11,8 @@ target_sources(llsm PRIVATE
   memtable.h
   options.cc
   options.h
+  overflow_chain.cc
+  overflow_chain.h
   page.cc
   page.h
   posix_logger.h

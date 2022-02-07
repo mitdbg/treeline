@@ -98,6 +98,13 @@ struct Options {
 
   // The maximum number of pages that reorganizing a single chain can produce.
   size_t max_reorg_fanout = 50;
+
+  // The capacity of the record cache in records.
+  size_t record_cache_capacity = 1024 * 1024;
+
+  // Optimistically cache, with a lower priority, all records on the same page
+  // as a record requested by the user.
+  bool optimistic_caching = true;
 };
 
 struct ReadOptions {};

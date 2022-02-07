@@ -57,8 +57,8 @@ TEST(FileManagerTest, WriteReadSequential) {
   BufMgrOptions bm_options;
 
   const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
-  const std::unique_ptr<BufferManager> buffer_manager =
-      std::make_unique<BufferManager>(bm_options, dbpath);
+  const std::shared_ptr<BufferManager> buffer_manager =
+      std::make_shared<BufferManager>(bm_options, dbpath);
   model->PreallocateAndInitialize(buffer_manager, records,
                                   key_hints.records_per_page());
 

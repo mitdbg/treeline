@@ -29,18 +29,23 @@ void RecordCacheRW_64MiB(benchmark::State& state, bool is_safe) {
   auto rng = std::default_random_engine{};
   std::shuffle(std::begin(v), std::end(v), rng);
 
+  Options db_options;
+  db_options.record_cache_capacity = cache_entries;
+  Statistics stats;
+
   for (auto _ : state) {
-    RecordCache rc(cache_entries);
+    RecordCache rc(&db_options, &stats);
     uint64_t i = 0;
     uint64_t index_out;
     for (const auto& record : dataset) {
       if (v[i++] < threshold) {
         s = rc.GetCacheIndex(record.key(), /*exclusive = */ false, &index_out,
-                        is_safe);
+                             is_safe);
         if (s.ok() && is_safe) rc.cache_entries[index_out].Unlock();
       } else {
         s = rc.Put(record.key(), record.value(), /*is_dirty  = */ true,
-                   llsm::format::WriteType::kWrite, 4, is_safe);
+                   llsm::format::WriteType::kWrite,
+                   RecordCache::kDefaultPriority, is_safe);
         if (!s.ok()) {
           throw std::runtime_error(
               "Failed to insert record into the record cache!");
