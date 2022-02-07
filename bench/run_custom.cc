@@ -36,7 +36,7 @@ template <class DatabaseInterface>
 ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
   ycsbr::Session<DatabaseInterface> session(FLAGS_threads);
   if (!FLAGS_skip_load) {
-    auto load = workload.GetLoadTrace();
+    auto load = workload.GetLoadTrace(/*sort_requests=*/true);
     auto minmax = load.GetKeyRange();
     session.db().SetKeyDistHints(/*min_key=*/minmax.min,
                                  /*max_key=*/minmax.max,
