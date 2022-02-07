@@ -251,7 +251,7 @@ bool RecordCache::WriteOutIfDirty(uint64_t index, size_t reorg_length,
         [this, page_id = page_id, page_fill_pct = page_fill_pct,
          buf_mgr = buf_mgr_.value(), model = model_.value(), options = options_,
          stats = stats_]() {
-          ReorganizeOverflowChain(page_id, page_fill_pct, buf_mgr, model,
+          ReorganizeOverflowChain(page_id, page_fill_pct, std::move(buf_mgr), std::move(model),
                                   options, stats);
         });
   }
