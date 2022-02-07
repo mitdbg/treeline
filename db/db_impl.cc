@@ -265,11 +265,12 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   uint64_t cache_index;
   Status status =
       rec_cache_->GetCacheIndex(key, /*exclusive = */ false, &cache_index);
-  auto entry = &RecordCache::cache_entries[cache_index];
   if (status.ok()) {
+    auto entry = &RecordCache::cache_entries[cache_index];
     ++stats_.temp_user_reads_cache_hits_records_;
 
     if (entry->IsDelete()) {
+      entry->Unlock();
       return Status::NotFound("Key not found.");
     }
 
