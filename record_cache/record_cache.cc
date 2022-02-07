@@ -10,17 +10,13 @@ RecordCache::RecordCache(Options* options, Statistics* stats,
                          std::shared_ptr<ThreadPool> workers)
     : options_(options),
       stats_(stats),
-      capacity_(options->record_cache_capacity) {
-  model_ = (model != nullptr) ? model : std::optional<std::shared_ptr<Model>>();
-  buf_mgr_ = (buf_mgr != nullptr)
-                 ? buf_mgr
-                 : std::optional<std::shared_ptr<BufferManager>>();
-  workers_ = (workers != nullptr)
-                 ? workers
-                 : std::optional<std::shared_ptr<ThreadPool>>();
+      model_(model),
+      buf_mgr_(buf_mgr),
+      workers_(workers),
+      capacity_(options->record_cache_capacity),
+      clock_(0) {
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
   cache_entries.resize(capacity_);
-  clock_ = 0;
 }
 
 RecordCache::~RecordCache() {
@@ -188,7 +184,7 @@ bool RecordCache::WriteOutIfDirty(uint64_t index, size_t reorg_length,
   // Do nothing if not dirty, or if using a standalone record cache.
   auto entry = &cache_entries[index];
   bool was_dirty = entry->IsDirty();
-  if (!was_dirty || !buf_mgr_.has_value() || !model_.has_value()) return false;
+  if (!was_dirty || buf_mgr_ == nullptr || model_ == nullptr) return false;
 
   Slice key = entry->GetKey();
   Slice value = entry->GetValue();
@@ -197,10 +193,10 @@ bool RecordCache::WriteOutIfDirty(uint64_t index, size_t reorg_length,
   PhysicalPageId page_id;
   OverflowChain chain = nullptr;
   while (chain == nullptr) {
-    page_id = model_.value()->KeyToPageId(key);
+    page_id = model_->KeyToPageId(key);
     chain = FixOverflowChain(page_id, /* exclusive = */ true,
-                             /* unlock_before_returning = */ false,
-                             buf_mgr_.value(), model_.value(), stats_);
+                             /* unlock_before_returning = */ false, buf_mgr_,
+                             model_, stats_);
   }
 
   // Flush the entry to the page.
@@ -218,11 +214,9 @@ bool RecordCache::WriteOutIfDirty(uint64_t index, size_t reorg_length,
         if (s.ok()) break;
 
         // Must allocate a new page
-        PhysicalPageId new_page_id =
-            buf_mgr_.value()->GetFileManager()->AllocatePage();
-        auto new_bf =
-            &(buf_mgr_.value()->FixPage(new_page_id, /* exclusive = */ true,
-                                        /*is_newly_allocated = */ true));
+        PhysicalPageId new_page_id = buf_mgr_->GetFileManager()->AllocatePage();
+        auto new_bf = &(buf_mgr_->FixPage(new_page_id, /* exclusive = */ true,
+                                          /*is_newly_allocated = */ true));
         Page new_page(new_bf->GetData(), bf->GetPage());
         new_page.MakeOverflow();
         bf->GetPage().SetOverflow(new_page_id);
@@ -246,19 +240,19 @@ bool RecordCache::WriteOutIfDirty(uint64_t index, size_t reorg_length,
   }
 
   // Trigger a reorg if the insertion created a long overflow chain.
-  if (workers_.has_value() && chain->size() >= reorg_length) {
-    workers_.value()->SubmitNoWait(
-        [this, page_id = page_id, page_fill_pct = page_fill_pct,
-         buf_mgr = buf_mgr_.value(), model = model_.value(), options = options_,
-         stats = stats_]() {
-          ReorganizeOverflowChain(page_id, page_fill_pct, std::move(buf_mgr), std::move(model),
-                                  options, stats);
-        });
+  if (workers_ != nullptr && chain->size() >= reorg_length) {
+    workers_->SubmitNoWait([this, page_id = page_id,
+                            page_fill_pct = page_fill_pct, buf_mgr = buf_mgr_,
+                            model = model_, options = options_,
+                            stats = stats_]() {
+      ReorganizeOverflowChain(page_id, page_fill_pct, std::move(buf_mgr),
+                              std::move(model), options, stats);
+    });
   }
 
   // Unfix all
   for (auto& bf : *chain) {
-    buf_mgr_.value()->UnfixPage(*bf, /* is_dirty = */ true);
+    buf_mgr_->UnfixPage(*bf, /* is_dirty = */ true);
   }
 
   entry->SetDirtyTo(false);

@@ -141,14 +141,14 @@ class RecordCache {
 
   // A pointer to the buffer manager of the  underlying system, used for
   // flushing dirty record cache entries.
-  std::optional<std::shared_ptr<BufferManager>> buf_mgr_;
+  std::shared_ptr<BufferManager> buf_mgr_;
 
   // A pointer to the model of the underlying system, used for finding the right
   // page for flushing dirty record cache entries.
-  std::optional<std::shared_ptr<Model>> model_;
+  std::shared_ptr<Model> model_;
 
   // A pointer to a set of background workers, used to perform reorganization.
-  std::optional<std::shared_ptr<ThreadPool>> workers_;
+  std::shared_ptr<ThreadPool> workers_;
 
   // An index for the cache, using ART with optimistic lock coupling from
   // https://github.com/flode/ARTSynchronized/tree/master/OptimisticLockCoupling.
