@@ -24,49 +24,41 @@ CUSTOM_DATASETS = [
   {"name": "osm", "file": "osm_ny.txt", "workload": "long_scan-osm.yml"},
 ]
 
+def suffix(config, segs):
+  return "{rsb}-{goal}-{delta}-{segs}".format(
+    rsb=config["record_size_bytes"],
+    goal=config["records_per_page_goal"],
+    delta=config["records_per_page_delta"],
+    segs=segs,
+  )
+
+def workload(config):
+  return "10M" if config["record_size_bytes"] == 1024 else "20M"
+
 run_experiment_group(
   name="long_scan",
   run="../run.sh",
   experiments=[
     ExperimentInstance(
-      name="long_scan-uniform-{rsb}-{goal}-{delta}-{segs}".format(
-        rsb=config["record_size_bytes"],
-        goal=config["records_per_page_goal"],
-        delta=config["records_per_page_delta"],
-        segs=segs,
-      ),
+      name="long_scan-uniform-{}".format(suffix(config, segs)),
       options={
         **config,
-        "workload_config": "workloads/20M/long_scan.yml",
-        "checkpoint_name": "uniform_insert-{rsb}-{goal}-{delta}-{segs}".format(
-          rsb=config["record_size_bytes"],
-          goal=config["records_per_page_goal"],
-          delta=config["records_per_page_delta"],
-          segs=segs,
-        ),
+        "workload_config": "workloads/{}/long_scan.yml".format(workload(config)),
+        "checkpoint_name": "uniform_insert-{}".format(suffix(config, segs)),
         "disable_segments": (segs == "pages"),
       },
     )
     for config, segs in product(CONFIGS, ["segs", "pages"])
   ] + [
     ExperimentInstance(
-      name="long_scan-{dataset}-{rsb}-{goal}-{delta}-{segs}".format(
-        dataset=dataset["name"],
-        rsb=config["record_size_bytes"],
-        goal=config["records_per_page_goal"],
-        delta=config["records_per_page_delta"],
-        segs=segs,
-      ),
+      name="long_scan-{}-{}".format(dataset["name"], suffix(config, segs)),
       options={
         **config,
-        "workload_config": "workloads/20M/{}".format(dataset["workload"]),
+        "workload_config": "workloads/{}/{}".format(workload(config), dataset["workload"]),
         "custom_dataset": "'$TP_DATASET_PATH/{}'".format(dataset["file"]),
-        "checkpoint_name": "{dataset}_insert-{rsb}-{goal}-{delta}-{segs}".format(
-          dataset=dataset["name"],
-          rsb=config["record_size_bytes"],
-          goal=config["records_per_page_goal"],
-          delta=config["records_per_page_delta"],
-          segs=segs,
+        "checkpoint_name": "{}_insert-{}".format(
+          dataset["name"],
+          suffix(config, segs),
         ),
         "disable_segments": (segs == "pages"),
       },
@@ -81,13 +73,7 @@ run_experiment_group(
 group(
   name="preload",
   deps=[
-    ":preload-{dataset}-{rsb}-{goal}-{delta}-{segs}".format(
-      dataset=dataset,
-      rsb=config["record_size_bytes"],
-      goal=config["records_per_page_goal"],
-      delta=config["records_per_page_delta"],
-      segs=segs,
-    )
+    ":preload-{dataset}-{}".format(dataset, suffix(config, segs))
     for config, dataset, segs in product(
       CONFIGS,
       ["uniform", *map(lambda d: d["name"], CUSTOM_DATASETS)],
@@ -100,36 +86,25 @@ group(
 for config in CONFIGS:
   common_opts = {
     **config,
-    "workload_config": "workloads/20M/preload-uniform-insert.yml",
-    "checkpoint_name": "uniform_insert-{rsb}-{goal}-{delta}-segs".format(
-      rsb=config["record_size_bytes"],
-      goal=config["records_per_page_goal"],
-      delta=config["records_per_page_delta"],
-    ),
+    "workload_config": "workloads/{}/preload-uniform-insert.yml".format(workload(config)),
   }
 
   run_command(
-    name="preload-uniform-{rsb}-{goal}-{delta}-segs".format(
-      rsb=config["record_size_bytes"],
-      goal=config["records_per_page_goal"],
-      delta=config["records_per_page_delta"],
-    ),
+    name="preload-uniform-{}".format(suffix(config, "segs")),
     run="../preload_insert_scan.sh",
     options={
       **common_opts,
+      "checkpoint_name": "uniform_insert-{}".format(suffix(config, "segs")),
       "disable_segments": False,
     },
   )
 
   run_command(
-    name="preload-uniform-{rsb}-{goal}-{delta}-pages".format(
-      rsb=config["record_size_bytes"],
-      goal=config["records_per_page_goal"],
-      delta=config["records_per_page_delta"],
-    ),
+    name="preload-uniform-{}".format(suffix(config, "pages")),
     run="../preload_insert_scan.sh",
     options={
       **common_opts,
+      "checkpoint_name": "uniform_insert-{}".format(suffix(config, "pages")),
       "disable_segments": True,
     },
   )
@@ -138,40 +113,38 @@ for config in CONFIGS:
 for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
   common_opts = {
     **config,
-    "workload_config": "workloads/20M/preload-{}-insert.yml".format(dataset["name"]),
+    "workload_config": "workloads/{}/preload-{}-insert.yml".format(workload(config), dataset["name"]),
     "custom_dataset": "'$TP_DATASET_PATH/{dataset_file}'".format(dataset["file"]),
-    "checkpoint_name": "{dataset}_insert-{rsb}-{goal}-{delta}-segs".format(
-      dataset=dataset["name"],
-      rsb=config["record_size_bytes"],
-      goal=config["records_per_page_goal"],
-      delta=config["records_per_page_delta"],
-    ),
   }
 
   run_command(
-    name="preload-{dataset}-{rsb}-{goal}-{delta}-segs".format(
-      dataset=dataset["name"],
-      rsb=config["record_size_bytes"],
-      goal=config["records_per_page_goal"],
-      delta=config["records_per_page_delta"],
+    name="preload-{dataset}-{}".format(
+      dataset["name"],
+      suffix(config, "segs"),
     ),
     run="../preload_insert_scan.sh",
     options={
       **common_opts,
       "disable_segments": False,
+      "checkpoint_name": "{dataset}_insert-{}".format(
+        dataset["name"],
+        suffix(config, "segs"),
+      ),
     },
   )
 
   run_command(
-    name="preload-{dataset}-{rsb}-{goal}-{delta}-pages".format(
-      dataset=dataset["name"],
-      rsb=config["record_size_bytes"],
-      goal=config["records_per_page_goal"],
-      delta=config["records_per_page_delta"],
+    name="preload-{dataset}-{}".format(
+      dataset["name"],
+      suffix(config, "pages"),
     ),
     run="../preload_insert_scan.sh",
     options={
       **common_opts,
       "disable_segments": True,
+      "checkpoint_name": "{dataset}_insert-{}".format(
+        dataset["name"],
+        suffix(config, "pages"),
+      ),
     },
   )

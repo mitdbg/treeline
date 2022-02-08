@@ -1,0 +1,14 @@
+load:
+  num_records: 10000000
+  distribution:
+    type: uniform
+    range_min: 0
+    range_max: 1000000000
+
+run:
+- num_requests: 100000
+  scan:
+    proportion_pct: 100
+    max_length: 500
+    distribution:
+      type: uniform
