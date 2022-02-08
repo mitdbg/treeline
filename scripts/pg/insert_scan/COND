@@ -5,15 +5,15 @@ BUFFER_SIZE_BYTES = 64 * 1024 * 1024
 CONFIGS = [
   # Represents 64 B records, 2880 bytes per page +/- (2 * 320) bytes
   {
-    "goal": 45,
-    "delta": 5,
+    "records_per_page_goal": 45,
+    "records_per_page_delta": 5,
     "record_size_bytes": 64,
     "write_batch_size": BUFFER_SIZE_BYTES // 64,
   },
   # Represents 1024 B records, 2048 bytes per page +/- (2 * 1024) bytes
   {
-    "goal": 2,
-    "delta": 1,
+    "records_per_page_goal": 2,
+    "records_per_page_delta": 1,
     "record_size_bytes": 1024,
     "write_batch_size": BUFFER_SIZE_BYTES // 1024,
   },
@@ -29,34 +29,44 @@ run_experiment_group(
   run="../run.sh",
   experiments=[
     ExperimentInstance(
-      name="long_scan-uniform-{record_size_bytes}-{goal}-{delta}-{segs}".format(segs=segs, **config),
+      name="long_scan-uniform-{rsb}-{goal}-{delta}-{segs}".format(
+        rsb=config["record_size_bytes"],
+        goal=config["records_per_page_goal"],
+        delta=config["records_per_page_delta"],
+        segs=segs,
+      ),
       options={
-        "records_per_page_goal": config["goal"],
-        "records_per_page_delta": config["delta"],
-        "record_size_bytes": config["record_size_bytes"],
-        "workload_config": "workloads/long_scan.yml",
-        "checkpoint_name": "uniform_insert-{record_size_bytes}-{goal}-{delta}-{segs}".format(segs=segs, **config),
+        **config,
+        "workload_config": "workloads/20M/long_scan.yml",
+        "checkpoint_name": "uniform_insert-{rsb}-{goal}-{delta}-{segs}".format(
+          rsb=config["record_size_bytes"],
+          goal=config["records_per_page_goal"],
+          delta=config["records_per_page_delta"],
+          segs=segs,
+        ),
         "disable_segments": (segs == "pages"),
       },
     )
     for config, segs in product(CONFIGS, ["segs", "pages"])
   ] + [
     ExperimentInstance(
-      name="long_scan-{dataset}-{record_size_bytes}-{goal}-{delta}-{segs}".format(
-        segs=segs,
+      name="long_scan-{dataset}-{rsb}-{goal}-{delta}-{segs}".format(
         dataset=dataset["name"],
-        **config,
+        rsb=config["record_size_bytes"],
+        goal=config["records_per_page_goal"],
+        delta=config["records_per_page_delta"],
+        segs=segs,
       ),
       options={
-        "records_per_page_goal": config["goal"],
-        "records_per_page_delta": config["delta"],
-        "record_size_bytes": config["record_size_bytes"],
-        "workload_config": "workloads/{}".format(dataset["workload"]),
+        **config,
+        "workload_config": "workloads/20M/{}".format(dataset["workload"]),
         "custom_dataset": "'$TP_DATASET_PATH/{}'".format(dataset["file"]),
-        "checkpoint_name": "{dataset}_insert-{record_size_bytes}-{goal}-{delta}-{segs}".format(
-          segs=segs,
+        "checkpoint_name": "{dataset}_insert-{rsb}-{goal}-{delta}-{segs}".format(
           dataset=dataset["name"],
-          **config,
+          rsb=config["record_size_bytes"],
+          goal=config["records_per_page_goal"],
+          delta=config["records_per_page_delta"],
+          segs=segs,
         ),
         "disable_segments": (segs == "pages"),
       },
@@ -71,7 +81,13 @@ run_experiment_group(
 group(
   name="preload",
   deps=[
-    ":preload-{dataset}-{record_size_bytes}-{goal}-{delta}-{segs}".format(dataset=dataset, segs=segs, **config)
+    ":preload-{dataset}-{rsb}-{goal}-{delta}-{segs}".format(
+      dataset=dataset,
+      rsb=config["record_size_bytes"],
+      goal=config["records_per_page_goal"],
+      delta=config["records_per_page_delta"],
+      segs=segs,
+    )
     for config, dataset, segs in product(
       CONFIGS,
       ["uniform", *map(lambda d: d["name"], CUSTOM_DATASETS)],
@@ -82,68 +98,80 @@ group(
 
 # Uniform dataset.
 for config in CONFIGS:
+  common_opts = {
+    **config,
+    "workload_config": "workloads/20M/preload-uniform-insert.yml",
+    "checkpoint_name": "uniform_insert-{rsb}-{goal}-{delta}-segs".format(
+      rsb=config["record_size_bytes"],
+      goal=config["records_per_page_goal"],
+      delta=config["records_per_page_delta"],
+    ),
+  }
+
   run_command(
-    name="preload-uniform-{record_size_bytes}-{goal}-{delta}-segs".format(**config),
-    run="../preload_insert_scan.sh "
-      "--workload_config=workloads/preload-uniform-insert.yml "
-      "--records_per_page_goal={goal} "
-      "--records_per_page_delta={delta} "
-      "--record_size_bytes={record_size_bytes} "
-      "--checkpoint_name=uniform_insert-{record_size_bytes}-{goal}-{delta}-segs "
-      "--write_batch_size={write_batch_size} "
-      "--disable_segments=false".format(**config),
+    name="preload-uniform-{rsb}-{goal}-{delta}-segs".format(
+      rsb=config["record_size_bytes"],
+      goal=config["records_per_page_goal"],
+      delta=config["records_per_page_delta"],
+    ),
+    run="../preload_insert_scan.sh",
+    options={
+      **common_opts,
+      "disable_segments": False,
+    },
   )
 
   run_command(
-    name="preload-uniform-{record_size_bytes}-{goal}-{delta}-pages".format(**config),
-    run="../preload_insert_scan.sh "
-      "--workload_config=workloads/preload-uniform-insert.yml "
-      "--records_per_page_goal={goal} "
-      "--records_per_page_delta={delta} "
-      "--record_size_bytes={record_size_bytes} "
-      "--checkpoint_name=uniform_insert-{record_size_bytes}-{goal}-{delta}-pages "
-      "--write_batch_size={write_batch_size} "
-      "--disable_segments=true".format(**config),
+    name="preload-uniform-{rsb}-{goal}-{delta}-pages".format(
+      rsb=config["record_size_bytes"],
+      goal=config["records_per_page_goal"],
+      delta=config["records_per_page_delta"],
+    ),
+    run="../preload_insert_scan.sh",
+    options={
+      **common_opts,
+      "disable_segments": True,
+    },
   )
 
 # Custom datasets.
 for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
-  run_command(
-    name="preload-{dataset}-{record_size_bytes}-{goal}-{delta}-segs".format(
+  common_opts = {
+    **config,
+    "workload_config": "workloads/20M/preload-{}-insert.yml".format(dataset["name"]),
+    "custom_dataset": "'$TP_DATASET_PATH/{dataset_file}'".format(dataset["file"]),
+    "checkpoint_name": "{dataset}_insert-{rsb}-{goal}-{delta}-segs".format(
       dataset=dataset["name"],
-      **config,
+      rsb=config["record_size_bytes"],
+      goal=config["records_per_page_goal"],
+      delta=config["records_per_page_delta"],
     ),
-    run="../preload_insert_scan.sh "
-      "--workload_config=workloads/preload-{dataset}-insert.yml "
-      "--custom_dataset='$TP_DATASET_PATH/{dataset_file}' "
-      "--records_per_page_goal={goal} "
-      "--records_per_page_delta={delta} "
-      "--record_size_bytes={record_size_bytes} "
-      "--checkpoint_name={dataset}_insert-{record_size_bytes}-{goal}-{delta}-segs "
-      "--write_batch_size={write_batch_size} "
-      "--disable_segments=false".format(
-        dataset=dataset["name"],
-        dataset_file=dataset["file"],
-        **config,
-      ),
+  }
+
+  run_command(
+    name="preload-{dataset}-{rsb}-{goal}-{delta}-segs".format(
+      dataset=dataset["name"],
+      rsb=config["record_size_bytes"],
+      goal=config["records_per_page_goal"],
+      delta=config["records_per_page_delta"],
+    ),
+    run="../preload_insert_scan.sh",
+    options={
+      **common_opts,
+      "disable_segments": False,
+    },
   )
 
   run_command(
-    name="preload-{dataset}-{record_size_bytes}-{goal}-{delta}-pages".format(
+    name="preload-{dataset}-{rsb}-{goal}-{delta}-pages".format(
       dataset=dataset["name"],
-      **config,
+      rsb=config["record_size_bytes"],
+      goal=config["records_per_page_goal"],
+      delta=config["records_per_page_delta"],
     ),
-    run="../preload_insert_scan.sh "
-      "--workload_config=workloads/preload-{dataset}-insert.yml "
-      "--custom_dataset='$TP_DATASET_PATH/{dataset_file}' "
-      "--records_per_page_goal={goal} "
-      "--records_per_page_delta={delta} "
-      "--record_size_bytes={record_size_bytes} "
-      "--checkpoint_name={dataset}_insert-{record_size_bytes}-{goal}-{delta}-pages "
-      "--write_batch_size={write_batch_size} "
-      "--disable_segments=true".format(
-        dataset=dataset["name"],
-        dataset_file=dataset["file"],
-        **config,
-      ),
+    run="../preload_insert_scan.sh",
+    options={
+      **common_opts,
+      "disable_segments": True,
+    },
   )

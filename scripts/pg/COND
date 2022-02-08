@@ -30,7 +30,7 @@ run_experiment_group(
         "records_per_page_goal": config["goal"],
         "records_per_page_delta": config["delta"],
         "record_size_bytes": config["record_size_bytes"],
-        "workload_config": "workloads/long_scan.yml",
+        "workload_config": "workloads/20M/long_scan.yml",
         "checkpoint_name": "uniform-{record_size_bytes}-{goal}-{delta}-{segs}".format(segs=segs, **config),
         "disable_segments": (segs == "pages"),
       },
@@ -47,7 +47,7 @@ run_experiment_group(
         "records_per_page_goal": config["goal"],
         "records_per_page_delta": config["delta"],
         "record_size_bytes": config["record_size_bytes"],
-        "workload_config": "workloads/{}".format(dataset["workload"]),
+        "workload_config": "workloads/20M/{}".format(dataset["workload"]),
         "custom_dataset": "'$TP_DATASET_PATH/{}'".format(dataset["file"]),
         "checkpoint_name": "{dataset}-{record_size_bytes}-{goal}-{delta}-{segs}".format(
           segs=segs,
@@ -81,7 +81,7 @@ for config in CONFIGS:
   run_command(
     name="preload-uniform-{record_size_bytes}-{goal}-{delta}-segs".format(**config),
     run="./preload.sh "
-      "--workload_config=workloads/preload.yml "
+      "--workload_config=workloads/20M/preload.yml "
       "--records_per_page_goal={goal} "
       "--records_per_page_delta={delta} "
       "--record_size_bytes={record_size_bytes} "
@@ -92,7 +92,7 @@ for config in CONFIGS:
   run_command(
     name="preload-uniform-{record_size_bytes}-{goal}-{delta}-pages".format(**config),
     run="./preload.sh "
-      "--workload_config=workloads/preload.yml "
+      "--workload_config=workloads/20M/preload.yml "
       "--records_per_page_goal={goal} "
       "--records_per_page_delta={delta} "
       "--record_size_bytes={record_size_bytes} "
@@ -108,7 +108,7 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
       **config,
     ),
     run="./preload.sh "
-      "--workload_config=workloads/preload.yml "
+      "--workload_config=workloads/20M/preload.yml "
       "--custom_dataset='$TP_DATASET_PATH/{dataset_file}' "
       "--records_per_page_goal={goal} "
       "--records_per_page_delta={delta} "
@@ -127,7 +127,7 @@ for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
       **config,
     ),
     run="./preload.sh "
-      "--workload_config=workloads/preload.yml "
+      "--workload_config=workloads/20M/preload.yml "
       "--custom_dataset='$TP_DATASET_PATH/{dataset_file}' "
       "--records_per_page_goal={goal} "
       "--records_per_page_delta={delta} "
