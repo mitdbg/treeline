@@ -1,3 +1,7 @@
+# Pseudo target used to simplify compiling all page grouping related targets.
+add_custom_target(pg_all)
+
+# The page grouping sources.
 add_library(pg STATIC)
 target_sources(pg PRIVATE
   persist/page.cc
@@ -35,41 +39,47 @@ target_include_directories(pg
     ${PROJECT_SOURCE_DIR}/include
 )
 target_link_libraries(pg PRIVATE crc32c)
+add_dependencies(pg_all pg)
 
-add_executable(pg_bench
-  config.cc
-  config.h
-  pg_bench.cc
-  pg_interface.h
-  ../bench/common/load_data.cc
-  ../bench/common/load_data.h
-  ../bench/common/startup.cc
-  ../bench/common/startup.h
-)
-target_link_libraries(pg_bench PRIVATE pg gflags ycsbr-gen Threads::Threads)
+if(LLSM_BUILD_BENCHMARKS)
+  # Primary workload runner.
+  add_executable(pg_bench
+    config.cc
+    config.h
+    pg_bench.cc
+    pg_interface.h
+    ../bench/common/load_data.cc
+    ../bench/common/load_data.h
+    ../bench/common/startup.cc
+    ../bench/common/startup.h
+  )
+  target_link_libraries(pg_bench PRIVATE pg gflags ycsbr-gen Threads::Threads)
 
-add_executable(pg_test
-  tests/datasets.cc
-  tests/datasets.h
-  tests/manager_rewrite_test.cc
-  tests/manager_test.cc
-  tests/segment_test.cc
-)
-target_link_libraries(pg_test PRIVATE pg gtest gtest_main)
+  # Used to shuffle pages on disk.
+  add_executable(pg_shuffle tools/shuffle_pages.cc)
+  target_link_libraries(pg_shuffle PRIVATE gflags)
 
-add_executable(pg_shuffle tools/shuffle_pages.cc)
-target_link_libraries(pg_shuffle PRIVATE gflags)
+  # Contains debug tools.
+  add_subdirectory(debug)
 
-add_subdirectory(debug)
-
-if(NOT TARGET pg_all)
-  add_custom_target(pg_all)
   add_dependencies(pg_all
     pg_bench
-    pg_test
     pg_shuffle
     pg_read
     pg_read2
     pg_standalone
   )
+endif()
+
+if(LLSM_BUILD_TESTS)
+  # Page grouping tests (kept separate from the rest of the LLSM tests).
+  add_executable(pg_test
+    tests/datasets.cc
+    tests/datasets.h
+    tests/manager_rewrite_test.cc
+    tests/manager_test.cc
+    tests/segment_test.cc
+  )
+  target_link_libraries(pg_test PRIVATE pg gtest gtest_main)
+  add_dependencies(pg_all pg_test)
 endif()
