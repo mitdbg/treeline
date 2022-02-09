@@ -1,0 +1,14 @@
+load:
+  num_records: 20000000
+  distribution:
+    type: uniform
+    range_min: 0
+    range_max: 2000000000
+
+# We use this workload for the dataset only.
+run:
+- num_requests: 1
+  read:
+    proportion_pct: 100
+    distribution:
+      type: uniform

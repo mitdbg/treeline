@@ -1,0 +1,150 @@
+from itertools import product
+
+BUFFER_SIZE_BYTES = 64 * 1024 * 1024
+
+CONFIGS = [
+  # Represents 64 B records, 2880 bytes per page +/- (2 * 320) bytes
+  {
+    "records_per_page_goal": 45,
+    "records_per_page_delta": 5,
+    "record_size_bytes": 64,
+    "write_batch_size": BUFFER_SIZE_BYTES // 64,
+  },
+  # Represents 1024 B records, 2048 bytes per page +/- (2 * 1024) bytes
+  {
+    "records_per_page_goal": 2,
+    "records_per_page_delta": 1,
+    "record_size_bytes": 1024,
+    "write_batch_size": BUFFER_SIZE_BYTES // 1024,
+  },
+]
+
+CUSTOM_DATASETS = [
+  {"name": "amzn", "file": "amazon_reviews.txt", "workload": "long_scan-amzn.yml"},
+  {"name": "osm", "file": "osm_ny.txt", "workload": "long_scan-osm.yml"},
+]
+
+def suffix(config, segs):
+  return "{rsb}-{goal}-{delta}-{segs}".format(
+    rsb=config["record_size_bytes"],
+    goal=config["records_per_page_goal"],
+    delta=config["records_per_page_delta"],
+    segs=segs,
+  )
+
+def workload(config):
+  return "10M" if config["record_size_bytes"] == 1024 else "20M"
+
+run_experiment_group(
+  name="long_scan",
+  run="../run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="long_scan-uniform-{}".format(suffix(config, segs)),
+      options={
+        **config,
+        "workload_config": "workloads/{}/long_scan.yml".format(workload(config)),
+        "checkpoint_name": "uniform_insert-{}".format(suffix(config, segs)),
+        "disable_segments": (segs == "pages"),
+      },
+    )
+    for config, segs in product(CONFIGS, ["segs", "pages"])
+  ] + [
+    ExperimentInstance(
+      name="long_scan-{}-{}".format(dataset["name"], suffix(config, segs)),
+      options={
+        **config,
+        "workload_config": "workloads/{}/{}".format(workload(config), dataset["workload"]),
+        "custom_dataset": "'$TP_DATASET_PATH/{}'".format(dataset["file"]),
+        "checkpoint_name": "{}_insert-{}".format(
+          dataset["name"],
+          suffix(config, segs),
+        ),
+        "disable_segments": (segs == "pages"),
+      },
+    )
+    for config, segs, dataset in product(CONFIGS, ["segs", "pages"], CUSTOM_DATASETS)
+  ],
+  deps=[":preload"],
+)
+
+# Checkpoint set up tasks.
+
+group(
+  name="preload",
+  deps=[
+    ":preload-{}-{}".format(dataset, suffix(config, segs))
+    for config, dataset, segs in product(
+      CONFIGS,
+      ["uniform", *map(lambda d: d["name"], CUSTOM_DATASETS)],
+      ["segs", "pages"],
+    )
+  ],
+)
+
+# Uniform dataset.
+for config in CONFIGS:
+  common_opts = {
+    **config,
+    "workload_config": "workloads/{}/preload-uniform-insert.yml".format(workload(config)),
+  }
+
+  run_command(
+    name="preload-uniform-{}".format(suffix(config, "segs")),
+    run="../preload_insert_scan.sh",
+    options={
+      **common_opts,
+      "checkpoint_name": "uniform_insert-{}".format(suffix(config, "segs")),
+      "disable_segments": False,
+    },
+  )
+
+  run_command(
+    name="preload-uniform-{}".format(suffix(config, "pages")),
+    run="../preload_insert_scan.sh",
+    options={
+      **common_opts,
+      "checkpoint_name": "uniform_insert-{}".format(suffix(config, "pages")),
+      "disable_segments": True,
+    },
+  )
+
+# Custom datasets.
+for config, dataset in product(CONFIGS, CUSTOM_DATASETS):
+  common_opts = {
+    **config,
+    "workload_config": "workloads/{}/preload-{}-insert.yml".format(workload(config), dataset["name"]),
+    "custom_dataset": "'$TP_DATASET_PATH/{}'".format(dataset["file"]),
+  }
+
+  run_command(
+    name="preload-{}-{}".format(
+      dataset["name"],
+      suffix(config, "segs"),
+    ),
+    run="../preload_insert_scan.sh",
+    options={
+      **common_opts,
+      "disable_segments": False,
+      "checkpoint_name": "{}_insert-{}".format(
+        dataset["name"],
+        suffix(config, "segs"),
+      ),
+    },
+  )
+
+  run_command(
+    name="preload-{}-{}".format(
+      dataset["name"],
+      suffix(config, "pages"),
+    ),
+    run="../preload_insert_scan.sh",
+    options={
+      **common_opts,
+      "disable_segments": True,
+      "checkpoint_name": "{}_insert-{}".format(
+        dataset["name"],
+        suffix(config, "pages"),
+      ),
+    },
+  )

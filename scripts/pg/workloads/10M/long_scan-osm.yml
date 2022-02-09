@@ -1,0 +1,15 @@
+load:
+  num_records: 10000000
+  distribution:
+    type: uniform
+    # Key bounds of the OSM dataset.
+    range_min: 699540
+    range_max: 6820987374
+
+run:
+- num_requests: 100000
+  scan:
+    proportion_pct: 100
+    max_length: 500
+    distribution:
+      type: uniform

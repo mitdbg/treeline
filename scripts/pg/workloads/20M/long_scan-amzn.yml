@@ -1,0 +1,15 @@
+load:
+  num_records: 20000000
+  distribution:
+    type: uniform
+    # Key bounds of the Amazon dataset.
+    range_min: 10001
+    range_max: 53096592
+
+run:
+- num_requests: 100000
+  scan:
+    proportion_pct: 100
+    max_length: 500
+    distribution:
+      type: uniform

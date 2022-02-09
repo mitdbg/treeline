@@ -1,0 +1,54 @@
+MODES = [
+  "all",
+  "power_two",
+  "single",
+]
+
+READ_PAGES = 10000000  # 10 million
+SIZE_MIB = 40960  # 40 GiB
+WARMUP = 1000
+
+OUT_FILE = "/flash1/geoffxy/pg_read_test_rand"
+WRITE_PATH = "/flash1/geoffxy/pg_read_dir"
+
+run_experiment_group(
+  name="simple",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="simple-{}".format(mode),
+      options={
+        "mode": mode,
+        "iterations": READ_PAGES,
+        "warmup": WARMUP,
+        "size_mib": SIZE_MIB,
+        "file": OUT_FILE,
+        "seed": 42,
+        "trials": 1,
+        "rand_init": True,
+      },
+    )
+    for mode in MODES
+  ],
+)
+
+run_experiment_group(
+  name="multi",
+  run="./run2.sh",
+  experiments=[
+    ExperimentInstance(
+      name="multi-{}".format(mode),
+      options={
+        "mode": mode,
+        "iterations": READ_PAGES,
+        "warmup": WARMUP,
+        "size_mib": SIZE_MIB,
+        "write_path": WRITE_PATH,
+        "seed": 42,
+        "trials": 1,
+        "interleave_alloc": True,
+      },
+    )
+    for mode in MODES
+  ],
+)
