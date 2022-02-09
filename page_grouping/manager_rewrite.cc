@@ -234,13 +234,22 @@ void Manager::RewriteSegments(
             if (maybe_key.has_value()) {
               upper_bound = *maybe_key;
             } else {
-              // NOTE: We could do slightly better here by querying the index to
-              // find the left boundary of the next segment (if it exists). But
-              // this adds more code complexity. The upper boundary key is used
-              // by the page format for computing shared key prefixes, so
-              // "overestimating" and using the maximum key doesn't limit us
-              // here.
-              upper_bound = std::numeric_limits<Key>::max();
+              // The segment builder is "empty". This happens in two situations:
+              // 1. We need to read in the next segment but do not have enough
+              //    memory to hold it, so we are flushing all the currently
+              //    processed records into segments.
+              // 2. We are writing out the last group of records in this
+              //    rewrite.
+              // To find the upper bound, we query the index to find the left
+              // boundary of the next segment (if it exists).
+              const auto it =
+                  index_.upper_bound(segments.back().records.back().first);
+              if (it != index_.end()) {
+                upper_bound = it->first;
+              } else {
+                // We are rewriting the last segment in the database.
+                upper_bound = std::numeric_limits<Key>::max();
+              }
             }
           }
           rewritten_segments.emplace_back(
