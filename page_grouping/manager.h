@@ -34,9 +34,13 @@ class Manager {
     bool write_debug_info = true;
 
     // If set to true, direct I/O will be disabled and synchronous writes will
-    // also be disabled. (This is used for the automated tests and for when not
-    // running benchmarks).
-    bool use_buffered_io = false;
+    // also be disabled. On machines with spare memory, this means that most I/O
+    // will leverage the file system's block cache and writes cannot be
+    // considered durable until the file is closed or fsync-ed.
+    //
+    // This flag is only meant to be set to true for the tests and when running
+    // experiment setup code not related to the evaluation.
+    bool use_memory_based_io = false;
 
     // If set to 0, no background threads will be used.
     size_t num_bg_threads = 16;
@@ -72,7 +76,9 @@ class Manager {
 
   // Benchmark statistics.
   const std::vector<size_t>& GetReadCounts() const { return w_.read_counts(); }
-  const std::vector<size_t>& GetWriteCounts() const { return w_.write_counts(); }
+  const std::vector<size_t>& GetWriteCounts() const {
+    return w_.write_counts();
+  }
 
   Manager(const Manager&) = delete;
   Manager& operator=(const Manager&) = delete;

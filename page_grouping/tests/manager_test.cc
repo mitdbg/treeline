@@ -44,7 +44,7 @@ Manager::Options GetOptions(size_t goal, size_t delta, bool use_segments) {
   options.records_per_page_delta = delta;
   options.use_segments = use_segments;
   options.write_debug_info = false;
-  options.use_buffered_io = true;
+  options.use_memory_based_io = true;
   options.num_bg_threads = 0;
   return options;
 }

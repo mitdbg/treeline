@@ -49,7 +49,7 @@ echo >&2 "Creating the database..."
   --seed=$SEED \
   --output_path=$COND_OUT \
   --verbose \
-  --use_buffered_io \
+  --use_memory_based_io \
   ${args[@]}
 
 echo >&2 "Done loading. Shuffling the pages now..."
@@ -67,7 +67,7 @@ echo >&2 "Done shuffling. Making the incremental writes now..."
   --output_path=$COND_OUT \
   --verbose \
   --skip_load \
-  --use_buffered_io \
+  --use_memory_based_io \
   ${args[@]}
 
 # Store a copy of the database debug information if it exists.

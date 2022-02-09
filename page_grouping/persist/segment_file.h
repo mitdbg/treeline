@@ -41,14 +41,14 @@ class SegmentFile {
         pages_per_segment_(0) {}
 
   SegmentFile(const std::filesystem::path& name, size_t pages_per_segment,
-              bool use_buffered_io = false)
+              bool use_memory_based_io = false)
       : fd_(-1),
         file_size_(0),
         next_page_allocation_offset_(0),
         pages_per_segment_(pages_per_segment) {
     assert(pages_per_segment > 0);
     int flags = O_CREAT | O_RDWR;
-    if (!use_buffered_io) {
+    if (!use_memory_based_io) {
       flags |= O_DIRECT;
       flags |= O_SYNC;
     }
