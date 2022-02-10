@@ -1,9 +1,10 @@
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <string>
 #include <utility>
 #include <vector>
-#include <string>
 
 #include "../key.h"
 #include "../manager.h"
@@ -14,6 +15,7 @@ DEFINE_string(db_path, "", "Path to an existing page-grouped DB.");
 DEFINE_uint32(goal, 45, "Records per page goal.");
 DEFINE_uint32(delta, 5, "Records per page delta.");
 DEFINE_bool(use_segments, true, "Set to false to use pages only.");
+DEFINE_string(dump_keys_to, "", "Write out the scanned keys to a file.");
 
 using namespace llsm;
 using namespace llsm::pg;
@@ -40,5 +42,13 @@ int main(int argc, char* argv[]) {
   m.Scan(0, 100000000ULL, &scanned_records);
 
   std::cerr << "Scanned " << scanned_records.size() << " records." << std::endl;
+
+  if (!FLAGS_dump_keys_to.empty()) {
+    std::ofstream out(FLAGS_dump_keys_to);
+    for (const auto& r : scanned_records) {
+      out << r.first << std::endl;
+    }
+  }
+
   return 0;
 }
