@@ -54,6 +54,6 @@ echo >&2 "Creating the database..."
 
 echo >&2 "Done loading. Shuffling the pages now..."
 
-../../build/page_grouping/tools/pg_shuffle \
+../../build/page_grouping/pg_shuffle \
   --db_path=$full_checkpoint_path \
   --seed=$SEED

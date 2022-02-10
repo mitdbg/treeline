@@ -61,6 +61,9 @@ class DBState {
   // Check segment checksums.
   bool CheckChecksums() const;
 
+  // Print a summary of the free segments in the DB.
+  void PrintFreeSegmentsSummary(std::ostream& out) const;
+
  private:
   DBState(bool uses_segments, std::unordered_set<SegmentId> declared_overflows,
           std::vector<SegmentState> segments,
@@ -161,8 +164,7 @@ bool DBState::CheckSegmentRanges() const {
   assert(!segments_.empty());
 
   size_t internal_range_errors = 0;
-  std::cout << std::endl
-            << ">>> Checking segment ranges..." << std::endl;
+  std::cout << std::endl << ">>> Checking segment ranges..." << std::endl;
   for (size_t i = 0; i < segments_.size(); ++i) {
     const auto& seg = segments_[i];
     if (seg.base_key > seg.upper_bound) {
@@ -311,6 +313,20 @@ bool DBState::CheckChecksums() const {
   return invalid_checksums == 0;
 }
 
+void DBState::PrintFreeSegmentsSummary(std::ostream& out) const {
+  // File ID -> Number of free segments
+  std::unordered_map<size_t, size_t> free_counts;
+  for (const auto& f : free_segments_) {
+    ++(free_counts[f.id.GetFileId()]);
+  }
+
+  out << std::endl << ">>> Free segments summary" << std::endl;
+  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
+    out << "Length " << SegmentBuilder::kSegmentPageCounts[i] << ": "
+        << free_counts[i] << std::endl;
+  }
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -335,6 +351,9 @@ int main(int argc, char* argv[]) {
   if (FLAGS_stop_early && !valid) return 1;
 
   valid = db.CheckOverflows() && valid;
+  if (FLAGS_stop_early && !valid) return 1;
+
+  db.PrintFreeSegmentsSummary(std::cout);
 
   return valid ? 0 : 1;
 }
