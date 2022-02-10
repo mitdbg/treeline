@@ -355,5 +355,11 @@ int main(int argc, char* argv[]) {
 
   db.PrintFreeSegmentsSummary(std::cout);
 
+  if (valid) {
+    std::cout << std::endl << ">>> ✓ On-disk database files are consistent." << std::endl;
+  } else {
+    std::cout << std::endl << ">>> ✗ Detected errors in the on-disk files." << std::endl;
+  }
+
   return valid ? 0 : 1;
 }
