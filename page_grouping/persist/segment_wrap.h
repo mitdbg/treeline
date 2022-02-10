@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "../key.h"
 #include "page.h"
 
 namespace llsm {
@@ -22,7 +23,8 @@ class SegmentWrap {
   // Sets all overflow values to "invalid" (indicating no overflow).
   void ClearAllOverflows();
 
-  // Returns true if there exists at least one page in the segment that has an overflow.
+  // Returns true if there exists at least one page in the segment that has an
+  // overflow.
   bool HasOverflow() const;
 
   // Returns the number of pages in this segment that have an overflow.
@@ -31,9 +33,13 @@ class SegmentWrap {
   template <class Callable>
   void ForEachPage(const Callable& callable) {
     for (size_t i = 0; i < pages_in_segment_; ++i) {
-      callable(PageAtIndex(i));
+      callable(i, PageAtIndex(i));
     }
   }
+
+  // Retrieve the encoded "lower"/"upper" boundaries in the segment.
+  Key EncodedBaseKey() const;
+  Key EncodedUpperKey() const;
 
  private:
   Page PageAtIndex(size_t index) const;

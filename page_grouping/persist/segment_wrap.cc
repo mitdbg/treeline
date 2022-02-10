@@ -5,6 +5,7 @@
 #include "../segment_builder.h"
 #include "page.h"
 #include "util/crc32c.h"
+#include "util/key.h"
 
 namespace llsm {
 namespace pg {
@@ -88,6 +89,16 @@ size_t SegmentWrap::NumOverflows() const {
     }
   }
   return num_overflows;
+}
+
+Key SegmentWrap::EncodedBaseKey() const {
+  const Page page = PageAtIndex(0);
+  return key_utils::ExtractHead64(page.GetLowerBoundary());
+}
+
+Key SegmentWrap::EncodedUpperKey() const {
+  const Page page = PageAtIndex(pages_in_segment_ - 1);
+  return key_utils::ExtractHead64(page.GetUpperBoundary());
 }
 
 }  // namespace pg

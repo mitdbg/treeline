@@ -320,7 +320,7 @@ void Manager::RewriteSegments(
     // needed.
     std::vector<PageChain> chains_in_segment;
     std::vector<std::pair<SegmentId, void*>> overflows_to_load;
-    sw.ForEachPage([&](pg::Page page) {
+    sw.ForEachPage([&](const size_t idx, pg::Page page) {
       if (page.HasOverflow()) {
         void* main_page = page_buf.Allocate();
         void* overflow_page = page_buf.Allocate();

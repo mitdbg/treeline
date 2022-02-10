@@ -15,3 +15,6 @@ target_link_libraries(pg_read2 PRIVATE gflags)
 
 add_executable(pg_scan pg_scan.cc)
 target_link_libraries(pg_scan PRIVATE pg gflags Threads::Threads)
+
+add_executable(pg_check pg_check.cc)
+target_link_libraries(pg_check PRIVATE pg gflags Threads::Threads)
