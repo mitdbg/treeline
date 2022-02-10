@@ -2,6 +2,7 @@
 #include <cassert>
 #include <filesystem>
 #include <iostream>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -14,6 +15,10 @@
 #include "gflags/gflags.h"
 
 DEFINE_string(db_path, "", "Path to the database to check.");
+DEFINE_bool(verbose, false,
+            "If set to true, will print details about all errors.");
+DEFINE_bool(stop_early, false,
+            "If set, will abort later checks if earlier checks fail.");
 
 namespace {
 
@@ -46,7 +51,15 @@ class DBState {
  public:
   static DBState Load(const fs::path& db_path);
 
-  void CheckSegmentRanges() const;
+  // Verify that the encoded key ranges in each segment are "valid".
+  bool CheckSegmentRanges() const;
+
+  // Check that overflows appear in single-page segment file only and that there
+  // are no dangling overflows.
+  bool CheckOverflows() const;
+
+  // Check segment checksums.
+  bool CheckChecksums() const;
 
  private:
   DBState(bool uses_segments, std::unordered_set<SegmentId> declared_overflows,
@@ -144,43 +157,158 @@ DBState::DBState(bool uses_segments,
             });
 }
 
-void DBState::CheckSegmentRanges() const {
+bool DBState::CheckSegmentRanges() const {
   assert(!segments_.empty());
 
   size_t internal_range_errors = 0;
-  std::cout << ">>> Checking internal segment ranges:" << std::endl;
+  std::cout << std::endl
+            << ">>> Checking segment ranges..." << std::endl;
   for (size_t i = 0; i < segments_.size(); ++i) {
     const auto& seg = segments_[i];
     if (seg.base_key > seg.upper_bound) {
-      std::cout << "ERROR: Invalid internal segment range. ";
-      PrintSegmentBounds(std::cout, i, seg);
-      std::cout << std::endl;
       ++internal_range_errors;
+      if (FLAGS_verbose) {
+        std::cout << "ERROR: Invalid internal segment range. ";
+        PrintSegmentBounds(std::cout, i, seg);
+        std::cout << std::endl;
+      }
     }
   }
-  std::cout << ">>> Done." << std::endl;
 
   size_t cross_segment_errors = 0;
-  std::cout << ">>> Checking segment ranges:" << std::endl;
   for (size_t i = 1; i < segments_.size(); ++i) {
     const auto& prev_seg = segments_[i - 1];
     const auto& curr_seg = segments_[i];
     if (curr_seg.base_key < prev_seg.upper_bound) {
-      std::cout << "ERROR: Segment range overlap." << std::endl;
-      std::cout << "Left: ";
-      PrintSegmentBounds(std::cout, i - 1, prev_seg);
-      std::cout << std::endl;
-      std::cout << "Right: ";
-      PrintSegmentBounds(std::cout, i - 1, prev_seg);
-      std::cout << std::endl;
       ++cross_segment_errors;
+      if (FLAGS_verbose) {
+        std::cout << "ERROR: Segment range overlap." << std::endl;
+        std::cout << "Left: ";
+        PrintSegmentBounds(std::cout, i - 1, prev_seg);
+        std::cout << std::endl;
+        std::cout << "Right: ";
+        PrintSegmentBounds(std::cout, i - 1, prev_seg);
+        std::cout << std::endl;
+      }
     }
   }
-  std::cout << ">>> Done." << std::endl;
 
-  std::cout << "Summary:" << std::endl;
-  std::cout << "Internal segment range errors: " << internal_range_errors << "/" << segments_.size() << std::endl;
-  std::cout << "Cross segment range errors: " << cross_segment_errors << "/" << segments_.size() << std::endl;
+  std::cout << ">>> Internal segment range errors: " << internal_range_errors
+            << "/" << segments_.size() << std::endl;
+  std::cout << ">>> Cross segment range errors: " << cross_segment_errors << "/"
+            << segments_.size() << std::endl;
+
+  return internal_range_errors + cross_segment_errors == 0;
+}
+
+bool DBState::CheckOverflows() const {
+  // Check that overflow pages are allocated in the correct file.
+  std::cout << std::endl << ">>> Checking overflows..." << std::endl;
+  size_t num_incorrect_overflows = 0;
+  for (const auto& id : declared_overflows_) {
+    if (id.GetFileId() != 0) {
+      ++num_incorrect_overflows;
+      if (FLAGS_verbose) {
+        std::cout << "ERROR: Overflow page in incorrect file. ID: " << id
+                  << std::endl;
+      }
+    }
+  }
+
+  // Check for dangling overflows.
+  // - Every page that declares itself as an overflow should be referenced by an
+  //   existing segment.
+  // - Every overflow that is referenced by a segment should exist.
+
+  // Store the number of times the overflow page is referenced. In consistent
+  // DBs, all overflow pages should be referenced exactly once.
+  std::unordered_map<SegmentId, size_t> overflow_refs;
+  overflow_refs.reserve(declared_overflows_.size());
+  for (const auto& id : declared_overflows_) {
+    overflow_refs[id] = 0;
+  }
+
+  // Check segments first.
+  size_t pointing_to_nonexistent_overflow = 0;
+  size_t multiple_references = 0;
+  for (size_t i = 0; i < segments_.size(); ++i) {
+    const auto& seg = segments_[i];
+    for (size_t j = 0; j < seg.overflows.size(); ++j) {
+      const auto& overflow_id = seg.overflows[j];
+      const auto it = overflow_refs.find(overflow_id);
+
+      // Segment page points to unknown overflow page.
+      if (it == overflow_refs.end()) {
+        ++pointing_to_nonexistent_overflow;
+        if (FLAGS_verbose) {
+          std::cout
+              << "ERROR: Page " << j << " in segment " << seg.id
+              << " references a non-existent overflow page (references ID: "
+              << overflow_id << ")" << std::endl;
+        }
+        continue;
+      }
+
+      // Multiple segment pages point to the same overflow page.
+      if (it->second > 0) {
+        ++multiple_references;
+        if (FLAGS_verbose) {
+          std::cout << "ERROR: Page " << j << " in segment " << seg.id
+                    << " is not the first page that references overflow page "
+                    << overflow_id << std::endl;
+        }
+      }
+
+      // Increase the reference count.
+      ++(it->second);
+    }
+  }
+
+  // Ensure that every declared overflow page was referenced once. We do not
+  // warn on multiple references here because we check for that above.
+  size_t unreferenced_overflows = 0;
+  for (const auto& [seg_id, ref_count] : overflow_refs) {
+    if (ref_count == 0) {
+      ++unreferenced_overflows;
+      if (FLAGS_verbose) {
+        std::cout << "ERROR: Overflow page " << seg_id
+                  << " was not referenced by any existing segment page."
+                  << std::endl;
+      }
+    }
+  }
+
+  std::cout << ">>> Incorrect overflow allocations: " << num_incorrect_overflows
+            << "/" << declared_overflows_.size() << std::endl;
+  std::cout << ">>> Segment pages that point to non-existing overflows: "
+            << pointing_to_nonexistent_overflow << std::endl;
+  std::cout << ">>> Overflow pages referenced multiple times: "
+            << multiple_references << std::endl;
+  std::cout << ">>> Overflow pages never referenced: " << unreferenced_overflows
+            << std::endl;
+
+  return num_incorrect_overflows + pointing_to_nonexistent_overflow +
+             multiple_references + unreferenced_overflows ==
+         0;
+}
+
+bool DBState::CheckChecksums() const {
+  size_t invalid_checksums = 0;
+  std::cout << std::endl << ">>> Checking segment checksums..." << std::endl;
+  for (size_t i = 0; i < segments_.size(); ++i) {
+    const auto& seg = segments_[i];
+    if (!seg.checksum_valid) {
+      ++invalid_checksums;
+      if (FLAGS_verbose) {
+        std::cout << "ERROR: Invalid checksum. Index: " << i
+                  << " ID: " << seg.id << std::endl;
+      }
+    }
+  }
+  std::cout << ">>> Invalid checksums: " << invalid_checksums << "/"
+            << segments_.size() << std::endl;
+
+  return invalid_checksums == 0;
 }
 
 }  // namespace
@@ -198,8 +326,15 @@ int main(int argc, char* argv[]) {
 
   std::cout << ">>> Reading the DB files..." << std::endl;
   DBState db = DBState::Load(FLAGS_db_path);
-  std::cout << ">>> Done! Running validation..." << std::endl;
-  db.CheckSegmentRanges();
 
-  return 0;
+  bool valid = true;
+  valid = db.CheckChecksums() && valid;
+  if (FLAGS_stop_early && !valid) return 1;
+
+  valid = db.CheckSegmentRanges() && valid;
+  if (FLAGS_stop_early && !valid) return 1;
+
+  valid = db.CheckOverflows() && valid;
+
+  return valid ? 0 : 1;
 }
