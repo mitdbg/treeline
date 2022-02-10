@@ -189,7 +189,7 @@ bool DBState::CheckSegmentRanges() const {
         PrintSegmentBounds(std::cout, i - 1, prev_seg);
         std::cout << std::endl;
         std::cout << "Right: ";
-        PrintSegmentBounds(std::cout, i - 1, prev_seg);
+        PrintSegmentBounds(std::cout, i, curr_seg);
         std::cout << std::endl;
       }
     }
