@@ -64,9 +64,11 @@ if(LLSM_BUILD_BENCHMARKS)
 
   add_dependencies(pg_all
     pg_bench
-    pg_shuffle
+    pg_check
     pg_read
     pg_read2
+    pg_scan
+    pg_shuffle
     pg_standalone
   )
 endif()
