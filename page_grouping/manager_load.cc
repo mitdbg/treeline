@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <vector>
 
 #include "manager.h"
@@ -50,6 +51,43 @@ void PrintSegmentsAsCSV(std::ostream& out,
   }
 }
 
+// Defined to run `std::lower_bound()` on the `Key` domain without materializing
+// the values into an array.
+class KeyDomainIterator
+    : public std::iterator<std::random_access_iterator_tag, Key> {
+ public:
+  KeyDomainIterator() : value_(0) {}
+  KeyDomainIterator(Key value) : value_(value) {}
+
+  Key operator*() const { return value_; }
+
+  // NOTE: This iterator does not define all the operators needed for a
+  // "RandomAccessIterator". It just defines the operators used by
+  // `std::lower_bound()`.
+
+  KeyDomainIterator& operator++() {
+    ++value_;
+    return *this;
+  }
+  KeyDomainIterator& operator--() {
+    --value_;
+    return *this;
+  }
+  KeyDomainIterator& operator+=(size_t delta) {
+    value_ += delta;
+    return *this;
+  }
+  bool operator==(const KeyDomainIterator& other) const {
+    return value_ == other.value_;
+  }
+  size_t operator-(const KeyDomainIterator& it) const {
+    return value_ - it.value_;
+  }
+
+ private:
+  Key value_;
+};
+
 void PrintSegmentSummaryAsCsv(std::ostream& out,
                               const std::vector<Segment>& segments) {
   std::vector<size_t> num_segments;
@@ -64,6 +102,65 @@ void PrintSegmentSummaryAsCsv(std::ostream& out,
   for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
     out << (1ULL << i) << "," << num_segments[i] << std::endl;
   }
+}
+
+std::vector<Key> ComputePageLowerBoundaries(const Segment& seg) {
+  std::vector<Key> lower_boundaries = {seg.base_key};
+  if (seg.page_count == 1) {
+    return lower_boundaries;
+  }
+  lower_boundaries.reserve(seg.page_count);
+
+  // Strategy: To avoid precision errors, we binary search on the key space to
+  // find the smallest possible key that will be assigned to each page. We use
+  // the `page_to_key` function to compute search bounds.
+  plr::Line64 page_to_key = seg.model->line().Invert();
+
+  for (size_t page_idx = 1; page_idx < seg.page_count; ++page_idx) {
+    // Find the smallest key such that PageToKey(..., seg.model, ..., key)
+    // returns page_idx.
+
+    // 1. Use the inverted model to compute a candidate boundary key. We should
+    // not use this key directly due to possible precision errors. Instead, we
+    // use it to establish a search bound.
+    const Key candidate_boundary =
+        static_cast<Key>(page_to_key(page_idx)) + seg.base_key;
+    const size_t page_for_candidate = PageForKey(
+        seg.base_key, seg.model->line(), seg.page_count, candidate_boundary);
+
+    // 2. Compute lower/upper bounds for the search space.
+    Key lower = 0, upper = 0;
+    if (page_for_candidate >= page_idx) {
+      // `candidate_boundary` is an upper bound for the search space.
+      // NOTE: This assumes that `page_to_key(page_idx - 1)` produces a strictly
+      // lower key.
+      lower = static_cast<Key>(page_to_key(page_idx - 1)) + seg.base_key;
+      upper = candidate_boundary;
+    } else {
+      // `candidate_boundary` is a lower bound for the search space.
+      // NOTE: This assumes that `page_to_key(page_idx + 1)` produces a strictly
+      // higher key.
+      lower = candidate_boundary;
+      upper = static_cast<Key>(page_to_key(page_idx + 1)) + seg.base_key;
+    }
+    assert(lower < upper);
+
+    // 3. Binary search over the search space to find the smallest key that maps
+    // to `page_idx`.
+    KeyDomainIterator lower_it(lower), upper_it(upper);
+    const auto bound_it = std::lower_bound(
+        lower_it, upper_it, page_idx,
+        [&seg](const Key key_candidate, const size_t page_idx) {
+          return PageForKey(seg.base_key, seg.model->line(), seg.page_count,
+                            key_candidate) < page_idx;
+        });
+    assert(PageForKey(seg.base_key, seg.model->line(), seg.page_count,
+                      *bound_it) == page_idx);
+    lower_boundaries.push_back(*bound_it);
+  }
+
+  assert(lower_boundaries.size() == seg.page_count);
+  return lower_boundaries;
 }
 
 }  // namespace
@@ -151,33 +248,28 @@ std::pair<Key, SegmentInfo> Manager::LoadIntoNewSegment(
   const PageBuffer& buf = w_.buffer();
   memset(buf.get(), 0, pg::Page::kSize * seg.page_count);
   if (seg.page_count > 1) {
-    // Partition the records into pages based on the model.
-    size_t curr_page = 0;
-    size_t curr_page_first_record_idx = 0;
-    for (size_t i = 0; i < seg.records.size(); ++i) {
-      const auto& rec = seg.records[i];
-      // Use the page assigned by the model.
-      const size_t assigned_page =
-          PageForKey(base_key, seg.model->line(), seg.page_count, rec.first);
-      if (assigned_page != curr_page) {
-        // Flush to page.
-        const auto result = LoadIntoPage(
-            buf, curr_page,
-            /*lower_key=*/seg.records[curr_page_first_record_idx].first,
-            /*upper_key=*/rec.first,
-            seg.records.begin() + curr_page_first_record_idx,
-            seg.records.begin() + i);
-        assert(result.ok());
-        curr_page = assigned_page;
-        curr_page_first_record_idx = i;
+    const auto lower_boundaries = ComputePageLowerBoundaries(seg);
+    size_t start_rec_idx = 0;
+    size_t curr_rec_idx = 0;
+    for (size_t page_idx = 0; page_idx < lower_boundaries.size() - 1;
+         ++page_idx) {
+      const Key page_upper = lower_boundaries[page_idx + 1];
+      for (; curr_rec_idx < seg.records.size() &&
+             seg.records[curr_rec_idx].first < page_upper;
+           ++curr_rec_idx) {
       }
+      const auto result = LoadIntoPage(
+          buf, page_idx, lower_boundaries[page_idx], page_upper,
+          seg.records.begin() + start_rec_idx, seg.records.begin() + curr_rec_idx);
+      assert(result.ok());
+      start_rec_idx = curr_rec_idx;
     }
     // Flush remaining to a page.
-    const auto result = LoadIntoPage(
-        buf, curr_page,
-        /*lower=*/seg.records[curr_page_first_record_idx].first,
-        /*upper=*/upper_bound, seg.records.begin() + curr_page_first_record_idx,
-        seg.records.end());
+    const auto result =
+        LoadIntoPage(buf, seg.page_count - 1,
+                     /*lower=*/lower_boundaries.back(),
+                     /*upper=*/upper_bound, seg.records.begin() + start_rec_idx,
+                     seg.records.end());
     assert(result.ok());
 
     // Write model into the first page (for deserialization).
@@ -188,7 +280,7 @@ std::pair<Key, SegmentInfo> Manager::LoadIntoNewSegment(
     // Simple case - put all the records into one page.
     assert(seg.page_count == 1);
     const auto result =
-        LoadIntoPage(buf, 0, /*lower=*/seg.records.front().first, upper_bound,
+        LoadIntoPage(buf, 0, /*lower=*/seg.base_key, upper_bound,
                      seg.records.begin(), seg.records.end());
     assert(result.ok());
   }
