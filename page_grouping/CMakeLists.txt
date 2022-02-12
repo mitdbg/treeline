@@ -67,7 +67,6 @@ if(LLSM_BUILD_BENCHMARKS)
     pg_check
     pg_read
     pg_read2
-    pg_scan
     pg_shuffle
     pg_standalone
   )

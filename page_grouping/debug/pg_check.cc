@@ -8,6 +8,7 @@
 
 #include "../../bufmgr/page_memory_allocator.h"
 #include "../../util/key.h"
+#include "../manager.h"
 #include "../persist/page.h"
 #include "../persist/segment_file.h"
 #include "../persist/segment_id.h"
@@ -20,6 +21,11 @@ DEFINE_bool(verbose, false,
             "If set to true, will print details about all errors.");
 DEFINE_bool(stop_early, false,
             "If set, will abort later checks if earlier checks fail.");
+
+DEFINE_bool(scan_db, false,
+            "Set to true to scan `scan_amount` records from the DB and to "
+            "check the results for consistency.");
+DEFINE_uint64(scan_amount, 100000000ULL, "The number of records to scan.");
 
 namespace {
 
@@ -446,31 +452,22 @@ bool DBState::CheckPageRanges() const {
          0;
 }
 
-}  // namespace
-
-int main(int argc, char* argv[]) {
-  gflags::SetUsageMessage(
-      "Check a page grouped DB's on-disk files for consistency (fsck for "
-      "page-grouped TreeLine).");
-  gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
-
-  if (FLAGS_db_path.empty()) {
-    std::cerr << "ERROR: Must provide a path to an existing DB." << std::endl;
-    return 1;
-  }
-
+// Run a "fsck-like" validation over the DB's physical files.
+bool RunCheck() {
+  std::cout << ">>> Checking the DB's physical files for consistency."
+            << std::endl;
   std::cout << ">>> Reading the DB files..." << std::endl;
   DBState db = DBState::Load(FLAGS_db_path);
 
   bool valid = true;
   valid = db.CheckChecksums() && valid;
-  if (FLAGS_stop_early && !valid) return 1;
+  if (FLAGS_stop_early && !valid) return valid;
 
   valid = db.CheckSegmentRanges() && valid;
-  if (FLAGS_stop_early && !valid) return 1;
+  if (FLAGS_stop_early && !valid) return valid;
 
   valid = db.CheckOverflows() && valid;
-  if (FLAGS_stop_early && !valid) return 1;
+  if (FLAGS_stop_early && !valid) return valid;
 
   db.PrintFreeSegmentsSummary(std::cout);
 
@@ -484,5 +481,72 @@ int main(int argc, char* argv[]) {
               << ">>> ✗ Detected errors in the on-disk files." << std::endl;
   }
 
-  return valid ? 0 : 1;
+  return valid;
+}
+
+// Attempt to scan "all" records from the DB and then check that the scanned
+// records are unique and in sorted order.
+bool RunScan() {
+  std::cout << ">>> Scanning up to " << FLAGS_scan_amount
+            << " records from the DB." << std::endl;
+  Manager::Options options;
+  options.use_memory_based_io = true;
+  std::cout << ">>> Opening the DB..." << std::endl;
+  Manager m = Manager::Reopen(FLAGS_db_path, options);
+
+  std::vector<std::pair<Key, std::string>> scanned_records;
+  std::cout << ">>> Running the scan..." << std::endl;
+  m.Scan(0, FLAGS_scan_amount, &scanned_records);
+
+  // Report the number of scanned keys and check that (i) they are sorted, and
+  // (ii) there are no duplicates.
+  std::cout << ">>> Scanned " << scanned_records.size() << " records."
+            << std::endl;
+  if (scanned_records.size() == 0) {
+    std::cout << std::endl << ">>> ✓ No records to check." << std::endl;
+    return true;
+  }
+
+  std::cout << ">>> Checking scanned records for correctness..." << std::endl;
+  bool correct = true;
+  Key last_key = scanned_records[0].first;
+  for (size_t i = 1; i < scanned_records.size(); ++i) {
+    const Key key = scanned_records[i].first;
+    if (key <= last_key) {
+      std::cout << "ERROR: Out of order or duplicate key detected at index "
+                << i << ". Previous key: " << last_key << " This key: " << key
+                << std::endl;
+      std::cout << std::endl
+                << ">>> ✗ Detected errors in the scanned records." << std::endl;
+      return false;
+    }
+    last_key = key;
+  }
+
+  std::cout
+      << std::endl
+      << ">>> ✓ Records were returned in sorted order. No duplicates detected."
+      << std::endl;
+
+  return true;
+}
+
+}  // namespace
+
+int main(int argc, char* argv[]) {
+  gflags::SetUsageMessage(
+      "Check a page grouped DB's on-disk files for consistency (fsck for "
+      "page-grouped TreeLine).");
+  gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
+
+  if (FLAGS_db_path.empty()) {
+    std::cerr << "ERROR: Must provide a path to an existing DB." << std::endl;
+    return 1;
+  }
+
+  if (!FLAGS_scan_db) {
+    return RunCheck() ? 0 : 2;
+  } else {
+    return RunScan() ? 0 : 3;
+  }
 }
