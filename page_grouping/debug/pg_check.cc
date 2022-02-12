@@ -188,7 +188,7 @@ bool DBState::CheckSegmentRanges() const {
   for (size_t i = 1; i < segments_.size(); ++i) {
     const auto& prev_seg = segments_[i - 1];
     const auto& curr_seg = segments_[i];
-    if (curr_seg.base_key < prev_seg.upper_bound) {
+    if (curr_seg.base_key <= prev_seg.upper_bound) {
       ++cross_segment_errors;
       if (FLAGS_verbose) {
         std::cout << "ERROR: Segment range overlap." << std::endl;

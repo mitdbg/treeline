@@ -20,7 +20,9 @@ const std::string kDebugDirName = "debug";
 Status LoadIntoPage(const PageBuffer& buf, size_t page_idx, Key lower,
                     Key upper, std::vector<Record>::const_iterator rec_begin,
                     std::vector<Record>::const_iterator rec_end) {
-  key_utils::IntKeyAsSlice lower_key(lower), upper_key(upper);
+  // All upper bound values in the page grouping code are exclusive. But the on
+  // disk page expects an inclusive upper bound. So we subtract 1 from `upper`.
+  key_utils::IntKeyAsSlice lower_key(lower), upper_key(upper - 1);
   pg::Page page(buf.get() + pg::Page::kSize * page_idx, lower_key.as<Slice>(),
                 upper_key.as<Slice>());
   for (auto it = rec_begin; it != rec_end; ++it) {
@@ -104,6 +106,9 @@ void PrintSegmentSummaryAsCsv(std::ostream& out,
   }
 }
 
+// Given a segment built by the `SegmentBuilder`, compute the smallest key that
+// will be assigned to each page. These boundaries are implicitly induced by the
+// segment's model.
 std::vector<Key> ComputePageLowerBoundaries(const Segment& seg) {
   std::vector<Key> lower_boundaries = {seg.base_key};
   if (seg.page_count == 1) {
