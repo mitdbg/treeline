@@ -159,8 +159,13 @@ std::vector<Key> ComputePageLowerBoundaries(const Segment& seg) {
           return PageForKey(seg.base_key, seg.model->line(), seg.page_count,
                             key_candidate) < page_idx;
         });
+    // The boundary key maps to `page_idx`.
     assert(PageForKey(seg.base_key, seg.model->line(), seg.page_count,
                       *bound_it) == page_idx);
+    // The boundary key is the smallest key that maps to `page_idx`.
+    assert(*bound_it == 0 ||
+           PageForKey(seg.base_key, seg.model->line(), seg.page_count,
+                      (*bound_it) - 1) < page_idx);
     lower_boundaries.push_back(*bound_it);
   }
 
@@ -254,27 +259,27 @@ std::pair<Key, SegmentInfo> Manager::LoadIntoNewSegment(
   memset(buf.get(), 0, pg::Page::kSize * seg.page_count);
   if (seg.page_count > 1) {
     const auto lower_boundaries = ComputePageLowerBoundaries(seg);
-    size_t start_rec_idx = 0;
-    size_t curr_rec_idx = 0;
+    auto page_start = seg.records.begin();
     for (size_t page_idx = 0; page_idx < lower_boundaries.size() - 1;
          ++page_idx) {
       const Key page_upper = lower_boundaries[page_idx + 1];
-      for (; curr_rec_idx < seg.records.size() &&
-             seg.records[curr_rec_idx].first < page_upper;
-           ++curr_rec_idx) {
-      }
-      const auto result = LoadIntoPage(
-          buf, page_idx, lower_boundaries[page_idx], page_upper,
-          seg.records.begin() + start_rec_idx, seg.records.begin() + curr_rec_idx);
+      const auto cutoff_it =
+          std::lower_bound(page_start, seg.records.end(), page_upper,
+                           [](const Record& rec, const Key page_upper) {
+                             return rec.first < page_upper;
+                           });
+      // All upper bounds in the page grouping code are exclusive.
+      const auto result =
+          LoadIntoPage(buf, page_idx, lower_boundaries[page_idx], page_upper,
+                       page_start, cutoff_it);
       assert(result.ok());
-      start_rec_idx = curr_rec_idx;
+      page_start = cutoff_it;
     }
     // Flush remaining to a page.
     const auto result =
         LoadIntoPage(buf, seg.page_count - 1,
                      /*lower=*/lower_boundaries.back(),
-                     /*upper=*/upper_bound, seg.records.begin() + start_rec_idx,
-                     seg.records.end());
+                     /*upper=*/upper_bound, page_start, seg.records.end());
     assert(result.ok());
 
     // Write model into the first page (for deserialization).
