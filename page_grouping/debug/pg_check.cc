@@ -15,6 +15,7 @@
 #include "../persist/segment_wrap.h"
 #include "../segment_builder.h"
 #include "gflags/gflags.h"
+#include "llsm/pg_options.h"
 
 DEFINE_string(db_path, "", "Path to the database to check.");
 DEFINE_bool(verbose, false,
@@ -489,7 +490,7 @@ bool RunCheck() {
 bool RunScan() {
   std::cout << ">>> Scanning up to " << FLAGS_scan_amount
             << " records from the DB." << std::endl;
-  Manager::Options options;
+  PageGroupedDBOptions options;
   options.use_memory_based_io = true;
   std::cout << ">>> Opening the DB..." << std::endl;
   Manager m = Manager::Reopen(FLAGS_db_path, options);

@@ -9,6 +9,7 @@
 #include "../segment_info.h"
 #include "datasets.h"
 #include "gtest/gtest.h"
+#include "llsm/pg_options.h"
 #include "llsm/slice.h"
 
 using namespace llsm;
@@ -38,8 +39,8 @@ std::vector<std::pair<uint64_t, Slice>> BuildRecords(
   return records;
 }
 
-Manager::Options GetOptions(size_t goal, size_t delta, bool use_segments) {
-  Manager::Options options;
+PageGroupedDBOptions GetOptions(size_t goal, size_t delta, bool use_segments) {
+  PageGroupedDBOptions options;
   options.records_per_page_goal = goal;
   options.records_per_page_delta = delta;
   options.use_segments = use_segments;
@@ -50,8 +51,7 @@ Manager::Options GetOptions(size_t goal, size_t delta, bool use_segments) {
 }
 
 TEST_F(ManagerTest, CreateReopenSegments) {
-  Manager::Options options =
-      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -85,8 +85,7 @@ TEST_F(ManagerTest, CreateReopenSegments) {
 }
 
 TEST_F(ManagerTest, CreateReopenPages) {
-  Manager::Options options =
-      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -120,8 +119,7 @@ TEST_F(ManagerTest, CreateReopenPages) {
 }
 
 TEST_F(ManagerTest, PointReadSegments) {
-  Manager::Options options =
-      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -163,8 +161,7 @@ TEST_F(ManagerTest, PointReadSegments) {
 }
 
 TEST_F(ManagerTest, PointReadPages) {
-  Manager::Options options =
-      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -206,8 +203,7 @@ TEST_F(ManagerTest, PointReadPages) {
 }
 
 TEST_F(ManagerTest, PointReadSegmentsSequential) {
-  Manager::Options options =
-      GetOptions(/*goal=*/45, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/45, /*delta=*/5, /*use_segments=*/true);
 
   // Use the sequential dataset instead of the uniform one.
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -279,8 +275,7 @@ const std::vector<std::pair<size_t, size_t>> kScanRequests = ([]() {
 })();
 
 TEST_F(ManagerTest, ScanSegments) {
-  Manager::Options options =
-      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -296,8 +291,7 @@ TEST_F(ManagerTest, ScanSegments) {
 }
 
 TEST_F(ManagerTest, ScanSegmentsSequential) {
-  Manager::Options options =
-      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kSequentialKeys, u8"08 bytes");
@@ -313,8 +307,7 @@ TEST_F(ManagerTest, ScanSegmentsSequential) {
 }
 
 TEST_F(ManagerTest, ScanPages) {
-  Manager::Options options =
-      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -330,8 +323,7 @@ TEST_F(ManagerTest, ScanPages) {
 }
 
 TEST_F(ManagerTest, BatchedUpdateSegments) {
-  Manager::Options options =
-      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -392,8 +384,7 @@ TEST_F(ManagerTest, BatchedUpdateSegments) {
 }
 
 TEST_F(ManagerTest, BatchedUpdatePages) {
-  Manager::Options options =
-      GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -454,8 +445,7 @@ TEST_F(ManagerTest, BatchedUpdatePages) {
 }
 
 TEST_F(ManagerTest, InsertOverflowSegments) {
-  Manager::Options options =
-      GetOptions(/*goal=*/4, /*delta=*/1, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/4, /*delta=*/1, /*use_segments=*/true);
 
   // 512 B string.
   std::string value;
@@ -510,8 +500,7 @@ TEST_F(ManagerTest, InsertOverflowSegments) {
 }
 
 TEST_F(ManagerTest, InsertOverflowPages) {
-  Manager::Options options =
-      GetOptions(/*goal=*/4, /*delta=*/1, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/4, /*delta=*/1, /*use_segments=*/false);
 
   // 512 B string.
   std::string value;

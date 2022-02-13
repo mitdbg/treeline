@@ -18,14 +18,19 @@ find_library(tbb tbb)
 # Load any third party dependencies
 add_subdirectory(third_party)
 
-# The Learned LSM embedded database library target
+# The Learned LSM embedded database library targets
 if (LLSM_BUILD_SHARED)
   add_library(llsm SHARED)
+  add_library(pg_llsm SHARED)
 else()
   add_library(llsm STATIC)
+  add_library(pg_llsm STATIC)
 endif()
 target_link_libraries(llsm crc32c tbb)
 target_include_directories(llsm
+  PUBLIC include
+  PRIVATE .)
+target_include_directories(pg_llsm
   PUBLIC include
   PRIVATE .)
 
@@ -34,9 +39,19 @@ set(llsm_inc include/llsm)
 set(llsm_api
   ${llsm_inc}/db.h
   ${llsm_inc}/options.h
+  ${llsm_inc}/record_batch.h
   ${llsm_inc}/slice.h
-  ${llsm_inc}/status.h)
+  ${llsm_inc}/statistics.h
+  ${llsm_inc}/status.h
+)
 target_sources(llsm PUBLIC ${llsm_api})
+set(pg_llsm_api
+  ${llsm_inc}/pg_db.h
+  ${llsm_inc}/pg_options.h
+  ${llsm_inc}/slice.h
+  ${llsm_inc}/status.h
+)
+target_sources(pg_llsm PUBLIC ${pg_llsm_api})
 
 # Add our sources by traversing the repository
 add_subdirectory(alex)
@@ -49,6 +64,8 @@ add_subdirectory(tlx)
 add_subdirectory(util)
 add_subdirectory(wal)
 
+add_subdirectory(page_grouping)
+
 # Build the tests iff requested
 if(LLSM_BUILD_TESTS)
   enable_testing()
@@ -59,6 +76,3 @@ endif()
 if(LLSM_BUILD_BENCHMARKS)
   add_subdirectory(bench)
 endif()
-
-# The page grouping prototype
-add_subdirectory(page_grouping)

@@ -7,6 +7,7 @@
 
 #include "bufmgr/page_memory_allocator.h"
 #include "key.h"
+#include "llsm/pg_db.h"
 #include "persist/merge_iterator.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
@@ -24,8 +25,9 @@ const std::string Manager::kSegmentFilePrefix = "sf-";
 
 Manager::Manager(fs::path db_path,
                  std::vector<std::pair<Key, SegmentInfo>> boundaries,
-                 std::vector<SegmentFile> segment_files, Options options,
-                 uint32_t next_sequence_number, FreeList free)
+                 std::vector<SegmentFile> segment_files,
+                 PageGroupedDBOptions options, uint32_t next_sequence_number,
+                 FreeList free)
     : db_path_(std::move(db_path)),
       segment_files_(std::move(segment_files)),
       next_sequence_number_(next_sequence_number),
@@ -41,7 +43,7 @@ Manager::Manager(fs::path db_path,
 
 Manager Manager::LoadIntoNew(const fs::path& db,
                              const std::vector<std::pair<Key, Slice>>& records,
-                             const Options& options) {
+                             const PageGroupedDBOptions& options) {
   fs::create_directory(db);
 
   if (options.use_segments) {
@@ -51,7 +53,8 @@ Manager Manager::LoadIntoNew(const fs::path& db,
   }
 }
 
-Manager Manager::Reopen(const fs::path& db, const Options& options) {
+Manager Manager::Reopen(const fs::path& db,
+                        const PageGroupedDBOptions& options) {
   // Figure out if there are segments in this DB.
   const bool uses_segments = fs::exists(db / (kSegmentFilePrefix + "1"));
   PageBuffer buf = PageMemoryAllocator::Allocate(

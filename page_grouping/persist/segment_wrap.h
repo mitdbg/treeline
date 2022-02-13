@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "../key.h"
+#include "llsm/pg_db.h"
 #include "page.h"
 
 namespace llsm {

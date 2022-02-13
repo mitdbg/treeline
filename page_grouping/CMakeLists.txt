@@ -41,6 +41,12 @@ target_include_directories(pg
 target_link_libraries(pg PRIVATE crc32c)
 add_dependencies(pg_all pg)
 
+target_sources(pg_llsm PRIVATE
+  pg_db_impl.cc
+  pg_db_impl.h
+)
+target_link_libraries(pg_llsm PRIVATE pg)
+
 if(LLSM_BUILD_BENCHMARKS)
   # Primary workload runner.
   add_executable(pg_bench
