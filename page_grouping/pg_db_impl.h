@@ -1,5 +1,8 @@
 #pragma once
 
+#include <filesystem>
+#include <optional>
+
 #include "llsm/pg_db.h"
 #include "llsm/pg_options.h"
 #include "manager.h"
@@ -9,7 +12,8 @@ namespace pg {
 
 class PageGroupedDBImpl : public PageGroupedDB {
  public:
-  explicit PageGroupedDBImpl(Manager mgr);
+  PageGroupedDBImpl(std::filesystem::path db_path, PageGroupedDBOptions options,
+                    std::optional<Manager> mgr);
 
   PageGroupedDBImpl(const PageGroupedDBImpl&) = delete;
   PageGroupedDBImpl& operator=(const PageGroupedDBImpl&) = delete;
@@ -22,7 +26,12 @@ class PageGroupedDBImpl : public PageGroupedDB {
       std::vector<std::pair<Key, std::string>>* results_out) override;
 
  private:
-  Manager mgr_;
+  // After opening a "new" DB, this will be empty until `BulkLoad()` is called.
+  // Otherwise this is always non-empty.
+  std::optional<Manager> mgr_;
+
+  std::filesystem::path db_path_;
+  PageGroupedDBOptions options_;
 };
 
 }  // namespace pg
