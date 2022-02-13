@@ -11,6 +11,7 @@
 #include "llsm/pg_options.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
+#include "persist/page.h"
 #include "persist/segment_file.h"
 #include "segment_info.h"
 #include "tlx/btree_map.h"
@@ -30,6 +31,14 @@ class Manager {
                         const PageGroupedDBOptions& options);
 
   Status Get(const Key& key, std::string* value_out);
+
+  // Similar to `Get()`, but also returns the page(s) read from disk (e.g., for
+  // access to other records for caching purposes).
+  //
+  // Callers should not store the returned `Page`s because their backing memory
+  // is only valid until the next call to a `Manager` method.
+  std::pair<Status, std::vector<pg::Page>> GetWithPages(const Key& key,
+                                                        std::string* value_out);
 
   // Pre-condition: The batch is sorted in ascending order by key.
   Status PutBatch(const std::vector<std::pair<Key, Slice>>& records);
@@ -68,9 +77,8 @@ class Manager {
  private:
   Manager(std::filesystem::path db_path,
           std::vector<std::pair<Key, SegmentInfo>> boundaries,
-          std::vector<SegmentFile> segment_files,
-          PageGroupedDBOptions options, uint32_t next_sequence_number,
-          FreeList free);
+          std::vector<SegmentFile> segment_files, PageGroupedDBOptions options,
+          uint32_t next_sequence_number, FreeList free);
 
   static Manager BulkLoadIntoSegments(
       const std::filesystem::path& db_path,
