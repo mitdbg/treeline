@@ -12,7 +12,8 @@
 // This header declares all the common configuration flags used across the LLSM
 // benchmarks as well as a few utility functions that use these flags.
 
-// Which database(s) to use in the benchmark {all, rocksdb, llsm, kvell, pgllsm}.
+// Which database(s) to use in the benchmark {all, rocksdb, llsm, kvell,
+// pg_llsm}.
 DECLARE_string(db);
 
 // The path where the database(s) should be stored.
@@ -85,7 +86,7 @@ DECLARE_uint32(rdb_bloom_bits);
 DECLARE_bool(pg_use_segments);
 DECLARE_uint64(records_per_page_goal);
 DECLARE_uint64(records_per_page_delta);
-DECLARE_bool(pg_use_fast_io);
+DECLARE_bool(pg_use_memory_based_io);
 
 namespace llsm {
 namespace bench {
@@ -106,7 +107,7 @@ enum class DBType : uint32_t {
 // - "rocksdb" maps to `kRocksDB`
 // - "leanstore" maps to `kLeanStore`
 // - "kvell" maps to `kKVell`
-// - "pgllsm" maps to `kPGLLSM`
+// - "pg_llsm" maps to `kPGLLSM`
 // All other strings map to an empty `std::optional`.
 std::optional<DBType> ParseDBType(const std::string& candidate);
 

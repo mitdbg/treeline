@@ -135,7 +135,7 @@ DEFINE_uint64(records_per_page_delta, 5,
 DEFINE_bool(pg_use_segments, true,
             "If set to false, all segments will be a single page (emulates not "
             "using page grouping).");
-DEFINE_bool(pg_use_fast_io, false,
+DEFINE_bool(pg_use_memory_based_io, false,
             "If set, PGLLSM will use memory-based I/O (only meant for setup; "
             "not for use during evaluation).");
 
@@ -146,7 +146,7 @@ std::optional<DBType> ParseDBType(const std::string& candidate) {
   static const std::unordered_map<std::string, DBType> kStringToDBType = {
       {"all", DBType::kAll},         {"llsm", DBType::kLLSM},
       {"rocksdb", DBType::kRocksDB}, {"leanstore", DBType::kLeanStore},
-      {"kvell", DBType::kKVell},     {"pgllsm", DBType::kPGLLSM}};
+      {"kvell", DBType::kKVell},     {"pg_llsm", DBType::kPGLLSM}};
 
   auto it = kStringToDBType.find(candidate);
   if (it == kStringToDBType.end()) {
@@ -212,7 +212,7 @@ llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
   options.num_bg_threads = FLAGS_bg_threads;
   options.record_cache_capacity =
       (FLAGS_cache_size_mib * 1024 * 1024) / (FLAGS_record_size_bytes);
-  options.use_memory_based_io = FLAGS_pg_use_fast_io;
+  options.use_memory_based_io = FLAGS_pg_use_memory_based_io;
   return options;
 }
 

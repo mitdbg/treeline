@@ -25,8 +25,8 @@ class PGLLSMInterface {
     const std::string dbname = FLAGS_db_path + "/pg_llsm";
     auto options = llsm::bench::BuildPGLLSMOptions();
     if (options.use_memory_based_io) {
-      std::cerr << "> WARNING: PGLLSM is using \"fast I/O\" mode. Performance "
-                   "results may be inflated."
+      std::cerr << "> WARNING: PGLLSM is using \"memory-based I/O\". "
+                   "Performance results may be inflated."
                 << std::endl;
     }
     if (FLAGS_verbose) {
