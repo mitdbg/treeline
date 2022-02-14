@@ -1,5 +1,6 @@
 # Pseudo target used to simplify compiling all page grouping related targets.
 add_custom_target(pg_all)
+add_dependencies(pg_all pg_llsm)
 
 # The page grouping sources.
 add_library(pg STATIC)

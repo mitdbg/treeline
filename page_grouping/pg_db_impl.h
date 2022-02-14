@@ -2,10 +2,16 @@
 
 #include <filesystem>
 #include <optional>
+#include <string>
+#include <tuple>
+#include <vector>
 
+#include "db/format.h"
 #include "llsm/pg_db.h"
 #include "llsm/pg_options.h"
+#include "llsm/slice.h"
 #include "manager.h"
+#include "record_cache/record_cache.h"
 
 namespace llsm {
 namespace pg {
@@ -26,9 +32,13 @@ class PageGroupedDBImpl : public PageGroupedDB {
       std::vector<std::pair<Key, std::string>>* results_out) override;
 
  private:
+  void WriteBatch(
+      const std::vector<std::tuple<Slice, Slice, format::WriteType>>& records);
+
   // After opening a "new" DB, this will be empty until `BulkLoad()` is called.
   // Otherwise this is always non-empty.
   std::optional<Manager> mgr_;
+  RecordCache cache_;
 
   std::filesystem::path db_path_;
   PageGroupedDBOptions options_;
