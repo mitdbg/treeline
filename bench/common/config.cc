@@ -127,16 +127,26 @@ DEFINE_uint64(reorg_length, 5,
               "The minimum length of an overflow chain for which "
               "reorganization is triggered.");
 
+// Page grouping related flags.
+
+DEFINE_uint64(records_per_page_goal, 45, "Page grouping fill rate goal.");
+DEFINE_uint64(records_per_page_delta, 5,
+              "Page grouping model error tolerance.");
+DEFINE_bool(pg_use_segments, true,
+            "If set to false, all segments will be a single page (emulates not "
+            "using page grouping).");
+DEFINE_bool(pg_use_fast_io, false,
+            "If set, PGLLSM will use memory-based I/O (only meant for setup; "
+            "not for use during evaluation).");
+
 namespace llsm {
 namespace bench {
 
 std::optional<DBType> ParseDBType(const std::string& candidate) {
-  static std::unordered_map<std::string, DBType> kStringToDBType = {
-      {"all", DBType::kAll},
-      {"llsm", DBType::kLLSM},
-      {"rocksdb", DBType::kRocksDB},
-      {"leanstore", DBType::kLeanStore},
-      {"kvell", DBType::kKVell}};
+  static const std::unordered_map<std::string, DBType> kStringToDBType = {
+      {"all", DBType::kAll},         {"llsm", DBType::kLLSM},
+      {"rocksdb", DBType::kRocksDB}, {"leanstore", DBType::kLeanStore},
+      {"kvell", DBType::kKVell},     {"pgllsm", DBType::kPGLLSM}};
 
   auto it = kStringToDBType.find(candidate);
   if (it == kStringToDBType.end()) {
@@ -191,6 +201,18 @@ llsm::Options BuildLLSMOptions() {
   options.deferral_autotuning = FLAGS_deferral_autotuning;
   options.memory_autotuning = FLAGS_memory_autotuning;
   options.reorg_length = FLAGS_reorg_length;
+  return options;
+}
+
+llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
+  llsm::pg::PageGroupedDBOptions options;
+  options.use_segments = FLAGS_pg_use_segments;
+  options.records_per_page_goal = FLAGS_records_per_page_goal;
+  options.records_per_page_delta = FLAGS_records_per_page_delta;
+  options.num_bg_threads = FLAGS_bg_threads;
+  options.record_cache_capacity =
+      (FLAGS_cache_size_mib * 1024 * 1024) / (FLAGS_record_size_bytes);
+  options.use_memory_based_io = FLAGS_pg_use_fast_io;
   return options;
 }
 

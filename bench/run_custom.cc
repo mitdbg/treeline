@@ -5,6 +5,7 @@
 #include "bench/common/leanstore_interface.h"
 #include "bench/common/llsm_interface.h"
 #include "bench/common/load_data.h"
+#include "bench/common/pg_llsm_interface.h"
 #include "bench/common/rocksdb_interface.h"
 #include "bench/common/startup.h"
 #include "gflags/gflags.h"
@@ -126,6 +127,9 @@ int main(int argc, char* argv[]) {
   }
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(*workload));
+  }
+  if (db == DBType::kAll || db == DBType::kPGLLSM) {
+    PrintExperimentResult("pg_llsm", Run<PGLLSMInterface>(*workload));
   }
 
   return 0;
