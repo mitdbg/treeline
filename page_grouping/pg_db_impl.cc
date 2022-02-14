@@ -1,5 +1,6 @@
 #include "pg_db_impl.h"
 
+#include <cassert>
 #include <algorithm>
 #include <functional>
 
@@ -47,6 +48,10 @@ Status PageGroupedDBImpl::BulkLoad(const std::vector<Record>& records) {
 }
 
 Status PageGroupedDBImpl::Put(const Key key, const Slice& value) {
+  if (!mgr_.has_value()) {
+    return Status::NotSupported(
+        "DB must be bulk loaded before any writes are allowed.");
+  }
   key_utils::IntKeyAsSlice key_slice(key);
   return cache_.Put(key_slice.as<Slice>(), value, /*is_dirty=*/true,
                     format::WriteType::kWrite, RecordCache::kDefaultPriority,
@@ -54,6 +59,8 @@ Status PageGroupedDBImpl::Put(const Key key, const Slice& value) {
 }
 
 Status PageGroupedDBImpl::Get(const Key key, std::string* value_out) {
+  if (!mgr_.has_value()) return Status::NotFound("DB is empty.");
+
   const key_utils::IntKeyAsSlice key_slice_helper(key);
   const Slice key_slice = key_slice_helper.as<Slice>();
 
@@ -93,6 +100,11 @@ Status PageGroupedDBImpl::Get(const Key key, std::string* value_out) {
 Status PageGroupedDBImpl::GetRange(
     const Key start_key, const size_t num_records,
     std::vector<std::pair<Key, std::string>>* results_out) {
+  if (!mgr_.has_value()) {
+    results_out->clear();
+    return Status::OK();
+  }
+
   const key_utils::IntKeyAsSlice key_slice_helper(start_key);
   const Slice key_slice = key_slice_helper.as<Slice>();
 
@@ -143,6 +155,7 @@ Status PageGroupedDBImpl::GetRange(
 
 void PageGroupedDBImpl::WriteBatch(
     const std::vector<std::tuple<Slice, Slice, format::WriteType>>& records) {
+  assert(mgr_.has_value());
   std::vector<std::pair<Key, Slice>> reformatted;
   reformatted.resize(records.size());
   std::transform(records.begin(), records.end(), reformatted.begin(),

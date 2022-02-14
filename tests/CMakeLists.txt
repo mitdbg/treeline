@@ -12,11 +12,12 @@ target_sources(tester
     memtable_test.cc
     packed_map_test.cc
     page_test.cc
+    pg_db_test.cc
     record_cache_test.cc
     thread_pool_test.cc
     wal_manager_test.cc
     wal_rw_test.cc)
-target_link_libraries(tester llsm gtest gtest_main Threads::Threads)
+target_link_libraries(tester llsm pg_llsm gtest gtest_main Threads::Threads)
 # Allow tests to also include LLSM internal headers
 target_include_directories(tester PRIVATE ${PROJECT_SOURCE_DIR})
 
