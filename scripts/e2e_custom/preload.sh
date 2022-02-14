@@ -51,6 +51,7 @@ if [ $db_type == "rocksdb" ] || [ $db_type == "all" ]; then
   # RocksDB - Important to use 64 MiB memtables to ensure the emitted sstables
   #           are small too.
   ../../build/bench/run_custom \
+    ${args[@]} \
     --db=rocksdb \
     --db_path=$full_checkpoint_path \
     --bg_threads=16 \
@@ -59,13 +60,13 @@ if [ $db_type == "rocksdb" ] || [ $db_type == "all" ]; then
     --workload_config=$workload_path \
     --use_direct_io=true \
     --seed=$SEED \
-    --verbose \
-    ${args[@]}
+    --verbose
 fi
 
 if [ $db_type == "llsm" ] || [ $db_type == "all" ]; then
   # LLSM - Use a larger memtable to help the load run faster.
   ../../build/bench/run_custom \
+    ${args[@]} \
     --db=llsm \
     --db_path=$full_checkpoint_path \
     --bg_threads=16 \
@@ -75,8 +76,7 @@ if [ $db_type == "llsm" ] || [ $db_type == "all" ]; then
     --workload_config=$workload_path \
     --seed=$SEED \
     --verbose \
-    --use_alex=false \
-    ${args[@]}
+    --use_alex=false
 fi
 
 if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
@@ -85,6 +85,7 @@ if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
 
   # 1. Bulk load the database.
   ../../build/bench/run_custom \
+    ${args[@]} \
     --db=pg_llsm \
     --bg_threads=16 \
     --db_path=$full_checkpoint_path \
@@ -92,8 +93,7 @@ if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
     --pg_use_memory_based_io \
     --seed=$SEED \
     --verbose \
-    --skip_workload \
-    ${args[@]}
+    --skip_workload
 
   # 2. Shuffle the on-disk pages.
   echo >&2 "Done loading. Shuffling the pages now..."
@@ -104,6 +104,7 @@ if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
   # 3. Run the preload workload.
   echo >&2 "Done shuffling. Running the setup workload now..."
   ../../build/bench/run_custom \
+    ${args[@]} \
     --db=pg_llsm \
     --bg_threads=16 \
     --db_path=$full_checkpoint_path \
@@ -111,8 +112,7 @@ if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
     --pg_use_memory_based_io \
     --seed=$SEED \
     --verbose \
-    --skip_load \
-    ${args[@]}
+    --skip_load
 
   # Store a copy of the database debug information if it exists.
   if [ -d $COND_OUT ] && [ -d "$full_checkpoint_path/debug" ]; then
