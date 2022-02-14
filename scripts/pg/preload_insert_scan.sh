@@ -12,18 +12,21 @@ args=()
 for val in "${orig_args[@]}"; do
   phys_arg=$(eval "echo $val")
 
-  # Extract the workload path
+  # Extract the workload path, which shouldn't be passed as an argument further
+  # (this script manually passes it on after making modifications).
   if [[ $phys_arg =~ --workload_config=.+ ]]; then
     workload_path=${phys_arg:18}
+    continue
   fi
 
   # Extract the checkpoint name, which shouldn't be passed as an argument further.
-  # Add anything else to args.
   if [[ $phys_arg =~ --checkpoint_name=.+ ]]; then
     checkpoint_name=${phys_arg:18}
-  else
-    args+=($phys_arg)
+    continue
   fi
+
+  # Add anything else to args.
+  args+=($phys_arg)
 done
 
 if [[ -z $checkpoint_name || -z $workload_path ]]; then
@@ -43,9 +46,14 @@ mkdir -p $DB_CHECKPOINT_PATH
 
 echo >&2 "Creating the database..."
 
+# Conductor will pass in the insert workload file. But we want to do an initial
+# bulk load and run a shuffle before running that insert workload. We use the
+# passed-in workload configuration path to set the initial bulk load workload.
+preload_workload_path=$(dirname $workload_path)/preload.yml
+
 ../../build/page_grouping/pg_bench \
   --db_path=$full_checkpoint_path \
-  --workload_config=workloads/preload.yml \
+  --workload_config=$preload_workload_path \
   --seed=$SEED \
   --output_path=$COND_OUT \
   --verbose \

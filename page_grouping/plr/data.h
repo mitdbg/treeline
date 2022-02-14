@@ -60,6 +60,11 @@ class Line {
     return Line<T>(slope_ / factor, intercept_ / factor);
   }
 
+  Line<T> Invert() const {
+    // x = 1 / slope_ * y - intercept_ / slope_
+    return Line<T>(1.0 / slope_, -intercept_ / slope_);
+  }
+
   bool operator==(const Line<T>& other) const {
     // N.B. Exact equality.
     return slope_ == other.slope_ && intercept_ == other.intercept_;

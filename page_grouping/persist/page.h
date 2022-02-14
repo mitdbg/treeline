@@ -105,12 +105,13 @@ class Page {
   void SetModel(const plr::Line64& model);
 
   // Retrieve/update the segment's sequence number.
-  // VALID FOR: Last page in a segment only (single and multi-page segments).
+  // VALID FOR: First (only) page in a single-page segment.
+  // VALID FOR: Second page in a segment (multi-page segments).
   uint32_t GetSequenceNumber() const;
   void SetSequenceNumber(uint32_t sequence);
 
   // Retrieve/update the segment's checksum.
-  // VALID FOR: Last page in a multi-page segment only.
+  // VALID FOR: Second page in a multi-page segment only.
   uint32_t GetChecksum() const;
   void SetChecksum(uint32_t checksum);
 
