@@ -27,6 +27,8 @@ for val in "${orig_args[@]}"; do
   # Extract the checkpoint name, which shouldn't be passed as an argument further.
   if [[ $phys_arg =~ --checkpoint_name=.+ ]]; then
     checkpoint_name=${phys_arg:18}
+    continue
+  fi
 
   # Add anything else to args.
   args+=($phys_arg)

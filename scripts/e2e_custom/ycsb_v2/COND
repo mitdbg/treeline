@@ -105,6 +105,14 @@ combine(
   ],
 )
 
+combine(
+  name="ycsb-64B",
+  deps=[
+    ":ycsb-{}-{}-64B-{}".format(*zipped)
+    for zipped in product(["synth", "osm", "amzn"], DBS, WORKLOADS)
+  ],
+)
+
 run_experiment_group(
   name="ycsb-synth",
   run="../run.sh",
