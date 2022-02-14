@@ -7,6 +7,8 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <tuple>
+#include <vector>
 
 #include "bufmgr/buffer_manager.h"
 #include "db/format.h"
@@ -59,13 +61,17 @@ class DBImpl : public DB {
   Status WriteImpl(const WriteOptions& options, const Slice& key,
                    const Slice& value, format::WriteType write_type);
 
+  // Writes the records in the batch to persistent storage.
+  void WriteBatch(
+      const std::vector<std::tuple<Slice, Slice, format::WriteType>>& records);
+
   // Will not be changed after `Initialize()` returns. The objects below are
   // thread safe; no additional mutual exclusion is required.
   Options options_;
   Statistics stats_;
   const std::filesystem::path db_path_;
   std::unique_ptr<RecordCache> rec_cache_;
-  
+
   // The pointers to the structures below are shared with the record cache.
   std::shared_ptr<BufferManager> buf_mgr_;
   std::shared_ptr<Model> model_;

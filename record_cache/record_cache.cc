@@ -4,17 +4,10 @@ namespace llsm {
 
 std::vector<RecordCacheEntry> RecordCache::cache_entries{};
 
-RecordCache::RecordCache(Options* options, Statistics* stats,
-                         std::shared_ptr<Model> model,
-                         std::shared_ptr<BufferManager> buf_mgr,
-                         std::shared_ptr<ThreadPool> workers)
-    : options_(options),
-      stats_(stats),
-      model_(model),
-      buf_mgr_(buf_mgr),
-      workers_(workers),
-      capacity_(options->record_cache_capacity),
-      clock_(0) {
+RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out)
+    : capacity_(capacity),
+      clock_(0),
+      write_out_(std::move(write_out)) {
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
   cache_entries.resize(capacity_);
 }
@@ -24,7 +17,7 @@ RecordCache::~RecordCache() {
                   // inaccessible while freeing.
   for (auto i = 0; i < capacity_; ++i) {
     cache_entries[i].Lock(/*exclusive = */ false);
-    WriteOutIfDirty(i, kDefaultReorgLength, kDefaultFillPct);
+    WriteOutIfDirty(i);
     FreeIfValid(i);
     cache_entries[i].Unlock();
   }
@@ -33,8 +26,7 @@ RecordCache::~RecordCache() {
 
 Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
                         format::WriteType write_type, uint8_t priority,
-                        bool safe, size_t reorg_length,
-                        uint32_t page_fill_pct) {
+                        bool safe) {
   uint64_t index;
   bool found = GetCacheIndex(key, /*exclusive = */ true, &index, safe).ok();
   char* ptr = nullptr;
@@ -44,7 +36,7 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
     index = SelectForEviction();
     if (safe) cache_entries[index].Lock(/*exclusive = */ true);
     if (cache_entries[index].IsValid()) {
-      WriteOutIfDirty(index, reorg_length, page_fill_pct);
+      WriteOutIfDirty(index);
       Key art_key;
       TIDToARTKey(index + 1, art_key);
       auto t1 = tree_->getThreadInfo();
@@ -145,14 +137,13 @@ Status RecordCache::GetRange(const Slice& start_key, size_t num_records,
   return Status::OK();
 }
 
-uint64_t RecordCache::WriteOutDirty(size_t reorg_length,
-                                    uint32_t page_fill_pct) {
+uint64_t RecordCache::WriteOutDirty() {
   uint64_t count = 0;
   for (auto i = 0; i < capacity_; ++i) {
     if (!cache_entries[i].IsDirty()) continue;
 
     cache_entries[i].Lock(/*exclusive = */ false);
-    count += WriteOutIfDirty(i, reorg_length, page_fill_pct);
+    count += WriteOutIfDirty(i);
     cache_entries[i].Unlock();
   }
   return count;
@@ -179,81 +170,22 @@ uint64_t RecordCache::SelectForEviction() {
   return local_clock;
 }
 
-bool RecordCache::WriteOutIfDirty(uint64_t index, size_t reorg_length,
-                                  uint32_t page_fill_pct) {
+bool RecordCache::WriteOutIfDirty(uint64_t index) {
   // Do nothing if not dirty, or if using a standalone record cache.
   auto entry = &cache_entries[index];
   bool was_dirty = entry->IsDirty();
-  if (!was_dirty || buf_mgr_ == nullptr || model_ == nullptr) return false;
+  if (!was_dirty) return false;
+  if (!write_out_) {
+    // Skip the write out because a write out function was not provided.
+    entry->SetDirtyTo(false);
+    return was_dirty;
+  }
 
   Slice key = entry->GetKey();
   Slice value = entry->GetValue();
 
-  // Retry until you can fix the chain.
-  PhysicalPageId page_id;
-  OverflowChain chain = nullptr;
-  while (chain == nullptr) {
-    page_id = model_->KeyToPageId(key);
-    chain = FixOverflowChain(page_id, /* exclusive = */ true,
-                             /* unlock_before_returning = */ false, buf_mgr_,
-                             model_, stats_);
-  }
-
-  // Flush the entry to the page.
-  Status s;
-  if (entry->IsWrite()) {  // INSERTION
-    // Try to update/insert into existing page in chain
-    for (auto& bf : *chain) {
-      if (bf->GetPage().HasOverflow()) {
-        // Not the last page in the chain; only update or remove.
-        s = bf->GetPage().UpdateOrRemove(key, value);
-        if (s.ok()) break;
-      } else {
-        // Last page in the chain; try inserting.
-        s = bf->GetPage().Put(key, value);
-        if (s.ok()) break;
-
-        // Must allocate a new page
-        PhysicalPageId new_page_id = buf_mgr_->GetFileManager()->AllocatePage();
-        auto new_bf = &(buf_mgr_->FixPage(new_page_id, /* exclusive = */ true,
-                                          /*is_newly_allocated = */ true));
-        Page new_page(new_bf->GetData(), bf->GetPage());
-        new_page.MakeOverflow();
-        bf->GetPage().SetOverflow(new_page_id);
-        chain->push_back(new_bf);
-
-        // Insert into the new page
-        s = new_page.Put(key, value);
-        if (!s.ok()) {  // Should never get here.
-          std::cerr << "ERROR: Failed to insert into overflow page. Aborting."
-                    << std::endl;
-          exit(1);
-        }
-      }
-    }
-
-  } else {  // DELETION
-    for (auto& bf : *chain) {
-      s = bf->GetPage().Delete(key);
-      if (s.ok()) break;
-    }
-  }
-
-  // Trigger a reorg if the insertion created a long overflow chain.
-  if (workers_ != nullptr && chain->size() >= reorg_length) {
-    workers_->SubmitNoWait([this, page_id = page_id,
-                            page_fill_pct = page_fill_pct, buf_mgr = buf_mgr_,
-                            model = model_, options = options_,
-                            stats = stats_]() {
-      ReorganizeOverflowChain(page_id, page_fill_pct, std::move(buf_mgr),
-                              std::move(model), options, stats);
-    });
-  }
-
-  // Unfix all
-  for (auto& bf : *chain) {
-    buf_mgr_->UnfixPage(*bf, /* is_dirty = */ true);
-  }
+  assert(write_out_);
+  write_out_({{key, value, entry->GetWriteType()}});
 
   entry->SetDirtyTo(false);
   return was_dirty;

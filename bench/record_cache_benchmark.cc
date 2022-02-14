@@ -29,12 +29,8 @@ void RecordCacheRW_64MiB(benchmark::State& state, bool is_safe) {
   auto rng = std::default_random_engine{};
   std::shuffle(std::begin(v), std::end(v), rng);
 
-  Options db_options;
-  db_options.record_cache_capacity = cache_entries;
-  Statistics stats;
-
   for (auto _ : state) {
-    RecordCache rc(&db_options, &stats);
+    RecordCache rc(cache_entries);
     uint64_t i = 0;
     uint64_t index_out;
     for (const auto& record : dataset) {
