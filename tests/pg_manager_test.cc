@@ -1,25 +1,24 @@
-#include "../manager.h"
-
 #include <filesystem>
 #include <random>
 #include <string>
 #include <vector>
 
-#include "../key.h"
-#include "../segment_info.h"
-#include "datasets.h"
 #include "gtest/gtest.h"
 #include "llsm/pg_options.h"
 #include "llsm/slice.h"
+#include "page_grouping/key.h"
+#include "page_grouping/manager.h"
+#include "page_grouping/segment_info.h"
+#include "pg_datasets.h"
 
 using namespace llsm;
 using namespace llsm::pg;
 
 namespace {
 
-class ManagerTest : public testing::Test {
+class PGManagerTest : public testing::Test {
  public:
-  ManagerTest() : kDBDir("/tmp/llsm-pg-test") {}
+  PGManagerTest() : kDBDir("/tmp/llsm-pg-test") {}
   void SetUp() override {
     std::filesystem::remove_all(kDBDir);
     std::filesystem::create_directory(kDBDir);
@@ -50,7 +49,7 @@ PageGroupedDBOptions GetOptions(size_t goal, size_t delta, bool use_segments) {
   return options;
 }
 
-TEST_F(ManagerTest, CreateReopenSegments) {
+TEST_F(PGManagerTest, CreateReopenSegments) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -84,7 +83,7 @@ TEST_F(ManagerTest, CreateReopenSegments) {
   }
 }
 
-TEST_F(ManagerTest, CreateReopenPages) {
+TEST_F(PGManagerTest, CreateReopenPages) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -118,7 +117,7 @@ TEST_F(ManagerTest, CreateReopenPages) {
   }
 }
 
-TEST_F(ManagerTest, PointReadSegments) {
+TEST_F(PGManagerTest, PointReadSegments) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -160,7 +159,7 @@ TEST_F(ManagerTest, PointReadSegments) {
   }
 }
 
-TEST_F(ManagerTest, PointReadPages) {
+TEST_F(PGManagerTest, PointReadPages) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -202,7 +201,7 @@ TEST_F(ManagerTest, PointReadPages) {
   }
 }
 
-TEST_F(ManagerTest, PointReadSegmentsSequential) {
+TEST_F(PGManagerTest, PointReadSegmentsSequential) {
   auto options = GetOptions(/*goal=*/45, /*delta=*/5, /*use_segments=*/true);
 
   // Use the sequential dataset instead of the uniform one.
@@ -274,7 +273,7 @@ const std::vector<std::pair<size_t, size_t>> kScanRequests = ([]() {
   return to_scan;
 })();
 
-TEST_F(ManagerTest, ScanSegments) {
+TEST_F(PGManagerTest, ScanSegments) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -290,7 +289,7 @@ TEST_F(ManagerTest, ScanSegments) {
   }
 }
 
-TEST_F(ManagerTest, ScanSegmentsSequential) {
+TEST_F(PGManagerTest, ScanSegmentsSequential) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -306,7 +305,7 @@ TEST_F(ManagerTest, ScanSegmentsSequential) {
   }
 }
 
-TEST_F(ManagerTest, ScanPages) {
+TEST_F(PGManagerTest, ScanPages) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -322,7 +321,7 @@ TEST_F(ManagerTest, ScanPages) {
   }
 }
 
-TEST_F(ManagerTest, BatchedUpdateSegments) {
+TEST_F(PGManagerTest, BatchedUpdateSegments) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -383,7 +382,7 @@ TEST_F(ManagerTest, BatchedUpdateSegments) {
   }
 }
 
-TEST_F(ManagerTest, BatchedUpdatePages) {
+TEST_F(PGManagerTest, BatchedUpdatePages) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -444,7 +443,7 @@ TEST_F(ManagerTest, BatchedUpdatePages) {
   }
 }
 
-TEST_F(ManagerTest, InsertOverflowSegments) {
+TEST_F(PGManagerTest, InsertOverflowSegments) {
   auto options = GetOptions(/*goal=*/4, /*delta=*/1, /*use_segments=*/true);
 
   // 512 B string.
@@ -499,7 +498,7 @@ TEST_F(ManagerTest, InsertOverflowSegments) {
   }
 }
 
-TEST_F(ManagerTest, InsertOverflowPages) {
+TEST_F(PGManagerTest, InsertOverflowPages) {
   auto options = GetOptions(/*goal=*/4, /*delta=*/1, /*use_segments=*/false);
 
   // 512 B string.

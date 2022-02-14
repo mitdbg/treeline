@@ -1,10 +1,13 @@
-#include "datasets.h"
+#include "pg_datasets.h"
 
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <unordered_set>
 #include <vector>
+
+namespace llsm {
+namespace pg {
 
 // Uniformly selects `num_samples` samples from the range [min_val, max_val]
 // without replacement.
@@ -42,3 +45,6 @@ const std::vector<uint64_t> Datasets::kUniformKeys =
       std::sort(res.begin(), res.end());
       return res;
     })(1000, 0, 1000000);
+
+}  // namespace pg
+}  // namespace llsm

@@ -78,16 +78,3 @@ if(LLSM_BUILD_BENCHMARKS)
     pg_standalone
   )
 endif()
-
-if(LLSM_BUILD_TESTS)
-  # Page grouping tests (kept separate from the rest of the LLSM tests).
-  add_executable(pg_test
-    tests/datasets.cc
-    tests/datasets.h
-    tests/manager_rewrite_test.cc
-    tests/manager_test.cc
-    tests/segment_test.cc
-  )
-  target_link_libraries(pg_test PRIVATE pg gtest gtest_main)
-  add_dependencies(pg_all pg_test)
-endif()

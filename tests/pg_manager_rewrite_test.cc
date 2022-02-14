@@ -4,22 +4,22 @@
 #include <utility>
 #include <vector>
 
-#include "../key.h"
-#include "../manager.h"
-#include "../segment_info.h"
-#include "datasets.h"
+#include "pg_datasets.h"
 #include "gtest/gtest.h"
 #include "llsm/pg_options.h"
 #include "llsm/slice.h"
+#include "page_grouping/key.h"
+#include "page_grouping/manager.h"
+#include "page_grouping/segment_info.h"
 
 namespace {
 
 using namespace llsm;
 using namespace llsm::pg;
 
-class ManagerRewriteTest : public testing::Test {
+class PGManagerRewriteTest : public testing::Test {
  public:
-  ManagerRewriteTest() : kDBDir("/tmp/llsm-pg-test") {}
+  PGManagerRewriteTest() : kDBDir("/tmp/llsm-pg-test") {}
   void SetUp() override {
     std::filesystem::remove_all(kDBDir);
     std::filesystem::create_directory(kDBDir);
@@ -50,7 +50,7 @@ PageGroupedDBOptions GetOptions(size_t goal, size_t delta, bool use_segments) {
   return options;
 }
 
-TEST_F(ManagerRewriteTest, AppendSegments) {
+TEST_F(PGManagerRewriteTest, AppendSegments) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
   options.num_bg_threads = 2;
 
@@ -106,7 +106,7 @@ TEST_F(ManagerRewriteTest, AppendSegments) {
   }
 }
 
-TEST_F(ManagerRewriteTest, AppendPages) {
+TEST_F(PGManagerRewriteTest, AppendPages) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
   options.num_bg_threads = 2;
 
@@ -162,7 +162,7 @@ TEST_F(ManagerRewriteTest, AppendPages) {
   }
 }
 
-TEST_F(ManagerRewriteTest, InsertMiddleSegments) {
+TEST_F(PGManagerRewriteTest, InsertMiddleSegments) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
   options.num_bg_threads = 2;
 
@@ -242,7 +242,7 @@ TEST_F(ManagerRewriteTest, InsertMiddleSegments) {
   }
 }
 
-TEST_F(ManagerRewriteTest, InsertMiddlePages) {
+TEST_F(PGManagerRewriteTest, InsertMiddlePages) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
   options.num_bg_threads = 2;
 
