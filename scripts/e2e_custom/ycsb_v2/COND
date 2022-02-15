@@ -230,6 +230,7 @@ for db, config in product(DBS, CONFIGS):
       **process_config(db, config, AMZN_MULT),
       "db": db,
       "checkpoint_name": "ycsb-amzn-{}-{}".format(db, config["name"]),
+      "workload_config": "ycsb_v2/workloads/setup.yml",
       "custom_dataset": AMZN_DATASET,
     },
   )
