@@ -2,7 +2,6 @@ from itertools import product
 
 WORKLOADS = [
   "a", "b", "c", "d", "e", "f",
-#  "un_a", "un_b", "un_c", "un_d", "un_e", "un_f",
 ]
 
 DBS = [
@@ -124,7 +123,7 @@ run_experiment_group(
         **process_config(db, config),
         "db": db,
         "checkpoint_name": "ycsb-synth-{}-{}".format(db, config["name"]),
-        "workload_config": "ycsb/workloads/{}.yml".format(workload),
+        "workload_config": "ycsb_v2/workloads/{}.yml".format(workload),
       },
     )
     for db, config, workload in product(DBS, CONFIGS, WORKLOADS)
@@ -146,7 +145,7 @@ run_experiment_group(
         **process_config(db, config, OSM_MULT),
         "db": db,
         "checkpoint_name": "ycsb-osm-{}-{}".format(db, config["name"]),
-        "workload_config": "ycsb/workloads/{}.yml".format(workload),
+        "workload_config": "ycsb_v2/workloads/{}.yml".format(workload),
         "custom_dataset": OSM_DATASET,
       },
     )
@@ -169,7 +168,7 @@ run_experiment_group(
         **process_config(db, config, AMZN_MULT),
         "db": db,
         "checkpoint_name": "ycsb-amzn-{}-{}".format(db, config["name"]),
-        "workload_config": "ycsb/workloads/{}.yml".format(workload),
+        "workload_config": "ycsb_v2/workloads/{}.yml".format(workload),
         "custom_dataset": OSM_DATASET,
       },
     )
@@ -206,7 +205,7 @@ for db, config in product(DBS, CONFIGS):
       **process_config(db, config),
       "db": db,
       "checkpoint_name": "ycsb-synth-{}-{}".format(db, config["name"]),
-      "workload_config": "ycsb/workloads/setup.yml",
+      "workload_config": "ycsb_v2/workloads/setup.yml",
     },
   )
 
@@ -218,7 +217,7 @@ for db, config in product(DBS, CONFIGS):
       **process_config(db, config, OSM_MULT),
       "db": db,
       "checkpoint_name": "ycsb-osm-{}-{}".format(db, config["name"]),
-      "workload_config": "ycsb/workloads/setup.yml",
+      "workload_config": "ycsb_v2/workloads/setup.yml",
       "custom_dataset": OSM_DATASET,
     },
   )
