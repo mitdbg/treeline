@@ -86,7 +86,9 @@ code=$?
 kill -s SIGINT -- $iostat_pid
 wait
 
-cp $DB_PATH/$db_type/LOG $COND_OUT/$db_type.log
+if [ -e $DB_PATH/$db_type/LOG ]; then
+  cp $DB_PATH/$db_type/LOG $COND_OUT/$db_type.log
+fi
 du -b $DB_PATH >$COND_OUT/db_space.log
 
 # Report that the experiment failed if the `run_custom` exit code is not 0

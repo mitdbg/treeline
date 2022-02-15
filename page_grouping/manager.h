@@ -8,8 +8,10 @@
 
 #include "free_list.h"
 #include "key.h"
+#include "llsm/pg_options.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
+#include "persist/page.h"
 #include "persist/segment_file.h"
 #include "segment_info.h"
 #include "tlx/btree_map.h"
@@ -21,41 +23,22 @@ namespace pg {
 
 class Manager {
  public:
-  struct Options {
-    // If set to false, no segments larger than 1 page will be created.
-    bool use_segments = true;
-
-    // By default, put 45 +/- (2 * 5) records into each page.
-    size_t records_per_page_goal = 45;
-    size_t records_per_page_delta = 5;
-
-    // If set to true, will write out the segment sizes and models to a CSV file
-    // for debug purposes.
-    bool write_debug_info = true;
-
-    // If set to true, direct I/O will be disabled and synchronous writes will
-    // also be disabled. On machines with spare memory, this means that most I/O
-    // will leverage the file system's block cache and writes cannot be
-    // considered durable until the file is closed or fsync-ed.
-    //
-    // This flag is only meant to be set to true for the tests and when running
-    // experiment setup code not related to the evaluation.
-    bool use_memory_based_io = false;
-
-    // If set to 0, no background threads will be used.
-    size_t num_bg_threads = 16;
-
-    // If set to false, only the segment that is "full" will be rewritten.
-    bool consider_neighbors_during_rewrite = true;
-  };
   static Manager LoadIntoNew(const std::filesystem::path& db,
                              const std::vector<std::pair<Key, Slice>>& records,
-                             const Options& options);
+                             const PageGroupedDBOptions& options);
 
   static Manager Reopen(const std::filesystem::path& db,
-                        const Options& options);
+                        const PageGroupedDBOptions& options);
 
   Status Get(const Key& key, std::string* value_out);
+
+  // Similar to `Get()`, but also returns the page(s) read from disk (e.g., for
+  // access to other records for caching purposes).
+  //
+  // Callers should not store the returned `Page`s because their backing memory
+  // is only valid until the next call to a `Manager` method.
+  std::pair<Status, std::vector<pg::Page>> GetWithPages(const Key& key,
+                                                        std::string* value_out);
 
   // Pre-condition: The batch is sorted in ascending order by key.
   Status PutBatch(const std::vector<std::pair<Key, Slice>>& records);
@@ -94,19 +77,19 @@ class Manager {
  private:
   Manager(std::filesystem::path db_path,
           std::vector<std::pair<Key, SegmentInfo>> boundaries,
-          std::vector<SegmentFile> segment_files, Options options,
+          std::vector<SegmentFile> segment_files, PageGroupedDBOptions options,
           uint32_t next_sequence_number, FreeList free);
 
   static Manager BulkLoadIntoSegments(
       const std::filesystem::path& db_path,
       const std::vector<std::pair<Key, Slice>>& records,
-      const Manager::Options& options);
+      const PageGroupedDBOptions& options);
   void BulkLoadIntoSegmentsImpl(const std::vector<Record>& records);
 
   static Manager BulkLoadIntoPages(
       const std::filesystem::path& db,
       const std::vector<std::pair<Key, Slice>>& records,
-      const Manager::Options& options);
+      const PageGroupedDBOptions& options);
   void BulkLoadIntoPagesImpl(const std::vector<Record>& records);
 
   // Write the range [start_idx, end_idx) into the given segment.
@@ -172,7 +155,7 @@ class Manager {
   std::unique_ptr<ThreadPool> bg_threads_;
 
   // Options passed in when the `Manager` was created.
-  Options options_;
+  PageGroupedDBOptions options_;
 
   // Holds state used by individual worker threads.
   // This is static for convenience (to use `thread_local`). So for correctness

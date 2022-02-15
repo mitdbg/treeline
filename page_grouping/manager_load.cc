@@ -3,6 +3,8 @@
 #include <iterator>
 #include <vector>
 
+#include "llsm/pg_db.h"
+#include "llsm/pg_options.h"
 #include "manager.h"
 #include "persist/segment_wrap.h"
 #include "util/key.h"
@@ -180,7 +182,7 @@ namespace pg {
 
 Manager Manager::BulkLoadIntoSegments(
     const fs::path& db_path, const std::vector<std::pair<Key, Slice>>& records,
-    const Manager::Options& options) {
+    const PageGroupedDBOptions& options) {
   assert(options.use_segments);
 
   // Open the segment files before constructing the `Manager`.
@@ -229,7 +231,7 @@ void Manager::BulkLoadIntoSegmentsImpl(const std::vector<Record>& records) {
 
 Manager Manager::BulkLoadIntoPages(
     const fs::path& db, const std::vector<std::pair<Key, Slice>>& records,
-    const Manager::Options& options) {
+    const PageGroupedDBOptions& options) {
   // One single file containing 4 KiB pages.
   std::vector<SegmentFile> segment_files;
   segment_files.emplace_back(db / (kSegmentFilePrefix + "0"),

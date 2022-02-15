@@ -4,6 +4,9 @@
 #include <random>
 #include <vector>
 
+namespace llsm {
+namespace pg {
+
 // Fixture datasets for the tests.
 class Datasets {
  public:
@@ -14,3 +17,6 @@ class Datasets {
   static const std::vector<uint64_t> kSequentialKeys;
   static const std::vector<uint64_t> kUniformKeys;
 };
+
+}  // namespace pg
+}  // namespace llsm

@@ -4,14 +4,12 @@
 #include <cstdint>
 #include <utility>
 
+#include "llsm/pg_db.h"
 #include "llsm/slice.h"
 #include "plr/data.h"
 
 namespace llsm {
 namespace pg {
-
-using Key = uint64_t;
-using Record = std::pair<Key, Slice>;
 
 // Returns an integer in the range [0, page_count) according to `model`.
 inline size_t PageForKey(const Key base_key, const plr::Line64& model,

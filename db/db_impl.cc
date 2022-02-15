@@ -133,8 +133,9 @@ Status DBImpl::InitializeNewDB() {
     } else {
       model_ = std::make_shared<BTreeModel>();
     }
-    rec_cache_ = std::make_unique<RecordCache>(&options_, &stats_, model_,
-                                               buf_mgr_, workers_);
+    rec_cache_ = std::make_unique<RecordCache>(
+        options_.record_cache_capacity,
+        std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1));
 
     model_->PreallocateAndInitialize(buf_mgr_, records,
                                      options_.key_hints.records_per_page());
@@ -178,8 +179,9 @@ Status DBImpl::InitializeExistingDB() {
   } else {
     model_ = std::make_shared<BTreeModel>();
   }
-  rec_cache_ = std::make_unique<RecordCache>(&options_, &stats_, model_,
-                                             buf_mgr_, workers_);
+  rec_cache_ = std::make_unique<RecordCache>(
+      options_.record_cache_capacity,
+      std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1));
 
   model_->ScanFilesAndInitialize(buf_mgr_);
   buf_mgr_->ClearStats();
@@ -410,8 +412,7 @@ Status DBImpl::BulkLoad(
 size_t DBImpl::GetNumIndexedPages() const { return model_->GetNumPages(); }
 
 Status DBImpl::FlushRecordCache(const bool disable_deferred_io) {
-  rec_cache_->WriteOutDirty(options_.reorg_length,
-                            options_.key_hints.page_fill_pct);
+  rec_cache_->WriteOutDirty();
   return Status::OK();
 }
 
@@ -428,11 +429,87 @@ Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
   uint64_t chain_size = 0;
   Status write_result =
       rec_cache_->Put(key, value, /*is_dirty = */ true, write_type,
-                      RecordCache::kDefaultPriority, /* safe = */ true,
-                      options_.reorg_length, options_.key_hints.page_fill_pct);
+                      RecordCache::kDefaultPriority, /* safe = */ true);
   if (write_result.ok()) ++stats_.temp_user_writes_records_;
 
   return write_result;
+}
+
+void DBImpl::WriteBatch(
+    const std::vector<std::tuple<Slice, Slice, format::WriteType>>& records) {
+  // TODO: Ideally we should flush all records that belong to the same chain
+  // "together" so that we don't keep fixing and unfixing the chain for records
+  // that belong to the same chain. But right now this method is only called
+  // with a single record in the batch, so this optimization is not yet needed.
+
+  for (const auto& [key, value, write_type] : records) {
+    // Retry until you can fix the chain.
+    PhysicalPageId page_id;
+    OverflowChain chain = nullptr;
+    while (chain == nullptr) {
+      page_id = model_->KeyToPageId(key);
+      chain = FixOverflowChain(page_id, /* exclusive = */ true,
+                               /* unlock_before_returning = */ false, buf_mgr_,
+                               model_, &stats_);
+    }
+
+    // Flush the entry to the page.
+    Status s;
+    if (write_type == format::WriteType::kWrite) {  // INSERTION or UPDATE
+      // Try to update/insert into existing page in chain
+      for (auto& bf : *chain) {
+        if (bf->GetPage().HasOverflow()) {
+          // Not the last page in the chain; only update or remove.
+          s = bf->GetPage().UpdateOrRemove(key, value);
+          if (s.ok()) break;
+        } else {
+          // Last page in the chain; try inserting.
+          s = bf->GetPage().Put(key, value);
+          if (s.ok()) break;
+
+          // Must allocate a new page
+          PhysicalPageId new_page_id =
+              buf_mgr_->GetFileManager()->AllocatePage();
+          auto new_bf = &(buf_mgr_->FixPage(new_page_id, /* exclusive = */ true,
+                                            /*is_newly_allocated = */ true));
+          Page new_page(new_bf->GetData(), bf->GetPage());
+          new_page.MakeOverflow();
+          bf->GetPage().SetOverflow(new_page_id);
+          chain->push_back(new_bf);
+
+          // Insert into the new page
+          s = new_page.Put(key, value);
+          if (!s.ok()) {  // Should never get here.
+            std::cerr << "ERROR: Failed to insert into overflow page. Aborting."
+                      << std::endl;
+            exit(1);
+          }
+        }
+      }
+
+    } else {  // DELETION
+      for (auto& bf : *chain) {
+        s = bf->GetPage().Delete(key);
+        if (s.ok()) break;
+      }
+    }
+
+    // Trigger a reorg if the insertion created a long overflow chain.
+    if (workers_ != nullptr && chain->size() >= options_.reorg_length) {
+      workers_->SubmitNoWait([this, page_id = page_id,
+                              page_fill_pct = options_.key_hints.page_fill_pct,
+                              buf_mgr = buf_mgr_, model = model_,
+                              options = &options_, stats = &stats_]() {
+        ReorganizeOverflowChain(page_id, page_fill_pct, std::move(buf_mgr),
+                                std::move(model), options, stats);
+      });
+    }
+
+    // Unfix all
+    for (auto& bf : *chain) {
+      buf_mgr_->UnfixPage(*bf, /* is_dirty = */ true);
+    }
+  }
 }
 
 }  // namespace llsm

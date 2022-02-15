@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "config.h"
+#include "llsm/pg_options.h"
 #include "llsm/slice.h"
 #include "manager.h"
 #include "ycsbr/ycsbr.h"
@@ -130,8 +131,8 @@ class PageGroupingInterface {
   const std::vector<size_t>& GetWriteCounts() const { return write_counts_; }
 
  private:
-  Manager::Options GetOptions() {
-    Manager::Options options;
+  PageGroupedDBOptions GetOptions() {
+    PageGroupedDBOptions options;
     options.records_per_page_goal = FLAGS_records_per_page_goal;
     options.records_per_page_delta = FLAGS_records_per_page_delta;
     options.use_segments = !FLAGS_disable_segments;

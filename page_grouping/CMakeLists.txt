@@ -1,5 +1,6 @@
 # Pseudo target used to simplify compiling all page grouping related targets.
 add_custom_target(pg_all)
+add_dependencies(pg_all pg_llsm)
 
 # The page grouping sources.
 add_library(pg STATIC)
@@ -41,6 +42,12 @@ target_include_directories(pg
 target_link_libraries(pg PRIVATE crc32c)
 add_dependencies(pg_all pg)
 
+target_sources(pg_llsm PRIVATE
+  pg_db_impl.cc
+  pg_db_impl.h
+)
+target_link_libraries(pg_llsm PRIVATE pg)
+
 if(LLSM_BUILD_BENCHMARKS)
   # Primary workload runner.
   add_executable(pg_bench
@@ -70,17 +77,4 @@ if(LLSM_BUILD_BENCHMARKS)
     pg_shuffle
     pg_standalone
   )
-endif()
-
-if(LLSM_BUILD_TESTS)
-  # Page grouping tests (kept separate from the rest of the LLSM tests).
-  add_executable(pg_test
-    tests/datasets.cc
-    tests/datasets.h
-    tests/manager_rewrite_test.cc
-    tests/manager_test.cc
-    tests/segment_test.cc
-  )
-  target_link_libraries(pg_test PRIVATE pg gtest gtest_main)
-  add_dependencies(pg_all pg_test)
 endif()

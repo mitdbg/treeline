@@ -7,10 +7,8 @@ namespace {
 using namespace llsm;
 
 TEST(RecordCacheTest, SimplePutGet) {
-  Options options;
-  options.record_cache_capacity = 5;
-  Statistics stats;
-  auto rc = RecordCache(&options, &stats);
+  const uint64_t capacity = 5;
+  auto rc = RecordCache(capacity);
   Slice key = "aaa";
   Slice value = "bbb";
 
@@ -23,10 +21,8 @@ TEST(RecordCacheTest, SimplePutGet) {
 }
 
 TEST(RecordCacheTest, SimpleMiss) {
-  Options options;
-  options.record_cache_capacity = 5;
-  Statistics stats;
-  auto rc = RecordCache(&options, &stats);
+  const uint64_t capacity = 5;
+  auto rc = RecordCache(capacity);
   Slice key = "aaa";
 
   uint64_t index_out;
@@ -34,10 +30,8 @@ TEST(RecordCacheTest, SimpleMiss) {
 }
 
 TEST(RecordCacheTest, PutFromRead) {
-  Options options;
-  options.record_cache_capacity = 5;
-  Statistics stats;
-  auto rc = RecordCache(&options, &stats);
+  const uint64_t capacity = 5;
+  auto rc = RecordCache(capacity);
   Slice key = "aaa";
   Slice value = "bbb";
 
@@ -52,10 +46,8 @@ TEST(RecordCacheTest, PutFromRead) {
 }
 
 TEST(RecordCacheTest, MultiPutGet) {
-  Options options;
-  options.record_cache_capacity = 10;
-  Statistics stats;
-  auto rc = RecordCache(&options, &stats);
+  const uint64_t capacity = 10;
+  auto rc = RecordCache(capacity);
 
   for (auto i = 100; i < 200; ++i) {
     std::string key_s = "a" + std::to_string(i);
@@ -81,10 +73,8 @@ TEST(RecordCacheTest, MultiPutGet) {
 }
 
 TEST(RecordCacheTest, RangeScan) {
-  Options options;
-  options.record_cache_capacity = 100;
-  Statistics stats;
-  auto rc = RecordCache(&options, &stats);
+  const uint64_t capacity = 100;
+  auto rc = RecordCache(capacity);
 
   for (auto i = 100; i < 200; ++i) {
     std::string key_s = "a" + std::to_string(i);

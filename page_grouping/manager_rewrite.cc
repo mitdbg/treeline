@@ -4,6 +4,7 @@
 
 #include "../bufmgr/page_memory_allocator.h"
 #include "circular_page_buffer.h"
+#include "llsm/pg_db.h"
 #include "manager.h"
 #include "persist/merge_iterator.h"
 #include "persist/page.h"

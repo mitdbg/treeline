@@ -3,13 +3,13 @@
 #include <utility>
 #include <vector>
 
-#include "../key.h"
-#include "../plr/data.h"
-#include "../plr/greedy.h"
-#include "../segment_builder.h"
-#include "datasets.h"
 #include "gtest/gtest.h"
 #include "llsm/slice.h"
+#include "page_grouping/key.h"
+#include "page_grouping/plr/data.h"
+#include "page_grouping/plr/greedy.h"
+#include "page_grouping/segment_builder.h"
+#include "pg_datasets.h"
 
 using namespace llsm;
 using namespace llsm::pg;

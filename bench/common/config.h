@@ -6,12 +6,14 @@
 
 #include "gflags/gflags.h"
 #include "llsm/options.h"
+#include "llsm/pg_options.h"
 #include "rocksdb/options.h"
 
 // This header declares all the common configuration flags used across the LLSM
 // benchmarks as well as a few utility functions that use these flags.
 
-// Which database(s) to use in the benchmark {all, rocksdb, llsm}.
+// Which database(s) to use in the benchmark {all, rocksdb, llsm, kvell,
+// pg_llsm}.
 DECLARE_string(db);
 
 // The path where the database(s) should be stored.
@@ -80,11 +82,24 @@ DECLARE_bool(use_alex);
 // use of bloom filters.
 DECLARE_uint32(rdb_bloom_bits);
 
+// Page grouping configuration options.
+DECLARE_bool(pg_use_segments);
+DECLARE_uint64(records_per_page_goal);
+DECLARE_uint64(records_per_page_delta);
+DECLARE_bool(pg_use_memory_based_io);
+
 namespace llsm {
 namespace bench {
 
 // An enum that represents the `db` flag above.
-enum class DBType : uint32_t { kAll = 0, kLLSM = 1, kRocksDB = 2, kLeanStore = 3, kKVell = 4 };
+enum class DBType : uint32_t {
+  kAll = 0,
+  kLLSM = 1,
+  kRocksDB = 2,
+  kLeanStore = 3,
+  kKVell = 4,
+  kPGLLSM = 5
+};
 
 // Returns the `DBType` enum value associated with a given string.
 // - "all" maps to `kAll`
@@ -92,6 +107,7 @@ enum class DBType : uint32_t { kAll = 0, kLLSM = 1, kRocksDB = 2, kLeanStore = 3
 // - "rocksdb" maps to `kRocksDB`
 // - "leanstore" maps to `kLeanStore`
 // - "kvell" maps to `kKVell`
+// - "pg_llsm" maps to `kPGLLSM`
 // All other strings map to an empty `std::optional`.
 std::optional<DBType> ParseDBType(const std::string& candidate);
 
@@ -102,6 +118,10 @@ rocksdb::Options BuildRocksDBOptions();
 // Returns options that can be used to start LLSM with the configuration
 // specified by the flags set above.
 llsm::Options BuildLLSMOptions();
+
+// Returns options that can be used to start page-grouped LLSM with the
+// configuration specified by the flags set above.
+llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions();
 
 // Appends a human-readable timestamp to the provided `prefix` string.
 // e.g.: AppendTimestamp("test") -> "test+2021-05-10+11-10-12".

@@ -5,6 +5,7 @@
 #include "bench/common/leanstore_interface.h"
 #include "bench/common/llsm_interface.h"
 #include "bench/common/load_data.h"
+#include "bench/common/pg_llsm_interface.h"
 #include "bench/common/rocksdb_interface.h"
 #include "bench/common/startup.h"
 #include "gflags/gflags.h"
@@ -21,6 +22,9 @@ DEFINE_string(workload_config, "",
 DEFINE_bool(
     skip_load, false,
     "If set to true, this workload runner will skip the initial data load.");
+DEFINE_bool(skip_workload, false,
+            "If set to true, this workload runner will skip running the "
+            "workload (it will only run the load portion of the workload).");
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
 
 DEFINE_string(output_path, llsm::bench::GetDefaultOutputPath(),
@@ -53,13 +57,16 @@ ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
     session.Initialize();
   }
 
+  if (FLAGS_notify_after_init) {
+    SendReadySignalToParent();
+  }
+  if (FLAGS_skip_workload) {
+    std::cerr << "> Skipping the workload." << std::endl;
+    return ycsbr::BenchmarkResult(std::chrono::nanoseconds(0));
+  }
   if (FLAGS_verbose) {
     std::cerr << "> Running workload using " << FLAGS_threads
               << " application thread(s)." << std::endl;
-  }
-
-  if (FLAGS_notify_after_init) {
-    SendReadySignalToParent();
   }
 
   ycsbr::RunOptions options;
@@ -126,6 +133,9 @@ int main(int argc, char* argv[]) {
   }
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(*workload));
+  }
+  if (db == DBType::kAll || db == DBType::kPGLLSM) {
+    PrintExperimentResult("pg_llsm", Run<PGLLSMInterface>(*workload));
   }
 
   return 0;
