@@ -8,7 +8,7 @@ load:
 
 # Ensures that RocksDB's LSM tree has multiple levels.
 run:
-- num_requests: 1000000
+- num_requests: 10000000
   update:
     proportion_pct: 100
     distribution:
