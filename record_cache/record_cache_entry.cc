@@ -89,7 +89,7 @@ bool RecordCacheEntry::SetPriorityTo(uint8_t priority) {
     // For subsequent iterations, compare_exchange_weak() will have updated
     // `old_metadata` appropriately when failing.
     new_metadata = (old_metadata & ~kPriorityMask) | priority;
-  } while (metadata_.compare_exchange_weak(old_metadata, new_metadata));
+  } while (!metadata_.compare_exchange_weak(old_metadata, new_metadata));
 
   return true;
 }
@@ -108,7 +108,7 @@ uint8_t RecordCacheEntry::IncrementPriority(bool return_post) {
     if (old_priority == kPriorityMask) return old_priority;
 
     new_metadata = old_metadata + 1;  // Priority is in the LSBs.
-  } while (metadata_.compare_exchange_weak(old_metadata, new_metadata));
+  } while (!metadata_.compare_exchange_weak(old_metadata, new_metadata));
 
   // If we get here, we actually performed an increment.
   if (return_post) {
@@ -132,7 +132,7 @@ uint8_t RecordCacheEntry::DecrementPriority(bool return_post) {
     if (old_priority == 0) return old_priority;
 
     new_metadata = old_metadata - 1;  // Priority is in the LSBs.
-  } while (metadata_.compare_exchange_weak(old_metadata, new_metadata));
+  } while (!metadata_.compare_exchange_weak(old_metadata, new_metadata));
 
   // If we get here, we actually performed an decrement.
   if (return_post) {
