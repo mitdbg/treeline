@@ -56,14 +56,13 @@ def main():
     # Process experiment result configs
     for dep in deps:
         for exp_inst in dep.iterdir():
-            # e.g.: ycsb-synthetic-64-llsm-a-1
+            # e.g.: ycsb-synthetic-pg_llsm-64B-a
             # NOTE: We don't need to extract the DB because it is already recorded
             #       in the result CSV.
             exp_parts = exp_inst.name.split("-")
-            config = "-".join(exp_parts[:3])
-            db = exp_parts[3]
+            config = "-".join(exp_parts[1:4])
+            db = exp_parts[2]
             workload = exp_parts[4]
-            threads = int(exp_parts[5])
 
             # Process end-to-end results
             df = pd.read_csv(exp_inst / "results.csv")
@@ -72,7 +71,6 @@ def main():
             orig_columns = list(df.columns)
             df["config"] = config
             df["workload"] = workload
-            df["threads"] = threads
 
             # Process iostat results (physical I/O)
             read_kb, written_kb = process_iostat(
@@ -86,7 +84,7 @@ def main():
 
             all_results.append(df)
 
-            # Copy over any relevant logs and options
+            # Copy over any additional relevant data and options
             shutil.copy2(
                 exp_inst / "options.json", options_dir / (exp_inst.name + ".json")
             )
@@ -100,13 +98,19 @@ def main():
                 # As far as we know, LeanStore does not log debug information to
                 # a separate file.
                 pass
+            elif db == "pg_llsm":
+                # Page-grouped LLSM does not have a log, but it writes out counters.
+                shutil.copy2(
+                    exp_inst / "counters.csv",
+                    logs_dir / (exp_inst.name + "_counters.csv"),
+                )
             else:
                 print("WARNING: Unknown DB", db)
 
     # Write out the combined results
     combined = pd.concat(all_results)
     combined.sort_values(
-        ["config", "workload", "db", "threads"],
+        ["config", "workload", "db"],
         inplace=True,
         ignore_index=True,
     )
@@ -114,7 +118,6 @@ def main():
         [
             "config",
             "workload",
-            "threads",
             *orig_columns,
             "phys_read_kb",
             "phys_written_kb",
