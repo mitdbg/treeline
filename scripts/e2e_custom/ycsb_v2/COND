@@ -186,7 +186,7 @@ run_experiment_group(
         "db": db,
         "checkpoint_name": "ycsb-amzn-{}-{}".format(db, config["name"]),
         "workload_config": "ycsb_v2/workloads/{}.yml".format(workload),
-        "custom_dataset": OSM_DATASET,
+        "custom_dataset": AMZN_DATASET,
       },
     )
     for db, config, workload in product(DBS, CONFIGS, WORKLOADS)
