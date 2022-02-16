@@ -91,12 +91,30 @@ def process_config(db, config, mem_multiplier=1.0):
   return copy
 
 
+###
+### Get aggregated results.
+###
+
 run_command(
-  name="combine",
+  name="combine-all",
   run="python3 ../ycsb/combine_raw.py",
   deps=[
-    ":ycsb-64B",
+    ":ycsb-synth",
+    ":ycsb-osm",
+    ":ycsb-amzn",
   ],
+)
+
+run_command(
+  name="combine-64B",
+  run="python3 ../ycsb/combine_raw.py",
+  deps=[":ycsb-64B"],
+)
+
+run_command(
+  name="combine-1024B",
+  run="python3 ../ycsb/combine_raw.py",
+  deps=[":ycsb-1024B"],
 )
 
 
