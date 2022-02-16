@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <thread>
 
@@ -16,6 +17,7 @@ class KVellInterface {
   void InitializeWorker(const std::thread::id& id) {}
   void ShutdownWorker(const std::thread::id& id) {}
   void SetKeyDistHints(uint64_t min_key, uint64_t max_key, uint64_t num_keys) {}
+  void WriteOutStats(const std::filesystem::path& out_dir) {}
 
   // Called once before the benchmark.
   void InitializeDatabase() {}

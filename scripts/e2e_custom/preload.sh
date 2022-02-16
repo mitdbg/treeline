@@ -114,7 +114,8 @@ if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
     --pg_use_memory_based_io \
     --seed=$SEED \
     --verbose \
-    --skip_load
+    --skip_load \
+    --output_path=$COND_OUT
 
   # Store a copy of the database debug information if it exists.
   if [ -d $COND_OUT ] && [ -d "$full_checkpoint_path/debug" ]; then

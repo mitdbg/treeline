@@ -27,8 +27,9 @@ DEFINE_bool(skip_workload, false,
             "workload (it will only run the load portion of the workload).");
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
 
-DEFINE_string(output_path, llsm::bench::GetDefaultOutputPath(),
-              "A path to where throughput samples should be written.");
+DEFINE_string(output_path, "",
+              "A path to where additional output should be written (e.g., "
+              "throughput samples, statistics).");
 DEFINE_uint64(throughput_sample_period, 0,
               "How frequently to sample the achieved throughput. Set to 0 to "
               "disable sampling.");
@@ -74,7 +75,13 @@ ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
   options.throughput_sample_period = FLAGS_throughput_sample_period;
   options.output_dir = std::filesystem::path(FLAGS_output_path);
   options.throughput_output_file_prefix = "throughput-";
-  return session.RunWorkload(workload, options);
+  const auto result = session.RunWorkload(workload, options);
+  session.Terminate();
+
+  if (!FLAGS_output_path.empty()) {
+    session.db().WriteOutStats(fs::path(FLAGS_output_path));
+  }
+  return result;
 }
 
 void PrintExperimentResult(const std::string& db,
@@ -117,8 +124,7 @@ int main(int argc, char* argv[]) {
   if (!fs::exists(FLAGS_db_path)) {
     fs::create_directory(FLAGS_db_path);
   }
-  if (FLAGS_throughput_sample_period > 0 && !fs::exists(FLAGS_output_path)) {
-    // Only create the output directory if we will take throughput samples.
+  if (!FLAGS_output_path.empty() && !fs::exists(FLAGS_output_path)) {
     fs::create_directory(FLAGS_output_path);
   }
 

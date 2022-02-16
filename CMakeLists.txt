@@ -48,6 +48,7 @@ target_sources(llsm PUBLIC ${llsm_api})
 set(pg_llsm_api
   ${llsm_inc}/pg_db.h
   ${llsm_inc}/pg_options.h
+  ${llsm_inc}/pg_stats.h
   ${llsm_inc}/slice.h
   ${llsm_inc}/status.h
 )

@@ -22,6 +22,7 @@ target_sources(pg PRIVATE
   manager_scan.cc
   manager.cc
   manager.h
+  pg_stats.cc
   segment_builder.cc
   segment_builder.h
   workspace.h
@@ -47,6 +48,10 @@ target_sources(pg_llsm PRIVATE
   pg_db_impl.h
 )
 target_link_libraries(pg_llsm PRIVATE pg)
+
+# The original LLSM source also uses the record cache, which depends on
+# definitions in `pg_stats.cc`.
+target_sources(llsm PRIVATE pg_stats.cc)
 
 if(LLSM_BUILD_BENCHMARKS)
   # Primary workload runner.

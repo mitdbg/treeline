@@ -1,4 +1,5 @@
 #include "record_cache.h"
+#include "llsm/pg_stats.h"
 
 namespace llsm {
 
@@ -36,6 +37,11 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
     index = SelectForEviction();
     if (safe) cache_entries[index].Lock(/*exclusive = */ true);
     if (cache_entries[index].IsValid()) {
+      if (cache_entries[index].IsDirty()) {
+        pg::PageGroupedDBStats::Local().BumpCacheDirtyEvictions();
+      } else {
+        pg::PageGroupedDBStats::Local().BumpCacheCleanEvictions();
+      }
       WriteOutIfDirty(index);
       Key art_key;
       TIDToARTKey(index + 1, art_key);
@@ -105,13 +111,17 @@ Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
 
   do {
     tid = tree_->lookup(art_key, t);
-    if (tid == 0) return Status::NotFound("Key not in cache");
+    if (tid == 0) {
+      pg::PageGroupedDBStats::Local().BumpCacheMisses();
+      return Status::NotFound("Key not in cache");
+    }
     if (safe) locked_successfully = cache_entries[tid - 1].TryLock(exclusive);
   } while (!locked_successfully && safe);
 
   *index_out = tid - 1;
   cache_entries[*index_out].IncrementPriority();
 
+  pg::PageGroupedDBStats::Local().BumpCacheHits();
   return Status::OK();
 }
 
