@@ -91,6 +91,15 @@ def process_config(db, config, mem_multiplier=1.0):
   return copy
 
 
+run_command(
+  name="combine",
+  run="python3 ../ycsb/combine_raw.py",
+  deps=[
+    ":ycsb-64B",
+  ],
+)
+
+
 ###
 ### YCSB.
 ###
@@ -108,6 +117,14 @@ combine(
   name="ycsb-64B",
   deps=[
     ":ycsb-{}-{}-64B-{}".format(*zipped)
+    for zipped in product(["synth", "osm", "amzn"], DBS, WORKLOADS)
+  ],
+)
+
+combine(
+  name="ycsb-1024B",
+  deps=[
+    ":ycsb-{}-{}-1024B-{}".format(*zipped)
     for zipped in product(["synth", "osm", "amzn"], DBS, WORKLOADS)
   ],
 )
