@@ -65,7 +65,10 @@ function on_init_finish() {
 trap "on_init_finish" USR1
 
 set +e
-../../build/bench/run_custom ${args[@]} >$COND_OUT/results.csv &
+../../build/bench/run_custom \
+  ${args[@]} \
+  --output_path=$COND_OUT \
+  > $COND_OUT/results.csv &
 wait %1
 code=$?
 

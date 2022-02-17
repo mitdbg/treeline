@@ -118,9 +118,10 @@ Status PageGroupedDBImpl::GetRange(
   // from disk when the keys are equal.
   results_out->reserve(std::min(num_records, results.size() + indices.size()));
 
+  size_t records_left = num_records;
   auto cache_it = indices.begin();
   auto disk_it = results.begin();
-  while (cache_it != indices.end() && disk_it != results.end()) {
+  while (records_left > 0 && cache_it != indices.end() && disk_it != results.end()) {
     auto& entry = RecordCache::cache_entries[*cache_it];
     const Key cache_record_key = key_utils::ExtractHead64(entry.GetKey());
     if (cache_record_key <= disk_it->first) {
@@ -137,17 +138,20 @@ Status PageGroupedDBImpl::GetRange(
       results_out->emplace_back(disk_it->first, std::move(disk_it->second));
       ++disk_it;
     }
+    --records_left;
   }
-  while (cache_it != indices.end()) {
+  while (records_left > 0 && cache_it != indices.end()) {
     auto& entry = RecordCache::cache_entries[*cache_it];
     const Key cache_record_key = key_utils::ExtractHead64(entry.GetKey());
     results_out->emplace_back(cache_record_key, entry.GetValue().ToString());
     entry.Unlock();
     ++cache_it;
+    --records_left;
   }
-  while (disk_it != results.end()) {
+  while (records_left > 0 && disk_it != results.end()) {
     results_out->emplace_back(disk_it->first, std::move(disk_it->second));
     ++disk_it;
+    --records_left;
   }
 
   return Status::OK();

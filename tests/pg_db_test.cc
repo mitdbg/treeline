@@ -138,4 +138,37 @@ TEST_F(PGDBTest, LoadWriteScanReopenScan) {
   }
 }
 
+TEST_F(PGDBTest, ScanAmount) {
+  PageGroupedDB* db = nullptr;
+  auto options = GetCommonTestOptions();
+  options.records_per_page_goal = 45;
+  options.records_per_page_delta = 5;
+  ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
+  ASSERT_NE(db, nullptr);
+
+  // Load.
+  const std::string value = "Test 1";
+  const auto dataset = GetRangeDataset(10, 1000, value);
+  ASSERT_TRUE(db->BulkLoad(dataset).ok());
+
+  // Write (insert).
+  const std::string new_value = "Test 2";
+  ASSERT_TRUE(db->Put(101, new_value).ok());
+  ASSERT_TRUE(db->Put(102, new_value).ok());
+  ASSERT_TRUE(db->Put(103, new_value).ok());
+
+  const std::vector<Record> expected = {{101, Slice(new_value)},
+                                        {102, Slice(new_value)},
+                                        {103, Slice(new_value)}};
+
+  // Scan.
+  std::vector<std::pair<Key, std::string>> scan_out;
+  ASSERT_TRUE(db->GetRange(101, 3, &scan_out).ok());
+  ASSERT_EQ(scan_out.size(), expected.size());
+  for (size_t i = 0; i < scan_out.size(); ++i) {
+    ASSERT_EQ(scan_out[i].first, expected[i].first);
+    ASSERT_EQ(expected[i].second.compare(scan_out[i].second), 0);
+  }
+}
+
 }  // namespace

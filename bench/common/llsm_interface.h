@@ -23,6 +23,8 @@ class LLSMInterface {
     num_keys_ = num_keys;
   }
 
+  void WriteOutStats(const std::filesystem::path& out_dir) {}
+
   // Called once before the benchmark.
   void InitializeDatabase() {
     const std::string dbname = FLAGS_db_path + "/llsm";

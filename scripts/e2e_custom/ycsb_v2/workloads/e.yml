@@ -6,7 +6,7 @@ load:
     range_max: 2000000000
 
 run:
-- num_requests: 100000
+- num_requests: 5000000
   scan:
     proportion_pct: 95
     max_length: 100

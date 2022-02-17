@@ -1,11 +1,13 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <thread>
 
 #include "config.h"
 #include "llsm/pg_db.h"
+#include "llsm/pg_stats.h"
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 
@@ -13,11 +15,27 @@ class PGLLSMInterface {
  public:
   PGLLSMInterface() : db_(nullptr) {}
 
-  void InitializeWorker(const std::thread::id& id) {}
-  void ShutdownWorker(const std::thread::id& id) {}
+  void InitializeWorker(const std::thread::id& id) {
+    llsm::pg::PageGroupedDBStats::Local().Reset();
+  }
+
+  void ShutdownWorker(const std::thread::id& id) {
+    llsm::pg::PageGroupedDBStats::Local().PostToGlobal();
+  }
 
   void SetKeyDistHints(uint64_t min_key, uint64_t max_key, uint64_t num_keys) {
     // Unused - kept for use with `run_custom`.
+  }
+
+  void WriteOutStats(const std::filesystem::path& out_dir) {
+    std::ofstream out(out_dir / "counters.csv");
+    out << "name,value" << std::endl;
+    llsm::pg::PageGroupedDBStats::RunOnGlobal([&out](const auto& stats) {
+      out << "cache_hits," << stats.GetCacheHits() << std::endl;
+      out << "cache_misses," << stats.GetCacheMisses() << std::endl;
+      out << "cache_clean_evictions," << stats.GetCacheCleanEvictions() << std::endl;
+      out << "cache_dirty_evictions," << stats.GetCacheDirtyEvictions() << std::endl;
+    });
   }
 
   // Called once before the benchmark.
@@ -41,6 +59,8 @@ class PGLLSMInterface {
       std::cerr << "> Opening PGLLSM DB at " << dbname << std::endl;
     }
 
+    llsm::pg::PageGroupedDBStats::RunOnGlobal(
+        [](auto& global_stats) { global_stats.Reset(); });
     const llsm::Status status =
         llsm::pg::PageGroupedDB::Open(options, dbname, &db_);
     if (!status.ok()) {
