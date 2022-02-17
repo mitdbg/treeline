@@ -3,7 +3,6 @@
 #include <iterator>
 
 #include "llsm/pg_db.h"
-#include "segment_builder.h"
 
 using namespace llsm;
 using namespace llsm::pg;
@@ -46,22 +45,6 @@ class KeyDomainIterator
  private:
   Key value_;
 };
-
-void PrintSegmentSummaryAsCsv(std::ostream& out,
-                              const std::vector<Segment>& segments) {
-  std::vector<size_t> num_segments;
-  num_segments.resize(SegmentBuilder::kSegmentPageCounts.size());
-  for (const auto& seg : segments) {
-    const auto it = SegmentBuilder::kPageCountToSegment.find(seg.page_count);
-    assert(it != SegmentBuilder::kPageCountToSegment.end());
-    ++num_segments[it->second];
-  }
-
-  out << "segment_page_count,num_segments" << std::endl;
-  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
-    out << (1ULL << i) << "," << num_segments[i] << std::endl;
-  }
-}
 
 }  // namespace
 
