@@ -1,6 +1,7 @@
-#include "../record_cache/record_cache.h"
-
 #include "gtest/gtest.h"
+
+#define private public
+#include "../record_cache/record_cache.h"
 
 namespace {
 
@@ -104,6 +105,53 @@ TEST(RecordCacheTest, RangeScan) {
 
       entry->Unlock();
     }
+  }
+}
+
+TEST(RecordCacheTest, PreferNonDirtyEviction) {
+  const uint64_t capacity = 10;
+  auto rc = RecordCache(capacity);
+
+  // Insert 10 records.
+  for (auto i = 100; i < 110; ++i) {
+    std::string key_s = "a" + std::to_string(i);
+    std::string val_s = "b" + std::to_string(i);
+    rc.Put(Slice(key_s), Slice(val_s), /*is_dirty = */ false);
+  }
+  ASSERT_EQ(rc.clock_ % rc.capacity_, 0);
+
+  // Make the first 5 dirty.
+  for (auto i = 100; i < 105; ++i) {
+    std::string key_s = "a" + std::to_string(i);
+    std::string val_s = "c" + std::to_string(i);
+    rc.Put(Slice(key_s), Slice(val_s), /*is_dirty = */ true);
+  }
+  ASSERT_EQ(rc.clock_ % rc.capacity_, 0);
+
+  // Insert 5 new records.
+  for (auto i = 110; i < 115; ++i) {
+    std::string key_s = "a" + std::to_string(i);
+    std::string val_s = "b" + std::to_string(i);
+    rc.Put(Slice(key_s), Slice(val_s), /*is_dirty = */ false);
+  }
+  ASSERT_EQ(rc.clock_ % rc.capacity_, 0);
+
+  // Check that the dirty records are still there, unlike the clean ones.
+  for (auto i = 100; i < 105; ++i) {
+    std::string key_s = "a" + std::to_string(i);
+    std::string val_s = "c" + std::to_string(i);
+
+    uint64_t index_out;
+    ASSERT_TRUE(rc.GetCacheIndex(Slice(key_s), false, &index_out).ok());
+    ASSERT_EQ(Slice(val_s).compare(rc.cache_entries[index_out].GetValue()), 0);
+    rc.cache_entries[index_out].Unlock();
+  }
+  for (auto i = 105; i < 110; ++i) {
+    std::string key_s = "a" + std::to_string(i);
+    std::string val_s = "b" + std::to_string(i);
+
+    uint64_t index_out;
+    ASSERT_FALSE(rc.GetCacheIndex(Slice(key_s), false, &index_out).ok());
   }
 }
 

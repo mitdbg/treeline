@@ -1,4 +1,5 @@
 #include "record_cache.h"
+
 #include "llsm/pg_stats.h"
 
 namespace llsm {
@@ -6,9 +7,7 @@ namespace llsm {
 std::vector<RecordCacheEntry> RecordCache::cache_entries{};
 
 RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out)
-    : capacity_(capacity),
-      clock_(0),
-      write_out_(std::move(write_out)) {
+    : capacity_(capacity), clock_(0), write_out_(std::move(write_out)) {
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
   cache_entries.resize(capacity_);
 }
@@ -170,11 +169,42 @@ void RecordCache::SliceToARTKey(const Slice& slice_key, Key& art_key) {
 
 uint64_t RecordCache::SelectForEviction() {
   uint64_t local_clock;
+  uint64_t dirty_candidate;
+  bool have_dirty_candidate = false;
 
+  // Implement the CLOCK algorithm, but if the first eviction
+  // candidate you find is dirty, go around once more in the hopes
+  // of evicting a non-dirty one instead.
   while (true) {
     local_clock = (clock_++) % capacity_;
-    if (cache_entries[local_clock].GetPriority() == 0) break;
-    cache_entries[local_clock].DecrementPriority();
+    auto entry = &cache_entries[local_clock];
+
+    bool zero_priority = (entry->GetPriority() == 0);
+    bool is_dirty = entry->IsDirty();
+    bool is_candidate = (local_clock == dirty_candidate);
+
+    // Case 1: 0 priority and clean -> evict.
+    if (zero_priority && !is_dirty) {
+      break;
+    }
+    // Case 2: 0 priority but dirty, don't have a dirty candidate -> set as
+    // dirty candidate and go around.
+    else if (zero_priority && is_dirty && !have_dirty_candidate) {
+      have_dirty_candidate = true;
+      dirty_candidate = local_clock;
+    }
+    // Case 3: Got back to dirty candidate and it still has priority 0 -> evict
+    // this time.
+    else if (zero_priority && have_dirty_candidate && is_candidate) {
+      break;
+    }
+    // Case 4: Got back to dirty candidate but now it has higher priority ->
+    // unmake candidate and continue.
+    else if (!zero_priority && have_dirty_candidate && is_candidate) {
+      have_dirty_candidate = false;
+    }
+
+    entry->DecrementPriority();
   }
 
   return local_clock;
