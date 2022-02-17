@@ -621,7 +621,7 @@ TEST_F(PGManagerTest, PageBoundsConsistency) {
     ASSERT_EQ(m.NumSegmentFiles(), 1);
     run_checks(m);
   }
-  // Check reopened DB that uses single-page segments only..
+  // Check reopened DB that uses single-page segments only.
   {
     Manager m = Manager::Reopen(kDBDir, options);
     ASSERT_EQ(m.NumSegmentFiles(), 1);
