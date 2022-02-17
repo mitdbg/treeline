@@ -18,5 +18,14 @@ inline size_t PageForKey(const Key base_key, const plr::Line64& model,
                                       0.0, model(candidate - base_key))));
 }
 
+// Returns the smallest key `k` such that
+// `PageForKey(base_key, model, page_count, k) == page_idx`.
+//
+// `model` should map keys to page indices. `model_inv` should be the result of
+// `model.Invert()`.
+Key FindLowerBoundary(const Key base_key, const plr::Line64& model,
+                      const size_t page_count, const plr::Line64& model_inv,
+                      size_t page_idx);
+
 }  // namespace pg
 }  // namespace llsm

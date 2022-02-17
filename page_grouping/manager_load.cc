@@ -3,6 +3,7 @@
 #include <iterator>
 #include <vector>
 
+#include "key.h"
 #include "llsm/pg_db.h"
 #include "llsm/pg_options.h"
 #include "manager.h"
@@ -55,43 +56,6 @@ void PrintSegmentsAsCSV(std::ostream& out,
   }
 }
 
-// Defined to run `std::lower_bound()` on the `Key` domain without materializing
-// the values into an array.
-class KeyDomainIterator
-    : public std::iterator<std::random_access_iterator_tag, Key> {
- public:
-  KeyDomainIterator() : value_(0) {}
-  KeyDomainIterator(Key value) : value_(value) {}
-
-  Key operator*() const { return value_; }
-
-  // NOTE: This iterator does not define all the operators needed for a
-  // "RandomAccessIterator". It just defines the operators used by
-  // `std::lower_bound()`.
-
-  KeyDomainIterator& operator++() {
-    ++value_;
-    return *this;
-  }
-  KeyDomainIterator& operator--() {
-    --value_;
-    return *this;
-  }
-  KeyDomainIterator& operator+=(size_t delta) {
-    value_ += delta;
-    return *this;
-  }
-  bool operator==(const KeyDomainIterator& other) const {
-    return value_ == other.value_;
-  }
-  size_t operator-(const KeyDomainIterator& it) const {
-    return value_ - it.value_;
-  }
-
- private:
-  Key value_;
-};
-
 void PrintSegmentSummaryAsCsv(std::ostream& out,
                               const std::vector<Segment>& segments) {
   std::vector<size_t> num_segments;
@@ -126,49 +90,9 @@ std::vector<Key> ComputePageLowerBoundaries(const Segment& seg) {
   for (size_t page_idx = 1; page_idx < seg.page_count; ++page_idx) {
     // Find the smallest key such that PageToKey(..., seg.model, ..., key)
     // returns page_idx.
-
-    // 1. Use the inverted model to compute a candidate boundary key. We should
-    // not use this key directly due to possible precision errors. Instead, we
-    // use it to establish a search bound.
-    const Key candidate_boundary =
-        static_cast<Key>(page_to_key(page_idx)) + seg.base_key;
-    const size_t page_for_candidate = PageForKey(
-        seg.base_key, seg.model->line(), seg.page_count, candidate_boundary);
-
-    // 2. Compute lower/upper bounds for the search space.
-    Key lower = 0, upper = 0;
-    if (page_for_candidate >= page_idx) {
-      // `candidate_boundary` is an upper bound for the search space.
-      // NOTE: This assumes that `page_to_key(page_idx - 1)` produces a strictly
-      // lower key.
-      lower = static_cast<Key>(page_to_key(page_idx - 1)) + seg.base_key;
-      upper = candidate_boundary;
-    } else {
-      // `candidate_boundary` is a lower bound for the search space.
-      // NOTE: This assumes that `page_to_key(page_idx + 1)` produces a strictly
-      // higher key.
-      lower = candidate_boundary;
-      upper = static_cast<Key>(page_to_key(page_idx + 1)) + seg.base_key;
-    }
-    assert(lower < upper);
-
-    // 3. Binary search over the search space to find the smallest key that maps
-    // to `page_idx`.
-    KeyDomainIterator lower_it(lower), upper_it(upper);
-    const auto bound_it = std::lower_bound(
-        lower_it, upper_it, page_idx,
-        [&seg](const Key key_candidate, const size_t page_idx) {
-          return PageForKey(seg.base_key, seg.model->line(), seg.page_count,
-                            key_candidate) < page_idx;
-        });
-    // The boundary key maps to `page_idx`.
-    assert(PageForKey(seg.base_key, seg.model->line(), seg.page_count,
-                      *bound_it) == page_idx);
-    // The boundary key is the smallest key that maps to `page_idx`.
-    assert(*bound_it == 0 ||
-           PageForKey(seg.base_key, seg.model->line(), seg.page_count,
-                      (*bound_it) - 1) < page_idx);
-    lower_boundaries.push_back(*bound_it);
+    lower_boundaries.push_back(
+        FindLowerBoundary(seg.base_key, seg.model->line(), seg.page_count,
+                          page_to_key, page_idx));
   }
 
   assert(lower_boundaries.size() == seg.page_count);

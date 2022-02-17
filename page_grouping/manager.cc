@@ -393,5 +393,41 @@ void Manager::ReadOverflows(
   }
 }
 
+std::pair<Key, Key> Manager::GetPageBoundsFor(const Key key) const {
+  auto it = SegmentForKey(key);
+  const Key seg_base_key = it->first;
+  const SegmentInfo& sinfo = it->second;
+  const size_t page_idx = sinfo.PageForKey(seg_base_key, key);
+
+  // Find lower boundary. For single-page segments it is the segment's base key.
+  Key lower_bound = seg_base_key;
+  if (sinfo.page_count() > 1) {
+    lower_bound =
+        FindLowerBoundary(seg_base_key, *(sinfo.model()), sinfo.page_count(),
+                          sinfo.model()->Invert(), page_idx);
+  }
+
+  // Find upper boundary (exclusive).
+  Key upper_bound = std::numeric_limits<Key>::max();
+  if (page_idx < sinfo.page_count() - 1) {
+    // `page_idx` is not the last page in the segment. Thus its upper boundary
+    // is the lower boundary of the next page.
+    upper_bound = FindLowerBoundary(seg_base_key, *(sinfo.model()), sinfo.page_count(),
+                          sinfo.model()->Invert(), page_idx + 1);
+
+  } else {
+    // `page_idx` is the last page in the segment. Its upper boundary is the
+    // next segment's base key (or the largest possible key if this is the last
+    // segment).
+    // TODO: Concurrency concerns.
+    ++it;
+    if (it != index_.end()) {
+      upper_bound = it->first;
+    }
+  }
+
+  return {lower_bound, upper_bound};
+}
+
 }  // namespace pg
 }  // namespace llsm

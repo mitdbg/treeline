@@ -16,6 +16,7 @@ target_sources(pg PRIVATE
   circular_page_buffer.h
   free_list.cc
   free_list.h
+  key.cc
   key.h
   manager_load.cc
   manager_rewrite.cc
