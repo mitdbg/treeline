@@ -310,26 +310,27 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
       bf = &(buf_mgr_->FixPage(page_id, /*exclusive=*/false));
     }
 
-    // If found, add to record cache for future lookups.
-    if (status.ok()) {
-      rec_cache_->PutFromRead(key, Slice(*value_out),
-                              RecordCache::kDefaultPriority);
+    buf_mgr_->UnfixPage(*old_bf, /*is_dirty=*/false);
+  }
 
-      // Optionally, also cache records on the same page.
-      // TODO: records in other links of the same chain?
-      if (options_.optimistic_caching) {
-        auto it = page.GetIterator();
-        it.Seek(page.GetLowerBoundary());
+  // If found, add to record cache for future lookups.
+  if (status.ok()) {
+    rec_cache_->PutFromRead(key, Slice(*value_out),
+                            RecordCache::kDefaultPriority);
 
-        while (it.Valid()) {
-          rec_cache_->PutFromRead(it.key(), it.value(),
-                                  RecordCache::kDefaultOptimisticPriority);
-          it.Next();
-        }
+    // Optionally, also cache records on the same page.
+    // TODO: records in other links of the same chain?
+    if (options_.optimistic_caching) {
+      Page page = bf->GetPage();
+      auto it = page.GetIterator();
+      it.Seek(page.GetLowerBoundary());
+
+      while (it.Valid()) {
+        rec_cache_->PutFromRead(it.key(), it.value(),
+                                RecordCache::kDefaultOptimisticPriority);
+        it.Next();
       }
     }
-
-    buf_mgr_->UnfixPage(*old_bf, /*is_dirty=*/false);
   }
 
   if (incurred_multi_io) {
