@@ -399,9 +399,11 @@ std::pair<Key, Key> Manager::GetPageBoundsFor(const Key key) const {
   const SegmentInfo& sinfo = it->second;
   const size_t page_idx = sinfo.PageForKey(seg_base_key, key);
 
-  // Find lower boundary. For single-page segments it is the segment's base key.
+  // Find the lower boundary. When `page_idx == 0` it is always the segment's
+  // base key.
   Key lower_bound = seg_base_key;
-  if (sinfo.page_count() > 1) {
+  if (page_idx > 0) {
+    assert(sinfo.page_count() > 1);
     lower_bound =
         FindLowerBoundary(seg_base_key, *(sinfo.model()), sinfo.page_count(),
                           sinfo.model()->Invert(), page_idx);
