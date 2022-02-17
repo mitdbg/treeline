@@ -37,7 +37,14 @@ def main():
     with open(out_path / "results.csv", "w") as file:
         writer = csv.writer(file)
         writer.writerow(
-            ["policy", "hit_rate", "read_ios", "write_ios", "logged_record_count"]
+            [
+                "policy",
+                "hit_rate",
+                "read_ios",
+                "write_ios",
+                "logged_record_count",
+                "num_evictions",
+            ]
         )
 
         for db_type, admit_page in product([GreedyCacheDB, LRUCacheDB], [False, True]):
@@ -55,7 +62,14 @@ def main():
                 policy_name, "admit_record" if not admit_page else "admit_page"
             )
             writer.writerow(
-                [policy, db.hit_rate, db.read_ios, db.write_ios, db.logged_record_count]
+                [
+                    policy,
+                    db.hit_rate,
+                    db.read_ios,
+                    db.write_ios,
+                    db.logged_record_count,
+                    db.num_evictions,
+                ]
             )
 
 

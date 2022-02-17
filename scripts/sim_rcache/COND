@@ -30,6 +30,7 @@ run_experiment_group(
       name="sim_rcache-{}-{}".format(workload, config["record_size_bytes"]),
       args=["{}.yml".format(workload)],
       options=config,
+      parallelizable=True,
     )
     for workload, config in product(WORKLOADS, CONFIGS)
   ],

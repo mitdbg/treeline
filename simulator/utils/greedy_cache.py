@@ -39,6 +39,7 @@ class GreedyCache:
         self._read_ios = 0
         self._write_ios = 0
         self._logged_records = 0
+        self._num_evictions = 0
 
         self._accesses = 0
         self._hits = 0
@@ -58,6 +59,10 @@ class GreedyCache:
     @property
     def logged_record_count(self):
         return self._logged_records
+
+    @property
+    def num_evictions(self):
+        return self._num_evictions
 
     def add_write(self, key, if_new_hotness):
         self._accesses += 1
@@ -113,6 +118,7 @@ class GreedyCache:
         evict_candidate = None
         evict_candidate_slot = None
         flush_size = 0
+        self._num_evictions += 1
 
         while (start_idx != self._arm) or (evict_candidate is None):
             key = self._slots[self._arm]
@@ -220,6 +226,10 @@ class GreedyCacheDB(ycsbr.DatabaseInterface):
     @property
     def logged_record_count(self):
         return self._cache.logged_record_count
+
+    @property
+    def num_evictions(self):
+        return self._cache.num_evictions
 
     def log_writes(self):
         self._cache.log_writes()

@@ -25,6 +25,7 @@ class LRUCacheDB(ycsbr.DatabaseInterface):
         self._logged_record_count = 0
         self._log_writes_period = log_writes_period
         self._write_count = 0
+        self._num_evictions = 0
 
     @property
     def read_ios(self):
@@ -42,6 +43,10 @@ class LRUCacheDB(ycsbr.DatabaseInterface):
     def logged_record_count(self):
         return self._logged_record_count
 
+    @property
+    def num_evictions(self):
+        return self._num_evictions
+
     def log_writes(self):
         for record in self._records_in_cache.values():
             if not record.dirty:
@@ -53,6 +58,7 @@ class LRUCacheDB(ycsbr.DatabaseInterface):
             return
 
         # Write out all dirty keys in the same page.
+        self._num_evictions += 1
         key, _ = evicted
         page = self._page_mapper(key)
         needs_write = False
