@@ -134,8 +134,8 @@ Status RecordCache::GetRange(const Slice& start_key, size_t num_records,
 
   // Retrieve & lock in ART.
   size_t num_found = 0;
-  tree_->lookupRange(art_key, &cache_entries, results_out, num_records,
-                     num_found, t);
+  tree_->lookupRange(art_key, results_out, num_records, num_found, t,
+                     &cache_entries);
 
   // Place in vector.
   indices_out->resize(num_found);
