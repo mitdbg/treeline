@@ -506,14 +506,10 @@ restart:
     break;
   }
 
-  if (continueKey == nullptr) return (resultsFound == resultSize);
-
-  if (toContinue != 0) {
+  if (toContinue != 0 && continueKey != nullptr) {
     loadKey(toContinue, *continueKey);
-    return true;
-  } else {
-    return false;
   }
+  return (resultsFound == resultSize);
 }
 
 TID Tree::checkKey(const TID tid, const Key& k) const {

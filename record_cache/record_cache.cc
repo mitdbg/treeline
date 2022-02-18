@@ -156,19 +156,35 @@ Status RecordCache::GetRange(const Slice& start_key, const Slice& end_key,
   TID results_out[ART_scan_size_];
 
   // Retrieve & lock in ART.
-  bool should_continue = true;
-  while (should_continue) {
+  bool should_scan_more = true;
+  while (should_scan_more) {
     size_t num_found = 0;
-    should_continue =
-        tree_->lookupRange(start_art_key, results_out, ART_scan_size_,
-                           num_found, t, &cache_entries, &start_art_key);
+
+    // The next largest key after `ART_scan_size_` keys will be returned in
+    // `start_art_key`, setting up the next iteration.
+    tree_->lookupRange(start_art_key, results_out, ART_scan_size_, num_found, t,
+                       &cache_entries, &start_art_key);
+
+    // Three conditions to scan more:
+    // 1. Didn't return too few records (would happen if we hit the upper key
+    // space bound).
+    // 2. The point from which to continue is beyond the keys we saw.
+    // 3. The point from which to continue is below the `end_key`.
+    should_scan_more =
+        (num_found == ART_scan_size_) &&
+        (cache_entries[results_out[ART_scan_size_ - 1] - 1].GetKey().compare(
+             ARTKeyToSlice(start_art_key)) < 0) &&
+        (ARTKeyToSlice(start_art_key).compare(end_key) < 0);
 
     // Place in vector.
     for (uint64_t i = 0; i < num_found; ++i) {
       auto index = results_out[i] - 1;
-      if (cache_entries[index].GetKey().compare(end_key) >= 0)
-        return Status::OK();
-      indices_out->emplace_back(index);
+      auto entry = &cache_entries[index];
+      if (should_scan_more || entry->GetKey().compare(end_key) < 0) {
+        indices_out->emplace_back(index);
+      } else {
+        entry->Unlock();
+      }
     }
   }
   return Status::OK();
@@ -193,6 +209,10 @@ void RecordCache::TIDToARTKey(TID tid, Key& key) {
 
 void RecordCache::SliceToARTKey(const Slice& slice_key, Key& art_key) {
   art_key.set(slice_key.data(), slice_key.size());
+}
+
+Slice RecordCache::ARTKeyToSlice(const Key& art_key) {
+  return Slice(reinterpret_cast<const char*>(&art_key[0]), art_key.getKeyLen());
 }
 
 uint64_t RecordCache::SelectForEviction() {

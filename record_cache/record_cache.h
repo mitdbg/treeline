@@ -112,6 +112,9 @@ class RecordCache {
   // Populates `art_key` with the record in `slice_key`.
   static void SliceToARTKey(const Slice& slice_key, Key& art_key);
 
+  // Return a slice with the same contents as `art_key`.
+  static Slice ARTKeyToSlice(const Key& art_key);
+
   // Selects a cache entry according to the chosen policy, and returns the
   // corresponding index into the `cache_entries` vector.
   uint64_t SelectForEviction();
