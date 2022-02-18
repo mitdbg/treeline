@@ -1,5 +1,6 @@
 #pragma once
-#include <string>
+
+#include <cstdint>
 
 #include "libcuckoo/cuckoohash_map.hh"
 #include "persist/segment_id.h"
@@ -54,37 +55,51 @@ class LockManager {
   //
   // If the acquisition was successful, the caller is responsible for calling
   // `ReleaseSegmentLock()` with the same mode to release the lock.
-  bool TryAcquireSegmentLock(SegmentId seg_id, SegmentMode mode);
+  bool TryAcquireSegmentLock(const SegmentId& seg_id, SegmentMode mode);
 
   // Release a segment lock that was previously acquired on `seg_id` with mode
   // `mode`.
-  void ReleaseSegmentLock(SegmentId seg_id, SegmentMode mode);
+  void ReleaseSegmentLock(const SegmentId& seg_id, SegmentMode mode);
+
+  // Upgrade the segment lock on `seg_id` to `kReorgExclusive`. The caller must
+  // already hold the lock in `kReorg` mode. This method will block until the
+  // upgraded lock can be granted (it will wait for any concurrent readers to
+  // release their `kPageRead` lock(s)).
+  void UpgradeSegmentLockToReorgExclusive(const SegmentId& seg_id);
 
   // Try to acquire a page lock on `seg_id` and page index `page_idx` with mode
   // `mode`. Returns true iff the acquisiton was successful.
   //
   // If the acquisition was successful, the caller is responsible for calling
   // `ReleasePageLock()` with the same mode to release the lock.
-  bool TryAcquirePageLock(SegmentId seg_id, size_t page_idx, PageMode mode);
+  bool TryAcquirePageLock(const SegmentId& seg_id, size_t page_idx, PageMode mode);
 
   // Release a page lock that was previously acquired on `seg_id` and page index
   // `page_idx` with mode `mode`.
-  void ReleasePageLock(SegmentId seg_id, size_t page_idx, PageMode mode);
+  void ReleasePageLock(const SegmentId& seg_id, size_t page_idx, PageMode mode);
 
  private:
+  using LockCount = uint16_t;
+  using LockId = size_t;
+
   struct SegmentLockState {
-    uint16_t num_shared = 0;
-    uint16_t num_exclusive = 0;
+    explicit SegmentLockState(SegmentMode initial_mode);
+    LockCount num_page_read = 0;
+    LockCount num_page_write = 0;
+    LockCount num_reorg = 0;
+    LockCount num_reorg_exclusive = 0;
   };
   struct PageLockState {
-    uint16_t num_page_read = 0;
-    uint16_t num_page_write = 0;
-    uint16_t num_reorg = 0;
-    uint16_t num_reorg_exclusive = 0;
+    explicit PageLockState(PageMode initial_mode);
+    LockCount num_shared = 0;
+    LockCount num_exclusive = 0;
   };
 
-  libcuckoo::cuckoohash_map<size_t, SegmentLockState> segment_locks_;
-  libcuckoo::cuckoohash_map<size_t, PageLockState> page_locks_;
+  LockId SegmentLockId(const SegmentId& seg_id) const;
+  LockId PageLockId(const SegmentId& seg_id, size_t page_idx) const;
+
+  libcuckoo::cuckoohash_map<LockId, SegmentLockState> segment_locks_;
+  libcuckoo::cuckoohash_map<LockId, PageLockState> page_locks_;
 };
 
 }  // namespace pg
