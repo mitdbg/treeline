@@ -26,6 +26,8 @@ target_sources(pg PRIVATE
   manager.cc
   manager.h
   pg_stats.cc
+  rand_exp_backoff.cc
+  rand_exp_backoff.h
   segment_builder.cc
   segment_builder.h
   workspace.h

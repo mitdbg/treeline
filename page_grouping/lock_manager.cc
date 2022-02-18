@@ -1,4 +1,5 @@
 #include "lock_manager.h"
+#include "rand_exp_backoff.h"
 
 #include <cassert>
 
@@ -100,13 +101,16 @@ void LockManager::UpgradeSegmentLockToReorgExclusive(const SegmentId& seg_id) {
   assert(lock_state_found);
 
   // Spin wait until the readers are done.
-  while (!can_return) {
-    // TODO: Exponential back off.
-    const bool found = segment_locks_.find_fn(
-        id, [&can_return](const SegmentLockState& lock_state) {
-          can_return = (lock_state.num_page_read == 0);
-        });
-    assert(found);
+  if (!can_return) {
+    RandExpBackoff backoff(12);
+    while (!can_return) {
+      backoff.Wait();
+      const bool found = segment_locks_.find_fn(
+          id, [&can_return](const SegmentLockState& lock_state) {
+            can_return = (lock_state.num_page_read == 0);
+          });
+      assert(found);
+    }
   }
 }
 
