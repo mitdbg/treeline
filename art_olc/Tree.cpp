@@ -340,10 +340,10 @@ restart:
   }
 }
 
-bool Tree::lookupRange(
-    const Key& start, TID result[], std::size_t resultSize,
-    std::size_t& resultsFound, ThreadInfo& threadEpocheInfo,
-    std::vector<llsm::RecordCacheEntry>* cache_entries) const {
+bool Tree::lookupRange(const Key& start, TID result[], std::size_t resultSize,
+                       std::size_t& resultsFound, ThreadInfo& threadEpocheInfo,
+                       std::vector<llsm::RecordCacheEntry>* cache_entries,
+                       Key* continueKey) const {
   EpocheGuard epocheGuard(threadEpocheInfo);
   TID toContinue = 0;
   std::function<void(const N*)> copy = [&result, &resultSize, &resultsFound,
@@ -512,7 +512,15 @@ restart:
     }
     break;
   }
-  return (resultsFound == resultSize);
+
+  if (continueKey == nullptr) return (resultsFound == resultSize);
+
+  if (toContinue != 0) {
+    loadKey(toContinue, *continueKey);
+    return true;
+  } else {
+    return false;
+  }
 }
 
 TID Tree::checkKey(const TID tid, const Key& k) const {
