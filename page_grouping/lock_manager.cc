@@ -1,7 +1,8 @@
 #include "lock_manager.h"
-#include "rand_exp_backoff.h"
 
 #include <cassert>
+
+#include "rand_exp_backoff.h"
 
 namespace llsm {
 namespace pg {
@@ -10,7 +11,7 @@ bool LockManager::TryAcquireSegmentLock(const SegmentId& seg_id,
                                         SegmentMode requested_mode) {
   const LockId id = SegmentLockId(seg_id);
   bool granted = false;
-  segment_locks_.uprase_fn(
+  const bool inserted_new = segment_locks_.uprase_fn(
       id,
       [&granted, &requested_mode](SegmentLockState& lock_state) {
         switch (requested_mode) {
@@ -46,7 +47,7 @@ bool LockManager::TryAcquireSegmentLock(const SegmentId& seg_id,
         return false;  // Return false to keep the lock state.
       },
       requested_mode);
-  return granted;
+  return inserted_new || granted;
 }
 
 void LockManager::ReleaseSegmentLock(const SegmentId& seg_id,
@@ -119,7 +120,7 @@ bool LockManager::TryAcquirePageLock(const SegmentId& seg_id,
                                      const PageMode requested_mode) {
   const LockId id = PageLockId(seg_id, page_idx);
   bool granted = false;
-  page_locks_.uprase_fn(
+  const bool inserted_new = page_locks_.uprase_fn(
       id,
       [&granted, &requested_mode](PageLockState& lock_state) {
         switch (requested_mode) {
@@ -143,7 +144,7 @@ bool LockManager::TryAcquirePageLock(const SegmentId& seg_id,
         return false;  // Return false to keep the lock state.
       },
       requested_mode);
-  return granted;
+  return inserted_new || granted;
 }
 
 void LockManager::ReleasePageLock(const SegmentId& seg_id,

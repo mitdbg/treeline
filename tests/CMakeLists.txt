@@ -15,6 +15,7 @@ target_sources(tester
     pg_datasets.cc
     pg_datasets.h
     pg_db_test.cc
+    pg_lock_manager_test.cc
     pg_manager_rewrite_test.cc
     pg_manager_test.cc
     pg_segment_test.cc

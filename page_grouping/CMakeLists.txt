@@ -45,7 +45,7 @@ target_include_directories(pg
     ${PROJECT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/include
 )
-target_link_libraries(pg PRIVATE crc32c libcuckoo)
+target_link_libraries(pg PUBLIC libcuckoo PRIVATE crc32c)
 add_dependencies(pg_all pg)
 
 target_sources(pg_llsm PRIVATE
