@@ -57,6 +57,10 @@ class Manager {
     return ScanWithEstimates(start_key, amount, values_out);
   }
 
+  // Returns the boundaries of the page on which `key` should be stored.
+  // The lower bound is inclusive and the upper bound is exclusive.
+  std::pair<Key, Key> GetPageBoundsFor(const Key key) const;
+
   // Benchmark statistics.
   const std::vector<size_t>& GetReadCounts() const { return w_.read_counts(); }
   const std::vector<size_t>& GetWriteCounts() const {

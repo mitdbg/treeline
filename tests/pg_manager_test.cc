@@ -10,6 +10,7 @@
 #include "page_grouping/manager.h"
 #include "page_grouping/segment_info.h"
 #include "pg_datasets.h"
+#include "util/key.h"
 
 using namespace llsm;
 using namespace llsm::pg;
@@ -550,6 +551,81 @@ TEST_F(PGManagerTest, InsertOverflowPages) {
     ASSERT_TRUE(m.Scan(0, 15, &scan_out).ok());
     ASSERT_EQ(scan_out.size(), combined.size());
     ValidateScanResults(0, combined.size(), combined, scan_out);
+  }
+}
+
+TEST_F(PGManagerTest, PageBoundsConsistency) {
+  auto options = GetOptions(/*goal=*/45, /*delta=*/5, /*use_segments=*/true);
+
+  // Use the sequential dataset instead of the uniform one.
+  std::vector<std::pair<uint64_t, Slice>> dataset =
+      BuildRecords(Datasets::kSequentialKeys, u8"08 bytes");
+
+  // Select 50 "random" dataset indices.
+  std::vector<size_t> to_read;
+  to_read.reserve(50);
+  std::uniform_int_distribution<size_t> dist(0, dataset.size() - 1);
+  std::mt19937 prng(42);
+  for (size_t i = 0; i < 50; ++i) {
+    to_read.push_back(dist(prng));
+  }
+
+  const auto run_checks = [&dataset, &to_read](Manager& m) {
+    std::string out;
+    for (const auto& idx : to_read) {
+      const std::pair<uint64_t, Slice>& rec = dataset[idx];
+      const auto& [status, pages] = m.GetWithPages(rec.first, &out);
+
+      // Successful read.
+      ASSERT_TRUE(status.ok());
+      ASSERT_EQ(rec.second.compare(Slice(out)), 0);
+
+      // No overflows.
+      ASSERT_EQ(pages.size(), 1);
+
+      // Check that the page boundaries stored on disk are consistent with the
+      // ones computed from the model.
+      const Key stored_lower =
+          key_utils::ExtractHead64(pages[0].GetLowerBoundary());
+      const Key stored_upper =
+          key_utils::ExtractHead64(pages[0].GetUpperBoundary());
+
+      const auto [computed_lower, computed_upper] =
+          m.GetPageBoundsFor(rec.first);
+      ASSERT_EQ(computed_lower, stored_lower);
+      // The on-disk page stores an inclusive upper bound. All other upper
+      // bounds in the page grouping code are exclusive.
+      ASSERT_EQ(computed_upper, stored_upper + 1);
+    }
+  };
+
+  // Check newly loaded DB that uses segments.
+  {
+    Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 5);
+    run_checks(m);
+  }
+  // Check reopened DB that uses segments.
+  {
+    Manager m = Manager::Reopen(kDBDir, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 5);
+    run_checks(m);
+  }
+
+  // Check newly loaded DB that uses single-page segments only.
+  std::filesystem::remove_all(kDBDir);
+  std::filesystem::create_directory(kDBDir);
+  options.use_segments = false;
+  {
+    Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 1);
+    run_checks(m);
+  }
+  // Check reopened DB that uses single-page segments only.
+  {
+    Manager m = Manager::Reopen(kDBDir, options);
+    ASSERT_EQ(m.NumSegmentFiles(), 1);
+    run_checks(m);
   }
 }
 
