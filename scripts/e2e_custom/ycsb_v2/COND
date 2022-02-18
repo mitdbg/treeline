@@ -54,6 +54,7 @@ COMMON_OPTIONS = {
 
   # Affects RocksDB
   "rdb_bloom_bits": 10,
+  "rdb_prefix_bloom_size": 3,
 
   # Affects LLSM
   "reorg_length": 2,
