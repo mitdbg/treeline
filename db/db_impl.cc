@@ -294,6 +294,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   }
   bool incurred_io = false;
   bool incurred_multi_io = false;
+  PageBuffer local_page = PageMemoryAllocator::Allocate(1);
 
   while (next_link_exists) {
     next_link_exists = false;
@@ -304,7 +305,13 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     Page page = bf->GetPage();
     status = page.Get(key, value_out);
     BufferFrame* old_bf = bf;
-    if (status.IsNotFound() && page.HasOverflow()) {
+
+    // If found, copy locally to try caching records after unfixing.
+    if (status.ok()) {
+      memcpy(local_page.get(), page.data().data(), Page::kSize);
+    }
+    // If not found & has overflow, keep searching.
+    else if (status.IsNotFound() && page.HasOverflow()) {
       page_id = page.GetOverflow();
       next_link_exists = true;
       bf = &(buf_mgr_->FixPage(page_id, /*exclusive=*/false));
@@ -321,7 +328,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     // Optionally, also cache records on the same page.
     // TODO: records in other links of the same chain?
     if (options_.optimistic_caching) {
-      Page page = bf->GetPage();
+      Page page(local_page.get());
       auto it = page.GetIterator();
       it.Seek(page.GetLowerBoundary());
 
