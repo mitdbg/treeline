@@ -18,6 +18,8 @@ target_sources(pg PRIVATE
   free_list.h
   key.cc
   key.h
+  lock_manager.cc
+  lock_manager.h
   manager_load.cc
   manager_rewrite.cc
   manager_scan.cc
@@ -41,7 +43,7 @@ target_include_directories(pg
     ${PROJECT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/include
 )
-target_link_libraries(pg PRIVATE crc32c)
+target_link_libraries(pg PRIVATE crc32c libcuckoo)
 add_dependencies(pg_all pg)
 
 target_sources(pg_llsm PRIVATE

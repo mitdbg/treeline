@@ -13,6 +13,14 @@ set(CRC32C_USE_GLOG OFF)
 set(CRC32C_INSTALL OFF)
 FetchContent_MakeAvailable(crc32c)
 
+# Concurrent hash table
+FetchContent_Declare(
+  libcuckoo
+  GIT_REPOSITORY https://github.com/efficient/libcuckoo.git
+  GIT_TAG        784d0f5d147b9a73f897ae55f6c3712d9a91b058
+)
+FetchContent_MakeAvailable(libcuckoo)
+
 if(LLSM_BUILD_TESTS)
   # Google Tests: Fetch it iff we need to build the test suite
   FetchContent_Declare(
