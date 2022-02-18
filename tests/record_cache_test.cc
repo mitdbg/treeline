@@ -73,7 +73,7 @@ TEST(RecordCacheTest, MultiPutGet) {
   }
 }
 
-TEST(RecordCacheTest, RangeScan) {
+TEST(RecordCacheTest, RangeScanWithLength) {
   const uint64_t capacity = 100;
   auto rc = RecordCache(capacity);
 
@@ -105,6 +105,46 @@ TEST(RecordCacheTest, RangeScan) {
 
       entry->Unlock();
     }
+  }
+}
+
+TEST(RecordCacheTest, RangeScanWithBound) {
+  const uint64_t capacity = 100;
+  auto rc = RecordCache(capacity);
+  rc.ART_scan_size_ = 6;
+
+  for (auto i = 100; i < 150; ++i) {
+    std::string key_s = "a" + std::to_string(i);
+    std::string val_s = "b" + std::to_string(i);
+    rc.Put(Slice(key_s), Slice(val_s));
+  }
+
+  uint64_t index_out;
+  uint64_t scan_length = 10;
+  std::vector<uint64_t> results;
+
+  for (auto i = 100; i < 150; ++i) {
+    std::string start_key_s = "a" + std::to_string(i);
+    std::string end_key_s = "a" + std::to_string(i + scan_length);
+
+    ASSERT_TRUE(
+        rc.GetRange(Slice(start_key_s), Slice(end_key_s), &results).ok());
+    uint64_t scanned_recs = results.size();
+    ASSERT_EQ(scanned_recs, i < 150 - scan_length ? scan_length : 150 - i);
+
+    for (auto j = 0; j < scanned_recs; ++j) {
+      std::string key_s = "a" + std::to_string(i + j);
+      std::string val_s = "b" + std::to_string(i + j);
+
+      auto entry = &rc.cache_entries[results[j]];
+
+      ASSERT_EQ(Slice(key_s).compare(entry->GetKey()), 0);
+      ASSERT_EQ(Slice(val_s).compare(entry->GetValue()), 0);
+
+      entry->Unlock();
+    }
+
+    results.clear();
   }
 }
 

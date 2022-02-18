@@ -10,6 +10,7 @@ RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out)
     : capacity_(capacity), clock_(0), write_out_(std::move(write_out)) {
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
   cache_entries.resize(capacity_);
+  ART_scan_size_ = kDefaultARTScanSize;
 }
 
 RecordCache::~RecordCache() {
@@ -143,6 +144,33 @@ Status RecordCache::GetRange(const Slice& start_key, size_t num_records,
     indices_out->at(i) = results_out[i] - 1;
   }
 
+  return Status::OK();
+}
+
+Status RecordCache::GetRange(const Slice& start_key, const Slice& end_key,
+                             std::vector<uint64_t>* indices_out) const {
+  Key start_art_key;
+  SliceToARTKey(start_key, start_art_key);
+  auto t = tree_->getThreadInfo();
+
+  TID results_out[ART_scan_size_];
+
+  // Retrieve & lock in ART.
+  bool should_continue = true;
+  while (should_continue) {
+    size_t num_found = 0;
+    should_continue =
+        tree_->lookupRange(start_art_key, results_out, ART_scan_size_,
+                           num_found, t, &cache_entries, &start_art_key);
+
+    // Place in vector.
+    for (uint64_t i = 0; i < num_found; ++i) {
+      auto index = results_out[i] - 1;
+      if (cache_entries[index].GetKey().compare(end_key) >= 0)
+        return Status::OK();
+      indices_out->emplace_back(index);
+    }
+  }
   return Status::OK();
 }
 
