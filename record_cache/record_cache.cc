@@ -1,4 +1,5 @@
 #include "record_cache.h"
+
 #include "llsm/pg_stats.h"
 
 namespace llsm {
@@ -6,11 +7,10 @@ namespace llsm {
 std::vector<RecordCacheEntry> RecordCache::cache_entries{};
 
 RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out)
-    : capacity_(capacity),
-      clock_(0),
-      write_out_(std::move(write_out)) {
+    : capacity_(capacity), clock_(0), write_out_(std::move(write_out)) {
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
   cache_entries.resize(capacity_);
+  ART_scan_size_ = kDefaultARTScanSize;
 }
 
 RecordCache::~RecordCache() {
@@ -135,8 +135,8 @@ Status RecordCache::GetRange(const Slice& start_key, size_t num_records,
 
   // Retrieve & lock in ART.
   size_t num_found = 0;
-  tree_->lookupRange(art_key, &cache_entries, results_out, num_records,
-                     num_found, t);
+  tree_->lookupRange(art_key, results_out, num_records, num_found, t,
+                     &cache_entries);
 
   // Place in vector.
   indices_out->resize(num_found);
@@ -144,6 +144,49 @@ Status RecordCache::GetRange(const Slice& start_key, size_t num_records,
     indices_out->at(i) = results_out[i] - 1;
   }
 
+  return Status::OK();
+}
+
+Status RecordCache::GetRange(const Slice& start_key, const Slice& end_key,
+                             std::vector<uint64_t>* indices_out) const {
+  Key start_art_key;
+  SliceToARTKey(start_key, start_art_key);
+  auto t = tree_->getThreadInfo();
+
+  TID results_out[ART_scan_size_];
+
+  // Retrieve & lock in ART.
+  bool should_scan_more = true;
+  while (should_scan_more) {
+    size_t num_found = 0;
+
+    // The next largest key after `ART_scan_size_` keys will be returned in
+    // `start_art_key`, setting up the next iteration.
+    tree_->lookupRange(start_art_key, results_out, ART_scan_size_, num_found, t,
+                       &cache_entries, &start_art_key);
+
+    // Three conditions to scan more:
+    // 1. Didn't return too few records (would happen if we hit the upper key
+    // space bound).
+    // 2. The point from which to continue is beyond the keys we saw.
+    // 3. The point from which to continue is below the `end_key`.
+    should_scan_more =
+        (num_found == ART_scan_size_) &&
+        (cache_entries[results_out[ART_scan_size_ - 1] - 1].GetKey().compare(
+             ARTKeyToSlice(start_art_key)) < 0) &&
+        (ARTKeyToSlice(start_art_key).compare(end_key) < 0);
+
+    // Place in vector.
+    for (uint64_t i = 0; i < num_found; ++i) {
+      auto index = results_out[i] - 1;
+      auto entry = &cache_entries[index];
+      if (should_scan_more || entry->GetKey().compare(end_key) < 0) {
+        indices_out->emplace_back(index);
+      } else {
+        entry->Unlock();
+      }
+    }
+  }
   return Status::OK();
 }
 
@@ -168,13 +211,48 @@ void RecordCache::SliceToARTKey(const Slice& slice_key, Key& art_key) {
   art_key.set(slice_key.data(), slice_key.size());
 }
 
+Slice RecordCache::ARTKeyToSlice(const Key& art_key) {
+  return Slice(reinterpret_cast<const char*>(&art_key[0]), art_key.getKeyLen());
+}
+
 uint64_t RecordCache::SelectForEviction() {
   uint64_t local_clock;
+  uint64_t dirty_candidate;
+  bool have_dirty_candidate = false;
 
+  // Implement the CLOCK algorithm, but if the first eviction
+  // candidate you find is dirty, go around once more in the hopes
+  // of evicting a non-dirty one instead.
   while (true) {
     local_clock = (clock_++) % capacity_;
-    if (cache_entries[local_clock].GetPriority() == 0) break;
-    cache_entries[local_clock].DecrementPriority();
+    auto entry = &cache_entries[local_clock];
+
+    bool zero_priority = (entry->GetPriority() == 0);
+    bool is_dirty = entry->IsDirty();
+    bool is_candidate = (local_clock == dirty_candidate);
+
+    // Case 1: 0 priority and clean -> evict.
+    if (zero_priority && !is_dirty) {
+      break;
+    }
+    // Case 2: 0 priority but dirty, don't have a dirty candidate -> set as
+    // dirty candidate and go around.
+    else if (zero_priority && is_dirty && !have_dirty_candidate) {
+      have_dirty_candidate = true;
+      dirty_candidate = local_clock;
+    }
+    // Case 3: Got back to dirty candidate and it still has priority 0 -> evict
+    // this time.
+    else if (zero_priority && have_dirty_candidate && is_candidate) {
+      break;
+    }
+    // Case 4: Got back to dirty candidate but now it has higher priority ->
+    // unmake candidate and continue.
+    else if (!zero_priority && have_dirty_candidate && is_candidate) {
+      have_dirty_candidate = false;
+    }
+
+    entry->DecrementPriority();
   }
 
   return local_clock;

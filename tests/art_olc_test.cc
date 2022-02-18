@@ -123,8 +123,8 @@ TEST_F(ARTOLCTest, StartNumberScan) {
     TID result[scan_length];
     uint64_t found;
 
-    auto val = tree->lookupRange(start_key, &cache_entries, result, scan_length,
-                                 found, t);
+    auto val = tree->lookupRange(start_key, result, scan_length,
+                                 found, t, &cache_entries);
     bool found_is_correct =
         (i < kNumKeys - scan_length) ? scan_length : kNumKeys - i;
     ASSERT_TRUE(found_is_correct);

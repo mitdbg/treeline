@@ -89,17 +89,31 @@ class RecordCache {
   Status GetRange(const Slice& start_key, size_t num_records,
                   std::vector<uint64_t>* indices_out) const;
 
+  // Retrieve an ascending range of records, starting from the smallest record
+  // whose key is greater than or equal to `start_key` and returning no records
+  // with key larger than `end_key`. The cache indices holding the records are
+  // return in `indices_out`.
+  Status GetRange(const Slice& start_key, const Slice& end_key,
+                  std::vector<uint64_t>* indices_out) const;
+
   // Writes out all dirty cache entries to the appropriate longer-term data
   // structure.
   uint64_t WriteOutDirty();
 
  private:
+  // The maximum size of each ART sub-scan when using GetRange() with `end_key`.
+  size_t ART_scan_size_;
+  const size_t kDefaultARTScanSize = 100;
+
   // Required by the ART constructor. Populates `key` with the key of the record
   // stored at `tid` - 1 within the record cache. See note below.
   static void TIDToARTKey(TID tid, Key& key);
 
   // Populates `art_key` with the record in `slice_key`.
   static void SliceToARTKey(const Slice& slice_key, Key& art_key);
+
+  // Return a slice with the same contents as `art_key`.
+  static Slice ARTKeyToSlice(const Key& art_key);
 
   // Selects a cache entry according to the chosen policy, and returns the
   // corresponding index into the `cache_entries` vector.
