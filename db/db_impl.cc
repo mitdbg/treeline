@@ -445,20 +445,49 @@ Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
 
 void DBImpl::WriteBatch(
     const std::vector<std::tuple<Slice, Slice, format::WriteType>>& records) {
-  // TODO: Ideally we should flush all records that belong to the same chain
-  // "together" so that we don't keep fixing and unfixing the chain for records
-  // that belong to the same chain. But right now this method is only called
-  // with a single record in the batch, so this optimization is not yet needed.
+  // The approach below tries to keep an overflow chain fixed for as long as the
+  // entries of `records` belong to it, while going through `records`
+  // sequentially.
+  //
+  // As such, performance will be significantly better if `records` are sorted
+  // by key, as any reorg will preserve this order and bouncing between overflow
+  // chains will be minimized. This will be true for the current record cache
+  // implementation, because we obtain the records to write out from a
+  // sequential ART scan of the appropriate key range.
+  //
+  // However, no specific sort order is strictly required for correctness.
+
+  if (records.size() == 0) return;
+
+  PhysicalPageId page_id;
+  OverflowChain chain = nullptr;
+  // Retry until you can fix the chain.
+  while (chain == nullptr) {
+    page_id = model_->KeyToPageId(std::get<0>(records[0]));
+    chain = FixOverflowChain(page_id, /* exclusive = */ true,
+                             /* unlock_before_returning = */ false, buf_mgr_,
+                             model_, &stats_);
+  }
 
   for (const auto& [key, value, write_type] : records) {
-    // Retry until you can fix the chain.
-    PhysicalPageId page_id;
-    OverflowChain chain = nullptr;
-    while (chain == nullptr) {
-      page_id = model_->KeyToPageId(key);
-      chain = FixOverflowChain(page_id, /* exclusive = */ true,
-                               /* unlock_before_returning = */ false, buf_mgr_,
-                               model_, &stats_);
+    // Check to see if a reorg intervened between collecting `records` and
+    // calling `WriteBatch()`, which might have caused this record to now belong
+    // to a different page.
+    PhysicalPageId local_page_id = model_->KeyToPageId(key);
+
+    if (local_page_id != page_id) {
+      // Unfix all
+      for (auto& bf : *chain) {
+        buf_mgr_->UnfixPage(*bf, /* is_dirty = */ true);
+      }
+
+      chain = nullptr;
+      while (chain == nullptr) {
+        page_id = model_->KeyToPageId(key);
+        chain = FixOverflowChain(page_id, /* exclusive = */ true,
+                                 /* unlock_before_returning = */ false,
+                                 buf_mgr_, model_, &stats_);
+      }
     }
 
     // Flush the entry to the page.
@@ -512,11 +541,10 @@ void DBImpl::WriteBatch(
                                 std::move(model), options, stats);
       });
     }
-
-    // Unfix all
-    for (auto& bf : *chain) {
-      buf_mgr_->UnfixPage(*bf, /* is_dirty = */ true);
-    }
+  }
+  // Unfix all from last chain used.
+  for (auto& bf : *chain) {
+    buf_mgr_->UnfixPage(*bf, /* is_dirty = */ true);
   }
 }
 
