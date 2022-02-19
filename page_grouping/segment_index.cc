@@ -30,29 +30,31 @@ void SegmentIndex::SetSegmentOverflow(const Key key, bool overflow) {
 
 std::vector<SegmentIndex::Entry> SegmentIndex::FindRewriteRegion(
     const Key segment_base) const {
-  std::shared_lock<std::shared_mutex> lock(mutex_);
+  std::vector<Entry> segments_to_rewrite;
+  {
+    std::shared_lock<std::shared_mutex> lock(mutex_);
+    const auto it = index_.lower_bound(segment_base);
+    assert(it != index_.end());
+    segments_to_rewrite.emplace_back(*it);
 
-  const auto it = index_.lower_bound(segment_base);
-  assert(it != index_.end());
-  std::vector<Entry> segments_to_rewrite = {*it};
-
-  // Scan backward.
-  if (it != index_.begin()) {
-    auto prev_it(it);
-    while (true) {
-      --prev_it;
-      if (!prev_it->second.HasOverflow()) break;
-      segments_to_rewrite.emplace_back(*prev_it);
-      if (prev_it == index_.begin()) break;
+    // Scan backward.
+    if (it != index_.begin()) {
+      auto prev_it(it);
+      while (true) {
+        --prev_it;
+        if (!prev_it->second.HasOverflow()) break;
+        segments_to_rewrite.emplace_back(*prev_it);
+        if (prev_it == index_.begin()) break;
+      }
     }
-  }
 
-  // Scan forward.
-  auto next_it(it);
-  ++next_it;
-  for (; next_it != index_.end(); ++next_it) {
-    if (!next_it->second.HasOverflow()) break;
-    segments_to_rewrite.emplace_back(*next_it);
+    // Scan forward.
+    auto next_it(it);
+    ++next_it;
+    for (; next_it != index_.end(); ++next_it) {
+      if (!next_it->second.HasOverflow()) break;
+      segments_to_rewrite.emplace_back(*next_it);
+    }
   }
 
   // Sort the segments.
@@ -61,7 +63,6 @@ std::vector<SegmentIndex::Entry> SegmentIndex::FindRewriteRegion(
                const std::pair<Key, SegmentInfo>& seg2) {
               return seg1.first < seg2.first;
             });
-
   return segments_to_rewrite;
 }
 
