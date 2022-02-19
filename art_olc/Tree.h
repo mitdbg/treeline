@@ -75,7 +75,7 @@ class Tree {
   bool lookupRange(const Key& start, TID result[], std::size_t resultLen,
                    std::size_t& resultCount, ThreadInfo& threadEpocheInfo,
                    std::vector<llsm::RecordCacheEntry>* cache_entries = nullptr,
-                   Key* continueKey = nullptr) const;
+                   Key* continueKey = nullptr, uint64_t* index_locked_already = nullptr) const;
 
   void insert(const Key& k, TID tid, ThreadInfo& epocheInfo);
 
