@@ -7,6 +7,7 @@
 
 #include "bufmgr/buffer_manager.h"
 #include "llsm/slice.h"
+#include "util/key.h"
 
 namespace llsm {
 
@@ -17,15 +18,15 @@ class Model {
 
   // Uses the model to derive a page_id given a `key`. Optionally also returns
   // the 8-byte prefix of the smallest key that maps to the same page.
-  virtual PhysicalPageId KeyToPageId(const Slice& key,
-                                     Slice* base_key_prefix = nullptr) = 0;
+  virtual PhysicalPageId KeyToPageId(
+      const Slice& key, key_utils::KeyHead* base_key_prefix = nullptr) = 0;
 
   // Uses the model to predict the page_id of the NEXT page given a `key` that
   // is within the correct range (upper bounds `key`). Returns an invalid
   // page_id if no next page exists. Optionally also returns
   // the 8-byte prefix of the smallest key that maps to the same page.
-  virtual PhysicalPageId KeyToNextPageId(const Slice& key,
-                                         Slice* base_key_prefix = nullptr) = 0;
+  virtual PhysicalPageId KeyToNextPageId(
+      const Slice& key, key_utils::KeyHead* base_key_prefix = nullptr) = 0;
 
   // Inserts a new mapping into the model (updates the page_id if the key
   // already exists).

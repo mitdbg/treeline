@@ -9,6 +9,8 @@
 namespace llsm {
 namespace key_utils {
 
+using KeyHead = uint64_t;
+
 // Returns the data pointed to by `p` as if it is a pointer to type `T`.
 //
 // The caller should ensure that the size of the buffer pointed to by `p` is at
@@ -55,7 +57,7 @@ static uint32_t ExtractHead(const uint8_t* key, unsigned key_length) {
 // system is little endian. Its purpose is to extract a prefix that can be used
 // for fast comparisons.
 template <class SliceKind>
-static uint64_t ExtractHead64(const SliceKind& key) {
+static KeyHead ExtractHead64(const SliceKind& key) {
   switch (key.size()) {
     case 0:
       return 0;
