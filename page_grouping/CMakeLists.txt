@@ -30,6 +30,8 @@ target_sources(pg PRIVATE
   rand_exp_backoff.h
   segment_builder.cc
   segment_builder.h
+  segment_index.cc
+  segment_index.h
   workspace.h
   ../bufmgr/page_memory_allocator.cc
   ../bufmgr/page_memory_allocator.h

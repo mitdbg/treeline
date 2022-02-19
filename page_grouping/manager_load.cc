@@ -150,7 +150,8 @@ void Manager::BulkLoadIntoSegmentsImpl(const std::vector<Record>& records) {
   }
 
   // Bulk load the index.
-  index_.bulk_load(segment_boundaries.begin(), segment_boundaries.end());
+  index_->BulkLoadFromEmpty(segment_boundaries.begin(),
+                            segment_boundaries.end());
 }
 
 Manager Manager::BulkLoadIntoPages(
@@ -173,7 +174,8 @@ void Manager::BulkLoadIntoPagesImpl(const std::vector<Record>& records) {
       LoadIntoNewPages(/*sequence_number=*/0, records.front().first,
                        std::numeric_limits<Key>::max(), records.begin(),
                        records.end());
-  index_.bulk_load(segment_boundaries.begin(), segment_boundaries.end());
+  index_->BulkLoadFromEmpty(segment_boundaries.begin(),
+                            segment_boundaries.end());
 }
 
 std::pair<Key, SegmentInfo> Manager::LoadIntoNewSegment(
