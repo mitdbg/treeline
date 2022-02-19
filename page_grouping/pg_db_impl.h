@@ -33,6 +33,7 @@ class PageGroupedDBImpl : public PageGroupedDB {
 
  private:
   void WriteBatch(const WriteOutBatch& records);
+  std::pair<Key,Key> GetPageBoundsFor(Key key);
 
   // After opening a "new" DB, this will be empty until `BulkLoad()` is called.
   // Otherwise this is always non-empty.

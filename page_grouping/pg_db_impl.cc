@@ -37,6 +37,8 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
       mgr_(std::move(mgr)),
       cache_(options.record_cache_capacity,
              std::bind(&PageGroupedDBImpl::WriteBatch, this,
+                       std::placeholders::_1),
+             std::bind(&PageGroupedDBImpl::GetPageBoundsFor, this,
                        std::placeholders::_1)) {}
 
 Status PageGroupedDBImpl::BulkLoad(const std::vector<Record>& records) {
@@ -174,6 +176,10 @@ void PageGroupedDBImpl::WriteBatch(const WriteOutBatch& records) {
               return left.first < right.first;
             });
   mgr_->PutBatch(reformatted);
+}
+
+std::pair<Key, Key> PageGroupedDBImpl::GetPageBoundsFor(Key key) {
+  return mgr_->GetPageBoundsFor(key);
 }
 
 }  // namespace pg
