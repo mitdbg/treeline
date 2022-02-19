@@ -124,16 +124,25 @@ class RecordCache {
   // Return a slice with the same contents as `art_key`.
   static Slice ARTKeyToSlice(const Key& art_key);
 
+  // Implements `GetRange` but adds private functionality to avoid locking a
+  // specific cache entry (used during writeout).
+  Status GetRangeImpl(const Slice& start_key, const Slice& end_key,
+                      std::vector<uint64_t>* indices_out,
+                      uint64_t* index_locked_already) const;
+
   // Selects a cache entry according to the chosen policy, and returns the
   // corresponding index into the `cache_entries` vector.
   uint64_t SelectForEviction();
 
   // Writes out the cache entry at `index`, if dirty, to the appropriate
-  // longer-term data structure. Returns true if the entry was dirty.
+  // longer-term data structure. If a write out takes place, also writes out
+  // all other cached dirty entries that correspond to the same page.
+  //
+  // Returns the number of dirty entries written out.
   //
   // The caller should ensure that it owns the mutex for the entry in question
   // (at least in non-exclusive mode).
-  bool WriteOutIfDirty(uint64_t index);
+  uint64_t WriteOutIfDirty(uint64_t index);
 
   // Frees the cache-owned copy of the record stored in the cache entry at
   // `index`, if the entry is valid. Returns true if the entry was valid.
