@@ -10,19 +10,24 @@ namespace llsm {
 // database.
 class BTreeModel : public Model {
  public:
-
   BTreeModel();
 
   // Uses the model to predict a page_id given a `key` that is within the
-  // correct range (lower bounds `key`).
-  PhysicalPageId KeyToPageId(const Slice& key);
-  PhysicalPageId KeyToPageId(const uint64_t key);
+  // correct range (lower bounds `key`). Optionally also returns
+  // the 8-byte prefix of the smallest key that maps to the same page.
+  PhysicalPageId KeyToPageId(const Slice& key,
+                             Slice* base_key_prefix = nullptr);
+  PhysicalPageId KeyToPageId(const uint64_t key,
+                             Slice* base_key_prefix = nullptr);
 
   // Uses the model to predict the page_id of the NEXT page given a `key` that
   // is within the correct range (upper bounds `key`). Returns an invalid
-  // page_id if no next page exists.
-  PhysicalPageId KeyToNextPageId(const Slice& key);
-  PhysicalPageId KeyToNextPageId(const uint64_t key);
+  // page_id if no next page exists. Optionally also returns
+  // the 8-byte prefix of the smallest key that maps to the same page.
+  PhysicalPageId KeyToNextPageId(const Slice& key,
+                                 Slice* base_key_prefix = nullptr);
+  PhysicalPageId KeyToNextPageId(const uint64_t key,
+                                 Slice* base_key_prefix = nullptr);
 
   // Inserts a new mapping into the model (updates the page_id if the key
   // already exists).

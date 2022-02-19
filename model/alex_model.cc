@@ -11,16 +11,20 @@ namespace llsm {
 
 // Uses the model to predict a page_id given a `key` that is within the
 // correct range (lower bounds `key`).
-PhysicalPageId ALEXModel::KeyToPageId(const Slice& key) {
-  return ALEXModel::KeyToPageId(key_utils::ExtractHead64(key));
+PhysicalPageId ALEXModel::KeyToPageId(const Slice& key,
+                                      Slice* base_key_prefix) {
+  return ALEXModel::KeyToPageId(key_utils::ExtractHead64(key), base_key_prefix);
 }
 
-PhysicalPageId ALEXModel::KeyToPageId(const uint64_t key) {
+PhysicalPageId ALEXModel::KeyToPageId(const uint64_t key,
+                                      Slice* base_key_prefix) {
   mutex_.lock_shared();
-  PhysicalPageId* page_id_ptr = index_.get_payload_last_no_greater_than(key);
-  PhysicalPageId page_id;
-  if (page_id_ptr != nullptr) {
-    page_id = *page_id_ptr;
+  auto it = index_.find_last_no_greater_than(key);
+  auto page_id = it.payload();
+  if (base_key_prefix != nullptr) {
+    // WARNING: HERE WE ASSUME KEYS OF AT LEAST 8 BYTES.
+    key_utils::IntKeyAsSlice ikas(it.key());
+    *base_key_prefix = ikas.as<Slice>();
   }
   mutex_.unlock_shared();
   return page_id;
@@ -29,16 +33,24 @@ PhysicalPageId ALEXModel::KeyToPageId(const uint64_t key) {
 // Uses the model to predict the page_id of the NEXT page given a `key` that
 // is within the correct range (upper bounds `key`). Returns an invalid
 // page_id if no next page exists.
-PhysicalPageId ALEXModel::KeyToNextPageId(const Slice& key) {
-  return ALEXModel::KeyToNextPageId(key_utils::ExtractHead64(key));
+PhysicalPageId ALEXModel::KeyToNextPageId(const Slice& key,
+                                          Slice* base_key_prefix) {
+  return ALEXModel::KeyToNextPageId(key_utils::ExtractHead64(key),
+                                    base_key_prefix);
 }
 
-PhysicalPageId ALEXModel::KeyToNextPageId(const uint64_t key) {
+PhysicalPageId ALEXModel::KeyToNextPageId(const uint64_t key,
+                                          Slice* base_key_prefix) {
   mutex_.lock_shared();
-  PhysicalPageId* page_id_ptr = index_.get_payload_upper_bound(key);
+  auto it = index_.upper_bound(key);
   PhysicalPageId page_id;
-  if (page_id_ptr != nullptr) {
-    page_id = *page_id_ptr;
+   if (it != index_.end()) {
+    page_id = it.payload();
+    if (base_key_prefix != nullptr) {
+      // WARNING: HERE WE ASSUME KEYS OF AT LEAST 8 BYTES.
+      key_utils::IntKeyAsSlice ikas(it.key());
+      *base_key_prefix = ikas.as<Slice>();
+    }
   }
   mutex_.unlock_shared();
   return page_id;
