@@ -55,6 +55,9 @@ class DBImpl : public DB {
   Status InitializeNewDB();
   Status InitializeExistingDB();
 
+  Status GetWithPage(const ReadOptions& options, const Slice& key,
+             std::string* value_out, PageBuffer* page_out = nullptr);
+
   // Records writes and deletes in the active `MemTable`. The `value` is ignored
   // if `write_type` is `WriteType::kDelete`.
   // This method is thread safe.
@@ -63,6 +66,11 @@ class DBImpl : public DB {
 
   // Writes the records in the batch to persistent storage.
   void WriteBatch(const WriteOutBatch& records);
+
+  // Gets the lower (inclusive) and upper (exclusive) bounds for the page that
+  // `key` should be placed on.
+  std::pair<key_utils::KeyHead, key_utils::KeyHead> GetPageBoundsFor(
+      key_utils::KeyHead key);
 
   // Will not be changed after `Initialize()` returns. The objects below are
   // thread safe; no additional mutual exclusion is required.

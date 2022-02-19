@@ -49,6 +49,11 @@ PhysicalPageId ALEXModel::KeyToNextPageId(const key_utils::KeyHead key,
       // WARNING: HERE WE ASSUME KEYS OF AT LEAST 8 BYTES.
       *base_key_prefix = it.key();
     }
+  } else {
+    if (base_key_prefix != nullptr) {
+      // WARNING: HERE WE ASSUME KEYS OF AT LEAST 8 BYTES.
+      *base_key_prefix = std::numeric_limits<key_utils::KeyHead>::max();
+    }
   }
   mutex_.unlock_shared();
   return page_id;

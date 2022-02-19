@@ -1,4 +1,3 @@
-#include "llsm/db.h"
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -8,9 +7,13 @@
 #include <random>
 #include <vector>
 
+#include "bufmgr/page_memory_allocator.h"
 #include "db/page.h"
 #include "gtest/gtest.h"
 #include "util/key.h"
+
+#define private public
+#include "db/db_impl.h"
 
 namespace {
 
@@ -1470,6 +1473,77 @@ TEST_F(DBTest, BulkLoadFailureModes) {
   // Fail 3: already several pages there
   status = db->BulkLoad(woptions, records);
   ASSERT_TRUE(status.IsNotSupportedError());
+}
+
+TEST_F(DBTest, PageBoundsConsistency) {
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 8;
+  constexpr size_t kRecordSize = kKeySize + kValueSize;
+
+  // Dummy value used for the records (8 byte key; record is 16B in total).
+  const std::string value(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kRecordSize;
+  options.key_hints.key_size = kKeySize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1;
+  // Generate records
+  options.key_hints.num_keys = 20 * options.key_hints.records_per_page();
+  options.record_cache_capacity = 1;
+
+  // Generate data used for the write (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write dummy data to the DB.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  std::string value_out;
+  llsm::PageBuffer page_out = llsm::PageMemoryAllocator::Allocate(1);
+
+  for (size_t i = 0; i < lexicographic_keys.size(); ++i) {
+    llsm::Slice key(reinterpret_cast<const char*>(&lexicographic_keys[i]),
+                    kKeySize);
+    status = static_cast<llsm::DBImpl*>(db)->GetWithPage(
+        llsm::ReadOptions(), key, &value_out, &page_out);
+    ASSERT_TRUE(status.ok());
+    ASSERT_EQ(value, value_out);
+
+    // Check that the page boundaries stored on disk are consistent with the
+    // ones computed from the model.
+    const llsm::key_utils::KeyHead stored_lower =
+        llsm::key_utils::ExtractHead64(
+            llsm::Page(page_out.get()).GetLowerBoundary());
+    const llsm::key_utils::KeyHead stored_upper =
+        llsm::key_utils::ExtractHead64(
+            llsm::Page(page_out.get()).GetUpperBoundary());
+
+    const auto [computed_lower, computed_upper] =
+        static_cast<llsm::DBImpl*>(db)->GetPageBoundsFor(
+            __builtin_bswap64(lexicographic_keys[i]));
+    /*std::cout << "Stored lower/upper: " << stored_lower << ", " << stored_upper
+              << std::endl;
+    std::cout << "Computed lower/upper: " << computed_lower << ", "
+              << computed_upper << std::endl;*/
+    ASSERT_EQ(computed_lower, stored_lower);
+    ASSERT_EQ(computed_upper, stored_upper);
+  }
 }
 
 }  // namespace

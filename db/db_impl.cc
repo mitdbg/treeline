@@ -135,7 +135,8 @@ Status DBImpl::InitializeNewDB() {
     }
     rec_cache_ = std::make_unique<RecordCache>(
         options_.record_cache_capacity,
-        std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1));
+        std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1),
+        std::bind(&DBImpl::GetPageBoundsFor, this, std::placeholders::_1));
 
     model_->PreallocateAndInitialize(buf_mgr_, records,
                                      options_.key_hints.records_per_page());
@@ -181,7 +182,8 @@ Status DBImpl::InitializeExistingDB() {
   }
   rec_cache_ = std::make_unique<RecordCache>(
       options_.record_cache_capacity,
-      std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1));
+      std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1),
+      std::bind(&DBImpl::GetPageBoundsFor, this, std::placeholders::_1));
 
   model_->ScanFilesAndInitialize(buf_mgr_);
   buf_mgr_->ClearStats();
@@ -263,6 +265,11 @@ DBImpl::~DBImpl() {
 // first).
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
                    std::string* value_out) {
+  return GetWithPage(options, key, value_out, nullptr);
+}
+
+Status DBImpl::GetWithPage(const ReadOptions& options, const Slice& key,
+                           std::string* value_out, PageBuffer* page_out) {
   // 1. Search the record cache.
   uint64_t cache_index;
   Status status =
@@ -294,7 +301,12 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   }
   bool incurred_io = false;
   bool incurred_multi_io = false;
-  PageBuffer local_page = PageMemoryAllocator::Allocate(1);
+  char* local_page;
+  if (page_out == nullptr) {
+    local_page = PageMemoryAllocator::Allocate(1).get();
+  } else {
+    local_page = (*page_out).get();
+  }
 
   while (next_link_exists) {
     next_link_exists = false;
@@ -308,7 +320,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
 
     // If found, copy locally to try caching records after unfixing.
     if (status.ok()) {
-      memcpy(local_page.get(), page.data().data(), Page::kSize);
+      memcpy(local_page, page.data().data(), Page::kSize);
     }
     // If not found & has overflow, keep searching.
     else if (status.IsNotFound() && page.HasOverflow()) {
@@ -328,7 +340,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     // Optionally, also cache records on the same page.
     // TODO: records in other links of the same chain?
     if (options_.optimistic_caching) {
-      Page page(local_page.get());
+      Page page(local_page);
       auto it = page.GetIterator();
       it.Seek(page.GetLowerBoundary());
 
@@ -391,7 +403,8 @@ Status DBImpl::BulkLoad(
   Page page(frame->GetData(), Slice(std::string(1, 0x00)),
             (records_per_page < records.size())
                 ? records.at(records_per_page).first
-                : Slice(""));
+                : key_utils::IntKeyAsSlice(std::numeric_limits<uint64_t>::max())
+                      .as<Slice>());
 
   // Allocate additional pages and insert records.
   page.Put(options, records[0].first, records[0].second);
@@ -401,10 +414,12 @@ Status DBImpl::BulkLoad(
       const PhysicalPageId page_id = buf_mgr_->GetFileManager()->AllocatePage();
       frame = &buf_mgr_->FixPage(page_id, /* exclusive = */ true,
                                  /* is_newly_allocated = */ true);
-      page = Page(frame->GetData(), records.at(i).first,
-                  (i + records_per_page < records.size())
-                      ? records.at(i + records_per_page).first
-                      : Slice(""));
+      page = Page(
+          frame->GetData(), records.at(i).first,
+          (i + records_per_page < records.size())
+              ? records.at(i + records_per_page).first
+              : key_utils::IntKeyAsSlice(std::numeric_limits<uint64_t>::max())
+                    .as<Slice>());
       model_->Insert(records.at(i).first, page_id);
     }
     page.Put(options, records[i].first, records[i].second);
@@ -545,6 +560,15 @@ void DBImpl::WriteBatch(const WriteOutBatch& records) {
   for (auto& bf : *chain) {
     buf_mgr_->UnfixPage(*bf, /* is_dirty = */ true);
   }
+}
+
+std::pair<key_utils::KeyHead, key_utils::KeyHead> DBImpl::GetPageBoundsFor(
+    key_utils::KeyHead key) {
+  key_utils::KeyHead lower;
+  key_utils::KeyHead upper;
+  model_->KeyToPageId(key, &lower);
+  model_->KeyToNextPageId(key, &upper);
+  return {lower, upper};
 }
 
 }  // namespace llsm
