@@ -27,8 +27,16 @@ class SegmentIndex {
 
   Entry SegmentForKey(const Key key) const;
   std::optional<Entry> NextSegmentForKey(const Key key) const;
+  std::vector<Entry> FindRewriteRegion(const Key segment_base) const;
 
   void SetSegmentOverflow(const Key key, bool overflow);
+
+  // Run `c` while holding an exclusive lock on the index.
+  template <typename Callable>
+  void RunExclusive(const Callable& c) {
+    std::unique_lock<std::shared_mutex> lock(mutex_);
+    c(index_);
+  }
 
   // Not intended for external use (used by the tests). Not thread safe.
   auto BeginIterator() const { return index_.begin(); }
