@@ -34,8 +34,9 @@ std::vector<SegmentIndex::Entry> SegmentIndex::FindRewriteRegion(
 
   const auto it = index_.lower_bound(segment_base);
   assert(it != index_.end());
-  std::vector<Entry> segments_to_rewrite;
+  std::vector<Entry> segments_to_rewrite = {*it};
 
+  // Scan backward.
   if (it != index_.begin()) {
     auto prev_it(it);
     while (true) {

@@ -146,6 +146,7 @@ void Manager::RewriteSegments(
   } else {
     segments_to_rewrite.emplace_back(index_->SegmentForKey(segment_base));
   }
+  assert(!segments_to_rewrite.empty());
 
   // 2. Load and merge the segments.
   //
