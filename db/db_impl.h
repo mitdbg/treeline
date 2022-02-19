@@ -62,8 +62,7 @@ class DBImpl : public DB {
                    const Slice& value, format::WriteType write_type);
 
   // Writes the records in the batch to persistent storage.
-  void WriteBatch(
-      const std::vector<std::tuple<Slice, Slice, format::WriteType>>& records);
+  void WriteBatch(const WriteOutBatch& records);
 
   // Will not be changed after `Initialize()` returns. The objects below are
   // thread safe; no additional mutual exclusion is required.

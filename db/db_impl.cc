@@ -443,8 +443,7 @@ Status DBImpl::WriteImpl(const WriteOptions& options, const Slice& key,
   return write_result;
 }
 
-void DBImpl::WriteBatch(
-    const std::vector<std::tuple<Slice, Slice, format::WriteType>>& records) {
+void DBImpl::WriteBatch(const WriteOutBatch& records) {
   // The approach below tries to keep an overflow chain fixed for as long as the
   // entries of `records` belong to it, while going through `records`
   // sequentially.

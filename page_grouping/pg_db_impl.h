@@ -32,8 +32,7 @@ class PageGroupedDBImpl : public PageGroupedDB {
       std::vector<std::pair<Key, std::string>>* results_out) override;
 
  private:
-  void WriteBatch(
-      const std::vector<std::tuple<Slice, Slice, format::WriteType>>& records);
+  void WriteBatch(const WriteOutBatch& records);
 
   // After opening a "new" DB, this will be empty until `BulkLoad()` is called.
   // Otherwise this is always non-empty.

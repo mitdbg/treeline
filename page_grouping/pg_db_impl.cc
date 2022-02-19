@@ -1,7 +1,7 @@
 #include "pg_db_impl.h"
 
-#include <cassert>
 #include <algorithm>
+#include <cassert>
 #include <functional>
 
 #include "util/key.h"
@@ -121,7 +121,8 @@ Status PageGroupedDBImpl::GetRange(
   size_t records_left = num_records;
   auto cache_it = indices.begin();
   auto disk_it = results.begin();
-  while (records_left > 0 && cache_it != indices.end() && disk_it != results.end()) {
+  while (records_left > 0 && cache_it != indices.end() &&
+         disk_it != results.end()) {
     auto& entry = RecordCache::cache_entries[*cache_it];
     const Key cache_record_key = key_utils::ExtractHead64(entry.GetKey());
     if (cache_record_key <= disk_it->first) {
@@ -157,8 +158,7 @@ Status PageGroupedDBImpl::GetRange(
   return Status::OK();
 }
 
-void PageGroupedDBImpl::WriteBatch(
-    const std::vector<std::tuple<Slice, Slice, format::WriteType>>& records) {
+void PageGroupedDBImpl::WriteBatch(const WriteOutBatch& records) {
   assert(mgr_.has_value());
   std::vector<std::pair<Key, Slice>> reformatted;
   reformatted.resize(records.size());

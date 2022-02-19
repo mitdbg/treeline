@@ -13,8 +13,11 @@
 #include "llsm/statistics.h"
 #include "llsm/status.h"
 #include "record_cache_entry.h"
+#include "util/key.h"
 
 namespace llsm {
+
+using WriteOutBatch = std::vector<std::tuple<Slice, Slice, format::WriteType>>;
 
 class RecordCache {
  private:
@@ -35,8 +38,13 @@ class RecordCache {
 
   // A function that should implement record write out functionality. We use
   // this to decouple the cache from the database's persistence logic.
-  using WriteOutFn = std::function<void(
-      const std::vector<std::tuple<Slice, Slice, format::WriteType>>&)>;
+  using WriteOutFn = std::function<void(const WriteOutBatch&)>;
+
+  // A function that should return the lower (inclusive) and upper (exclusive)
+  // bounds of the page that the argument should be placed on.
+  using KeyBoundsFn =
+      std::function<std::pair<key_utils::KeyHead, key_utils::KeyHead>(
+          key_utils::KeyHead)>;
 
   // Initializes a record cache in tandem with a database. `capacity` is
   // measured in the number of records.
@@ -44,7 +52,8 @@ class RecordCache {
   // The last argument can optionally be omitted when using a standalone
   // RecordCache. In that case, no persistence guarantees are provided, and data
   // will be lost when exceeding the size of the record cache.
-  RecordCache(uint64_t capacity, WriteOutFn write_out = WriteOutFn());
+  RecordCache(uint64_t capacity, WriteOutFn write_out = WriteOutFn(),
+              KeyBoundsFn key_bounds = KeyBoundsFn());
 
   // Destroys the record cache, after writing back any dirty records.
   ~RecordCache();
@@ -147,6 +156,12 @@ class RecordCache {
   // indicates that no persistence guarantees are provided (data will be lost
   // when exceeding the size of the record cache).
   WriteOutFn write_out_;
+
+  // The function to run to determine the range of keys that correspond to the
+  // same page as some key being written out from the cache. This member can be
+  // empty, in which case the cache will not attempt to write out additional
+  // records from the same page when writing out a dirty record.
+  KeyBoundsFn key_bounds_;
 
   // An index for the cache, using ART with optimistic lock coupling from
   // https://github.com/flode/ARTSynchronized/tree/master/OptimisticLockCoupling.

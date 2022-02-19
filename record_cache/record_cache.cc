@@ -6,8 +6,12 @@ namespace llsm {
 
 std::vector<RecordCacheEntry> RecordCache::cache_entries{};
 
-RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out)
-    : capacity_(capacity), clock_(0), write_out_(std::move(write_out)) {
+RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out,
+                         KeyBoundsFn key_bounds)
+    : capacity_(capacity),
+      clock_(0),
+      write_out_(std::move(write_out)),
+      key_bounds_(std::move(key_bounds_)) {
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
   cache_entries.resize(capacity_);
   ART_scan_size_ = kDefaultARTScanSize;
