@@ -302,8 +302,10 @@ Status DBImpl::GetWithPage(const ReadOptions& options, const Slice& key,
   bool incurred_io = false;
   bool incurred_multi_io = false;
   char* local_page;
+  PageBuffer buf;
   if (page_out == nullptr) {
-    local_page = PageMemoryAllocator::Allocate(1).get();
+    buf = PageMemoryAllocator::Allocate(1);
+    local_page = buf.get();
   } else {
     local_page = (*page_out).get();
   }
