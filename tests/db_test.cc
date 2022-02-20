@@ -1215,11 +1215,25 @@ TEST_F(DBTest, ReorgOverflowChain) {
   options.key_hints.key_step_size = 1;
   // Generate records that will all fit on 1 page.
   options.key_hints.num_keys = options.key_hints.records_per_page();
-  options.record_cache_capacity = options.key_hints.records_per_page();
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
       llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Generate data for enough additional writes to trigger overflow.
+  constexpr size_t kNumOverflows = 10;
+  llsm::KeyDistHints extra_key_hints;
+  extra_key_hints.page_fill_pct = 50;
+  extra_key_hints.record_size = kRecordSize;
+  extra_key_hints.key_size = kKeySize;
+  extra_key_hints.min_key = 1024;
+  extra_key_hints.key_step_size = 1;
+  extra_key_hints.num_keys = kNumOverflows * extra_key_hints.records_per_page();
+  const std::vector<uint64_t> extra_lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+
+  // Make cache large enough to hold everything.
+  options.record_cache_capacity = extra_key_hints.num_keys;
 
   // Open the DB.
   llsm::DB* db = nullptr;
@@ -1236,24 +1250,21 @@ TEST_F(DBTest, ReorgOverflowChain) {
     ASSERT_TRUE(status.ok());
   }
 
-  // Generate data for enough additional writes to trigger overflow.
-  constexpr size_t kNumOverflows = 10;
-  llsm::KeyDistHints extra_key_hints;
-  extra_key_hints.page_fill_pct = 50;
-  extra_key_hints.record_size = kRecordSize;
-  extra_key_hints.key_size = kKeySize;
-  extra_key_hints.min_key = 1024;
-  extra_key_hints.key_step_size = 1;
-  extra_key_hints.num_keys = kNumOverflows * extra_key_hints.records_per_page();
-  const std::vector<uint64_t> extra_lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+  // Flush the writes to the pages.
+  auto written_out =
+      static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  ASSERT_EQ(written_out, options.key_hints.records_per_page());
 
-  // Write dummy data to the DB (should cause overflow).
+  // Write additional dummy data to the DB.
   for (const auto& key_as_int : extra_lexicographic_keys) {
     llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
+
+  // Flush the writes to the pages (should cause overflow).
+  written_out = static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  ASSERT_EQ(written_out, options.record_cache_capacity);
 
   // Read all keys from new pages
   std::string value_out;
@@ -1277,7 +1288,7 @@ TEST_F(DBTest, ReorgOverflowChain) {
   // This is because reads will block for as long as a reorganization on the
   // page they want to access (the only "old" non-overflow page in this context)
   // is going on.
-  ASSERT_EQ(db->GetNumIndexedPages(), kNumOverflows - 1);
+  ASSERT_EQ(db->GetNumIndexedPages(), kNumOverflows + 1);
 
   delete db;
   db = nullptr;
@@ -1301,11 +1312,25 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   options.key_hints.key_step_size = 1;
   // Generate records that will all fit on 1 page.
   options.key_hints.num_keys = options.key_hints.records_per_page();
-  options.record_cache_capacity = options.key_hints.records_per_page();
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
       llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Generate data for enough additional writes to trigger overflow.
+  constexpr size_t kNumOverflows = 10;
+  llsm::KeyDistHints extra_key_hints;
+  extra_key_hints.page_fill_pct = 50;
+  extra_key_hints.record_size = kRecordSize;
+  extra_key_hints.key_size = kKeySize;
+  extra_key_hints.min_key = 1024;
+  extra_key_hints.key_step_size = 1;
+  extra_key_hints.num_keys = kNumOverflows * extra_key_hints.records_per_page();
+  const std::vector<uint64_t> extra_lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+
+  // Make cache large enough to hold everything.
+  options.record_cache_capacity = extra_key_hints.num_keys;
 
   // Open the DB.
   llsm::DB* db = nullptr;
@@ -1323,24 +1348,21 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
     ASSERT_TRUE(status.ok());
   }
 
-  // Generate data for enough additional writes to trigger overflow.
-  constexpr size_t kNumOverflows = 10;
-  llsm::KeyDistHints extra_key_hints;
-  extra_key_hints.page_fill_pct = 50;
-  extra_key_hints.record_size = kRecordSize;
-  extra_key_hints.key_size = kKeySize;
-  extra_key_hints.min_key = 1024;
-  extra_key_hints.key_step_size = 1;
-  extra_key_hints.num_keys = kNumOverflows * extra_key_hints.records_per_page();
-  const std::vector<uint64_t> extra_lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+  // Flush the writes to the pages.
+  auto written_out =
+      static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  ASSERT_EQ(written_out, options.key_hints.records_per_page());
 
-  // Write dummy data to the DB (should cause overflow).
+  // Write additional dummy data to the DB.
   for (const auto& key_as_int : extra_lexicographic_keys) {
     llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
+
+  // Flush the writes to the pages (should cause overflow).
+  written_out = static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  ASSERT_EQ(written_out, options.record_cache_capacity);
 
   // Read all keys from new pages
   std::string value_out;
@@ -1364,7 +1386,7 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   // This is because reads will block for as long as a reorganization on the
   // page they want to access (the only "old" non-overflow page in this context)
   // is going on.
-  ASSERT_EQ(db->GetNumIndexedPages(), kNumOverflows - 1);
+  ASSERT_EQ(db->GetNumIndexedPages(), kNumOverflows + 1);
 
   delete db;
   db = nullptr;
