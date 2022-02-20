@@ -2,13 +2,44 @@
 
 #include <algorithm>
 
+#include "rand_exp_backoff.h"
+
+namespace {
+
+constexpr uint32_t kBackoffSaturate = 12;
+
+}  // namespace
+
 namespace llsm {
 namespace pg {
+
+SegmentIndex::SegmentIndex(std::shared_ptr<LockManager> lock_manager)
+    : lock_manager_(std::move(lock_manager)) {
+  assert(lock_manager_ != nullptr);
+}
 
 SegmentIndex::Entry SegmentIndex::SegmentForKey(const Key key) const {
   std::shared_lock<std::shared_mutex> lock(mutex_);
   // Return a copy.
   return SegmentForKeyImpl(key);
+}
+
+SegmentIndex::Entry SegmentIndex::SegmentForKeyWithLock(
+    const Key key, LockManager::SegmentMode mode) const {
+  RandExpBackoff backoff(kBackoffSaturate);
+  while (true) {
+    {
+      std::shared_lock<std::shared_mutex> lock(mutex_);
+      auto& entry = SegmentForKeyImpl(key);
+      const bool lock_granted =
+          lock_manager_->TryAcquireSegmentLock(entry.second.id(), mode);
+      if (lock_granted) {
+        // Returns a copy.
+        return entry;
+      }
+    }
+    backoff.Wait();
+  }
 }
 
 std::optional<SegmentIndex::Entry> SegmentIndex::NextSegmentForKey(

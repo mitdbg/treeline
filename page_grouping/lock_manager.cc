@@ -4,6 +4,12 @@
 
 #include "rand_exp_backoff.h"
 
+namespace {
+
+constexpr uint32_t kBackoffSaturate = 12;
+
+}
+
 namespace llsm {
 namespace pg {
 
@@ -103,7 +109,7 @@ void LockManager::UpgradeSegmentLockToReorgExclusive(const SegmentId& seg_id) {
 
   // Spin wait until the readers are done.
   if (!can_return) {
-    RandExpBackoff backoff(12);
+    RandExpBackoff backoff(kBackoffSaturate);
     while (!can_return) {
       backoff.Wait();
       const bool found = segment_locks_.find_fn(
@@ -145,6 +151,17 @@ bool LockManager::TryAcquirePageLock(const SegmentId& seg_id,
       },
       requested_mode);
   return inserted_new || granted;
+}
+
+void LockManager::AcquirePageLock(const SegmentId& seg_id,
+                                  const size_t page_idx,
+                                  const PageMode requested_mode) {
+  RandExpBackoff backoff(kBackoffSaturate);
+  while (true) {
+    const bool granted = TryAcquirePageLock(seg_id, page_idx, requested_mode);
+    if (granted) return;
+    backoff.Wait();
+  }
 }
 
 void LockManager::ReleasePageLock(const SegmentId& seg_id,

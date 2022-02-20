@@ -11,6 +11,7 @@
 #include "llsm/pg_options.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
+#include "lock_manager.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
 #include "segment_index.h"
@@ -136,6 +137,7 @@ class Manager {
       std::vector<Record>::const_iterator rec_end);
 
   std::filesystem::path db_path_;
+  std::shared_ptr<LockManager> lock_manager_;
   std::unique_ptr<SegmentIndex> index_;
   std::vector<SegmentFile> segment_files_;
   uint32_t next_sequence_number_;
