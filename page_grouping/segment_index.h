@@ -36,6 +36,21 @@ class SegmentIndex {
   Entry SegmentForKeyWithLock(const Key key,
                               LockManager::SegmentMode mode) const;
 
+  // Atomically retrieves the segment that logically follows the segment that is
+  // responsible for `key` and acquires a lock on that segment if it exists.
+  // This method is only meant to be used for acquiring locks with the
+  // `kPageRead` and `kPageWrite` modes.
+  //
+  // If the returned optional is non-empty, then the caller will hold a lock on
+  // the segment in the requested mode. The caller is responsible for later
+  // releasing the lock.
+  //
+  // If the returned optional is empty, it indicates that there is no "logically
+  // next" segment (i.e., the segment that holds `key` is the last segment in
+  // the DB).
+  std::optional<Entry> NextSegmentForKeyWithLock(
+      const Key key, LockManager::SegmentMode mode) const;
+
   Entry SegmentForKey(const Key key) const;
   std::optional<Entry> NextSegmentForKey(const Key key) const;
   std::vector<Entry> FindRewriteRegion(const Key segment_base) const;

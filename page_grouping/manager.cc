@@ -20,6 +20,9 @@ namespace fs = std::filesystem;
 namespace llsm {
 namespace pg {
 
+using SegmentMode = LockManager::SegmentMode;
+using PageMode = LockManager::PageMode;
+
 thread_local Workspace Manager::w_;
 const std::string Manager::kSegmentFilePrefix = "sf-";
 
@@ -132,12 +135,11 @@ std::pair<Status, std::vector<pg::Page>> Manager::GetWithPages(
 
   // 1. Find the segment that should hold the key.
   const auto [base_key, sinfo] =
-      index_->SegmentForKeyWithLock(key, LockManager::SegmentMode::kPageRead);
+      index_->SegmentForKeyWithLock(key, SegmentMode::kPageRead);
 
   // 2. Figure out the page offset, lock the page, and then read it in.
   const size_t page_idx = sinfo.PageForKey(base_key, key);
-  lock_manager_->AcquirePageLock(sinfo.id(), page_idx,
-                                 LockManager::PageMode::kShared);
+  lock_manager_->AcquirePageLock(sinfo.id(), page_idx, PageMode::kShared);
   ReadPage(sinfo.id(), page_idx, main_page_buf);
 
   // 3. Search for the record on the page.
@@ -145,20 +147,16 @@ std::pair<Status, std::vector<pg::Page>> Manager::GetWithPages(
   key_utils::IntKeyAsSlice key_slice(key);
   auto status = main_page.Get(key_slice.as<Slice>(), value_out);
   if (status.ok()) {
-    lock_manager_->ReleasePageLock(sinfo.id(), page_idx,
-                                   LockManager::PageMode::kShared);
-    lock_manager_->ReleaseSegmentLock(sinfo.id(),
-                                      LockManager::SegmentMode::kPageRead);
+    lock_manager_->ReleasePageLock(sinfo.id(), page_idx, PageMode::kShared);
+    lock_manager_->ReleaseSegmentLock(sinfo.id(), SegmentMode::kPageRead);
     return {status, {main_page}};
   }
 
   // 4. Check the overflow page if it exists.
   // TODO: We always assume at most 1 overflow page.
   if (!main_page.HasOverflow()) {
-    lock_manager_->ReleasePageLock(sinfo.id(), page_idx,
-                                   LockManager::PageMode::kShared);
-    lock_manager_->ReleaseSegmentLock(sinfo.id(),
-                                      LockManager::SegmentMode::kPageRead);
+    lock_manager_->ReleasePageLock(sinfo.id(), page_idx, PageMode::kShared);
+    lock_manager_->ReleaseSegmentLock(sinfo.id(), SegmentMode::kPageRead);
     return {Status::NotFound("Record does not exist."), {main_page}};
   }
   const SegmentId overflow_id = main_page.GetOverflow();
@@ -168,10 +166,8 @@ std::pair<Status, std::vector<pg::Page>> Manager::GetWithPages(
   pg::Page overflow_page(overflow_page_buf);
   status = overflow_page.Get(key_slice.as<Slice>(), value_out);
 
-  lock_manager_->ReleasePageLock(sinfo.id(), page_idx,
-                                  LockManager::PageMode::kShared);
-  lock_manager_->ReleaseSegmentLock(sinfo.id(),
-                                    LockManager::SegmentMode::kPageRead);
+  lock_manager_->ReleasePageLock(sinfo.id(), page_idx, PageMode::kShared);
+  lock_manager_->ReleaseSegmentLock(sinfo.id(), SegmentMode::kPageRead);
   return {status, {main_page, overflow_page}};
 }
 

@@ -53,6 +53,27 @@ std::optional<SegmentIndex::Entry> SegmentIndex::NextSegmentForKey(
   return *it;
 }
 
+std::optional<SegmentIndex::Entry> SegmentIndex::NextSegmentForKeyWithLock(
+    const Key key, LockManager::SegmentMode mode) const {
+  RandExpBackoff backoff(kBackoffSaturate);
+  while (true) {
+    {
+      std::shared_lock<std::shared_mutex> lock(mutex_);
+      const auto it = index_.upper_bound(key);
+      if (it == index_.end()) {
+        return std::optional<Entry>();
+      }
+      const bool lock_granted =
+          lock_manager_->TryAcquireSegmentLock(it->second.id(), mode);
+      if (lock_granted) {
+        // Returns a copy.
+        return *it;
+      }
+    }
+    backoff.Wait();
+  }
+}
+
 void SegmentIndex::SetSegmentOverflow(const Key key, bool overflow) {
   std::unique_lock<std::shared_mutex> lock(mutex_);
   auto& entry = SegmentForKeyImpl(key);
