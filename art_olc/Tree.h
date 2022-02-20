@@ -4,6 +4,8 @@
 
 #ifndef ART_OPTIMISTICLOCK_COUPLING_N_H
 #define ART_OPTIMISTICLOCK_COUPLING_N_H
+#include <optional>
+
 #include "N.h"
 #include "record_cache/record_cache_entry.h"
 
@@ -72,10 +74,12 @@ class Tree {
                    std::size_t& resultCount,
                    ThreadInfo& threadEpocheInfo) const;
 
-  bool lookupRange(const Key& start, TID result[], std::size_t resultLen,
-                   std::size_t& resultCount, ThreadInfo& threadEpocheInfo,
-                   std::vector<llsm::RecordCacheEntry>* cache_entries = nullptr,
-                   Key* continueKey = nullptr, uint64_t* index_locked_already = nullptr) const;
+  bool lookupRange(
+      const Key& start, TID result[], std::size_t resultLen,
+      std::size_t& resultCount, ThreadInfo& threadEpocheInfo,
+      std::vector<llsm::RecordCacheEntry>* cache_entries = nullptr,
+      Key* continueKey = nullptr,
+      std::optional<uint64_t> index_locked_already = std::nullopt) const;
 
   void insert(const Key& k, TID tid, ThreadInfo& epocheInfo);
 

@@ -336,12 +336,13 @@ restart:
 bool Tree::lookupRange(const Key& start, TID result[], std::size_t resultSize,
                        std::size_t& resultsFound, ThreadInfo& threadEpocheInfo,
                        std::vector<llsm::RecordCacheEntry>* cache_entries,
-                       Key* continueKey, uint64_t* index_locked_already) const {
+                       Key* continueKey,
+                       std::optional<uint64_t> index_locked_already) const {
   EpocheGuard epocheGuard(threadEpocheInfo);
   TID toContinue = 0;
   std::function<void(const N*)> copy = [&result, &resultSize, &resultsFound,
                                         &toContinue, &copy, cache_entries,
-                                        index_locked_already](const N* node) {
+                                        &index_locked_already](const N* node) {
     if (N::isLeaf(node)) {
       if (resultsFound == resultSize) {
         toContinue = N::getLeaf(node);
@@ -350,7 +351,8 @@ bool Tree::lookupRange(const Key& start, TID result[], std::size_t resultSize,
       result[resultsFound] = N::getLeaf(node);
       if (cache_entries != nullptr) {
         auto index = result[resultsFound] - 1;
-        if (index_locked_already == nullptr || *index_locked_already != index)
+        if (!index_locked_already.has_value() ||
+            index_locked_already.value() != index)
           cache_entries->at(index).Lock(/*exclusive = */ false);
         cache_entries->at(index).IncrementPriority();
       }

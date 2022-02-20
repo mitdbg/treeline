@@ -155,12 +155,13 @@ Status RecordCache::GetRange(const Slice& start_key, size_t num_records,
 
 Status RecordCache::GetRange(const Slice& start_key, const Slice& end_key,
                              std::vector<uint64_t>* indices_out) const {
-  return GetRangeImpl(start_key, end_key, indices_out, nullptr);
+  return GetRangeImpl(start_key, end_key, indices_out);
 }
 
-Status RecordCache::GetRangeImpl(const Slice& start_key, const Slice& end_key,
-                                 std::vector<uint64_t>* indices_out,
-                                 uint64_t* index_locked_already) const {
+Status RecordCache::GetRangeImpl(
+    const Slice& start_key, const Slice& end_key,
+    std::vector<uint64_t>* indices_out,
+    std::optional<uint64_t> index_locked_already) const {
   Key start_art_key;
   SliceToARTKey(start_key, start_art_key);
   auto t = tree_->getThreadInfo();
@@ -291,7 +292,7 @@ uint64_t RecordCache::WriteOutIfDirty(uint64_t index) {
         key_bounds_(llsm::key_utils::ExtractHead64(key));
     Status s = GetRangeImpl(key_utils::IntKeyAsSlice(lower_bound).as<Slice>(),
                             key_utils::IntKeyAsSlice(upper_bound).as<Slice>(),
-                            &indices, &index);
+                            &indices, index);
     for (auto& idx : indices) {
       entry = &cache_entries[idx];
       if (entry->IsDirty()) {

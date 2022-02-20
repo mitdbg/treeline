@@ -132,9 +132,10 @@ class RecordCache {
 
   // Implements `GetRange` but adds private functionality to avoid locking a
   // specific cache entry (used during writeout).
-  Status GetRangeImpl(const Slice& start_key, const Slice& end_key,
-                      std::vector<uint64_t>* indices_out,
-                      uint64_t* index_locked_already) const;
+  Status GetRangeImpl(
+      const Slice& start_key, const Slice& end_key,
+      std::vector<uint64_t>* indices_out,
+      std::optional<uint64_t> index_locked_already = std::nullopt) const;
 
   // Selects a cache entry according to the chosen policy, and returns the
   // corresponding index into the `cache_entries` vector.
