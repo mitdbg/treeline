@@ -20,10 +20,11 @@ bool EqualTimespec(const timespec& lhs, const timespec& rhs) {
 
 class DBTest : public testing::Test {
  public:
-  DBTest() : kDBDir("/tmp/llsm-test") {}
+  DBTest()
+      : kDBDir("/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-test") {}
   void SetUp() override {
     std::filesystem::remove_all(kDBDir);
-    std::filesystem::create_directory(kDBDir);
+    std::filesystem::create_directories(kDBDir);
   }
   void TearDown() override { std::filesystem::remove_all(kDBDir); }
 

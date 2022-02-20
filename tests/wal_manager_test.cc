@@ -15,11 +15,12 @@ namespace fs = std::filesystem;
 
 class WALManagerTest : public testing::Test {
  public:
-  WALManagerTest() : kWALDir("/tmp/llsm-wal") {}
+  WALManagerTest()
+      : kWALDir("/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-wal") {}
 
   void SetUp() override {
     fs::remove_all(kWALDir);
-    fs::create_directory(kWALDir);
+    fs::create_directories(kWALDir);
   }
 
   void TearDown() override { fs::remove_all(kWALDir); }

@@ -24,7 +24,8 @@ namespace fs = std::filesystem;
 using namespace llsm;
 using namespace llsm::wal;
 
-const std::string kTestDir = "/tmp/llsm-test";
+const std::string kTestDir =
+    "/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-test";
 const std::string kTestLogFile = kTestDir + "/test.wal";
 
 // Construct a string of the specified length made out of the supplied
@@ -51,7 +52,7 @@ class WALTest : public testing::Test {
   WALTest() : reading_(false), writer_(), reader_(), log_fd_(-1) {}
 
   void SetUp() override {
-    fs::create_directory(kTestDir);
+    fs::create_directories(kTestDir);
     writer_.reset(new Writer(kTestLogFile));
     reader_.reset(new Reader(kTestLogFile, &report_, /*checksum=*/true,
                              /*initial_offset=*/0));

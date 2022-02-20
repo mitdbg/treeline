@@ -15,10 +15,12 @@ using namespace llsm::pg;
 
 class PGDBTest : public testing::Test {
  public:
-  PGDBTest() : kDBDir("/tmp/pg-llsm-test") {}
+  PGDBTest()
+      : kDBDir("/tmp/" + std::to_string(std::time(nullptr)) + "/pg-llsm-test") {
+  }
   void SetUp() override {
     std::filesystem::remove_all(kDBDir);
-    std::filesystem::create_directory(kDBDir);
+    std::filesystem::create_directories(kDBDir);
   }
   void TearDown() override { std::filesystem::remove_all(kDBDir); }
 

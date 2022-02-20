@@ -17,9 +17,10 @@ using namespace llsm;
 // *** Tests ***
 
 TEST(FileManagerTest, FileConstruction) {
-  const std::string dbpath = "/tmp/llsm-filemgr-test";
+  const std::string dbpath =
+      "/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-filemgr-test";
   std::filesystem::remove_all(dbpath);
-  std::filesystem::create_directory(dbpath);
+  std::filesystem::create_directories(dbpath);
 
   // Create data.
   KeyDistHints key_hints;
@@ -42,9 +43,10 @@ TEST(FileManagerTest, FileConstruction) {
 }
 
 TEST(FileManagerTest, WriteReadSequential) {
-  const std::string dbpath = "/tmp/llsm-filemgr-test";
+  const std::string dbpath =
+      "/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-filemgr-test";
   std::filesystem::remove_all(dbpath);
-  std::filesystem::create_directory(dbpath);
+  std::filesystem::create_directories(dbpath);
 
   // Create data.
   KeyDistHints key_hints;

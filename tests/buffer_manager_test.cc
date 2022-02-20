@@ -1,5 +1,6 @@
 #include "bufmgr/buffer_manager.h"
 
+#include <ctime>
 #include <filesystem>
 #include <memory>
 #include <vector>
@@ -25,9 +26,10 @@ TEST(BufferManagerTest, CreateValues) {
 }
 
 TEST(BufferManagerTest, WriteReadSequential) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-bufmgr-test";
   std::filesystem::remove_all(dbname);
-  std::filesystem::create_directory(dbname);
+  std::filesystem::create_directories(dbname);
 
   // Create data.
   KeyDistHints key_hints;
@@ -67,9 +69,10 @@ TEST(BufferManagerTest, WriteReadSequential) {
 }
 
 TEST(BufferManagerTest, FlushDirty) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-bufmgr-test";
   std::filesystem::remove_all(dbname);
-  std::filesystem::create_directory(dbname);
+  std::filesystem::create_directories(dbname);
 
   // Create data.
   KeyDistHints key_hints;
@@ -118,9 +121,10 @@ TEST(BufferManagerTest, FlushDirty) {
 }
 
 TEST(BufferManagerTest, Contains) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-bufmgr-test";
   std::filesystem::remove_all(dbname);
-  std::filesystem::create_directory(dbname);
+  std::filesystem::create_directories(dbname);
 
   // Create data.
   KeyDistHints key_hints;
@@ -166,9 +170,10 @@ TEST(BufferManagerTest, Contains) {
 }
 
 TEST(BufferManagerTest, IncreaseNumPages) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-bufmgr-test";
   std::filesystem::remove_all(dbname);
-  std::filesystem::create_directory(dbname);
+  std::filesystem::create_directories(dbname);
 
   // Create data and model
   KeyDistHints key_hints;
@@ -219,9 +224,10 @@ TEST(BufferManagerTest, IncreaseNumPages) {
 }
 
 TEST(BufferManagerTest, DecreaseNumPages) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-bufmgr-test";
   std::filesystem::remove_all(dbname);
-  std::filesystem::create_directory(dbname);
+  std::filesystem::create_directories(dbname);
 
   // Create data and model
   KeyDistHints key_hints;
@@ -282,9 +288,10 @@ TEST(BufferManagerTest, DecreaseNumPages) {
 }
 
 TEST(BufferManagerTest, FixPageIfFrameAvailable) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-bufmgr-test";
   std::filesystem::remove_all(dbname);
-  std::filesystem::create_directory(dbname);
+  std::filesystem::create_directories(dbname);
 
   // Create buffer manager with 2 pages.
   BufMgrOptions bm_options;
