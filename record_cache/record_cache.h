@@ -106,8 +106,14 @@ class RecordCache {
                   std::vector<uint64_t>* indices_out) const;
 
   // Writes out all dirty cache entries to the appropriate longer-term data
-  // structure.
+  // structure. Returns the number of dirty entries written out.
   uint64_t WriteOutDirty();
+
+  // Clears the cache: any clean cache records are deleted and any dirty cached
+  // records are optionally written out based on `write_out_dirty` and then also
+  // deleted. The eviction clock is reset to 0. Returns the number of dirty
+  // entries written out.
+  uint64_t ClearCache(bool write_out_dirty = true);
 
  private:
   // The maximum size of each ART sub-scan when using GetRange() with `end_key`.
