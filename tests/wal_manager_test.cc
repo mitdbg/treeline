@@ -15,7 +15,8 @@ namespace fs = std::filesystem;
 
 class WALManagerTest : public testing::Test {
  public:
-  WALManagerTest() : kWALDir("/tmp/llsm-wal") {}
+  WALManagerTest()
+      : kWALDir("/tmp/llsm-wal-" + std::to_string(std::time(nullptr))) {}
 
   void SetUp() override {
     fs::remove_all(kWALDir);

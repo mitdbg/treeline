@@ -24,7 +24,8 @@ namespace fs = std::filesystem;
 using namespace llsm;
 using namespace llsm::wal;
 
-const std::string kTestDir = "/tmp/llsm-test";
+const std::string kTestDir =
+    "/tmp/llsm-test-" + std::to_string(std::time(nullptr));
 const std::string kTestLogFile = kTestDir + "/test.wal";
 
 // Construct a string of the specified length made out of the supplied

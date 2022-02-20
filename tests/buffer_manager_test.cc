@@ -1,5 +1,6 @@
 #include "bufmgr/buffer_manager.h"
 
+#include <ctime>
 #include <filesystem>
 #include <memory>
 #include <vector>
@@ -25,7 +26,8 @@ TEST(BufferManagerTest, CreateValues) {
 }
 
 TEST(BufferManagerTest, WriteReadSequential) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 
@@ -67,7 +69,8 @@ TEST(BufferManagerTest, WriteReadSequential) {
 }
 
 TEST(BufferManagerTest, FlushDirty) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 
@@ -118,10 +121,10 @@ TEST(BufferManagerTest, FlushDirty) {
 }
 
 TEST(BufferManagerTest, Contains) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
-
   // Create data.
   KeyDistHints key_hints;
   key_hints.record_size = 512;
@@ -166,7 +169,8 @@ TEST(BufferManagerTest, Contains) {
 }
 
 TEST(BufferManagerTest, IncreaseNumPages) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 
@@ -219,7 +223,8 @@ TEST(BufferManagerTest, IncreaseNumPages) {
 }
 
 TEST(BufferManagerTest, DecreaseNumPages) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 
@@ -282,7 +287,8 @@ TEST(BufferManagerTest, DecreaseNumPages) {
 }
 
 TEST(BufferManagerTest, FixPageIfFrameAvailable) {
-  const std::string dbname = "/tmp/llsm-bufmgr-test";
+  const std::string dbname =
+      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 
