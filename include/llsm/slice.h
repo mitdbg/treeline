@@ -22,6 +22,12 @@
 
 namespace llsm {
 
+namespace key_utils {
+// 8-byte prefix of a key, with bytes switched appropriately to maintain
+// `Slice` sort order when comparing `KeyHead`s.
+using KeyHead = uint64_t;
+}  // namespace key_utils
+
 class Slice {
  public:
   // Create an empty slice.

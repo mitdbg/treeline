@@ -9,8 +9,6 @@
 namespace llsm {
 namespace key_utils {
 
-using KeyHead = uint64_t;
-
 // Returns the data pointed to by `p` as if it is a pointer to type `T`.
 //
 // The caller should ensure that the size of the buffer pointed to by `p` is at

@@ -7,7 +7,6 @@
 #include "llsm/pg_options.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
-#include "util/key.h"
 
 namespace llsm {
 namespace pg {
