@@ -56,6 +56,10 @@ TEST(PGLockManagerTest, PageLockDistinct) {
   ASSERT_FALSE(
       m.TryAcquirePageLock(sid, page1, LockManager::PageMode::kShared));
   ASSERT_TRUE(m.TryAcquirePageLock(sid, page2, LockManager::PageMode::kShared));
+
+  m.ReleasePageLock(sid, page2, LockManager::PageMode::kShared);
+  m.ReleasePageLock(sid, page2, LockManager::PageMode::kShared);
+  m.ReleasePageLock(sid, page1, LockManager::PageMode::kExclusive);
 }
 
 TEST(PGLockManagerTest, SegmentLockCompatibility) {
@@ -184,7 +188,7 @@ TEST(PGLockManagerTest, SegmentLockDistinct) {
   LockManager m;
   const SegmentId sid1(0, 0), sid2(0, 16);
 
-  // Locks for distinct pages should not affect each other.
+  // Locks for distinct segments should not affect each other.
   ASSERT_TRUE(m.TryAcquireSegmentLock(sid1, LockManager::SegmentMode::kReorg));
   ASSERT_TRUE(m.TryAcquireSegmentLock(sid2, LockManager::SegmentMode::kPageWrite));
 
@@ -197,6 +201,11 @@ TEST(PGLockManagerTest, SegmentLockDistinct) {
 
   ASSERT_TRUE(m.TryAcquireSegmentLock(sid1, LockManager::SegmentMode::kPageRead));
   ASSERT_TRUE(m.TryAcquireSegmentLock(sid2, LockManager::SegmentMode::kPageRead));
+
+  m.ReleaseSegmentLock(sid1, LockManager::SegmentMode::kPageRead);
+  m.ReleaseSegmentLock(sid1, LockManager::SegmentMode::kReorg);
+  m.ReleaseSegmentLock(sid2, LockManager::SegmentMode::kPageRead);
+  m.ReleaseSegmentLock(sid2, LockManager::SegmentMode::kPageWrite);
 }
 
 }  // namespace
