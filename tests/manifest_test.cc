@@ -16,11 +16,11 @@ namespace fs = std::filesystem;
 class ManifestTest : public testing::Test {
  public:
   const fs::path kManifestFile =
-      "/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-test/MANIFEST";
+      "/tmp/llsm-test/MANIFEST-" + std::to_string(std::time(nullptr));
 
   void SetUp() override {
     fs::remove_all(kManifestFile.parent_path());
-    fs::create_directories(kManifestFile.parent_path());
+    fs::create_directory(kManifestFile.parent_path());
   }
 
   void TearDown() override { fs::remove_all(kManifestFile.parent_path()); }

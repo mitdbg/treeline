@@ -20,11 +20,10 @@ namespace {
 class PGManagerTest : public testing::Test {
  public:
   PGManagerTest()
-      : kDBDir("/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-pg-test") {
-  }
+      : kDBDir("/tmp/llsm-pg-test-" + std::to_string(std::time(nullptr))) {}
   void SetUp() override {
     std::filesystem::remove_all(kDBDir);
-    std::filesystem::create_directories(kDBDir);
+    std::filesystem::create_directory(kDBDir);
   }
   void TearDown() override { std::filesystem::remove_all(kDBDir); }
 
@@ -616,7 +615,7 @@ TEST_F(PGManagerTest, PageBoundsConsistency) {
 
   // Check newly loaded DB that uses single-page segments only.
   std::filesystem::remove_all(kDBDir);
-  std::filesystem::create_directories(kDBDir);
+  std::filesystem::create_directory(kDBDir);
   options.use_segments = false;
   {
     Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);

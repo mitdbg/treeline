@@ -20,11 +20,10 @@ using namespace llsm::pg;
 class PGManagerRewriteTest : public testing::Test {
  public:
   PGManagerRewriteTest()
-      : kDBDir("/tmp/" + std::to_string(std::time(nullptr)) + "/llsm-pg-test") {
-  }
+      : kDBDir("/tmp/llsm-pg-test-" + std::to_string(std::time(nullptr))) {}
   void SetUp() override {
     std::filesystem::remove_all(kDBDir);
-    std::filesystem::create_directories(kDBDir);
+    std::filesystem::create_directory(kDBDir);
   }
   void TearDown() override { std::filesystem::remove_all(kDBDir); }
 
