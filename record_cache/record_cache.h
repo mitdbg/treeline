@@ -13,8 +13,11 @@
 #include "llsm/statistics.h"
 #include "llsm/status.h"
 #include "record_cache_entry.h"
+#include "util/key.h"
 
 namespace llsm {
+
+using WriteOutBatch = std::vector<std::tuple<Slice, Slice, format::WriteType>>;
 
 class RecordCache {
  private:
@@ -35,8 +38,13 @@ class RecordCache {
 
   // A function that should implement record write out functionality. We use
   // this to decouple the cache from the database's persistence logic.
-  using WriteOutFn = std::function<void(
-      const std::vector<std::tuple<Slice, Slice, format::WriteType>>&)>;
+  using WriteOutFn = std::function<void(const WriteOutBatch&)>;
+
+  // A function that should return the lower (inclusive) and upper (exclusive)
+  // bounds of the page that the argument should be placed on.
+  using KeyBoundsFn =
+      std::function<std::pair<key_utils::KeyHead, key_utils::KeyHead>(
+          key_utils::KeyHead)>;
 
   // Initializes a record cache in tandem with a database. `capacity` is
   // measured in the number of records.
@@ -44,7 +52,8 @@ class RecordCache {
   // The last argument can optionally be omitted when using a standalone
   // RecordCache. In that case, no persistence guarantees are provided, and data
   // will be lost when exceeding the size of the record cache.
-  RecordCache(uint64_t capacity, WriteOutFn write_out = WriteOutFn());
+  RecordCache(uint64_t capacity, WriteOutFn write_out = WriteOutFn(),
+              KeyBoundsFn key_bounds = KeyBoundsFn());
 
   // Destroys the record cache, after writing back any dirty records.
   ~RecordCache();
@@ -97,8 +106,14 @@ class RecordCache {
                   std::vector<uint64_t>* indices_out) const;
 
   // Writes out all dirty cache entries to the appropriate longer-term data
-  // structure.
+  // structure. Returns the number of dirty entries written out.
   uint64_t WriteOutDirty();
+
+  // Clears the cache: any clean cache records are deleted and any dirty cached
+  // records are optionally written out based on `write_out_dirty` and then also
+  // deleted. The eviction clock is reset to 0. Returns the number of dirty
+  // entries written out.
+  uint64_t ClearCache(bool write_out_dirty = true);
 
  private:
   // The maximum size of each ART sub-scan when using GetRange() with `end_key`.
@@ -115,16 +130,26 @@ class RecordCache {
   // Return a slice with the same contents as `art_key`.
   static Slice ARTKeyToSlice(const Key& art_key);
 
+  // Implements `GetRange` but adds private functionality to avoid locking a
+  // specific cache entry (used during writeout).
+  Status GetRangeImpl(
+      const Slice& start_key, const Slice& end_key,
+      std::vector<uint64_t>* indices_out,
+      std::optional<uint64_t> index_locked_already = std::nullopt) const;
+
   // Selects a cache entry according to the chosen policy, and returns the
   // corresponding index into the `cache_entries` vector.
   uint64_t SelectForEviction();
 
   // Writes out the cache entry at `index`, if dirty, to the appropriate
-  // longer-term data structure. Returns true if the entry was dirty.
+  // longer-term data structure. If a write out takes place, also writes out
+  // all other cached dirty entries that correspond to the same page.
+  //
+  // Returns the number of dirty entries written out.
   //
   // The caller should ensure that it owns the mutex for the entry in question
   // (at least in non-exclusive mode).
-  bool WriteOutIfDirty(uint64_t index);
+  uint64_t WriteOutIfDirty(uint64_t index);
 
   // Frees the cache-owned copy of the record stored in the cache entry at
   // `index`, if the entry is valid. Returns true if the entry was valid.
@@ -147,6 +172,12 @@ class RecordCache {
   // indicates that no persistence guarantees are provided (data will be lost
   // when exceeding the size of the record cache).
   WriteOutFn write_out_;
+
+  // The function to run to determine the range of keys that correspond to the
+  // same page as some key being written out from the cache. This member can be
+  // empty, in which case the cache will not attempt to write out additional
+  // records from the same page when writing out a dirty record.
+  KeyBoundsFn key_bounds_;
 
   // An index for the cache, using ART with optimistic lock coupling from
   // https://github.com/flode/ARTSynchronized/tree/master/OptimisticLockCoupling.

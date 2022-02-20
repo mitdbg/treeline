@@ -1,4 +1,3 @@
-#include "llsm/db.h"
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -8,9 +7,13 @@
 #include <random>
 #include <vector>
 
+#include "bufmgr/page_memory_allocator.h"
 #include "db/page.h"
 #include "gtest/gtest.h"
 #include "util/key.h"
+
+#define private public
+#include "db/db_impl.h"
 
 namespace {
 
@@ -1212,11 +1215,25 @@ TEST_F(DBTest, ReorgOverflowChain) {
   options.key_hints.key_step_size = 1;
   // Generate records that will all fit on 1 page.
   options.key_hints.num_keys = options.key_hints.records_per_page();
-  options.record_cache_capacity = options.key_hints.records_per_page();
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
       llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Generate data for enough additional writes to trigger overflow.
+  constexpr size_t kNumOverflows = 10;
+  llsm::KeyDistHints extra_key_hints;
+  extra_key_hints.page_fill_pct = 50;
+  extra_key_hints.record_size = kRecordSize;
+  extra_key_hints.key_size = kKeySize;
+  extra_key_hints.min_key = 1024;
+  extra_key_hints.key_step_size = 1;
+  extra_key_hints.num_keys = kNumOverflows * extra_key_hints.records_per_page();
+  const std::vector<uint64_t> extra_lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+
+  // Make cache large enough to hold everything.
+  options.record_cache_capacity = extra_key_hints.num_keys;
 
   // Open the DB.
   llsm::DB* db = nullptr;
@@ -1233,24 +1250,21 @@ TEST_F(DBTest, ReorgOverflowChain) {
     ASSERT_TRUE(status.ok());
   }
 
-  // Generate data for enough additional writes to trigger overflow.
-  constexpr size_t kNumOverflows = 10;
-  llsm::KeyDistHints extra_key_hints;
-  extra_key_hints.page_fill_pct = 50;
-  extra_key_hints.record_size = kRecordSize;
-  extra_key_hints.key_size = kKeySize;
-  extra_key_hints.min_key = 1024;
-  extra_key_hints.key_step_size = 1;
-  extra_key_hints.num_keys = kNumOverflows * extra_key_hints.records_per_page();
-  const std::vector<uint64_t> extra_lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+  // Flush the writes to the pages.
+  auto written_out =
+      static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  ASSERT_EQ(written_out, options.key_hints.records_per_page());
 
-  // Write dummy data to the DB (should cause overflow).
+  // Write additional dummy data to the DB.
   for (const auto& key_as_int : extra_lexicographic_keys) {
     llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
+
+  // Flush the writes to the pages (should cause overflow).
+  written_out = static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  ASSERT_EQ(written_out, options.record_cache_capacity);
 
   // Read all keys from new pages
   std::string value_out;
@@ -1274,7 +1288,7 @@ TEST_F(DBTest, ReorgOverflowChain) {
   // This is because reads will block for as long as a reorganization on the
   // page they want to access (the only "old" non-overflow page in this context)
   // is going on.
-  ASSERT_EQ(db->GetNumIndexedPages(), kNumOverflows - 1);
+  ASSERT_EQ(db->GetNumIndexedPages(), kNumOverflows + 1);
 
   delete db;
   db = nullptr;
@@ -1298,11 +1312,25 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   options.key_hints.key_step_size = 1;
   // Generate records that will all fit on 1 page.
   options.key_hints.num_keys = options.key_hints.records_per_page();
-  options.record_cache_capacity = options.key_hints.records_per_page();
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
       llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Generate data for enough additional writes to trigger overflow.
+  constexpr size_t kNumOverflows = 10;
+  llsm::KeyDistHints extra_key_hints;
+  extra_key_hints.page_fill_pct = 50;
+  extra_key_hints.record_size = kRecordSize;
+  extra_key_hints.key_size = kKeySize;
+  extra_key_hints.min_key = 1024;
+  extra_key_hints.key_step_size = 1;
+  extra_key_hints.num_keys = kNumOverflows * extra_key_hints.records_per_page();
+  const std::vector<uint64_t> extra_lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+
+  // Make cache large enough to hold everything.
+  options.record_cache_capacity = extra_key_hints.num_keys;
 
   // Open the DB.
   llsm::DB* db = nullptr;
@@ -1320,24 +1348,21 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
     ASSERT_TRUE(status.ok());
   }
 
-  // Generate data for enough additional writes to trigger overflow.
-  constexpr size_t kNumOverflows = 10;
-  llsm::KeyDistHints extra_key_hints;
-  extra_key_hints.page_fill_pct = 50;
-  extra_key_hints.record_size = kRecordSize;
-  extra_key_hints.key_size = kKeySize;
-  extra_key_hints.min_key = 1024;
-  extra_key_hints.key_step_size = 1;
-  extra_key_hints.num_keys = kNumOverflows * extra_key_hints.records_per_page();
-  const std::vector<uint64_t> extra_lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+  // Flush the writes to the pages.
+  auto written_out =
+      static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  ASSERT_EQ(written_out, options.key_hints.records_per_page());
 
-  // Write dummy data to the DB (should cause overflow).
+  // Write additional dummy data to the DB.
   for (const auto& key_as_int : extra_lexicographic_keys) {
     llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
+
+  // Flush the writes to the pages (should cause overflow).
+  written_out = static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  ASSERT_EQ(written_out, options.record_cache_capacity);
 
   // Read all keys from new pages
   std::string value_out;
@@ -1361,7 +1386,7 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   // This is because reads will block for as long as a reorganization on the
   // page they want to access (the only "old" non-overflow page in this context)
   // is going on.
-  ASSERT_EQ(db->GetNumIndexedPages(), kNumOverflows - 1);
+  ASSERT_EQ(db->GetNumIndexedPages(), kNumOverflows + 1);
 
   delete db;
   db = nullptr;
@@ -1470,6 +1495,265 @@ TEST_F(DBTest, BulkLoadFailureModes) {
   // Fail 3: already several pages there
   status = db->BulkLoad(woptions, records);
   ASSERT_TRUE(status.IsNotSupportedError());
+}
+
+TEST_F(DBTest, PageBoundsConsistency) {
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 8;
+  constexpr size_t kRecordSize = kKeySize + kValueSize;
+
+  // Dummy value used for the records (8 byte key; record is 16B in total).
+  const std::string value(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kRecordSize;
+  options.key_hints.key_size = kKeySize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1;
+  // Generate records
+  options.key_hints.num_keys = 20 * options.key_hints.records_per_page();
+  options.record_cache_capacity = 1;
+
+  // Generate data used for the write (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write dummy data to the DB.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  std::string value_out;
+  llsm::PageBuffer page_out = llsm::PageMemoryAllocator::Allocate(1);
+
+  for (size_t i = 0; i < lexicographic_keys.size(); ++i) {
+    llsm::Slice key(reinterpret_cast<const char*>(&lexicographic_keys[i]),
+                    kKeySize);
+    status = static_cast<llsm::DBImpl*>(db)->GetWithPage(
+        llsm::ReadOptions(), key, &value_out, &page_out);
+    ASSERT_TRUE(status.ok());
+    ASSERT_EQ(value, value_out);
+
+    // Check that the page boundaries stored on disk are consistent with the
+    // ones computed from the model.
+    const llsm::key_utils::KeyHead stored_lower =
+        llsm::key_utils::ExtractHead64(
+            llsm::Page(page_out.get()).GetLowerBoundary());
+    const llsm::key_utils::KeyHead stored_upper =
+        llsm::key_utils::ExtractHead64(
+            llsm::Page(page_out.get()).GetUpperBoundary());
+
+    const auto [computed_lower, computed_upper] =
+        static_cast<llsm::DBImpl*>(db)->GetPageBoundsFor(
+            __builtin_bswap64(lexicographic_keys[i]));
+    ASSERT_EQ(computed_lower, stored_lower);
+    ASSERT_EQ(computed_upper, stored_upper);
+  }
+}
+
+TEST_F(DBTest, RecordCacheWriteOutBatchingSimple) {
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 8;
+  constexpr size_t kRecordSize = kKeySize + kValueSize;
+
+  // Dummy value used for the records (8 byte key; record is 16B in total).
+  const std::string value(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kRecordSize;
+  options.key_hints.key_size = kKeySize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1;
+  // Generate records
+  options.key_hints.num_keys = options.key_hints.records_per_page();
+  options.record_cache_capacity = options.key_hints.records_per_page();
+
+  // Generate data used for the write (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write dummy data to the DB.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // All records fit into one page so this should flush all of them.
+  auto written_out =
+      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(0);
+  ASSERT_EQ(written_out, lexicographic_keys.size());
+}
+
+TEST_F(DBTest, RecordCacheWriteOutBatchingMultiPage) {
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 8;
+  constexpr size_t kRecordSize = kKeySize + kValueSize;
+
+  // Dummy value used for the records (8 byte key; record is 16B in total).
+  const std::string value(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kRecordSize;
+  options.key_hints.key_size = kKeySize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1;
+  // Generate records
+  auto records_per_page = options.key_hints.records_per_page();
+  auto num_pages = records_per_page;
+  auto num_records = records_per_page * num_pages;
+  options.key_hints.num_keys = num_records;
+  options.record_cache_capacity = records_per_page;
+
+  // Generate data used for the write (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write dummy data to the DB.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // All records currently in the cache go into the same page so this should
+  // flush all of them.
+  auto written_out =
+      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(0);
+  ASSERT_EQ(written_out, records_per_page);
+
+  // Helper functions.
+  std::function<void(const uint64_t)> dirty = [num_pages, &lexicographic_keys,
+                                               records_per_page, &status, &db,
+                                               &woptions,
+                                               value](const uint64_t n) {
+    static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache();
+    const std::string value2(kValueSize, 0xFF);
+    for (auto i = 0; i < (num_pages / n); ++i) {
+      for (auto j = 0; j < n; ++j) {
+        const auto& key_as_int = lexicographic_keys[i * records_per_page + j];
+        llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+        status = db->Put(woptions, key, value2);
+        ASSERT_TRUE(status.ok());
+      }
+    }
+  };
+
+  std::function<void(const uint64_t)> check = [&options, &db,
+                                               num_pages](const uint64_t n) {
+    auto written_total = 0;
+    for (auto i = 0; i < options.record_cache_capacity; ++i) {
+      auto written_out =
+          static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(i);
+      ASSERT_TRUE((written_out == n) || (written_out == 0));
+      written_total += written_out;
+    }
+    ASSERT_EQ(written_total, (num_pages / n) * n);
+  };
+
+  // Update one record for every page, enough to exactly fill the cache.
+  dirty(1);
+  check(1);
+
+  // Update four records for 1/4 of pages, enough to fit in the cache.
+  dirty(4);
+  check(4);
+}
+
+TEST_F(DBTest, RecordCacheClearHalfDirty) {
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 8;
+  constexpr size_t kRecordSize = kKeySize + kValueSize;
+
+  // Dummy value used for the records (8 byte key; record is 16B in total).
+  const std::string value(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kRecordSize;
+  options.key_hints.key_size = kKeySize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1;
+  // Generate records
+  auto records_per_page = options.key_hints.records_per_page();
+  auto num_pages = 2;
+  auto num_records = records_per_page * num_pages;
+  options.key_hints.num_keys = num_records;
+  options.record_cache_capacity = records_per_page;
+
+  // Generate data used for the write (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write dummy data to the DB.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // All records currently in the cache go into the same page so this should
+  // flush all of them.
+  auto written_out =
+      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(0);
+  ASSERT_EQ(written_out, records_per_page);
+
+  // Re-dirty half the cache.
+  for (auto i = 0; i < options.record_cache_capacity / 2; ++i) {
+    const auto& key_as_int = lexicographic_keys[i];
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // This should write out the dirty half.
+  written_out = static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  ASSERT_EQ(written_out, options.record_cache_capacity / 2);
 }
 
 }  // namespace

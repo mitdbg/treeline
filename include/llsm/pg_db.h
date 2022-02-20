@@ -11,7 +11,7 @@
 namespace llsm {
 namespace pg {
 
-using Key = uint64_t;
+using Key = llsm::key_utils::KeyHead;
 using Record = std::pair<Key, Slice>;
 
 // The public page-grouped Learned LSM (LLSM) database interface, representing

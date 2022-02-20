@@ -6,21 +6,27 @@ namespace llsm {
 
 std::vector<RecordCacheEntry> RecordCache::cache_entries{};
 
-RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out)
-    : capacity_(capacity), clock_(0), write_out_(std::move(write_out)) {
+RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out,
+                         KeyBoundsFn key_bounds)
+    : capacity_(capacity),
+      clock_(0),
+      write_out_(std::move(write_out)),
+      key_bounds_(std::move(key_bounds)) {
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
   cache_entries.resize(capacity_);
   ART_scan_size_ = kDefaultARTScanSize;
 }
 
 RecordCache::~RecordCache() {
-  tree_.reset();  // Delete ART before freeing anything, so that entries are
-                  // inaccessible while freeing.
   for (auto i = 0; i < capacity_; ++i) {
     cache_entries[i].Lock(/*exclusive = */ false);
     WriteOutIfDirty(i);
-    FreeIfValid(i);
     cache_entries[i].Unlock();
+  }
+  tree_.reset();  // Delete ART before freeing anything, so that entries are
+                  // inaccessible while freeing.
+  for (auto i = 0; i < capacity_; ++i) {
+    FreeIfValid(i);
   }
   cache_entries.clear();
 }
@@ -149,6 +155,13 @@ Status RecordCache::GetRange(const Slice& start_key, size_t num_records,
 
 Status RecordCache::GetRange(const Slice& start_key, const Slice& end_key,
                              std::vector<uint64_t>* indices_out) const {
+  return GetRangeImpl(start_key, end_key, indices_out);
+}
+
+Status RecordCache::GetRangeImpl(
+    const Slice& start_key, const Slice& end_key,
+    std::vector<uint64_t>* indices_out,
+    std::optional<uint64_t> index_locked_already) const {
   Key start_art_key;
   SliceToARTKey(start_key, start_art_key);
   auto t = tree_->getThreadInfo();
@@ -163,7 +176,7 @@ Status RecordCache::GetRange(const Slice& start_key, const Slice& end_key,
     // The next largest key after `ART_scan_size_` keys will be returned in
     // `start_art_key`, setting up the next iteration.
     tree_->lookupRange(start_art_key, results_out, ART_scan_size_, num_found, t,
-                       &cache_entries, &start_art_key);
+                       &cache_entries, &start_art_key, index_locked_already);
 
     // Three conditions to scan more:
     // 1. Didn't return too few records (would happen if we hit the upper key
@@ -258,11 +271,11 @@ uint64_t RecordCache::SelectForEviction() {
   return local_clock;
 }
 
-bool RecordCache::WriteOutIfDirty(uint64_t index) {
+uint64_t RecordCache::WriteOutIfDirty(uint64_t index) {
   // Do nothing if not dirty, or if using a standalone record cache.
   auto entry = &cache_entries[index];
   bool was_dirty = entry->IsDirty();
-  if (!was_dirty) return false;
+  if (!was_dirty) return 0;
   if (!write_out_) {
     // Skip the write out because a write out function was not provided.
     entry->SetDirtyTo(false);
@@ -270,13 +283,37 @@ bool RecordCache::WriteOutIfDirty(uint64_t index) {
   }
 
   Slice key = entry->GetKey();
-  Slice value = entry->GetValue();
+
+  std::vector<uint64_t> indices;
+  WriteOutBatch batch;
+
+  if (key_bounds_) {
+    auto [lower_bound, upper_bound] =
+        key_bounds_(llsm::key_utils::ExtractHead64(key));
+    Status s = GetRangeImpl(key_utils::IntKeyAsSlice(lower_bound).as<Slice>(),
+                            key_utils::IntKeyAsSlice(upper_bound).as<Slice>(),
+                            &indices, index);
+    for (auto& idx : indices) {
+      entry = &cache_entries[idx];
+      if (entry->IsDirty()) {
+        batch.emplace_back(entry->GetKey(), entry->GetValue(),
+                           entry->GetWriteType());
+      }
+    }
+  } else {
+    indices.push_back(index);
+    batch.emplace_back(entry->GetKey(), entry->GetValue(),
+                       entry->GetWriteType());
+  }
 
   assert(write_out_);
-  write_out_({{key, value, entry->GetWriteType()}});
+  write_out_(batch);
 
-  entry->SetDirtyTo(false);
-  return was_dirty;
+  for (auto& idx : indices) {
+    cache_entries[idx].SetDirtyTo(false);
+    if (idx != index) cache_entries[idx].Unlock();
+  }
+  return batch.size();
 }
 
 bool RecordCache::FreeIfValid(uint64_t index) {
@@ -291,6 +328,23 @@ bool RecordCache::FreeIfValid(uint64_t index) {
   } else {
     return false;
   }
+}
+
+uint64_t RecordCache::ClearCache(bool write_out_dirty) {
+  clock_ = 0;
+  uint64_t count = 0;
+  for (auto i = 0; i < capacity_; ++i) {
+    cache_entries[i].SetPriorityTo(0);
+    if (write_out_dirty) {
+      cache_entries[i].Lock(/*exclusive = */ false);
+      count += WriteOutIfDirty(i);
+      cache_entries[i].Unlock();
+    } else {
+      cache_entries[i].SetDirtyTo(false);
+    }
+  }
+
+  return count;
 }
 
 }  // namespace llsm
