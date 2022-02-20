@@ -29,12 +29,13 @@ Manager::Manager(fs::path db_path,
                  PageGroupedDBOptions options, uint32_t next_sequence_number,
                  FreeList free)
     : db_path_(std::move(db_path)),
+      index_(std::make_unique<SegmentIndex>()),
       segment_files_(std::move(segment_files)),
       next_sequence_number_(next_sequence_number),
       free_(std::move(free)),
       options_(std::move(options)) {
   if (!boundaries.empty()) {
-    index_.bulk_load(boundaries.begin(), boundaries.end());
+    index_->BulkLoadFromEmpty(boundaries.begin(), boundaries.end());
   }
   if (options_.num_bg_threads > 0) {
     bg_threads_ = std::make_unique<ThreadPool>(options_.num_bg_threads);
@@ -129,15 +130,11 @@ std::pair<Status, std::vector<pg::Page>> Manager::GetWithPages(
   void* overflow_page_buf = w_.buffer().get() + pg::Page::kSize;
 
   // 1. Find the segment that should hold the key.
-  auto it = index_.upper_bound(key);
-  if (it != index_.begin()) {
-    --it;
-  }
+  const auto [base_key, sinfo] = index_->SegmentForKey(key);
 
   // 2. Figure out the page offset and read it in.
-  const Key base_key = it->first;
-  const size_t page_idx = it->second.PageForKey(base_key, key);
-  ReadPage(it->second.id(), page_idx, main_page_buf);
+  const size_t page_idx = sinfo.PageForKey(base_key, key);
+  ReadPage(sinfo.id(), page_idx, main_page_buf);
 
   // 3. Search for the record on the page.
   // TODO: Lock the page.
@@ -167,44 +164,40 @@ Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {
   if (records.empty()) return Status::OK();
   // TODO: Support deletes.
 
-  const auto start_it = SegmentForKey(records.front().first);
+  SegmentIndex::Entry curr = index_->SegmentForKey(records.front().first);
   size_t start_idx = 0;
-  Key curr_base = start_it->first;
-  SegmentInfo* curr_sinfo = &(start_it->second);
 
   for (size_t i = 1; i < records.size(); ++i) {
     // TODO: We query the index for each key in the batch. This may be
     // expensive, but this is also the approach we took in the original LLSM
     // implementation. We can make this batching strategy fancier if this is a
     // bottleneck.
-    const auto it = SegmentForKey(records[i].first);
-    if (it->first != curr_base) {
+    const auto [rec_base, _] = index_->SegmentForKey(records[i].first);
+    if (rec_base != curr.first) {
       // The records in [start_idx, i) belong to the same segment.
       // Write out segment
-      const auto status =
-          WriteToSegment(curr_base, curr_sinfo, records, start_idx, i);
+      const auto status = WriteToSegment(curr, records, start_idx, i);
       if (!status.ok()) {
         return status;
       }
 
       // Important to redo the lookup since `WriteToSegment()` might have
       // modified the index.
-      const auto it2 = SegmentForKey(records[i].first);
-      curr_base = it2->first;
-      curr_sinfo = &(it2->second);
+      curr = index_->SegmentForKey(records[i].first);
       start_idx = i;
     }
   }
 
-  WriteToSegment(curr_base, curr_sinfo, records, start_idx, records.size());
+  WriteToSegment(curr, records, start_idx, records.size());
   return Status::OK();
 }
 
 Status Manager::WriteToSegment(
-    Key segment_base, SegmentInfo* sinfo,
+    const SegmentIndex::Entry& segment,
     const std::vector<std::pair<Key, Slice>>& records, size_t start_idx,
     size_t end_idx) {
   // TODO: Need to lock the segment and pages.
+  const auto& [segment_base, sinfo] = segment;
 
   // Simplifying assumptions:
   // - If the number of writes is past a certain threshold
@@ -216,7 +209,7 @@ Status Manager::WriteToSegment(
   //   segment reorg.
 
   const size_t reorg_threshold =
-      options_.records_per_page_goal * sinfo->page_count() * 2ULL;
+      options_.records_per_page_goal * sinfo.page_count() * 2ULL;
   if (end_idx - start_idx > reorg_threshold) {
     // Immediately trigger a segment rewrite that merges in the records.
     if (options_.use_segments) {
@@ -235,8 +228,8 @@ Status Manager::WriteToSegment(
   pg::Page overflow_page(overflow_page_buf);
 
   size_t curr_page_idx =
-      sinfo->PageForKey(segment_base, records[start_idx].first);
-  ReadPage(sinfo->id(), curr_page_idx, orig_page_buf);
+      sinfo.PageForKey(segment_base, records[start_idx].first);
+  ReadPage(sinfo.id(), curr_page_idx, orig_page_buf);
 
   SegmentId overflow_page_id;
   bool orig_page_dirty = false;
@@ -245,13 +238,13 @@ Status Manager::WriteToSegment(
   pg::Page* curr_page = &orig_page;
   bool* curr_page_dirty = &orig_page_dirty;
 
-  auto write_dirty_pages = [&]() {
+  auto write_dirty_pages = [&, segment_base = segment_base, sinfo = sinfo]() {
     // Write out overflow first to avoid dangling overflow pointers.
     if (overflow_page_dirty) {
       WritePage(overflow_page_id, 0, overflow_page_buf);
     }
     if (curr_page_dirty) {
-      WritePage(sinfo->id(), curr_page_idx, orig_page_buf);
+      WritePage(sinfo.id(), curr_page_idx, orig_page_buf);
     }
   };
   auto write_record_to_chain = [&](Key key, const Slice& value) {
@@ -291,7 +284,7 @@ Status Manager::WriteToSegment(
       overflow_page.MakeOverflow();
       overflow_page.SetOverflow(SegmentId());
       overflow_page_dirty = true;
-      sinfo->SetOverflow(true);
+      index_->SetSegmentOverflow(segment_base, true);
 
       orig_page.SetOverflow(overflow_page_id);
       orig_page_dirty = true;
@@ -312,12 +305,12 @@ Status Manager::WriteToSegment(
   };
 
   for (size_t i = start_idx; i < end_idx; ++i) {
-    const size_t page_idx = sinfo->PageForKey(segment_base, records[i].first);
+    const size_t page_idx = sinfo.PageForKey(segment_base, records[i].first);
     if (page_idx != curr_page_idx) {
       write_dirty_pages();
       // Update the current page.
       curr_page_idx = page_idx;
-      ReadPage(sinfo->id(), curr_page_idx, orig_page_buf);
+      ReadPage(sinfo.id(), curr_page_idx, orig_page_buf);
       overflow_page_id = SegmentId();
       orig_page_dirty = false;
       overflow_page_dirty = false;
@@ -394,9 +387,7 @@ void Manager::ReadOverflows(
 }
 
 std::pair<Key, Key> Manager::GetPageBoundsFor(const Key key) const {
-  auto it = SegmentForKey(key);
-  const Key seg_base_key = it->first;
-  const SegmentInfo& sinfo = it->second;
+  const auto [seg_base_key, sinfo] = index_->SegmentForKey(key);
   const size_t page_idx = sinfo.PageForKey(seg_base_key, key);
 
   // Find the lower boundary. When `page_idx == 0` it is always the segment's
@@ -414,7 +405,8 @@ std::pair<Key, Key> Manager::GetPageBoundsFor(const Key key) const {
   if (page_idx < sinfo.page_count() - 1) {
     // `page_idx` is not the last page in the segment. Thus its upper boundary
     // is the lower boundary of the next page.
-    upper_bound = FindLowerBoundary(seg_base_key, *(sinfo.model()), sinfo.page_count(),
+    upper_bound =
+        FindLowerBoundary(seg_base_key, *(sinfo.model()), sinfo.page_count(),
                           sinfo.model()->Invert(), page_idx + 1);
 
   } else {
@@ -422,9 +414,9 @@ std::pair<Key, Key> Manager::GetPageBoundsFor(const Key key) const {
     // next segment's base key (or the largest possible key if this is the last
     // segment).
     // TODO: Concurrency concerns.
-    ++it;
-    if (it != index_.end()) {
-      upper_bound = it->first;
+    const auto maybe_next = index_->NextSegmentForKey(key);
+    if (maybe_next.has_value()) {
+      upper_bound = maybe_next->first;
     }
   }
 

@@ -13,8 +13,8 @@
 #include "llsm/status.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
+#include "segment_index.h"
 #include "segment_info.h"
-#include "tlx/btree_map.h"
 #include "util/thread_pool.h"
 #include "workspace.h"
 
@@ -74,8 +74,8 @@ class Manager {
   Manager& operator=(Manager&&) = default;
 
   // Not intended for external use (used by the tests).
-  auto IndexBeginIterator() const { return index_.begin(); }
-  auto IndexEndIterator() const { return index_.end(); }
+  auto IndexBeginIterator() const { return index_->BeginIterator(); }
+  auto IndexEndIterator() const { return index_->EndIterator(); }
   size_t NumSegmentFiles() const { return segment_files_.size(); }
 
  private:
@@ -97,7 +97,7 @@ class Manager {
   void BulkLoadIntoPagesImpl(const std::vector<Record>& records);
 
   // Write the range [start_idx, end_idx) into the given segment.
-  Status WriteToSegment(Key segment_base, SegmentInfo* sinfo,
+  Status WriteToSegment(const SegmentIndex::Entry& segment,
                         const std::vector<std::pair<Key, Slice>>& records,
                         size_t start_idx, size_t end_idx);
 
@@ -135,24 +135,8 @@ class Manager {
       std::vector<Record>::const_iterator rec_begin,
       std::vector<Record>::const_iterator rec_end);
 
-  auto SegmentForKey(Key key) {
-    auto it = index_.upper_bound(key);
-    if (it != index_.begin()) {
-      --it;
-    }
-    return it;
-  }
-
-  auto SegmentForKey(Key key) const {
-    auto it = index_.upper_bound(key);
-    if (it != index_.begin()) {
-      --it;
-    }
-    return it;
-  }
-
   std::filesystem::path db_path_;
-  tlx::btree_map<Key, SegmentInfo> index_;
+  std::unique_ptr<SegmentIndex> index_;
   std::vector<SegmentFile> segment_files_;
   uint32_t next_sequence_number_;
   FreeList free_;

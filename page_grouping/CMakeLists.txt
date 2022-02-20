@@ -18,14 +18,20 @@ target_sources(pg PRIVATE
   free_list.h
   key.cc
   key.h
+  lock_manager.cc
+  lock_manager.h
   manager_load.cc
   manager_rewrite.cc
   manager_scan.cc
   manager.cc
   manager.h
   pg_stats.cc
+  rand_exp_backoff.cc
+  rand_exp_backoff.h
   segment_builder.cc
   segment_builder.h
+  segment_index.cc
+  segment_index.h
   workspace.h
   ../bufmgr/page_memory_allocator.cc
   ../bufmgr/page_memory_allocator.h
@@ -41,7 +47,7 @@ target_include_directories(pg
     ${PROJECT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/include
 )
-target_link_libraries(pg PRIVATE crc32c)
+target_link_libraries(pg PUBLIC libcuckoo PRIVATE crc32c)
 add_dependencies(pg_all pg)
 
 target_sources(pg_llsm PRIVATE

@@ -1,8 +1,7 @@
-#include "manager.h"
-
-#include <vector>
 #include <utility>
+#include <vector>
 
+#include "manager.h"
 #include "persist/merge_iterator.h"
 #include "util/key.h"
 
@@ -24,20 +23,16 @@ Status Manager::ScanWithEstimates(
   size_t records_left = amount;
 
   // 1. Find the segment that should hold the start key.
-  auto it = index_.upper_bound(start_key);
-  if (it != index_.begin()) {
-    --it;
-  }
+  const auto [start_base_key, start_sinfo] = index_->SegmentForKey(start_key);
 
   // 2. Estimate how much of the segment to read based on the position of the
   // key.
   size_t est_start_pages_to_read = 1;
   size_t start_page_idx = 0;
-  const size_t first_segment_page_count = it->second.page_count();
+  const size_t first_segment_page_count = start_sinfo.page_count();
   if (first_segment_page_count > 1) {
-    const Key base_key = it->first;
-    const double pos =
-        std::max(0.0, it->second.model()->operator()(start_key - base_key));
+    const double pos = std::max(
+        0.0, start_sinfo.model()->operator()(start_key - start_base_key));
     const size_t page_idx = static_cast<size_t>(pos);
     if (page_idx >= first_segment_page_count) {
       // Edge case due to numeric errors.
@@ -69,8 +64,8 @@ Status Manager::ScanWithEstimates(
 
   // 3. Start scanning the first segment, reading in more pages as needed if
   // our estimate was incorrect.
-  const SegmentFile& sf = segment_files_[it->second.id().GetFileId()];
-  const size_t segment_byte_offset = it->second.id().GetOffset() * Page::kSize;
+  const SegmentFile& sf = segment_files_[start_sinfo.id().GetFileId()];
+  const size_t segment_byte_offset = start_sinfo.id().GetOffset() * Page::kSize;
   sf.ReadPages(segment_byte_offset + start_page_idx * Page::kSize,
                w_.buffer().get(), est_start_pages_to_read);
   w_.BumpReadCount(est_start_pages_to_read);
@@ -136,12 +131,12 @@ Status Manager::ScanWithEstimates(
 
   // 4. Done reading the first segment. Now keep scanning forward as far as
   // needed.
-  if (it != index_.end()) {
-    ++it;
-  }
-  while (records_left > 0 && it != index_.end()) {
-    const size_t seg_page_count = it->second.page_count();
-    const size_t seg_byte_offset = it->second.id().GetOffset() * Page::kSize;
+  std::optional<SegmentIndex::Entry> curr_seg =
+      index_->NextSegmentForKey(start_base_key);
+  while (records_left > 0 && curr_seg.has_value()) {
+    const auto& [curr_base_key, curr_sinfo] = *curr_seg;
+    const size_t seg_page_count = curr_sinfo.page_count();
+    const size_t seg_byte_offset = curr_sinfo.id().GetOffset() * Page::kSize;
     const size_t est_pages_left = std::ceil(
         records_left / static_cast<double>(options_.records_per_page_goal));
 
@@ -149,7 +144,7 @@ Status Manager::ScanWithEstimates(
     // avoid reading the whole segment if we do not anticipate needing to scan
     // all the records in the segment.
     const size_t pages_to_read = std::min(seg_page_count, est_pages_left);
-    const SegmentFile& sf = segment_files_[it->second.id().GetFileId()];
+    const SegmentFile& sf = segment_files_[curr_sinfo.id().GetFileId()];
     sf.ReadPages(seg_byte_offset, w_.buffer().get(), pages_to_read);
     w_.BumpReadCount(pages_to_read);
 
@@ -173,7 +168,7 @@ Status Manager::ScanWithEstimates(
     }
 
     // Go to the next segment.
-    ++it;
+    curr_seg = index_->NextSegmentForKey(curr_base_key);
   }
 
   return Status::OK();
@@ -189,15 +184,12 @@ Status Manager::ScanWhole(
   size_t records_left = amount;
 
   // 1. Find the segment that should hold the start key.
-  auto it = index_.upper_bound(start_key);
-  if (it != index_.begin()) {
-    --it;
-  }
+  const auto [start_base_key, start_sinfo] = index_->SegmentForKey(start_key);
 
   // 2. Read the first segment.
-  const SegmentFile& sf = segment_files_[it->second.id().GetFileId()];
-  const size_t first_segment_size = it->second.page_count();
-  const size_t segment_byte_offset = it->second.id().GetOffset() * Page::kSize;
+  const SegmentFile& sf = segment_files_[start_sinfo.id().GetFileId()];
+  const size_t first_segment_size = start_sinfo.page_count();
+  const size_t segment_byte_offset = start_sinfo.id().GetOffset() * Page::kSize;
   sf.ReadPages(segment_byte_offset, w_.buffer().get(), first_segment_size);
   w_.BumpReadCount(first_segment_size);
 
@@ -208,7 +200,7 @@ Status Manager::ScanWhole(
   Page overflow_page(overflow_buf);
 
   // 3. Scan the first matching page in the segment.
-  size_t start_segment_page_idx = it->second.PageForKey(it->first, start_key);
+  size_t start_segment_page_idx = start_sinfo.PageForKey(start_base_key, start_key);
   Page first_page(w_.buffer().get() + start_segment_page_idx * Page::kSize);
   std::vector<Page::Iterator> page_its = {first_page.GetIterator()};
   if (first_page.HasOverflow()) {
@@ -249,14 +241,16 @@ Status Manager::ScanWhole(
 
   // 5. Scan forward until we read enough records or run out of segments to
   //    read.
-  if (records_left > 0 && it != index_.end()) {
-    ++it;
+  std::optional<SegmentIndex::Entry> curr_seg;
+  if (records_left > 0) {
+    curr_seg = index_->NextSegmentForKey(start_base_key);
   }
-  while (records_left > 0 && it != index_.end()) {
-    const size_t seg_page_count = it->second.page_count();
-    const size_t seg_byte_offset = it->second.id().GetOffset() * Page::kSize;
+  while (records_left > 0 && curr_seg.has_value()) {
+    const auto& [curr_base_key, curr_sinfo] = *curr_seg;
+    const size_t seg_page_count = curr_sinfo.page_count();
+    const size_t seg_byte_offset = curr_sinfo.id().GetOffset() * Page::kSize;
 
-    const SegmentFile& sf = segment_files_[it->second.id().GetFileId()];
+    const SegmentFile& sf = segment_files_[curr_sinfo.id().GetFileId()];
     sf.ReadPages(seg_byte_offset, w_.buffer().get(), seg_page_count);
     w_.BumpReadCount(seg_page_count);
 
@@ -268,7 +262,7 @@ Status Manager::ScanWhole(
     }
 
     // Go to the next segment.
-    ++it;
+    curr_seg = index_->NextSegmentForKey(curr_base_key);
   }
 
   return Status::OK();

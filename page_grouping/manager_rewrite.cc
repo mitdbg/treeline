@@ -137,42 +137,16 @@ void Manager::RewriteSegments(
     Key segment_base, std::vector<Record>::const_iterator addtl_rec_begin,
     std::vector<Record>::const_iterator addtl_rec_end) {
   // TODO: Multi-threading concerns.
-  std::vector<std::pair<Key, SegmentInfo*>> segments_to_rewrite;
+  std::vector<std::pair<Key, SegmentInfo>> segments_to_rewrite;
   std::vector<std::pair<Key, SegmentInfo>> rewritten_segments;
   std::vector<SegmentId> overflows_to_clear;
 
-  const auto it = index_.lower_bound(segment_base);
-  assert(it != index_.end());
-  segments_to_rewrite.emplace_back(segment_base, &(it->second));
-
-  // 1. Look up neighboring segments that can benefit from a rewrite.
   if (options_.consider_neighbors_during_rewrite) {
-    // Scan backward.
-    if (it != index_.begin()) {
-      auto prev_it(it);
-      while (true) {
-        --prev_it;
-        if (!prev_it->second.HasOverflow()) break;
-        segments_to_rewrite.emplace_back(prev_it->first, &(prev_it->second));
-        if (prev_it == index_.begin()) break;
-      }
-    }
-
-    // Scan forward.
-    auto next_it(it);
-    ++next_it;
-    for (; next_it != index_.end(); ++next_it) {
-      if (!next_it->second.HasOverflow()) break;
-      segments_to_rewrite.emplace_back(next_it->first, &(next_it->second));
-    }
-
-    // Sort the segments.
-    std::sort(segments_to_rewrite.begin(), segments_to_rewrite.end(),
-              [](const std::pair<Key, SegmentInfo*>& seg1,
-                 const std::pair<Key, SegmentInfo*>& seg2) {
-                return seg1.first < seg2.first;
-              });
+    segments_to_rewrite = index_->FindRewriteRegion(segment_base);
+  } else {
+    segments_to_rewrite.emplace_back(index_->SegmentForKey(segment_base));
   }
+  assert(!segments_to_rewrite.empty());
 
   // 2. Load and merge the segments.
   //
@@ -243,10 +217,10 @@ void Manager::RewriteSegments(
               //    rewrite.
               // To find the upper bound, we query the index to find the left
               // boundary of the next segment (if it exists).
-              const auto it =
-                  index_.upper_bound(segments.back().records.back().first);
-              if (it != index_.end()) {
-                upper_bound = it->first;
+              const auto maybe_next_seg = index_->NextSegmentForKey(
+                  segments.back().records.back().first);
+              if (maybe_next_seg.has_value()) {
+                upper_bound = maybe_next_seg->first;
               } else {
                 // We are rewriting the last segment in the database.
                 upper_bound = std::numeric_limits<Key>::max();
@@ -294,7 +268,7 @@ void Manager::RewriteSegments(
       };
 
   for (const auto& seg_to_rewrite : segments_to_rewrite) {
-    const size_t segment_pages = seg_to_rewrite.second->page_count();
+    const size_t segment_pages = seg_to_rewrite.second.page_count();
     if (segment_pages > page_buf.NumFreePages()) {
       // Not enough memory to read the next segment. Flush the
       // currently-being-built segment to disk.
@@ -305,8 +279,8 @@ void Manager::RewriteSegments(
     }
 
     // Load the segment and check for overflows.
-    ReadSegment(seg_to_rewrite.second->id());
-    SegmentWrap sw(w_.buffer().get(), seg_to_rewrite.second->page_count());
+    ReadSegment(seg_to_rewrite.second.id());
+    SegmentWrap sw(w_.buffer().get(), seg_to_rewrite.second.page_count());
     const size_t num_overflows = sw.NumOverflows();
     if (segment_pages + num_overflows > page_buf.NumFreePages()) {
       // Not enough memory to read the next segment's overflows. Flush the
@@ -386,7 +360,7 @@ void Manager::RewriteSegments(
     write_futures.reserve(segments_to_rewrite.size() +
                           overflows_to_clear.size());
     for (const auto& seg_to_rewrite : segments_to_rewrite) {
-      const SegmentId seg_id = seg_to_rewrite.second->id();
+      const SegmentId seg_id = seg_to_rewrite.second.id();
       write_futures.push_back(bg_threads_->Submit(
           [this, seg_id, zero]() { WritePage(seg_id, 0, zero); }));
       free_.Add(seg_id);
@@ -403,7 +377,7 @@ void Manager::RewriteSegments(
   } else {
     // Synchronously clear the segments and overflows.
     for (const auto& seg_to_rewrite : segments_to_rewrite) {
-      const SegmentId seg_id = seg_to_rewrite.second->id();
+      const SegmentId seg_id = seg_to_rewrite.second.id();
       WritePage(seg_id, 0, zero);
       free_.Add(seg_id);
     }
@@ -414,13 +388,16 @@ void Manager::RewriteSegments(
   }
 
   // 4. Update in-memory index with the new segments.
-  for (const auto& to_remove : segments_to_rewrite) {
-    const auto num_removed = index_.erase(to_remove.first);
-    assert(num_removed == 1);
-  }
-  for (const auto& new_segment : rewritten_segments) {
-    index_.insert(new_segment);
-  }
+  index_->RunExclusive(
+      [&segments_to_rewrite, &rewritten_segments](auto& raw_index) {
+        for (const auto& to_remove : segments_to_rewrite) {
+          const auto num_removed = raw_index.erase(to_remove.first);
+          assert(num_removed == 1);
+        }
+        for (const auto& new_segment : rewritten_segments) {
+          raw_index.insert(new_segment);
+        }
+      });
 
   // 5. Wait on any write futures.
   for (auto& f : write_futures) {
@@ -434,17 +411,16 @@ void Manager::RewriteSegments(
 void Manager::FlattenChain(
     const Key base, const std::vector<Record>::const_iterator addtl_rec_begin,
     const std::vector<Record>::const_iterator addtl_rec_end) {
-  auto it = index_.lower_bound(base);
-  assert(it != index_.end());
-  assert(base == it->first);
-  assert(it->second.page_count() == 1);
-  const SegmentId main_page_id = it->second.id();
+  const auto [seg_base, sinfo] = index_->SegmentForKey(base);
+  assert(base == seg_base);
+  assert(sinfo.page_count() == 1);
+  const SegmentId main_page_id = sinfo.id();
 
   // Retrieve the upper bound.
-  ++it;
+  const auto maybe_upper_seg = index_->NextSegmentForKey(base);
   Key upper = std::numeric_limits<Key>::max();
-  if (it != index_.end()) {
-    upper = it->first;
+  if (maybe_upper_seg.has_value()) {
+    upper = maybe_upper_seg->first;
   }
 
   // Load the existing page(s).
@@ -525,8 +501,10 @@ void Manager::FlattenChain(
   }
 
   // Remove the old segment info and replace it with the new pages.
-  index_.erase(base);
-  index_.insert(new_pages.begin(), new_pages.end());
+  index_->RunExclusive([&base, &new_pages](auto& raw_index) {
+    raw_index.erase(base);
+    raw_index.insert(new_pages.begin(), new_pages.end());
+  });
 
   for (auto& f : write_futures) {
     f.get();
