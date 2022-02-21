@@ -174,31 +174,26 @@ Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {
   if (records.empty()) return Status::OK();
   // TODO: Support deletes.
 
-  SegmentIndex::Entry curr = index_->SegmentForKey(records.front().first);
   size_t start_idx = 0;
-
-  for (size_t i = 1; i < records.size(); ++i) {
-    // TODO: We query the index for each key in the batch. This may be
-    // expensive, but this is also the approach we took in the original LLSM
-    // implementation. We can make this batching strategy fancier if this is a
-    // bottleneck.
-    const auto rec_base = index_->SegmentForKey(records[i].first).lower;
-    if (rec_base != curr.lower) {
-      // The records in [start_idx, i) belong to the same segment.
-      // Write out segment
-      const auto status = WriteToSegment(curr, records, start_idx, i);
-      if (!status.ok()) {
-        return status;
-      }
-
-      // Important to redo the lookup since `WriteToSegment()` might have
-      // modified the index.
-      curr = index_->SegmentForKey(records[i].first);
-      start_idx = i;
+  while (start_idx < records.size()) {
+    const auto segment = index_->SegmentForKeyWithLock(records[start_idx].first,
+                                                       SegmentMode::kPageWrite);
+    const auto left_it = records.begin() + start_idx;
+    const auto cutoff_it =
+        std::lower_bound(left_it, records.end(), segment.upper,
+                         [](const auto& rec, const Key next_segment_start) {
+                           return rec.first < next_segment_start;
+                         });
+    const size_t range_size = cutoff_it - left_it;
+    // `WriteToSegment()` will release the segment lock.
+    const auto status =
+        WriteToSegment(segment, records, start_idx, start_idx + range_size);
+    if (status.ok()) {
+      start_idx += range_size;
+    } else {
+      // A reorg must have intervened. So we retry the write.
     }
   }
-
-  WriteToSegment(curr, records, start_idx, records.size());
   return Status::OK();
 }
 
@@ -206,8 +201,6 @@ Status Manager::WriteToSegment(
     const SegmentIndex::Entry& segment,
     const std::vector<std::pair<Key, Slice>>& records, size_t start_idx,
     size_t end_idx) {
-  // TODO: Need to lock the segment and pages.
-
   // Simplifying assumptions:
   // - If the number of writes is past a certain threshold
   //   (`record_per_page_goal` x `pages_in_segment` x 2), we don't attempt to
@@ -221,6 +214,8 @@ Status Manager::WriteToSegment(
       options_.records_per_page_goal * segment.sinfo.page_count() * 2ULL;
   if (end_idx - start_idx > reorg_threshold) {
     // Immediately trigger a segment rewrite that merges in the records.
+    lock_manager_->ReleaseSegmentLock(segment.sinfo.id(),
+                                      SegmentMode::kPageWrite);
     if (options_.use_segments) {
       RewriteSegments(segment.lower, records.begin() + start_idx,
                       records.begin() + end_idx);
@@ -236,9 +231,7 @@ Status Manager::WriteToSegment(
   pg::Page orig_page(orig_page_buf);
   pg::Page overflow_page(overflow_page_buf);
 
-  size_t curr_page_idx =
-      segment.sinfo.PageForKey(segment.lower, records[start_idx].first);
-  ReadPage(segment.sinfo.id(), curr_page_idx, orig_page_buf);
+  size_t curr_page_idx = 0;
 
   SegmentId overflow_page_id;
   bool orig_page_dirty = false;
@@ -314,12 +307,23 @@ Status Manager::WriteToSegment(
     }
   };
 
+  curr_page_idx =
+      segment.sinfo.PageForKey(segment.lower, records[start_idx].first);
+  lock_manager_->AcquirePageLock(segment.sinfo.id(), curr_page_idx,
+                                 PageMode::kExclusive);
+  ReadPage(segment.sinfo.id(), curr_page_idx, orig_page_buf);
+
   for (size_t i = start_idx; i < end_idx; ++i) {
-    const size_t page_idx = segment.sinfo.PageForKey(segment.lower, records[i].first);
+    const size_t page_idx =
+        segment.sinfo.PageForKey(segment.lower, records[i].first);
     if (page_idx != curr_page_idx) {
       write_dirty_pages();
+      lock_manager_->ReleasePageLock(segment.sinfo.id(), curr_page_idx,
+                                     PageMode::kExclusive);
       // Update the current page.
       curr_page_idx = page_idx;
+      lock_manager_->AcquirePageLock(segment.sinfo.id(), curr_page_idx,
+                                     PageMode::kExclusive);
       ReadPage(segment.sinfo.id(), curr_page_idx, orig_page_buf);
       overflow_page_id = SegmentId();
       orig_page_dirty = false;
@@ -332,6 +336,10 @@ Status Manager::WriteToSegment(
         write_record_to_chain(records[i].first, records[i].second);
     if (!succeeded) {
       write_dirty_pages();
+      lock_manager_->ReleasePageLock(segment.sinfo.id(), curr_page_idx,
+                                     PageMode::kExclusive);
+      lock_manager_->ReleaseSegmentLock(segment.sinfo.id(),
+                                        SegmentMode::kPageWrite);
       // The segment is full. We need to rewrite it in order to merge in the
       // writes.
       if (options_.use_segments) {
@@ -346,7 +354,10 @@ Status Manager::WriteToSegment(
   }
 
   write_dirty_pages();
-
+  lock_manager_->ReleasePageLock(segment.sinfo.id(), curr_page_idx,
+                                 PageMode::kExclusive);
+  lock_manager_->ReleaseSegmentLock(segment.sinfo.id(),
+                                    SegmentMode::kPageWrite);
   return Status::OK();
 }
 

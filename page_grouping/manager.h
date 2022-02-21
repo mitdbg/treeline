@@ -97,7 +97,13 @@ class Manager {
       const PageGroupedDBOptions& options);
   void BulkLoadIntoPagesImpl(const std::vector<Record>& records);
 
-  // Write the range [start_idx, end_idx) into the given segment.
+  // Write the range [start_idx, end_idx) into the given segment. The caller
+  // must already hold a `kPageWrite` lock on the segment. This method will
+  // release the segment lock when it is done making the write(s).
+  //
+  // If the write was successful, this method will return an OK status.
+  // Otherwise if a reorg is needed but a different reorg intervenes, this
+  // method will abort and return `Status::InvalidArgument()`.
   Status WriteToSegment(const SegmentIndex::Entry& segment,
                         const std::vector<std::pair<Key, Slice>>& records,
                         size_t start_idx, size_t end_idx);
