@@ -173,7 +173,6 @@ std::pair<Status, std::vector<pg::Page>> Manager::GetWithPages(
 Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {
   if (records.empty()) return Status::OK();
   // TODO: Support deletes.
-
   size_t start_idx = 0;
   while (start_idx < records.size()) {
     const auto segment = index_->SegmentForKeyWithLock(records[start_idx].first,
@@ -186,21 +185,19 @@ Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {
                          });
     const size_t range_size = cutoff_it - left_it;
     // `WriteToSegment()` will release the segment lock.
-    const auto status =
+    const size_t num_written =
         WriteToSegment(segment, records, start_idx, start_idx + range_size);
-    if (status.ok()) {
-      start_idx += range_size;
-    } else {
-      // A reorg must have intervened. So we retry the write.
-    }
+    // If a reorg intervenes and no records are written, `num_written` will
+    // be 0 and the logic in this loop will retry the write.
+    start_idx += num_written;
   }
   return Status::OK();
 }
 
-Status Manager::WriteToSegment(
+size_t Manager::WriteToSegment(
     const SegmentIndex::Entry& segment,
-    const std::vector<std::pair<Key, Slice>>& records, size_t start_idx,
-    size_t end_idx) {
+    const std::vector<std::pair<Key, Slice>>& records, const size_t start_idx,
+    const size_t end_idx) {
   // Simplifying assumptions:
   // - If the number of writes is past a certain threshold
   //   (`record_per_page_goal` x `pages_in_segment` x 2), we don't attempt to
@@ -216,14 +213,17 @@ Status Manager::WriteToSegment(
     // Immediately trigger a segment rewrite that merges in the records.
     lock_manager_->ReleaseSegmentLock(segment.sinfo.id(),
                                       SegmentMode::kPageWrite);
+    Status status;
     if (options_.use_segments) {
-      RewriteSegments(segment.lower, records.begin() + start_idx,
-                      records.begin() + end_idx);
+      status = RewriteSegments(segment.lower, records.begin() + start_idx,
+                               records.begin() + end_idx);
     } else {
-      FlattenChain(segment.lower, records.begin() + start_idx,
-                   records.begin() + end_idx);
+      status = FlattenChain(segment.lower, records.begin() + start_idx,
+                            records.begin() + end_idx);
     }
-    return Status::OK();
+    // If the rewrite succeeded then all of the records will have been written
+    // into the new segments.
+    return status.ok() ? (end_idx - start_idx) : 0;
   }
 
   void* orig_page_buf = w_.buffer().get();
@@ -342,14 +342,19 @@ Status Manager::WriteToSegment(
                                         SegmentMode::kPageWrite);
       // The segment is full. We need to rewrite it in order to merge in the
       // writes.
+      Status status;
       if (options_.use_segments) {
-        RewriteSegments(segment.lower, records.begin() + i,
-                        records.begin() + end_idx);
+        status = RewriteSegments(segment.lower, records.begin() + i,
+                                 records.begin() + end_idx);
       } else {
-        FlattenChain(segment.lower, records.begin() + i,
-                     records.begin() + end_idx);
+        status = FlattenChain(segment.lower, records.begin() + i,
+                              records.begin() + end_idx);
       }
-      return Status::OK();
+
+      // If the rewrite succeeded then all the records will have been written
+      // into the new segments. Otherwise only the records we processed up to
+      // index `i` (but excluding `i`) will have been written.
+      return status.ok() ? (end_idx - start_idx) : (i - start_idx);
     }
   }
 
@@ -358,7 +363,9 @@ Status Manager::WriteToSegment(
                                  PageMode::kExclusive);
   lock_manager_->ReleaseSegmentLock(segment.sinfo.id(),
                                     SegmentMode::kPageWrite);
-  return Status::OK();
+
+  // All the records were successfully written.
+  return end_idx - start_idx;
 }
 
 void Manager::ReadPage(const SegmentId& seg_id, size_t page_idx,

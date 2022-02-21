@@ -101,10 +101,11 @@ class Manager {
   // must already hold a `kPageWrite` lock on the segment. This method will
   // release the segment lock when it is done making the write(s).
   //
-  // If the write was successful, this method will return an OK status.
-  // Otherwise if a reorg is needed but a different reorg intervenes, this
-  // method will abort and return `Status::InvalidArgument()`.
-  Status WriteToSegment(const SegmentIndex::Entry& segment,
+  // This method returns the number of records actually written. This number may
+  // be less than the number of records passed to the method; this indicates
+  // that a reorganization intervened during the write. If this happens, the
+  // caller should retry the write.
+  size_t WriteToSegment(const SegmentIndex::Entry& segment,
                         const std::vector<std::pair<Key, Slice>>& records,
                         size_t start_idx, size_t end_idx);
 
