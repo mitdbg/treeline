@@ -30,7 +30,7 @@ Manager::Manager(fs::path db_path,
                  std::vector<std::pair<Key, SegmentInfo>> boundaries,
                  std::vector<SegmentFile> segment_files,
                  PageGroupedDBOptions options, uint32_t next_sequence_number,
-                 FreeList free)
+                 std::unique_ptr<FreeList> free)
     : db_path_(std::move(db_path)),
       lock_manager_(std::make_shared<LockManager>()),
       index_(std::make_unique<SegmentIndex>(lock_manager_)),
@@ -68,7 +68,7 @@ Manager Manager::Reopen(const fs::path& db,
 
   std::vector<SegmentFile> segment_files;
   std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
-  FreeList free;
+  std::unique_ptr<FreeList> free = std::make_unique<FreeList>();
   uint32_t max_sequence = 0;
 
   for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
@@ -88,7 +88,7 @@ Manager Manager::Reopen(const fs::path& db,
       SegmentWrap sw(buf.get(), pages_per_segment);
       if (!sw.CheckChecksum() || !first_page.IsValid()) {
         // This segment is a "hole" in the file and can be reused.
-        free.Add(id);
+        free->Add(id);
         continue;
       }
       if (first_page.IsOverflow()) {
@@ -273,7 +273,7 @@ size_t Manager::WriteToSegment(
 
     } else {
       // Allocate a new page.
-      const auto maybe_free_page = free_.Get(/*page_count=*/1);
+      const auto maybe_free_page = free_->Get(/*page_count=*/1);
       if (maybe_free_page.has_value()) {
         overflow_page_id = *maybe_free_page;
       } else {

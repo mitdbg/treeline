@@ -83,7 +83,7 @@ class Manager {
   Manager(std::filesystem::path db_path,
           std::vector<std::pair<Key, SegmentInfo>> boundaries,
           std::vector<SegmentFile> segment_files, PageGroupedDBOptions options,
-          uint32_t next_sequence_number, FreeList free);
+          uint32_t next_sequence_number, std::unique_ptr<FreeList> free);
 
   static Manager BulkLoadIntoSegments(
       const std::filesystem::path& db_path,
@@ -156,7 +156,7 @@ class Manager {
   std::unique_ptr<SegmentIndex> index_;
   std::vector<SegmentFile> segment_files_;
   uint32_t next_sequence_number_;
-  FreeList free_;
+  std::unique_ptr<FreeList> free_;
   std::unique_ptr<ThreadPool> bg_threads_;
 
   // Options passed in when the `Manager` was created.

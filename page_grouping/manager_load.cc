@@ -119,7 +119,7 @@ Manager Manager::BulkLoadIntoSegments(
   }
 
   Manager m(db_path, {}, std::move(segment_files), options,
-            /*next_sequence_number=*/0, FreeList());
+            /*next_sequence_number=*/0, std::make_unique<FreeList>());
   m.BulkLoadIntoSegmentsImpl(records);
   return m;
 }
@@ -164,7 +164,7 @@ Manager Manager::BulkLoadIntoPages(
                              options.use_memory_based_io);
 
   Manager m(db, {}, std::move(segment_files), options,
-            /*next_sequence_number=*/0, FreeList());
+            /*next_sequence_number=*/0, std::make_unique<FreeList>());
   m.BulkLoadIntoPagesImpl(records);
   return m;
 }
@@ -236,7 +236,7 @@ std::pair<Key, SegmentInfo> Manager::LoadIntoNewSegment(
 
   // Either use an existing free segment or allocate a new one.
   SegmentId seg_id;
-  const auto maybe_seg_id = free_.Get(seg.page_count);
+  const auto maybe_seg_id = free_->Get(seg.page_count);
   if (maybe_seg_id.has_value()) {
     seg_id = *maybe_seg_id;
   } else {
@@ -281,7 +281,7 @@ std::vector<std::pair<Key, SegmentInfo>> Manager::LoadIntoNewPages(
 
     // Write page to disk.
     SegmentId seg_id;
-    const auto maybe_seg_id = free_.Get(/*page_count=*/1);
+    const auto maybe_seg_id = free_->Get(/*page_count=*/1);
     if (maybe_seg_id.has_value()) {
       seg_id = *maybe_seg_id;
     } else {
@@ -313,7 +313,7 @@ std::vector<std::pair<Key, SegmentInfo>> Manager::LoadIntoNewPages(
 
     // Write page to disk.
     SegmentId seg_id;
-    const auto maybe_seg_id = free_.Get(/*page_count=*/1);
+    const auto maybe_seg_id = free_->Get(/*page_count=*/1);
     if (maybe_seg_id.has_value()) {
       seg_id = *maybe_seg_id;
     } else {

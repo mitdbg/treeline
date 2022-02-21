@@ -450,19 +450,22 @@ Status Manager::RewriteSegments(
     for (size_t i = 1; i < segments_to_rewrite.size(); ++i) {
       const SegmentId seg_id = segments_to_rewrite[i].sinfo.id();
       WritePage(seg_id, 0, zero);
-      free_.Add(seg_id);
+      free_->Add(seg_id);
     }
     for (const auto& overflow_to_clear : overflows_to_clear) {
       WritePage(overflow_to_clear, 0, zero);
-      free_.Add(overflow_to_clear);
+      free_->Add(overflow_to_clear);
     }
   }
+  std::vector<SegmentId> to_free;
+  to_free.reserve(segments_to_rewrite.size() + overflows_to_clear.size());
   for (const auto& seg_to_rewrite : segments_to_rewrite) {
-    free_.Add(seg_to_rewrite.sinfo.id());
+    to_free.push_back(seg_to_rewrite.sinfo.id());
   }
   for (const auto& overflow_to_clear : overflows_to_clear) {
-    free_.Add(overflow_to_clear);
+    to_free.push_back(overflow_to_clear);
   }
+  free_->AddBatch(to_free);
 
   // TODO: Log that the rewrite has finished (this log record does not need to
   // be forced to disk for crash consistency).
@@ -582,7 +585,7 @@ Status Manager::FlattenChain(
   lock_manager_->ReleaseSegmentLock(seg.sinfo.id(),
                                     SegmentMode::kReorgExclusive);
 
-  free_.Add(main_page_id);
+  free_->Add(main_page_id);
   if (overflow_page_id.IsValid()) {
     if (bg_threads_ != nullptr) {
       assert(overflow_invalidate.valid());
@@ -590,7 +593,7 @@ Status Manager::FlattenChain(
     } else {
       WritePage(overflow_page_id, 0, zero);
     }
-    free_.Add(overflow_page_id);
+    free_->Add(overflow_page_id);
   }
 
   return Status::OK();
