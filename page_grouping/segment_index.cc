@@ -78,22 +78,24 @@ void SegmentIndex::SetSegmentOverflow(const Key key, bool overflow) {
   it->second.SetOverflow(overflow);
 }
 
-std::vector<std::pair<Key, SegmentInfo>> SegmentIndex::FindRewriteRegion(
-    const Key segment_base) const {
-  std::vector<std::pair<Key, SegmentInfo>> segments_to_rewrite;
+std::vector<SegmentIndex::Entry> SegmentIndex::FindAndLockRewriteRegion(
+    const Key segment_base, const uint32_t search_radius) const {
+  std::vector<SegmentIndex::Entry> segments_to_rewrite;
   {
     std::shared_lock<std::shared_mutex> lock(mutex_);
     const auto it = index_.lower_bound(segment_base);
     assert(it != index_.end());
-    segments_to_rewrite.emplace_back(*it);
+    segments_to_rewrite.emplace_back(IndexIteratorToEntry(it));
 
     // Scan backward.
     if (it != index_.begin()) {
       auto prev_it(it);
-      while (true) {
+      uint32_t num_to_check = search_radius;
+      while (num_to_check > 0) {
         --prev_it;
+        --num_to_check;
         if (!prev_it->second.HasOverflow()) break;
-        segments_to_rewrite.emplace_back(*prev_it);
+        segments_to_rewrite.emplace_back(IndexIteratorToEntry(prev_it));
         if (prev_it == index_.begin()) break;
       }
     }
@@ -101,18 +103,59 @@ std::vector<std::pair<Key, SegmentInfo>> SegmentIndex::FindRewriteRegion(
     // Scan forward.
     auto next_it(it);
     ++next_it;
-    for (; next_it != index_.end(); ++next_it) {
+    for (uint32_t num_to_check = search_radius;
+         num_to_check > 0 && next_it != index_.end();
+         ++next_it, --num_to_check) {
       if (!next_it->second.HasOverflow()) break;
-      segments_to_rewrite.emplace_back(*next_it);
+      segments_to_rewrite.emplace_back(IndexIteratorToEntry(next_it));
     }
   }
+  assert(!segments_to_rewrite.empty());
 
   // Sort the segments.
   std::sort(segments_to_rewrite.begin(), segments_to_rewrite.end(),
-            [](const std::pair<Key, SegmentInfo>& seg1,
-               const std::pair<Key, SegmentInfo>& seg2) {
-              return seg1.first < seg2.first;
+            [](const auto& seg1, const auto& seg2) {
+              return seg1.lower < seg2.lower;
             });
+
+  // Acquire locks in order. We do not hold the index latch while doing this
+  // because acquiring reorg locks may take time.
+  RandExpBackoff backoff(kBackoffSaturate);
+  for (const auto& seg : segments_to_rewrite) {
+    backoff.Reset();
+    while (true) {
+      const bool lock_granted = lock_manager_->TryAcquireSegmentLock(
+          seg.sinfo.id(), LockManager::SegmentMode::kReorg);
+      if (lock_granted) break;
+      backoff.Wait();
+    }
+  }
+
+  // Check that the locked segments are still valid. All segments should exist
+  // and their lower bounds should be consistent. The segments may be invalid if
+  // another reorg intervened.
+  bool still_valid = true;
+  {
+    std::shared_lock<std::shared_mutex> lock(mutex_);
+    auto it = index_.find(segments_to_rewrite.front().lower);
+    for (const auto& seg : segments_to_rewrite) {
+      if (it == index_.end() || it->first != seg.lower) {
+        still_valid = false;
+        break;
+      }
+      ++it;
+    }
+  }
+
+  // Caller will need to retry; the segment ranges have changed.
+  if (!still_valid) {
+    for (const auto& seg : segments_to_rewrite) {
+      lock_manager_->ReleaseSegmentLock(seg.sinfo.id(),
+                                        LockManager::SegmentMode::kReorg);
+    }
+    segments_to_rewrite.clear();
+  }
+
   return segments_to_rewrite;
 }
 

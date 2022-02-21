@@ -61,8 +61,12 @@ class SegmentIndex {
 
   Entry SegmentForKey(const Key key) const;
   std::optional<Entry> NextSegmentForKey(const Key key) const;
-  std::vector<std::pair<Key, SegmentInfo>> FindRewriteRegion(
-      const Key segment_base) const;
+
+  // Find a contiguous segment range to rewrite and acquire locks in `kReorg`
+  // mode on the segments. If the returned vector is empty, the caller must
+  // retry the call.
+  std::vector<Entry> FindAndLockRewriteRegion(const Key segment_base,
+                                              uint32_t search_radius) const;
 
   void SetSegmentOverflow(const Key key, bool overflow);
 

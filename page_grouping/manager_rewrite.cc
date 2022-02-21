@@ -154,15 +154,20 @@ Status Manager::RewriteSegments(
     Key segment_base, std::vector<Record>::const_iterator addtl_rec_begin,
     std::vector<Record>::const_iterator addtl_rec_end) {
   // TODO: Multi-threading concerns.
-  std::vector<std::pair<Key, SegmentInfo>> segments_to_rewrite;
+  std::vector<SegmentIndex::Entry> segments_to_rewrite;
   std::vector<std::pair<Key, SegmentInfo>> rewritten_segments;
   std::vector<SegmentId> overflows_to_clear;
 
   if (options_.consider_neighbors_during_rewrite) {
-    segments_to_rewrite = index_->FindRewriteRegion(segment_base);
+    segments_to_rewrite = index_->FindAndLockRewriteRegion(segment_base, 5);
   } else {
-    const auto seg = index_->SegmentForKey(segment_base);
-    segments_to_rewrite.emplace_back(seg.lower, seg.sinfo);
+    segments_to_rewrite.emplace_back(
+        index_->SegmentForKeyWithLock(segment_base, SegmentMode::kReorg));
+  }
+
+  if (segments_to_rewrite.empty()) {
+    return Status::InvalidArgument(
+        "RewriteSegments(): Could not acquire locks; intervening rewrite.");
   }
   assert(!segments_to_rewrite.empty());
 
@@ -434,7 +439,8 @@ Status Manager::FlattenChain(
   if (base != seg.lower ||
       !ValidRangeForSegment(seg, addtl_rec_begin, addtl_rec_end)) {
     lock_manager_->ReleaseSegmentLock(seg.sinfo.id(), SegmentMode::kReorg);
-    return Status::InvalidArgument("Invalid record range.");
+    return Status::InvalidArgument(
+        "FlattenChain(): Invalid record range; intervening rewrite.");
   }
 
   assert(base == seg.lower);
