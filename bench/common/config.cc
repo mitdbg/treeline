@@ -138,6 +138,9 @@ DEFINE_bool(pg_use_segments, true,
 DEFINE_bool(pg_use_memory_based_io, false,
             "If set, PGLLSM will use memory-based I/O (only meant for setup; "
             "not for use during evaluation).");
+DEFINE_bool(pg_bypass_cache, false,
+            "If set, PGLLSM will bypass the record cache. All requests will "
+            "incur I/O.");
 
 namespace llsm {
 namespace bench {
@@ -213,6 +216,7 @@ llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
   options.record_cache_capacity =
       (FLAGS_cache_size_mib * 1024 * 1024) / (FLAGS_record_size_bytes);
   options.use_memory_based_io = FLAGS_pg_use_memory_based_io;
+  options.bypass_cache = FLAGS_pg_bypass_cache;
   return options;
 }
 
