@@ -45,8 +45,7 @@ CONFIGS = [
 ]
 
 COMMON_OPTIONS = {
-  "threads": 1,
-  "bg_threads": 8,
+  "bg_threads": 4,
   "latency_sample_period": 10,
 
   # Affects RocksDB & LLSM
@@ -62,6 +61,8 @@ COMMON_OPTIONS = {
   "deferral_autotuning": True,
   "max_deferrals": 1,
 }
+
+THREADS = [1, 2, 4, 8, 16]
 
 OSM_DATASET = "'$TP_DATASET_PATH/osm_ny.txt'"
 OSM_MULT = 1.160804
@@ -117,11 +118,18 @@ run_command(
   deps=[":ycsb-1024B"],
 )
 
+run_command(
+  name="combine-single",
+  run="python3 combine_raw.py",
+  deps=[":ycsb-single"],
+)
+
 
 ###
 ### YCSB.
 ###
 
+# All YCSB experiments.
 combine(
   name="ycsb",
   deps=[
@@ -131,19 +139,30 @@ combine(
   ],
 )
 
+# All 64B workloads.
 combine(
   name="ycsb-64B",
   deps=[
-    ":ycsb-{}-{}-64B-{}".format(*zipped)
-    for zipped in product(["synth", "osm", "amzn"], DBS, WORKLOADS)
+    ":ycsb-{}-{}-64B-{}-{}".format(*zipped)
+    for zipped in product(["synth", "osm", "amzn"], DBS, WORKLOADS, THREADS)
   ],
 )
 
+# All 1024B workloads.
 combine(
   name="ycsb-1024B",
   deps=[
-    ":ycsb-{}-{}-1024B-{}".format(*zipped)
-    for zipped in product(["synth", "osm", "amzn"], DBS, WORKLOADS)
+    ":ycsb-{}-{}-1024B-{}-{}".format(*zipped)
+    for zipped in product(["synth", "osm", "amzn"], DBS, WORKLOADS, THREADS)
+  ],
+)
+
+# All single-threaded workloads.
+combine(
+  name="ycsb-single",
+  deps=[
+    ":ycsb-{}-{}-{}-{}-1".format(*zipped)
+    for zipped in product(["synth", "osm", "amzn"], DBS, ["64B", "1024B"], WORKLOADS)
   ],
 )
 
@@ -152,16 +171,17 @@ run_experiment_group(
   run="../run.sh",
   experiments=[
     ExperimentInstance(
-      name="ycsb-synth-{}-{}-{}".format(db, config["name"], workload),
+      name="ycsb-synth-{}-{}-{}-{}".format(db, config["name"], workload, threads),
       options={
         **COMMON_OPTIONS,
         **process_config(db, config),
         "db": db,
         "checkpoint_name": "ycsb-synth-{}-{}".format(db, config["name"]),
         "workload_config": "ycsb_v2/workloads/{}.yml".format(workload),
+        "threads": threads,
       },
     )
-    for db, config, workload in product(DBS, CONFIGS, WORKLOADS)
+    for db, config, workload, threads in product(DBS, CONFIGS, WORKLOADS, THREADS)
   ],
   deps=[
     ":preload-synth-{}-{}".format(db, config["name"])
@@ -174,7 +194,7 @@ run_experiment_group(
   run="../run.sh",
   experiments=[
     ExperimentInstance(
-      name="ycsb-osm-{}-{}-{}".format(db, config["name"], workload),
+      name="ycsb-osm-{}-{}-{}-{}".format(db, config["name"], workload, threads),
       options={
         **COMMON_OPTIONS,
         **process_config(db, config, OSM_MULT),
@@ -182,9 +202,10 @@ run_experiment_group(
         "checkpoint_name": "ycsb-osm-{}-{}".format(db, config["name"]),
         "workload_config": "ycsb_v2/workloads/{}.yml".format(workload),
         "custom_dataset": OSM_DATASET,
+        "threads": threads,
       },
     )
-    for db, config, workload in product(DBS, CONFIGS, WORKLOADS)
+    for db, config, workload, threads in product(DBS, CONFIGS, WORKLOADS, THREADS)
   ],
   deps=[
     ":preload-osm-{}-{}".format(db, config["name"])
@@ -197,7 +218,7 @@ run_experiment_group(
   run="../run.sh",
   experiments=[
     ExperimentInstance(
-      name="ycsb-amzn-{}-{}-{}".format(db, config["name"], workload),
+      name="ycsb-amzn-{}-{}-{}-{}".format(db, config["name"], workload, threads),
       options={
         **COMMON_OPTIONS,
         **process_config(db, config, AMZN_MULT),
@@ -205,9 +226,10 @@ run_experiment_group(
         "checkpoint_name": "ycsb-amzn-{}-{}".format(db, config["name"]),
         "workload_config": "ycsb_v2/workloads/{}.yml".format(workload),
         "custom_dataset": AMZN_DATASET,
+        "threads": threads,
       },
     )
-    for db, config, workload in product(DBS, CONFIGS, WORKLOADS)
+    for db, config, workload, threads in product(DBS, CONFIGS, WORKLOADS, THREADS)
   ],
   deps=[
     ":preload-amzn-{}-{}".format(db, config["name"])
@@ -241,6 +263,7 @@ for db, config in product(DBS, CONFIGS):
       "db": db,
       "checkpoint_name": "ycsb-synth-{}-{}".format(db, config["name"]),
       "workload_config": "ycsb_v2/workloads/setup.yml",
+      "threads": 1,
     },
   )
 
@@ -254,6 +277,7 @@ for db, config in product(DBS, CONFIGS):
       "checkpoint_name": "ycsb-osm-{}-{}".format(db, config["name"]),
       "workload_config": "ycsb_v2/workloads/setup.yml",
       "custom_dataset": OSM_DATASET,
+      "threads": 1,
     },
   )
 
@@ -267,5 +291,6 @@ for db, config in product(DBS, CONFIGS):
       "checkpoint_name": "ycsb-amzn-{}-{}".format(db, config["name"]),
       "workload_config": "ycsb_v2/workloads/setup.yml",
       "custom_dataset": AMZN_DATASET,
+      "threads": 1,
     },
   )
