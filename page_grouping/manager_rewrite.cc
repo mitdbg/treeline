@@ -157,8 +157,9 @@ Status Manager::RewriteSegments(
   std::vector<std::pair<Key, SegmentInfo>> rewritten_segments;
   std::vector<SegmentId> overflows_to_clear;
 
-  if (options_.consider_neighbors_during_rewrite) {
-    segments_to_rewrite = index_->FindAndLockRewriteRegion(segment_base, 5);
+  if (options_.rewrite_search_radius > 0) {
+    segments_to_rewrite = index_->FindAndLockRewriteRegion(
+        segment_base, options_.rewrite_search_radius);
   } else {
     segments_to_rewrite.emplace_back(
         index_->SegmentForKeyWithLock(segment_base, SegmentMode::kReorg));

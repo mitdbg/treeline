@@ -34,8 +34,10 @@ struct PageGroupedDBOptions {
   // only used to issue I/O in parallel when possible.
   size_t num_bg_threads = 16;
 
-  // If set to false, only the segment that is "full" will be rewritten.
-  bool consider_neighbors_during_rewrite = true;
+  // The number of neighboring pages to check (in each direction) when
+  // performing a rewrite of a segment. If set to 0, only the segment that is
+  // "full" will be rewritten.
+  uint32_t rewrite_search_radius = 5;
 
   // The capacity of the record cache in records.
   size_t record_cache_capacity = 1024 * 1024;

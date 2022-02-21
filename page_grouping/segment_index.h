@@ -59,6 +59,7 @@ class SegmentIndex {
   // lower bound is inclusive and the upper bound is exclusive.
   std::pair<Key, Key> GetSegmentBoundsFor(const Key key) const;
 
+  // Similar to the "WithLock" versions, but does not acquire any segment locks.
   Entry SegmentForKey(const Key key) const;
   std::optional<Entry> NextSegmentForKey(const Key key) const;
 
@@ -68,6 +69,7 @@ class SegmentIndex {
   std::vector<Entry> FindAndLockRewriteRegion(const Key segment_base,
                                               uint32_t search_radius) const;
 
+  // Mark whether or not the segment storing `key` has an overflow page.
   void SetSegmentOverflow(const Key key, bool overflow);
 
   // Run `c` while holding an exclusive latch on the index.
@@ -87,8 +89,8 @@ class SegmentIndex {
   OrderedMap::const_iterator SegmentForKeyImpl(const Key key) const;
   Entry IndexIteratorToEntry(OrderedMap::const_iterator it) const;
 
-  // Used for acquiring segment and page locks. This pointer never changes after
-  // the segment index is constructed.
+  // Used for acquiring segment locks. This pointer never changes after the
+  // segment index is constructed.
   std::shared_ptr<LockManager> lock_manager_;
 
   mutable std::shared_mutex mutex_;
