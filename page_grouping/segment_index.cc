@@ -20,8 +20,7 @@ SegmentIndex::SegmentIndex(std::shared_ptr<LockManager> lock_manager)
 
 SegmentIndex::Entry SegmentIndex::SegmentForKey(const Key key) const {
   std::shared_lock<std::shared_mutex> lock(mutex_);
-  // Return a copy.
-  return SegmentForKeyImpl(key);
+  return IndexIteratorToEntry(SegmentForKeyImpl(key));
 }
 
 SegmentIndex::Entry SegmentIndex::SegmentForKeyWithLock(
@@ -30,12 +29,11 @@ SegmentIndex::Entry SegmentIndex::SegmentForKeyWithLock(
   while (true) {
     {
       std::shared_lock<std::shared_mutex> lock(mutex_);
-      auto& entry = SegmentForKeyImpl(key);
+      const auto it = SegmentForKeyImpl(key);
       const bool lock_granted =
-          lock_manager_->TryAcquireSegmentLock(entry.second.id(), mode);
+          lock_manager_->TryAcquireSegmentLock(it->second.id(), mode);
       if (lock_granted) {
-        // Returns a copy.
-        return entry;
+        return IndexIteratorToEntry(it);
       }
     }
     backoff.Wait();
@@ -50,7 +48,7 @@ std::optional<SegmentIndex::Entry> SegmentIndex::NextSegmentForKey(
     return std::optional<Entry>();
   }
   // Return a copy.
-  return *it;
+  return IndexIteratorToEntry(it);
 }
 
 std::optional<SegmentIndex::Entry> SegmentIndex::NextSegmentForKeyWithLock(
@@ -67,7 +65,7 @@ std::optional<SegmentIndex::Entry> SegmentIndex::NextSegmentForKeyWithLock(
           lock_manager_->TryAcquireSegmentLock(it->second.id(), mode);
       if (lock_granted) {
         // Returns a copy.
-        return *it;
+        return IndexIteratorToEntry(it);
       }
     }
     backoff.Wait();
@@ -76,13 +74,13 @@ std::optional<SegmentIndex::Entry> SegmentIndex::NextSegmentForKeyWithLock(
 
 void SegmentIndex::SetSegmentOverflow(const Key key, bool overflow) {
   std::unique_lock<std::shared_mutex> lock(mutex_);
-  auto& entry = SegmentForKeyImpl(key);
-  entry.second.SetOverflow(overflow);
+  auto it = SegmentForKeyImpl(key);
+  it->second.SetOverflow(overflow);
 }
 
-std::vector<SegmentIndex::Entry> SegmentIndex::FindRewriteRegion(
+std::vector<std::pair<Key, SegmentInfo>> SegmentIndex::FindRewriteRegion(
     const Key segment_base) const {
-  std::vector<Entry> segments_to_rewrite;
+  std::vector<std::pair<Key, SegmentInfo>> segments_to_rewrite;
   {
     std::shared_lock<std::shared_mutex> lock(mutex_);
     const auto it = index_.lower_bound(segment_base);
@@ -118,21 +116,49 @@ std::vector<SegmentIndex::Entry> SegmentIndex::FindRewriteRegion(
   return segments_to_rewrite;
 }
 
-SegmentIndex::Entry& SegmentIndex::SegmentForKeyImpl(const Key key) {
+std::pair<Key, Key> SegmentIndex::GetSegmentBoundsFor(const Key key) const {
+  std::shared_lock<std::shared_mutex> lock(mutex_);
+  auto it = SegmentForKeyImpl(key);
+  const Key lower = it->first;
+  ++it;
+  if (it == index_.end()) {
+    return {lower, std::numeric_limits<Key>::max()};
+  } else {
+    return {lower, it->first};
+  }
+}
+
+SegmentIndex::OrderedMap::iterator SegmentIndex::SegmentForKeyImpl(
+    const Key key) {
   auto it = index_.upper_bound(key);
   if (it != index_.begin()) {
     --it;
   }
-  return *it;
+  return it;
 }
 
-const SegmentIndex::Entry& SegmentIndex::SegmentForKeyImpl(
+SegmentIndex::OrderedMap::const_iterator SegmentIndex::SegmentForKeyImpl(
     const Key key) const {
   auto it = index_.upper_bound(key);
   if (it != index_.begin()) {
     --it;
   }
-  return *it;
+  return it;
+}
+
+SegmentIndex::Entry SegmentIndex::IndexIteratorToEntry(
+    SegmentIndex::OrderedMap::const_iterator it) const {
+  // We deliberately make a copy.
+  Entry entry;
+  entry.lower = it->first;
+  entry.sinfo = it->second;
+  ++it;
+  if (it == index_.end()) {
+    entry.upper = std::numeric_limits<Key>::max();
+  } else {
+    entry.upper = it->first;
+  }
+  return entry;
 }
 
 }  // namespace pg

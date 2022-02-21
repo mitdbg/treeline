@@ -16,8 +16,12 @@ namespace pg {
 // Maps keys to segments.
 class SegmentIndex {
  public:
-  // Base key and segment metadata.
-  using Entry = std::pair<Key, SegmentInfo>;
+  struct Entry {
+    // The key boundaries of the segment.
+    // Lower is inclusive (and is the segment's base key). Upper is exclusive.
+    Key lower, upper;
+    SegmentInfo sinfo;
+  };
 
   explicit SegmentIndex(std::shared_ptr<LockManager> lock_manager);
 
@@ -51,9 +55,14 @@ class SegmentIndex {
   std::optional<Entry> NextSegmentForKeyWithLock(
       const Key key, LockManager::SegmentMode mode) const;
 
+  // Returns the boundaries of the segment on which `key` should be stored. The
+  // lower bound is inclusive and the upper bound is exclusive.
+  std::pair<Key, Key> GetSegmentBoundsFor(const Key key) const;
+
   Entry SegmentForKey(const Key key) const;
   std::optional<Entry> NextSegmentForKey(const Key key) const;
-  std::vector<Entry> FindRewriteRegion(const Key segment_base) const;
+  std::vector<std::pair<Key, SegmentInfo>> FindRewriteRegion(
+      const Key segment_base) const;
 
   void SetSegmentOverflow(const Key key, bool overflow);
 
@@ -69,8 +78,10 @@ class SegmentIndex {
   auto EndIterator() const { return index_.end(); }
 
  private:
-  Entry& SegmentForKeyImpl(const Key key);
-  const Entry& SegmentForKeyImpl(const Key key) const;
+  using OrderedMap = tlx::btree_map<Key, SegmentInfo>;
+  OrderedMap::iterator SegmentForKeyImpl(const Key key);
+  OrderedMap::const_iterator SegmentForKeyImpl(const Key key) const;
+  Entry IndexIteratorToEntry(OrderedMap::const_iterator it) const;
 
   // Used for acquiring segment and page locks. This pointer never changes after
   // the segment index is constructed.
@@ -79,7 +90,7 @@ class SegmentIndex {
   mutable std::shared_mutex mutex_;
   // TODO: In theory, this can be any ordered key-value data structure (e.g.,
   // ART).
-  tlx::btree_map<Key, SegmentInfo> index_;
+  OrderedMap index_;
 };
 
 }  // namespace pg

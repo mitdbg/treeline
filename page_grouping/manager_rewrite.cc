@@ -144,7 +144,8 @@ void Manager::RewriteSegments(
   if (options_.consider_neighbors_during_rewrite) {
     segments_to_rewrite = index_->FindRewriteRegion(segment_base);
   } else {
-    segments_to_rewrite.emplace_back(index_->SegmentForKey(segment_base));
+    const auto seg = index_->SegmentForKey(segment_base);
+    segments_to_rewrite.emplace_back(seg.lower, seg.sinfo);
   }
   assert(!segments_to_rewrite.empty());
 
@@ -220,7 +221,7 @@ void Manager::RewriteSegments(
               const auto maybe_next_seg = index_->NextSegmentForKey(
                   segments.back().records.back().first);
               if (maybe_next_seg.has_value()) {
-                upper_bound = maybe_next_seg->first;
+                upper_bound = maybe_next_seg->lower;
               } else {
                 // We are rewriting the last segment in the database.
                 upper_bound = std::numeric_limits<Key>::max();
@@ -411,17 +412,11 @@ void Manager::RewriteSegments(
 void Manager::FlattenChain(
     const Key base, const std::vector<Record>::const_iterator addtl_rec_begin,
     const std::vector<Record>::const_iterator addtl_rec_end) {
-  const auto [seg_base, sinfo] = index_->SegmentForKey(base);
-  assert(base == seg_base);
-  assert(sinfo.page_count() == 1);
-  const SegmentId main_page_id = sinfo.id();
-
-  // Retrieve the upper bound.
-  const auto maybe_upper_seg = index_->NextSegmentForKey(base);
-  Key upper = std::numeric_limits<Key>::max();
-  if (maybe_upper_seg.has_value()) {
-    upper = maybe_upper_seg->first;
-  }
+  const auto seg = index_->SegmentForKey(base);
+  assert(base == seg.lower);
+  assert(seg.sinfo.page_count() == 1);
+  const SegmentId main_page_id = seg.sinfo.id();
+  const Key upper = seg.upper;
 
   // Load the existing page(s).
   PageBuffer buf = PageMemoryAllocator::Allocate(/*num_pages=*/2);
