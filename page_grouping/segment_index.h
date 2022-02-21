@@ -34,7 +34,7 @@ class SegmentIndex {
 
   // Atomically retrieves the segment that is responsible for `key` and acquires
   // a lock on the segment. This method is only meant to be used for acquiring
-  // locks with the `kPageRead` and `kPageWrite` modes.
+  // locks with the `kPageRead`, `kPageWrite`, and `kReorg` modes.
   //
   // The caller is responsible for releasing the lock.
   Entry SegmentForKeyWithLock(const Key key,

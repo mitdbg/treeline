@@ -113,15 +113,23 @@ class Manager {
   //
   // If `consider_adjacent` is true, this method will also rewrite all logically
   // neighboring segments that also have overflows.
-  void RewriteSegments(Key segment_base,
-                       std::vector<Record>::const_iterator addtl_rec_begin,
-                       std::vector<Record>::const_iterator addtl_rec_end);
+  //
+  // This method may return a non-OK status which indicates that the additional
+  // records passed in do not belong to the specified segment and that the
+  // rewrite was aborted. This happens when a concurrent reorg intervenes.
+  Status RewriteSegments(Key segment_base,
+                         std::vector<Record>::const_iterator addtl_rec_begin,
+                         std::vector<Record>::const_iterator addtl_rec_end);
 
   // Flatten the given page chain and merge in the additional records (which
   // must fall in the key space assigned to the given page chain).
-  void FlattenChain(Key base,
-                    std::vector<Record>::const_iterator addtl_rec_begin,
-                    std::vector<Record>::const_iterator addtl_rec_end);
+  //
+  // This method may return a non-OK status which indicates that the additional
+  // records passed in do not belong to the specified segment and that the
+  // flatten was aborted. This happens when a concurrent reorg intervenes.
+  Status FlattenChain(Key base,
+                      std::vector<Record>::const_iterator addtl_rec_begin,
+                      std::vector<Record>::const_iterator addtl_rec_end);
 
   // Helpers for convenience.
   void ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer) const;

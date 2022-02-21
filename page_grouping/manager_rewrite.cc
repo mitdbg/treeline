@@ -16,6 +16,9 @@ namespace {
 using namespace llsm;
 using namespace llsm::pg;
 
+using SegmentMode = LockManager::SegmentMode;
+using PageMode = LockManager::PageMode;
+
 class PageChain {
  public:
   PageChain() : main_page_(nullptr), overflow_page_(nullptr) {}
@@ -128,12 +131,26 @@ class PagePlusRecordMerger {
   std::vector<Record>::const_iterator it_end_;
 };
 
+// Returns true iff the record range [begin, end) belongs in `segment`. Note
+// that `begin` and `end` must refer to a sorted range.
+bool ValidRangeForSegment(const SegmentIndex::Entry& segment,
+                          std::vector<Record>::const_iterator begin,
+                          std::vector<Record>::const_iterator end) {
+  // Empty range.
+  if (begin == end) return true;
+  const Key first_key = begin->first;
+  const Key last_key = (end - 1)->first;
+  // This function requires a sorted range, so we implicitly have
+  // `first_key` <= `last_key`.
+  return segment.lower <= first_key && last_key < segment.upper;
+}
+
 }  // namespace
 
 namespace llsm {
 namespace pg {
 
-void Manager::RewriteSegments(
+Status Manager::RewriteSegments(
     Key segment_base, std::vector<Record>::const_iterator addtl_rec_begin,
     std::vector<Record>::const_iterator addtl_rec_end) {
   // TODO: Multi-threading concerns.
@@ -407,18 +424,27 @@ void Manager::RewriteSegments(
 
   // TODO: Log that the rewrite has finished (this log record does not need to
   // be forced to disk for crash consistency).
+  return Status::OK();
 }
 
-void Manager::FlattenChain(
+Status Manager::FlattenChain(
     const Key base, const std::vector<Record>::const_iterator addtl_rec_begin,
     const std::vector<Record>::const_iterator addtl_rec_end) {
-  const auto seg = index_->SegmentForKey(base);
+  const auto seg = index_->SegmentForKeyWithLock(base, SegmentMode::kReorg);
+  if (base != seg.lower ||
+      !ValidRangeForSegment(seg, addtl_rec_begin, addtl_rec_end)) {
+    lock_manager_->ReleaseSegmentLock(seg.sinfo.id(), SegmentMode::kReorg);
+    return Status::InvalidArgument("Invalid record range.");
+  }
+
   assert(base == seg.lower);
   assert(seg.sinfo.page_count() == 1);
   const SegmentId main_page_id = seg.sinfo.id();
   const Key upper = seg.upper;
 
   // Load the existing page(s).
+  // NOTE: No need for page lock(s) if you hold the segment lock in `kReorg`
+  // mode.
   PageBuffer buf = PageMemoryAllocator::Allocate(/*num_pages=*/2);
   ReadPage(main_page_id, 0, buf.get());
   pg::Page main(buf.get());
@@ -470,40 +496,60 @@ void Manager::FlattenChain(
   const auto new_pages = LoadIntoNewPages(sequence_number, base, upper,
                                           records.begin(), records.end());
 
-  // Update the free list and mark the old pages as invalid.
+  // The flattened chain has been written to new pages. Now we upgrade the
+  // segment lock to `kReorgExclusive` to wait for any concurrent readers to
+  // finish reading the old chain.
+  lock_manager_->UpgradeSegmentLockToReorgExclusive(seg.sinfo.id());
+
+  // For crash consistency, we need to invalidate at least one of the old pages
+  // before exposing the newly rewritten pages. Ideally we would submit
+  // invalidations for both pages and wait for the first one to complete, but
+  // the C++ futures library does not provide this functionality. So we just
+  // wait for the main page to be invalidated before proceeding.
+
   void* const zero = buf.get();
   memset(zero, 0, pg::Page::kSize);
-  std::vector<std::future<void>> write_futures;
+
+  // If we can run this additional invalidation in the background, do so.
+  std::future<void> main_invalidate, overflow_invalidate;
   if (bg_threads_ != nullptr) {
-    write_futures.push_back(bg_threads_->Submit(
-        [this, main_page_id, zero]() { WritePage(main_page_id, 0, zero); }));
-    free_.Add(main_page_id);
+    main_invalidate = bg_threads_->Submit(
+        [this, main_page_id, zero]() { WritePage(main_page_id, 0, zero); });
     if (overflow_page_id.IsValid()) {
-      write_futures.push_back(
+      overflow_invalidate =
           bg_threads_->Submit([this, overflow_page_id, zero]() {
             WritePage(overflow_page_id, 0, zero);
-          }));
-      free_.Add(overflow_page_id);
+          });
     }
-
+    main_invalidate.get();
   } else {
-    WritePage(main_page_id, 0, buf.get());
-    free_.Add(main_page_id);
-    if (overflow_page_id.IsValid()) {
-      WritePage(overflow_page_id, 0, buf.get());
-      free_.Add(overflow_page_id);
-    }
+    WritePage(main_page_id, 0, zero);
   }
 
-  // Remove the old segment info and replace it with the new pages.
+  // TODO: Log that the flatten (rewrite) has finished.
+
+  // Remove the old segment info and replace it with the new pages. At this
+  // point the new pages become visible to other threads. The old pages will no
+  // longer be accessible, so we can also release the exclusive segment lock.
   index_->RunExclusive([&base, &new_pages](auto& raw_index) {
     raw_index.erase(base);
     raw_index.insert(new_pages.begin(), new_pages.end());
   });
+  lock_manager_->ReleaseSegmentLock(seg.sinfo.id(),
+                                    SegmentMode::kReorgExclusive);
 
-  for (auto& f : write_futures) {
-    f.get();
+  free_.Add(main_page_id);
+  if (overflow_page_id.IsValid()) {
+    if (bg_threads_ != nullptr) {
+      assert(overflow_invalidate.valid());
+      overflow_invalidate.get();
+    } else {
+      WritePage(overflow_page_id, 0, zero);
+    }
+    free_.Add(overflow_page_id);
   }
+
+  return Status::OK();
 }
 
 }  // namespace pg
