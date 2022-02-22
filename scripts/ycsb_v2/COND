@@ -108,7 +108,7 @@ CUSTOM_DATASETS = [
 # Number of uniform updates to make during the preload process. The purpose of
 # these updates is to ensure that RocksDB has sstables present in multiple
 # levels.
-NUM_PRELOAD_UPDATES = 50000000
+NUM_PRELOAD_UPDATES = 40000000
 
 
 ###
@@ -263,6 +263,8 @@ combine(
     ":synth-rocksdb-64B-a-zipfian-8",
     ":amzn-pg_llsm-64B-c-zipfian-8",
     ":amzn-rocksdb-64B-c-zipfian-8",
+    ":osm-pg_llsm-64B-e-zipfian-8",
+    ":osm-rocksdb-64B-e-zipfian-8",
   ],
 )
 
