@@ -73,8 +73,7 @@ class LLSMInterface {
     keys.reserve(load.size());
     records.reserve(load.size());
     for (const auto& req : load) {
-      const llsm::key_utils::IntKeyAsSlice strkey(req.key);
-      keys.push_back(strkey);
+      keys.emplace_back(req.key);
       records.emplace_back(keys.back().as<llsm::Slice>(),
                            llsm::Slice(req.value, req.value_size));
     }
