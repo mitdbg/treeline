@@ -45,6 +45,9 @@ class LockManager {
   // ---+---+---+
   //  X | N | N |
   // ---+---+---+
+  // Page locks are currently only acquired on the "main" page located in a
+  // segment. As a result, the page lock on the main page protects both the main
+  // page and its overflow (if one exists).
   enum class PageMode : uint8_t {
     kShared = 0,    // S
     kExclusive = 1  // X

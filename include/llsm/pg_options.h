@@ -34,7 +34,7 @@ struct PageGroupedDBOptions {
   // only used to issue I/O in parallel when possible.
   size_t num_bg_threads = 16;
 
-  // The number of neighboring pages to check (in each direction) when
+  // The number of neighboring segments to check (in each direction) when
   // performing a rewrite of a segment. If set to 0, only the segment that is
   // "full" will be rewritten.
   uint32_t rewrite_search_radius = 5;
