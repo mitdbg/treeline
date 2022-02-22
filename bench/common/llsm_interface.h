@@ -68,12 +68,15 @@ class LLSMInterface {
 
   // Load the records into the database.
   void BulkLoad(const ycsbr::BulkLoadTrace& load) {
+    std::vector<llsm::key_utils::IntKeyAsSlice> keys;
     std::vector<std::pair<const llsm::Slice, const llsm::Slice>> records;
-
+    keys.reserve(load.size());
+    records.reserve(load.size());
     for (const auto& req : load) {
       const llsm::key_utils::IntKeyAsSlice strkey(req.key);
-      records.push_back(
-          {strkey.as<llsm::Slice>(), llsm::Slice(req.value, req.value_size)});
+      keys.push_back(strkey);
+      records.emplace_back(keys.back().as<llsm::Slice>(),
+                           llsm::Slice(req.value, req.value_size));
     }
 
     llsm::WriteOptions options;
