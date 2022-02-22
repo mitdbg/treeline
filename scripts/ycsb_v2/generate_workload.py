@@ -31,7 +31,7 @@ def main():
     config = {
         "range_min": args.gen_range_min,
         "range_max": args.gen_range_max,
-        "num_requests": args.gen_num_records,
+        "num_requests": args.gen_num_requests,
         "distribution": ZIPFIAN_DIST
         if args.gen_distribution == "zipfian"
         else UNIFORM_DIST,

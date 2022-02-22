@@ -53,15 +53,13 @@ args=$(python3 generate_workload.py ${all_args[@]})
 mkdir -p $DB_CHECKPOINT_PATH
 
 if [ $db_type == "rocksdb" ] || [ $db_type == "all" ]; then
-  # RocksDB - Important to use 64 MiB memtables to ensure the emitted sstables
-  #           are small too.
+  # RocksDB
   ../../build/bench/run_custom \
     ${args[@]} \
     --db=rocksdb \
     --db_path=$full_checkpoint_path \
     --bg_threads=16 \
     --bypass_wal=true \
-    --memtable_size_mib=64 \
     --workload_config=$COND_OUT/workload.yml \
     --use_direct_io=true \
     --seed=$SEED \
