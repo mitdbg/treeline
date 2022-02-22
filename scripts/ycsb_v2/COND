@@ -51,10 +51,8 @@ CONFIGS = [
     "cache_mib": 2235,
 
     # Used to configure the length of the workload.
-    # These request counts are 16x lower than the ones used for the 64B
-    # workload.
-    "point_requests": 500000,
-    "scan_requests": 150000,
+    "point_requests": 4000000,
+    "scan_requests": 1200000,
   },
 ]
 
