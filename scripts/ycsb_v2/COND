@@ -9,6 +9,10 @@ DBS = [
   "rocksdb",
 ]
 
+DISTRIBUTIONS = ["zipfian", "uniform"]
+
+THREADS = [1, 2, 4, 8, 16]
+
 CONFIGS = [
   {
     "name": "64B",
@@ -73,8 +77,6 @@ COMMON_OPTIONS = {
   "max_deferrals": 1,
 }
 
-THREADS = [1, 2, 4, 8, 16]
-
 SYNTH_DATASET = {
   "name": "synth",
   "mem_mult": 1,
@@ -102,6 +104,11 @@ CUSTOM_DATASETS = [
     "range_max": 53096592,
   },
 ]
+
+# Number of uniform updates to make during the preload process. The purpose of
+# these updates is to ensure that RocksDB has sstables present in multiple
+# levels.
+NUM_PRELOAD_UPDATES = 50000000
 
 
 ###
@@ -170,10 +177,37 @@ run_command(
   deps=[":single"],
 )
 
+run_command(
+  name="combine-zipfian",
+  run="python3 combine_raw.py",
+  deps=[":zipfian"],
+)
+
+run_command(
+  name="combine-sanity_check",
+  run="python3 combine_raw.py",
+  deps=[":sanity_check"],
+)
+
 
 ###
 ### YCSB.
 ###
+
+ALL_EXPERIMENTS = [
+  ":{}-{}-{}-{}-{}-{}".format(*zipped)
+  for zipped in product(
+    ["synth", "osm", "amzn"],
+    DBS,
+    ["64B", "1024B"],
+    WORKLOADS,
+    DISTRIBUTIONS,
+    THREADS,
+  )
+  # The uniform and zipfian "d" workloads are the same, so we only run one of
+  # them.
+  if zipped[3] != "d" or zipped[4] == "zipfian"
+]
 
 # All YCSB experiments.
 combine(
@@ -188,37 +222,84 @@ combine(
 # All 64B workloads.
 combine(
   name="64B",
-  deps=[
-    ":{}-{}-64B-{}-{}".format(*zipped)
-    for zipped in product(["synth", "osm", "amzn"], DBS, WORKLOADS, THREADS)
-  ],
+  deps=list(filter(lambda exp: "64B" in exp, ALL_EXPERIMENTS)),
 )
 
 # All 1024B workloads.
 combine(
   name="1024B",
-  deps=[
-    ":{}-{}-1024B-{}-{}".format(*zipped)
-    for zipped in product(["synth", "osm", "amzn"], DBS, WORKLOADS, THREADS)
-  ],
+  deps=list(filter(lambda exp: "1024B" in exp, ALL_EXPERIMENTS)),
 )
 
 # All single-threaded workloads.
 combine(
   name="single",
+  deps=list(filter(lambda exp: exp.endswith("-1"), ALL_EXPERIMENTS)),
+)
+
+# All zipfian workloads.
+combine(
+  name="zipfian",
+  deps=list(filter(lambda exp: "zipfian" in exp, ALL_EXPERIMENTS)),
+)
+
+# All RocksDB workloads.
+combine(
+  name="rocksdb",
+  deps=list(filter(lambda exp: "rocksdb" in exp, ALL_EXPERIMENTS)),
+)
+
+# All page-grouped LLSM workloads.
+combine(
+  name="pg_llsm",
+  deps=list(filter(lambda exp: "pg_llsm" in exp, ALL_EXPERIMENTS)),
+)
+
+# A selection of a few workloads to use for testing.
+combine(
+  name="sanity_check",
   deps=[
-    ":{}-{}-{}-{}-1".format(*zipped)
-    for zipped in product(["synth", "osm", "amzn"], DBS, ["64B", "1024B"], WORKLOADS)
+    ":synth-pg_llsm-64B-a-zipfian-8",
+    ":synth-rocksdb-64B-a-zipfian-8",
+    ":amzn-pg_llsm-64B-c-zipfian-8",
+    ":amzn-rocksdb-64B-c-zipfian-8",
   ],
 )
+
+# Used for dividing up the experiments across 2 machines. Run this task on
+# machine 1 of 2.
+group(
+  name="ycsb-1-of-2",
+  deps=[
+    exp_name
+    for idx, exp_name in enumerate(ALL_EXPERIMENTS)
+    if idx % 2 == 0
+  ],
+)
+
+# Used for dividing up the experiments across 2 machines. Run this task on
+# machine 2 of 2.
+group(
+  name="ycsb-2-of-2",
+  deps=[
+    exp_name
+    for idx, exp_name in enumerate(ALL_EXPERIMENTS)
+    if idx % 2 == 1
+  ],
+)
+
+
+###
+### The actual YCSB experiment definitions.
+###
 
 run_experiment_group(
   name="synth",
   run="./run.sh",
   experiments=[
-    # e.g. synth-pg_llsm-64B-a-1
+    # e.g. synth-pg_llsm-64B-a-zipfian-1
     ExperimentInstance(
-      name="synth-{}-{}-{}-{}".format(db, config["name"], workload, threads),
+      name="synth-{}-{}-{}-{}-{}".format(db, config["name"], workload, dist, threads),
       options={
         **COMMON_OPTIONS,
         **process_config(db, config, SYNTH_DATASET, workload),
@@ -226,9 +307,18 @@ run_experiment_group(
         "checkpoint_name": "ycsb-synth-{}-{}".format(db, config["name"]),
         "threads": threads,
         "gen_template": "workloads/{}.yml".format(workload),
+        "gen_distribution": dist,
       },
     )
-    for db, config, workload, threads in product(DBS, CONFIGS, WORKLOADS, THREADS)
+    for db, config, workload, dist, threads in product(
+      DBS,
+      CONFIGS,
+      WORKLOADS,
+      DISTRIBUTIONS,
+      THREADS,
+    )
+    # The uniform and zipfian "d" workloads are the same, so just run one.
+    if workload != "d" or dist == "zipfian"
   ],
   deps=[
     # e.g. :preload-synth-pg_llsm-64B
@@ -243,9 +333,9 @@ for dataset in CUSTOM_DATASETS:
     name="{}".format(dataset["name"]),
     run="./run.sh",
     experiments=[
-      # e.g. amzn-pg_llsm-64B-a-1
+      # e.g. amzn-pg_llsm-64B-a-zipfian-1
       ExperimentInstance(
-        name="{}-{}-{}-{}-{}".format(dataset["name"], db, config["name"], workload, threads),
+        name="{}-{}-{}-{}-{}-{}".format(dataset["name"], db, config["name"], workload, dist, threads),
         options={
           **COMMON_OPTIONS,
           **process_config(db, config, dataset, workload),
@@ -254,9 +344,18 @@ for dataset in CUSTOM_DATASETS:
           "custom_dataset": dataset["path"],
           "threads": threads,
           "gen_template": "workloads/{}.yml".format(workload),
+          "gen_distribution": dist,
         },
       )
-      for db, config, workload, threads in product(DBS, CONFIGS, WORKLOADS, THREADS)
+      for db, config, workload, dist, threads in product(
+        DBS,
+        CONFIGS,
+        WORKLOADS,
+        DISTRIBUTIONS,
+        THREADS,
+      )
+      # The uniform and zipfian "d" workloads are the same, so just run one.
+      if workload != "d" or dist == "zipfian"
     ],
     deps=[
       # e.g. :preload-amzn-pg_llsm-64B
@@ -294,6 +393,8 @@ for db, config in product(DBS, CONFIGS):
       "checkpoint_name": "ycsb-synth-{}-{}".format(db, config["name"]),
       "threads": 1,
       "gen_template": "workloads/setup.yml",
+      # NOTE: This overrides any previously set value.
+      "gen_num_requests": NUM_PRELOAD_UPDATES,
     },
   )
 
@@ -309,5 +410,7 @@ for db, config in product(DBS, CONFIGS):
         "custom_dataset": dataset["path"],
         "threads": 1,
         "gen_template": "workloads/setup.yml",
+        # NOTE: This overrides any previously set value.
+        "gen_num_requests": NUM_PRELOAD_UPDATES,
       },
     )
