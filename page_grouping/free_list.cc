@@ -12,10 +12,12 @@ FreeList::FreeList() {
 }
 
 void FreeList::Add(SegmentId id) {
-  list_[id.GetFileId()].push(id);
+  std::unique_lock<std::mutex> lock(mutex_);
+  AddImpl(id);
 }
 
 std::optional<SegmentId> FreeList::Get(const size_t page_count) {
+  std::unique_lock<std::mutex> lock(mutex_);
   const auto it = SegmentBuilder::kPageCountToSegment.find(page_count);
   assert(it != SegmentBuilder::kPageCountToSegment.end());
   const size_t file_id = it->second;
@@ -26,6 +28,17 @@ std::optional<SegmentId> FreeList::Get(const size_t page_count) {
   const SegmentId free = list_[file_id].front();
   list_[file_id].pop();
   return free;
+}
+
+void FreeList::AddBatch(const std::vector<SegmentId>& ids) {
+  std::unique_lock<std::mutex> lock(mutex_);
+  for (const auto& id : ids) {
+    AddImpl(id);
+  }
+}
+
+void FreeList::AddImpl(SegmentId id) {
+  list_[id.GetFileId()].push(id);
 }
 
 }  // namespace pg

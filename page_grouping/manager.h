@@ -11,6 +11,7 @@
 #include "llsm/pg_options.h"
 #include "llsm/slice.h"
 #include "llsm/status.h"
+#include "lock_manager.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
 #include "segment_index.h"
@@ -82,7 +83,7 @@ class Manager {
   Manager(std::filesystem::path db_path,
           std::vector<std::pair<Key, SegmentInfo>> boundaries,
           std::vector<SegmentFile> segment_files, PageGroupedDBOptions options,
-          uint32_t next_sequence_number, FreeList free);
+          uint32_t next_sequence_number, std::unique_ptr<FreeList> free);
 
   static Manager BulkLoadIntoSegments(
       const std::filesystem::path& db_path,
@@ -96,8 +97,15 @@ class Manager {
       const PageGroupedDBOptions& options);
   void BulkLoadIntoPagesImpl(const std::vector<Record>& records);
 
-  // Write the range [start_idx, end_idx) into the given segment.
-  Status WriteToSegment(const SegmentIndex::Entry& segment,
+  // Write the range [start_idx, end_idx) into the given segment. The caller
+  // must already hold a `kPageWrite` lock on the segment. This method will
+  // release the segment lock when it is done making the write(s).
+  //
+  // This method returns the number of records actually written. This number may
+  // be less than the number of records passed to the method; this indicates
+  // that a reorganization intervened during the write. If this happens, the
+  // caller should retry the write.
+  size_t WriteToSegment(const SegmentIndex::Entry& segment,
                         const std::vector<std::pair<Key, Slice>>& records,
                         size_t start_idx, size_t end_idx);
 
@@ -106,15 +114,23 @@ class Manager {
   //
   // If `consider_adjacent` is true, this method will also rewrite all logically
   // neighboring segments that also have overflows.
-  void RewriteSegments(Key segment_base,
-                       std::vector<Record>::const_iterator addtl_rec_begin,
-                       std::vector<Record>::const_iterator addtl_rec_end);
+  //
+  // This method may return a non-OK status which indicates that the additional
+  // records passed in do not belong to the specified segment and that the
+  // rewrite was aborted. This happens when a concurrent reorg intervenes.
+  Status RewriteSegments(Key segment_base,
+                         std::vector<Record>::const_iterator addtl_rec_begin,
+                         std::vector<Record>::const_iterator addtl_rec_end);
 
   // Flatten the given page chain and merge in the additional records (which
   // must fall in the key space assigned to the given page chain).
-  void FlattenChain(Key base,
-                    std::vector<Record>::const_iterator addtl_rec_begin,
-                    std::vector<Record>::const_iterator addtl_rec_end);
+  //
+  // This method may return a non-OK status which indicates that the additional
+  // records passed in do not belong to the specified segment and that the
+  // flatten was aborted. This happens when a concurrent reorg intervenes.
+  Status FlattenChain(Key base,
+                      std::vector<Record>::const_iterator addtl_rec_begin,
+                      std::vector<Record>::const_iterator addtl_rec_end);
 
   // Helpers for convenience.
   void ReadPage(const SegmentId& seg_id, size_t page_idx, void* buffer) const;
@@ -136,10 +152,11 @@ class Manager {
       std::vector<Record>::const_iterator rec_end);
 
   std::filesystem::path db_path_;
+  std::shared_ptr<LockManager> lock_manager_;
   std::unique_ptr<SegmentIndex> index_;
   std::vector<SegmentFile> segment_files_;
   uint32_t next_sequence_number_;
-  FreeList free_;
+  std::unique_ptr<FreeList> free_;
   std::unique_ptr<ThreadPool> bg_threads_;
 
   // Options passed in when the `Manager` was created.

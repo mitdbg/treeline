@@ -16,6 +16,9 @@ namespace {
 using namespace llsm;
 using namespace llsm::pg;
 
+using SegmentMode = LockManager::SegmentMode;
+using PageMode = LockManager::PageMode;
+
 class PageChain {
  public:
   PageChain() : main_page_(nullptr), overflow_page_(nullptr) {}
@@ -128,25 +131,56 @@ class PagePlusRecordMerger {
   std::vector<Record>::const_iterator it_end_;
 };
 
+// Returns true iff the record range [begin, end) belongs in [lower, upper).
+// Note that `begin` and `end` must refer to a sorted range.
+bool ValidRangeForSegment(const Key lower, const Key upper,
+                          std::vector<Record>::const_iterator begin,
+                          std::vector<Record>::const_iterator end) {
+  // Empty range.
+  if (begin == end) return true;
+  const Key first_key = begin->first;
+  const Key last_key = (end - 1)->first;
+  // This function requires a sorted range, so we implicitly have
+  // `first_key` <= `last_key`.
+  return lower <= first_key && last_key < upper;
+}
+
 }  // namespace
 
 namespace llsm {
 namespace pg {
 
-void Manager::RewriteSegments(
+Status Manager::RewriteSegments(
     Key segment_base, std::vector<Record>::const_iterator addtl_rec_begin,
     std::vector<Record>::const_iterator addtl_rec_end) {
-  // TODO: Multi-threading concerns.
-  std::vector<std::pair<Key, SegmentInfo>> segments_to_rewrite;
+  std::vector<SegmentIndex::Entry> segments_to_rewrite;
   std::vector<std::pair<Key, SegmentInfo>> rewritten_segments;
   std::vector<SegmentId> overflows_to_clear;
 
-  if (options_.consider_neighbors_during_rewrite) {
-    segments_to_rewrite = index_->FindRewriteRegion(segment_base);
+  if (options_.rewrite_search_radius > 0) {
+    segments_to_rewrite = index_->FindAndLockRewriteRegion(
+        segment_base, options_.rewrite_search_radius);
   } else {
-    segments_to_rewrite.emplace_back(index_->SegmentForKey(segment_base));
+    segments_to_rewrite.emplace_back(
+        index_->SegmentForKeyWithLock(segment_base, SegmentMode::kReorg));
   }
-  assert(!segments_to_rewrite.empty());
+
+  // Verify that the segments can still be rewritten after we have acquired the
+  // segment locks.
+  if (segments_to_rewrite.empty()) {
+    return Status::InvalidArgument(
+        "RewriteSegments(): Could not acquire locks; intervening rewrite.");
+  }
+  if (!ValidRangeForSegment(segments_to_rewrite.front().lower,
+                            segments_to_rewrite.back().upper, addtl_rec_begin,
+                            addtl_rec_end)) {
+    for (const auto& seg : segments_to_rewrite) {
+      lock_manager_->ReleaseSegmentLock(seg.sinfo.id(), SegmentMode::kReorg);
+    }
+    return Status::InvalidArgument(
+        "RewriteSegments(): Intervening rewrite altered the segment "
+        "boundaries.");
+  }
 
   // 2. Load and merge the segments.
   //
@@ -220,7 +254,7 @@ void Manager::RewriteSegments(
               const auto maybe_next_seg = index_->NextSegmentForKey(
                   segments.back().records.back().first);
               if (maybe_next_seg.has_value()) {
-                upper_bound = maybe_next_seg->first;
+                upper_bound = maybe_next_seg->lower;
               } else {
                 // We are rewriting the last segment in the database.
                 upper_bound = std::numeric_limits<Key>::max();
@@ -268,7 +302,7 @@ void Manager::RewriteSegments(
       };
 
   for (const auto& seg_to_rewrite : segments_to_rewrite) {
-    const size_t segment_pages = seg_to_rewrite.second.page_count();
+    const size_t segment_pages = seg_to_rewrite.sinfo.page_count();
     if (segment_pages > page_buf.NumFreePages()) {
       // Not enough memory to read the next segment. Flush the
       // currently-being-built segment to disk.
@@ -279,8 +313,8 @@ void Manager::RewriteSegments(
     }
 
     // Load the segment and check for overflows.
-    ReadSegment(seg_to_rewrite.second.id());
-    SegmentWrap sw(w_.buffer().get(), seg_to_rewrite.second.page_count());
+    ReadSegment(seg_to_rewrite.sinfo.id());
+    SegmentWrap sw(w_.buffer().get(), seg_to_rewrite.sinfo.page_count());
     const size_t num_overflows = sw.NumOverflows();
     if (segment_pages + num_overflows > page_buf.NumFreePages()) {
       // Not enough memory to read the next segment's overflows. Flush the
@@ -351,8 +385,18 @@ void Manager::RewriteSegments(
     load_into_segments_and_free_pages(segments);
   }
 
-  // 3. Update the free list and mark the old segments as invalid. To do this we
-  // zero out the first page in each segment.
+  // The new segments have now been rewritten. Upgrade to exclusive mode before
+  // exposing the new segments.
+  for (const auto& seg : segments_to_rewrite) {
+    lock_manager_->UpgradeSegmentLockToReorgExclusive(seg.sinfo.id());
+  }
+
+  // 3. For crash consistency, we need to invalidate at least one of the old
+  // segments before exposing the newly rewritten segments. Ideally we would
+  // submit invalidations for all segments and wait for the first one to
+  // complete, but the C++ futures library does not provide this functionality.
+  // So we just wait for the first segment to be invalidated before proceeding.
+
   void* zero = w_.buffer().get();
   memset(zero, 0, pg::Page::kSize);
   std::vector<std::future<void>> write_futures;
@@ -360,70 +404,95 @@ void Manager::RewriteSegments(
     write_futures.reserve(segments_to_rewrite.size() +
                           overflows_to_clear.size());
     for (const auto& seg_to_rewrite : segments_to_rewrite) {
-      const SegmentId seg_id = seg_to_rewrite.second.id();
+      const SegmentId seg_id = seg_to_rewrite.sinfo.id();
       write_futures.push_back(bg_threads_->Submit(
           [this, seg_id, zero]() { WritePage(seg_id, 0, zero); }));
-      free_.Add(seg_id);
     }
     for (const auto& overflow_to_clear : overflows_to_clear) {
       write_futures.push_back(
           bg_threads_->Submit([this, overflow_to_clear, zero]() {
             WritePage(overflow_to_clear, 0, zero);
           }));
-      free_.Add(overflow_to_clear);
     }
-    // Important that the page at `zero` is not modified until after we wait on
-    // the futures.
+    // Wait on the first future.
+    write_futures.front().get();
   } else {
-    // Synchronously clear the segments and overflows.
-    for (const auto& seg_to_rewrite : segments_to_rewrite) {
-      const SegmentId seg_id = seg_to_rewrite.second.id();
-      WritePage(seg_id, 0, zero);
-      free_.Add(seg_id);
-    }
-    for (const auto& overflow_to_clear : overflows_to_clear) {
-      WritePage(overflow_to_clear, 0, zero);
-      free_.Add(overflow_to_clear);
-    }
+    // Clear the first segment synchronously.
+    WritePage(segments_to_rewrite.front().sinfo.id(), 0, zero);
   }
 
-  // 4. Update in-memory index with the new segments.
+  // 4. Update in-memory index with the new segments. The new segments now
+  // become visible to other threads. The old segments are also no longer
+  // accessible, so we can release the exclusive lock.
   index_->RunExclusive(
       [&segments_to_rewrite, &rewritten_segments](auto& raw_index) {
         for (const auto& to_remove : segments_to_rewrite) {
-          const auto num_removed = raw_index.erase(to_remove.first);
+          const auto num_removed = raw_index.erase(to_remove.lower);
           assert(num_removed == 1);
         }
         for (const auto& new_segment : rewritten_segments) {
           raw_index.insert(new_segment);
         }
       });
-
-  // 5. Wait on any write futures.
-  for (auto& f : write_futures) {
-    f.get();
+  for (const auto& seg : segments_to_rewrite) {
+    lock_manager_->ReleaseSegmentLock(seg.sinfo.id(),
+                                      SegmentMode::kReorgExclusive);
   }
+
+  // 5. Finish invalidating the remaining old segments. Then add them to the
+  // free list.
+  if (bg_threads_ != nullptr) {
+    // NOTE: We already called `get()` on the first future.
+    for (size_t i = 1; i < write_futures.size(); ++i) {
+      write_futures[i].get();
+    }
+  } else {
+    // NOTE: We already synchronously invalidated the first segment.
+    for (size_t i = 1; i < segments_to_rewrite.size(); ++i) {
+      const SegmentId seg_id = segments_to_rewrite[i].sinfo.id();
+      WritePage(seg_id, 0, zero);
+      free_->Add(seg_id);
+    }
+    for (const auto& overflow_to_clear : overflows_to_clear) {
+      WritePage(overflow_to_clear, 0, zero);
+      free_->Add(overflow_to_clear);
+    }
+  }
+  std::vector<SegmentId> to_free;
+  to_free.reserve(segments_to_rewrite.size() + overflows_to_clear.size());
+  for (const auto& seg_to_rewrite : segments_to_rewrite) {
+    to_free.push_back(seg_to_rewrite.sinfo.id());
+  }
+  for (const auto& overflow_to_clear : overflows_to_clear) {
+    to_free.push_back(overflow_to_clear);
+  }
+  free_->AddBatch(to_free);
 
   // TODO: Log that the rewrite has finished (this log record does not need to
   // be forced to disk for crash consistency).
+  return Status::OK();
 }
 
-void Manager::FlattenChain(
+Status Manager::FlattenChain(
     const Key base, const std::vector<Record>::const_iterator addtl_rec_begin,
     const std::vector<Record>::const_iterator addtl_rec_end) {
-  const auto [seg_base, sinfo] = index_->SegmentForKey(base);
-  assert(base == seg_base);
-  assert(sinfo.page_count() == 1);
-  const SegmentId main_page_id = sinfo.id();
-
-  // Retrieve the upper bound.
-  const auto maybe_upper_seg = index_->NextSegmentForKey(base);
-  Key upper = std::numeric_limits<Key>::max();
-  if (maybe_upper_seg.has_value()) {
-    upper = maybe_upper_seg->first;
+  const auto seg = index_->SegmentForKeyWithLock(base, SegmentMode::kReorg);
+  if (base != seg.lower ||
+      !ValidRangeForSegment(seg.lower, seg.upper, addtl_rec_begin,
+                            addtl_rec_end)) {
+    lock_manager_->ReleaseSegmentLock(seg.sinfo.id(), SegmentMode::kReorg);
+    return Status::InvalidArgument(
+        "FlattenChain(): Invalid record range; intervening rewrite.");
   }
 
+  assert(base == seg.lower);
+  assert(seg.sinfo.page_count() == 1);
+  const SegmentId main_page_id = seg.sinfo.id();
+  const Key upper = seg.upper;
+
   // Load the existing page(s).
+  // NOTE: No need for page lock(s) if you hold the segment lock in `kReorg`
+  // mode.
   PageBuffer buf = PageMemoryAllocator::Allocate(/*num_pages=*/2);
   ReadPage(main_page_id, 0, buf.get());
   pg::Page main(buf.get());
@@ -475,40 +544,60 @@ void Manager::FlattenChain(
   const auto new_pages = LoadIntoNewPages(sequence_number, base, upper,
                                           records.begin(), records.end());
 
-  // Update the free list and mark the old pages as invalid.
+  // The flattened chain has been written to new pages. Now we upgrade the
+  // segment lock to `kReorgExclusive` to wait for any concurrent readers to
+  // finish reading the old chain.
+  lock_manager_->UpgradeSegmentLockToReorgExclusive(seg.sinfo.id());
+
+  // For crash consistency, we need to invalidate at least one of the old pages
+  // before exposing the newly rewritten pages. Ideally we would submit
+  // invalidations for both pages and wait for the first one to complete, but
+  // the C++ futures library does not provide this functionality. So we just
+  // wait for the main page to be invalidated before proceeding.
+
   void* const zero = buf.get();
   memset(zero, 0, pg::Page::kSize);
-  std::vector<std::future<void>> write_futures;
+
+  // If we can run this additional invalidation in the background, do so.
+  std::future<void> main_invalidate, overflow_invalidate;
   if (bg_threads_ != nullptr) {
-    write_futures.push_back(bg_threads_->Submit(
-        [this, main_page_id, zero]() { WritePage(main_page_id, 0, zero); }));
-    free_.Add(main_page_id);
+    main_invalidate = bg_threads_->Submit(
+        [this, main_page_id, zero]() { WritePage(main_page_id, 0, zero); });
     if (overflow_page_id.IsValid()) {
-      write_futures.push_back(
+      overflow_invalidate =
           bg_threads_->Submit([this, overflow_page_id, zero]() {
             WritePage(overflow_page_id, 0, zero);
-          }));
-      free_.Add(overflow_page_id);
+          });
     }
-
+    main_invalidate.get();
   } else {
-    WritePage(main_page_id, 0, buf.get());
-    free_.Add(main_page_id);
-    if (overflow_page_id.IsValid()) {
-      WritePage(overflow_page_id, 0, buf.get());
-      free_.Add(overflow_page_id);
-    }
+    WritePage(main_page_id, 0, zero);
   }
 
-  // Remove the old segment info and replace it with the new pages.
+  // TODO: Log that the flatten (rewrite) has finished.
+
+  // Remove the old segment info and replace it with the new pages. At this
+  // point the new pages become visible to other threads. The old pages will no
+  // longer be accessible, so we can also release the exclusive segment lock.
   index_->RunExclusive([&base, &new_pages](auto& raw_index) {
     raw_index.erase(base);
     raw_index.insert(new_pages.begin(), new_pages.end());
   });
+  lock_manager_->ReleaseSegmentLock(seg.sinfo.id(),
+                                    SegmentMode::kReorgExclusive);
 
-  for (auto& f : write_futures) {
-    f.get();
+  free_->Add(main_page_id);
+  if (overflow_page_id.IsValid()) {
+    if (bg_threads_ != nullptr) {
+      assert(overflow_invalidate.valid());
+      overflow_invalidate.get();
+    } else {
+      WritePage(overflow_page_id, 0, zero);
+    }
+    free_->Add(overflow_page_id);
   }
+
+  return Status::OK();
 }
 
 }  // namespace pg

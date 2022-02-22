@@ -20,6 +20,9 @@ namespace fs = std::filesystem;
 namespace llsm {
 namespace pg {
 
+using SegmentMode = LockManager::SegmentMode;
+using PageMode = LockManager::PageMode;
+
 thread_local Workspace Manager::w_;
 const std::string Manager::kSegmentFilePrefix = "sf-";
 
@@ -27,9 +30,10 @@ Manager::Manager(fs::path db_path,
                  std::vector<std::pair<Key, SegmentInfo>> boundaries,
                  std::vector<SegmentFile> segment_files,
                  PageGroupedDBOptions options, uint32_t next_sequence_number,
-                 FreeList free)
+                 std::unique_ptr<FreeList> free)
     : db_path_(std::move(db_path)),
-      index_(std::make_unique<SegmentIndex>()),
+      lock_manager_(std::make_shared<LockManager>()),
+      index_(std::make_unique<SegmentIndex>(lock_manager_)),
       segment_files_(std::move(segment_files)),
       next_sequence_number_(next_sequence_number),
       free_(std::move(free)),
@@ -64,7 +68,7 @@ Manager Manager::Reopen(const fs::path& db,
 
   std::vector<SegmentFile> segment_files;
   std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
-  FreeList free;
+  std::unique_ptr<FreeList> free = std::make_unique<FreeList>();
   uint32_t max_sequence = 0;
 
   for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
@@ -84,7 +88,7 @@ Manager Manager::Reopen(const fs::path& db,
       SegmentWrap sw(buf.get(), pages_per_segment);
       if (!sw.CheckChecksum() || !first_page.IsValid()) {
         // This segment is a "hole" in the file and can be reused.
-        free.Add(id);
+        free->Add(id);
         continue;
       }
       if (first_page.IsOverflow()) {
@@ -130,25 +134,28 @@ std::pair<Status, std::vector<pg::Page>> Manager::GetWithPages(
   void* overflow_page_buf = w_.buffer().get() + pg::Page::kSize;
 
   // 1. Find the segment that should hold the key.
-  const auto [base_key, sinfo] = index_->SegmentForKey(key);
+  const auto seg = index_->SegmentForKeyWithLock(key, SegmentMode::kPageRead);
 
-  // 2. Figure out the page offset and read it in.
-  const size_t page_idx = sinfo.PageForKey(base_key, key);
-  ReadPage(sinfo.id(), page_idx, main_page_buf);
+  // 2. Figure out the page offset, lock the page, and then read it in.
+  const size_t page_idx = seg.sinfo.PageForKey(seg.lower, key);
+  lock_manager_->AcquirePageLock(seg.sinfo.id(), page_idx, PageMode::kShared);
+  ReadPage(seg.sinfo.id(), page_idx, main_page_buf);
 
   // 3. Search for the record on the page.
-  // TODO: Lock the page.
   pg::Page main_page(main_page_buf);
   key_utils::IntKeyAsSlice key_slice(key);
   auto status = main_page.Get(key_slice.as<Slice>(), value_out);
   if (status.ok()) {
+    lock_manager_->ReleasePageLock(seg.sinfo.id(), page_idx, PageMode::kShared);
+    lock_manager_->ReleaseSegmentLock(seg.sinfo.id(), SegmentMode::kPageRead);
     return {status, {main_page}};
   }
 
   // 4. Check the overflow page if it exists.
   // TODO: We always assume at most 1 overflow page.
-  // TODO: Lock the overflow page.
   if (!main_page.HasOverflow()) {
+    lock_manager_->ReleasePageLock(seg.sinfo.id(), page_idx, PageMode::kShared);
+    lock_manager_->ReleaseSegmentLock(seg.sinfo.id(), SegmentMode::kPageRead);
     return {Status::NotFound("Record does not exist."), {main_page}};
   }
   const SegmentId overflow_id = main_page.GetOverflow();
@@ -156,49 +163,41 @@ std::pair<Status, std::vector<pg::Page>> Manager::GetWithPages(
   assert(overflow_id.GetFileId() == 0);
   ReadPage(overflow_id, /*page_idx=*/0, overflow_page_buf);
   pg::Page overflow_page(overflow_page_buf);
-  return {overflow_page.Get(key_slice.as<Slice>(), value_out),
-          {main_page, overflow_page}};
+  status = overflow_page.Get(key_slice.as<Slice>(), value_out);
+
+  lock_manager_->ReleasePageLock(seg.sinfo.id(), page_idx, PageMode::kShared);
+  lock_manager_->ReleaseSegmentLock(seg.sinfo.id(), SegmentMode::kPageRead);
+  return {status, {main_page, overflow_page}};
 }
 
 Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {
   if (records.empty()) return Status::OK();
   // TODO: Support deletes.
-
-  SegmentIndex::Entry curr = index_->SegmentForKey(records.front().first);
   size_t start_idx = 0;
-
-  for (size_t i = 1; i < records.size(); ++i) {
-    // TODO: We query the index for each key in the batch. This may be
-    // expensive, but this is also the approach we took in the original LLSM
-    // implementation. We can make this batching strategy fancier if this is a
-    // bottleneck.
-    const auto [rec_base, _] = index_->SegmentForKey(records[i].first);
-    if (rec_base != curr.first) {
-      // The records in [start_idx, i) belong to the same segment.
-      // Write out segment
-      const auto status = WriteToSegment(curr, records, start_idx, i);
-      if (!status.ok()) {
-        return status;
-      }
-
-      // Important to redo the lookup since `WriteToSegment()` might have
-      // modified the index.
-      curr = index_->SegmentForKey(records[i].first);
-      start_idx = i;
-    }
+  while (start_idx < records.size()) {
+    const auto segment = index_->SegmentForKeyWithLock(records[start_idx].first,
+                                                       SegmentMode::kPageWrite);
+    const auto left_it = records.begin() + start_idx;
+    const auto cutoff_it =
+        std::lower_bound(left_it, records.end(), segment.upper,
+                         [](const auto& rec, const Key next_segment_start) {
+                           return rec.first < next_segment_start;
+                         });
+    const size_t range_size = cutoff_it - left_it;
+    // `WriteToSegment()` will release the segment lock.
+    const size_t num_written =
+        WriteToSegment(segment, records, start_idx, start_idx + range_size);
+    // If a reorg intervenes and no records are written, `num_written` will
+    // be 0 and the logic in this loop will retry the write.
+    start_idx += num_written;
   }
-
-  WriteToSegment(curr, records, start_idx, records.size());
   return Status::OK();
 }
 
-Status Manager::WriteToSegment(
+size_t Manager::WriteToSegment(
     const SegmentIndex::Entry& segment,
-    const std::vector<std::pair<Key, Slice>>& records, size_t start_idx,
-    size_t end_idx) {
-  // TODO: Need to lock the segment and pages.
-  const auto& [segment_base, sinfo] = segment;
-
+    const std::vector<std::pair<Key, Slice>>& records, const size_t start_idx,
+    const size_t end_idx) {
   // Simplifying assumptions:
   // - If the number of writes is past a certain threshold
   //   (`record_per_page_goal` x `pages_in_segment` x 2), we don't attempt to
@@ -209,17 +208,22 @@ Status Manager::WriteToSegment(
   //   segment reorg.
 
   const size_t reorg_threshold =
-      options_.records_per_page_goal * sinfo.page_count() * 2ULL;
+      options_.records_per_page_goal * segment.sinfo.page_count() * 2ULL;
   if (end_idx - start_idx > reorg_threshold) {
     // Immediately trigger a segment rewrite that merges in the records.
+    lock_manager_->ReleaseSegmentLock(segment.sinfo.id(),
+                                      SegmentMode::kPageWrite);
+    Status status;
     if (options_.use_segments) {
-      RewriteSegments(segment_base, records.begin() + start_idx,
-                      records.begin() + end_idx);
+      status = RewriteSegments(segment.lower, records.begin() + start_idx,
+                               records.begin() + end_idx);
     } else {
-      FlattenChain(segment_base, records.begin() + start_idx,
-                   records.begin() + end_idx);
+      status = FlattenChain(segment.lower, records.begin() + start_idx,
+                            records.begin() + end_idx);
     }
-    return Status::OK();
+    // If the rewrite succeeded then all of the records will have been written
+    // into the new segments.
+    return status.ok() ? (end_idx - start_idx) : 0;
   }
 
   void* orig_page_buf = w_.buffer().get();
@@ -227,9 +231,7 @@ Status Manager::WriteToSegment(
   pg::Page orig_page(orig_page_buf);
   pg::Page overflow_page(overflow_page_buf);
 
-  size_t curr_page_idx =
-      sinfo.PageForKey(segment_base, records[start_idx].first);
-  ReadPage(sinfo.id(), curr_page_idx, orig_page_buf);
+  size_t curr_page_idx = 0;
 
   SegmentId overflow_page_id;
   bool orig_page_dirty = false;
@@ -238,7 +240,8 @@ Status Manager::WriteToSegment(
   pg::Page* curr_page = &orig_page;
   bool* curr_page_dirty = &orig_page_dirty;
 
-  auto write_dirty_pages = [&, segment_base = segment_base, sinfo = sinfo]() {
+  auto write_dirty_pages = [&, segment_base = segment.lower,
+                            sinfo = segment.sinfo]() {
     // Write out overflow first to avoid dangling overflow pointers.
     if (overflow_page_dirty) {
       WritePage(overflow_page_id, 0, overflow_page_buf);
@@ -270,7 +273,7 @@ Status Manager::WriteToSegment(
 
     } else {
       // Allocate a new page.
-      const auto maybe_free_page = free_.Get(/*page_count=*/1);
+      const auto maybe_free_page = free_->Get(/*page_count=*/1);
       if (maybe_free_page.has_value()) {
         overflow_page_id = *maybe_free_page;
       } else {
@@ -284,7 +287,7 @@ Status Manager::WriteToSegment(
       overflow_page.MakeOverflow();
       overflow_page.SetOverflow(SegmentId());
       overflow_page_dirty = true;
-      index_->SetSegmentOverflow(segment_base, true);
+      index_->SetSegmentOverflow(segment.lower, true);
 
       orig_page.SetOverflow(overflow_page_id);
       orig_page_dirty = true;
@@ -304,13 +307,24 @@ Status Manager::WriteToSegment(
     }
   };
 
+  curr_page_idx =
+      segment.sinfo.PageForKey(segment.lower, records[start_idx].first);
+  lock_manager_->AcquirePageLock(segment.sinfo.id(), curr_page_idx,
+                                 PageMode::kExclusive);
+  ReadPage(segment.sinfo.id(), curr_page_idx, orig_page_buf);
+
   for (size_t i = start_idx; i < end_idx; ++i) {
-    const size_t page_idx = sinfo.PageForKey(segment_base, records[i].first);
+    const size_t page_idx =
+        segment.sinfo.PageForKey(segment.lower, records[i].first);
     if (page_idx != curr_page_idx) {
       write_dirty_pages();
+      lock_manager_->ReleasePageLock(segment.sinfo.id(), curr_page_idx,
+                                     PageMode::kExclusive);
       // Update the current page.
       curr_page_idx = page_idx;
-      ReadPage(sinfo.id(), curr_page_idx, orig_page_buf);
+      lock_manager_->AcquirePageLock(segment.sinfo.id(), curr_page_idx,
+                                     PageMode::kExclusive);
+      ReadPage(segment.sinfo.id(), curr_page_idx, orig_page_buf);
       overflow_page_id = SegmentId();
       orig_page_dirty = false;
       overflow_page_dirty = false;
@@ -322,22 +336,36 @@ Status Manager::WriteToSegment(
         write_record_to_chain(records[i].first, records[i].second);
     if (!succeeded) {
       write_dirty_pages();
+      lock_manager_->ReleasePageLock(segment.sinfo.id(), curr_page_idx,
+                                     PageMode::kExclusive);
+      lock_manager_->ReleaseSegmentLock(segment.sinfo.id(),
+                                        SegmentMode::kPageWrite);
       // The segment is full. We need to rewrite it in order to merge in the
       // writes.
+      Status status;
       if (options_.use_segments) {
-        RewriteSegments(segment_base, records.begin() + i,
-                        records.begin() + end_idx);
+        status = RewriteSegments(segment.lower, records.begin() + i,
+                                 records.begin() + end_idx);
       } else {
-        FlattenChain(segment_base, records.begin() + i,
-                     records.begin() + end_idx);
+        status = FlattenChain(segment.lower, records.begin() + i,
+                              records.begin() + end_idx);
       }
-      return Status::OK();
+
+      // If the rewrite succeeded then all the records will have been written
+      // into the new segments. Otherwise only the records we processed up to
+      // index `i` (but excluding `i`) will have been written.
+      return status.ok() ? (end_idx - start_idx) : (i - start_idx);
     }
   }
 
   write_dirty_pages();
+  lock_manager_->ReleasePageLock(segment.sinfo.id(), curr_page_idx,
+                                 PageMode::kExclusive);
+  lock_manager_->ReleaseSegmentLock(segment.sinfo.id(),
+                                    SegmentMode::kPageWrite);
 
-  return Status::OK();
+  // All the records were successfully written.
+  return end_idx - start_idx;
 }
 
 void Manager::ReadPage(const SegmentId& seg_id, size_t page_idx,
@@ -387,37 +415,33 @@ void Manager::ReadOverflows(
 }
 
 std::pair<Key, Key> Manager::GetPageBoundsFor(const Key key) const {
-  const auto [seg_base_key, sinfo] = index_->SegmentForKey(key);
-  const size_t page_idx = sinfo.PageForKey(seg_base_key, key);
+  const auto seg = index_->SegmentForKey(key);
+  const size_t page_idx = seg.sinfo.PageForKey(seg.lower, key);
 
   // Find the lower boundary. When `page_idx == 0` it is always the segment's
   // base key.
-  Key lower_bound = seg_base_key;
+  Key lower_bound = seg.lower;
   if (page_idx > 0) {
-    assert(sinfo.page_count() > 1);
-    lower_bound =
-        FindLowerBoundary(seg_base_key, *(sinfo.model()), sinfo.page_count(),
-                          sinfo.model()->Invert(), page_idx);
+    assert(seg.sinfo.page_count() > 1);
+    lower_bound = FindLowerBoundary(seg.lower, *(seg.sinfo.model()),
+                                    seg.sinfo.page_count(),
+                                    seg.sinfo.model()->Invert(), page_idx);
   }
 
   // Find upper boundary (exclusive).
   Key upper_bound = std::numeric_limits<Key>::max();
-  if (page_idx < sinfo.page_count() - 1) {
+  if (page_idx < seg.sinfo.page_count() - 1) {
     // `page_idx` is not the last page in the segment. Thus its upper boundary
     // is the lower boundary of the next page.
-    upper_bound =
-        FindLowerBoundary(seg_base_key, *(sinfo.model()), sinfo.page_count(),
-                          sinfo.model()->Invert(), page_idx + 1);
+    upper_bound = FindLowerBoundary(seg.lower, *(seg.sinfo.model()),
+                                    seg.sinfo.page_count(),
+                                    seg.sinfo.model()->Invert(), page_idx + 1);
 
   } else {
     // `page_idx` is the last page in the segment. Its upper boundary is the
     // next segment's base key (or the largest possible key if this is the last
     // segment).
-    // TODO: Concurrency concerns.
-    const auto maybe_next = index_->NextSegmentForKey(key);
-    if (maybe_next.has_value()) {
-      upper_bound = maybe_next->first;
-    }
+    upper_bound = seg.upper;
   }
 
   return {lower_bound, upper_bound};

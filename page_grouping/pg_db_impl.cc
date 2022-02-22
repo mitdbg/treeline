@@ -54,10 +54,14 @@ Status PageGroupedDBImpl::Put(const Key key, const Slice& value) {
     return Status::NotSupported(
         "DB must be bulk loaded before any writes are allowed.");
   }
-  key_utils::IntKeyAsSlice key_slice(key);
-  return cache_.Put(key_slice.as<Slice>(), value, /*is_dirty=*/true,
-                    format::WriteType::kWrite, RecordCache::kDefaultPriority,
-                    /*safe=*/true);
+  if (!options_.bypass_cache) {
+    key_utils::IntKeyAsSlice key_slice(key);
+    return cache_.Put(key_slice.as<Slice>(), value, /*is_dirty=*/true,
+                      format::WriteType::kWrite, RecordCache::kDefaultPriority,
+                      /*safe=*/true);
+  } else {
+    return mgr_->PutBatch({{key, value}});
+  }
 }
 
 Status PageGroupedDBImpl::Get(const Key key, std::string* value_out) {
@@ -67,23 +71,25 @@ Status PageGroupedDBImpl::Get(const Key key, std::string* value_out) {
   const Slice key_slice = key_slice_helper.as<Slice>();
 
   // 1. Search the record cache.
-  uint64_t cache_index;
-  const Status cache_status =
-      cache_.GetCacheIndex(key_slice, /*exclusive=*/false, &cache_index);
-  if (cache_status.ok()) {
-    auto entry = &RecordCache::cache_entries[cache_index];
-    if (entry->IsDelete()) {
+  if (!options_.bypass_cache) {
+    uint64_t cache_index;
+    const Status cache_status =
+        cache_.GetCacheIndex(key_slice, /*exclusive=*/false, &cache_index);
+    if (cache_status.ok()) {
+      auto entry = &RecordCache::cache_entries[cache_index];
+      if (entry->IsDelete()) {
+        entry->Unlock();
+        return Status::NotFound("Key not found.");
+      }
+      value_out->assign(entry->GetValue().data(), entry->GetValue().size());
       entry->Unlock();
-      return Status::NotFound("Key not found.");
+      return cache_status;
     }
-    value_out->assign(entry->GetValue().data(), entry->GetValue().size());
-    entry->Unlock();
-    return cache_status;
   }
 
   // 2. Go to disk. Cache the record if found.
   auto [status, pages] = mgr_->GetWithPages(key, value_out);
-  if (!status.ok()) return status;
+  if (!status.ok() || options_.bypass_cache) return status;
 
   cache_.PutFromRead(key_slice, Slice(*value_out),
                      RecordCache::kDefaultPriority);
@@ -114,7 +120,9 @@ Status PageGroupedDBImpl::GetRange(
   mgr_->Scan(start_key, num_records, &results);
 
   std::vector<uint64_t> indices;
-  cache_.GetRange(key_slice, num_records, &indices);
+  if (!options_.bypass_cache) {
+    cache_.GetRange(key_slice, num_records, &indices);
+  }
 
   // Merge the results while preferring records in the cache over records read
   // from disk when the keys are equal.

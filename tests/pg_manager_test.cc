@@ -346,6 +346,10 @@ TEST_F(PGManagerTest, BatchedUpdateSegments) {
     const std::pair<uint64_t, Slice>& rec = dataset[idx];
     updates.emplace_back(rec.first, new_value);
   }
+  std::sort(updates.begin(), updates.end(),
+            [](const auto& left, const auto& right) {
+              return left.first < right.first;
+            });
 
   {
     Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
@@ -407,6 +411,10 @@ TEST_F(PGManagerTest, BatchedUpdatePages) {
     const std::pair<uint64_t, Slice>& rec = dataset[idx];
     updates.emplace_back(rec.first, new_value);
   }
+  std::sort(updates.begin(), updates.end(),
+            [](const auto& left, const auto& right) {
+              return left.first < right.first;
+            });
 
   {
     Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);

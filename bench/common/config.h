@@ -87,6 +87,7 @@ DECLARE_bool(pg_use_segments);
 DECLARE_uint64(records_per_page_goal);
 DECLARE_uint64(records_per_page_delta);
 DECLARE_bool(pg_use_memory_based_io);
+DECLARE_bool(pg_bypass_cache);
 
 namespace llsm {
 namespace bench {

@@ -45,6 +45,9 @@ class LockManager {
   // ---+---+---+
   //  X | N | N |
   // ---+---+---+
+  // Page locks are currently only acquired on the "main" page located in a
+  // segment. As a result, the page lock on the main page protects both the main
+  // page and its overflow (if one exists).
   enum class PageMode : uint8_t {
     kShared = 0,    // S
     kExclusive = 1  // X
@@ -73,6 +76,11 @@ class LockManager {
   // If the acquisition was successful, the caller is responsible for calling
   // `ReleasePageLock()` with the same mode to release the lock.
   bool TryAcquirePageLock(const SegmentId& seg_id, size_t page_idx, PageMode mode);
+
+  // Acquire a page lock on `seg_id` and page index `page_idx` with mode `mode`.
+  // After returning, the caller will hold the lock. The caller is responsible
+  // for calling `ReleasePageLock()` with the same mode to release the lock.
+  void AcquirePageLock(const SegmentId& seg_id, size_t page_idx, PageMode mode);
 
   // Release a page lock that was previously acquired on `seg_id` and page index
   // `page_idx` with mode `mode`.
