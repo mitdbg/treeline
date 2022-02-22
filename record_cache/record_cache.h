@@ -116,9 +116,11 @@ class RecordCache {
   uint64_t ClearCache(bool write_out_dirty = true);
 
  private:
-  // The maximum size of each ART sub-scan when using GetRange() with `end_key`.
-  size_t ART_scan_size_;
-  const size_t kDefaultARTScanSize = 100;
+  // The default sizes for ART sub-scans when..
+  static const uint64_t kDefaultUserSubScan =
+      64;  // ...the user specifies a range through `end_key`.
+  static const uint64_t kDefaultWriteOutSubScan =
+      4;  // ...we use a range scan for batch write out.
 
   // Required by the ART constructor. Populates `key` with the key of the record
   // stored at `tid` - 1 within the record cache. See note below.
@@ -135,11 +137,15 @@ class RecordCache {
   Status GetRangeImpl(
       const Slice& start_key, const Slice& end_key,
       std::vector<uint64_t>* indices_out,
-      std::optional<uint64_t> index_locked_already = std::nullopt) const;
+      std::optional<uint64_t> index_locked_already = std::nullopt,
+      uint64_t sub_scan_size = kDefaultUserSubScan) const;
 
   // Selects a cache entry according to the chosen policy, and returns the
-  // corresponding index into the `cache_entries` vector.
+  // corresponding index into the `cache_entries` vector. If the entry
+  // originally selected is dirty, will look at the next
+  // `kDefaultEvictionLookahead` entries to try to find a clean one.
   uint64_t SelectForEviction();
+  const uint64_t kDefaultEvictionLookahead = 32;
 
   // Writes out the cache entry at `index`, if dirty, to the appropriate
   // longer-term data structure. If a write out takes place, also writes out

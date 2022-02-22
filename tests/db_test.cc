@@ -273,60 +273,60 @@ TEST_F(DBTest, WriteThenDelete) {
 //   options.buffer_pool_size = llsm::Page::kSize;
 //   auto status = llsm::DB::Open(options, kDBDir, &db);
 //   ASSERT_TRUE(status.ok());
-
+//
 //   const std::string value = "Hello world!";
 //   std::string value_out;
-
+//
 //   // Write
 //   const uint64_t key_as_int1 = __builtin_bswap64(1ULL);
 //   llsm::Slice key1(reinterpret_cast<const char*>(&key_as_int1),
 //                    sizeof(key_as_int1));
 //   status = db->Put(llsm::WriteOptions(), key1, value);
 //   ASSERT_TRUE(status.ok());
-
+//
 //   // Create a copy
 //   sync();
 //   auto source_file = kDBDir / "segment-0";
 //   auto dest_file = source_file;
 //   dest_file += "_v0";
 //   ASSERT_TRUE(std::filesystem::copy_file(source_file, dest_file));
-
+//
 //   // Flush - shouldn't flush anything
 //   status = db->FlushRecordCache(/*disable_deferred_io = */ false);
 //   ASSERT_TRUE(status.ok());
-
+//
 //   // Make sure page is evicted by looking up sth else.
 //   const uint64_t key_as_int9 = __builtin_bswap64(9ULL);
 //   llsm::Slice key9(reinterpret_cast<const char*>(&key_as_int9),
 //                    sizeof(key_as_int9));
 //   status = db->Get(llsm::ReadOptions(), key9, &value_out);
 //   ASSERT_TRUE(status.IsNotFound());
-
+//
 //   // Check that the flush never happened.
 //   const char command_template[22] = "diff %s %s >/dev/null";
 //   char s[18 + source_file.string().length() + dest_file.string().length()];
 //   sprintf(s, command_template, source_file.string().data(),
 //   dest_file.string().data()); ASSERT_EQ(system(s), 0);
-
+//
 //   // Write another to segment 0
 //   const uint64_t key_as_int0 = __builtin_bswap64(0ULL);
 //   llsm::Slice key0(reinterpret_cast<const char*>(&key_as_int0),
 //                    sizeof(key_as_int0));
 //   status = db->Put(llsm::WriteOptions(), key0, value);
 //   ASSERT_TRUE(status.ok());
-
+//
 //   // Flush - should work now
 //   status = db->FlushMemTable(/*disable_deferred_io = */ false);
 //   ASSERT_TRUE(status.ok());
-
+//
 //   // Make sure page is evicted by looking up sth else.
 //   status = db->Get(llsm::ReadOptions(), key9, &value_out);
 //   ASSERT_TRUE(status.IsNotFound());
-
+//
 //   // Check that the flush happened.
 //   sync();
 //   ASSERT_NE(system(s), 0);
-
+//
 //   // Can still read them
 //   status = db->Get(llsm::ReadOptions(), key1, &value_out);
 //   ASSERT_TRUE(status.ok());
@@ -334,7 +334,7 @@ TEST_F(DBTest, WriteThenDelete) {
 //   status = db->Get(llsm::ReadOptions(), key0, &value_out);
 //   ASSERT_TRUE(status.ok());
 //   ASSERT_EQ(value_out, value);
-
+//
 //   delete db;
 // }
 
@@ -352,58 +352,58 @@ TEST_F(DBTest, WriteThenDelete) {
 //   options.buffer_pool_size = llsm::Page::kSize;
 //   auto status = llsm::DB::Open(options, kDBDir, &db);
 //   ASSERT_TRUE(status.ok());
-
+//
 //   const std::string value = "Hello world!";
 //   std::string value_out;
-
+//
 //   // Write
 //   const uint64_t key_as_int1 = __builtin_bswap64(1ULL);
 //   llsm::Slice key1(reinterpret_cast<const char*>(&key_as_int1),
 //                    sizeof(key_as_int1));
 //   status = db->Put(llsm::WriteOptions(), key1, value);
 //   ASSERT_TRUE(status.ok());
-
+//
 //   // Create a copy
 //   sync();
 //   auto source_file = kDBDir / "segment-0";
 //   auto dest_file = source_file;
 //   dest_file += "_v0";
 //   ASSERT_TRUE(std::filesystem::copy_file(source_file, dest_file));
-
+//
 //   // Flush - shouldn't flush anything
 //   status = db->FlushMemTable(/*disable_deferred_io = */ false);
 //   ASSERT_TRUE(status.ok());
-
+//
 //   // Make sure page is evicted by looking up sth else.
 //   const uint64_t key_as_int9 = __builtin_bswap64(9ULL);
 //   llsm::Slice key9(reinterpret_cast<const char*>(&key_as_int9),
 //                    sizeof(key_as_int9));
 //   status = db->Get(llsm::ReadOptions(), key9, &value_out);
 //   ASSERT_TRUE(status.IsNotFound());
-
+//
 //   // Check that the flush never happened.
 //   const char command_template[22] = "diff %s %s >/dev/null";
 //   char s[18 + source_file.string().length() + dest_file.string().length()];
 //   sprintf(s, command_template, source_file.string().data(),
 //   dest_file.string().data()); ASSERT_EQ(system(s), 0);
-
+//
 //   // Flush - should work now
 //   status = db->FlushMemTable(/*disable_deferred_io = */ false);
 //   ASSERT_TRUE(status.ok());
-
+//
 //   // Make sure page is evicted by looking up sth else.
 //   status = db->Get(llsm::ReadOptions(), key9, &value_out);
 //   ASSERT_TRUE(status.IsNotFound());
-
+//
 //   // Check that the flush happened.
 //   sync();
 //   ASSERT_NE(system(s), 0);
-
+//
 //   // Can still read
 //   status = db->Get(llsm::ReadOptions(), key1, &value_out);
 //   ASSERT_TRUE(status.ok());
 //   ASSERT_EQ(value_out, value);
-
+//
 //   delete db;
 // }
 
@@ -1756,4 +1756,70 @@ TEST_F(DBTest, RecordCacheClearHalfDirty) {
   ASSERT_EQ(written_out, options.record_cache_capacity / 2);
 }
 
+TEST_F(DBTest, UpdatesBeyondCacheCapacity) {
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 8;
+  constexpr size_t kRecordSize = kKeySize + kValueSize;
+
+  // Dummy value used for the records (8 byte key; record is 16B in total).
+  const std::string value(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kRecordSize;
+  options.key_hints.key_size = kKeySize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1;
+  // Generate records
+  auto records_per_page = options.key_hints.records_per_page();
+  auto num_pages = records_per_page;
+  auto num_records = records_per_page * num_pages;
+  options.key_hints.num_keys = num_records;
+  options.record_cache_capacity = records_per_page;
+
+  // Generate data used for the write (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write dummy data to the DB.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // Perform many updates, beyond the cache capacity.
+  const std::string value2(kValueSize, 0xFE);
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value2);
+    ASSERT_TRUE(status.ok());
+  }
+  
+  const std::string value3(kValueSize, 0xFD);
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value3);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // Read back
+  std::string value_out;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    ASSERT_TRUE(status.ok());
+    ASSERT_EQ(value_out, value3);
+  }
+}
 }  // namespace
