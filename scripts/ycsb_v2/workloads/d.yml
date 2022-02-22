@@ -1,0 +1,27 @@
+# YCSB D
+# 95% Read Latest, 5% Insert
+
+# NOTE: This workload's request distribution is always fixed since it is a "read
+# latest" workload. Changing the read distribution to zipfian or uniform would
+# change the workload's semantics.
+
+load:
+  num_records: 20000000
+  distribution:
+    type: uniform
+    range_min: {range_min}
+    range_max: {range_max}
+
+run:
+- num_requests: {num_requests}
+  read:
+    proportion_pct: 95
+    distribution:
+      type: latest
+      theta: 0.99
+  insert:
+    proportion_pct: 5
+    distribution:
+      type: uniform
+      range_min: {range_min}
+      range_max: {range_max}

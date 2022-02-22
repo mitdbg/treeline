@@ -1,0 +1,16 @@
+# YCSB C
+# 100% Read
+
+load:
+  num_records: 20000000
+  distribution:
+    type: uniform
+    range_min: {range_min}
+    range_max: {range_max}
+
+run:
+- num_requests: {num_requests}
+  read:
+    proportion_pct: 100
+    distribution:
+{distribution}

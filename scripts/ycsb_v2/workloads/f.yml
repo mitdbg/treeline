@@ -1,19 +1,20 @@
+# YCSB F
+# 50% Read, 50% Read-modify-write
+
 load:
   num_records: 20000000
   distribution:
     type: uniform
-    range_min: 0
-    range_max: 2000000000
+    range_min: {range_min}
+    range_max: {range_max}
 
 run:
-- num_requests: 10000000
+- num_requests: {num_requests}
   read:
     proportion_pct: 50
     distribution:
-      type: zipfian
-      theta: 0.99
+{distribution}
   readmodifywrite:
     proportion_pct: 50
     distribution:
-      type: zipfian
-      theta: 0.99
+{distribution}
