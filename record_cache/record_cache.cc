@@ -14,7 +14,6 @@ RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out,
       key_bounds_(std::move(key_bounds)) {
   tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
   cache_entries.resize(capacity_);
-  ART_scan_size_ = kDefaultARTScanSize;
 }
 
 RecordCache::~RecordCache() {
@@ -158,24 +157,24 @@ Status RecordCache::GetRange(const Slice& start_key, const Slice& end_key,
   return GetRangeImpl(start_key, end_key, indices_out);
 }
 
-Status RecordCache::GetRangeImpl(
-    const Slice& start_key, const Slice& end_key,
-    std::vector<uint64_t>* indices_out,
-    std::optional<uint64_t> index_locked_already) const {
+Status RecordCache::GetRangeImpl(const Slice& start_key, const Slice& end_key,
+                                 std::vector<uint64_t>* indices_out,
+                                 std::optional<uint64_t> index_locked_already,
+                                 uint64_t sub_scan_size) const {
   Key start_art_key;
   SliceToARTKey(start_key, start_art_key);
   auto t = tree_->getThreadInfo();
 
-  TID results_out[ART_scan_size_];
+  TID results_out[sub_scan_size];
 
   // Retrieve & lock in ART.
   bool should_scan_more = true;
   while (should_scan_more) {
     size_t num_found = 0;
 
-    // The next largest key after `ART_scan_size_` keys will be returned in
+    // The next largest key after `sub_scan_size` keys will be returned in
     // `start_art_key`, setting up the next iteration.
-    tree_->lookupRange(start_art_key, results_out, ART_scan_size_, num_found, t,
+    tree_->lookupRange(start_art_key, results_out, sub_scan_size, num_found, t,
                        &cache_entries, &start_art_key, index_locked_already);
 
     // Three conditions to scan more:
@@ -184,8 +183,8 @@ Status RecordCache::GetRangeImpl(
     // 2. The point from which to continue is beyond the keys we saw.
     // 3. The point from which to continue is below the `end_key`.
     should_scan_more =
-        (num_found == ART_scan_size_) &&
-        (cache_entries[results_out[ART_scan_size_ - 1] - 1].GetKey().compare(
+        (num_found == sub_scan_size) &&
+        (cache_entries[results_out[sub_scan_size - 1] - 1].GetKey().compare(
              ARTKeyToSlice(start_art_key)) < 0) &&
         (ARTKeyToSlice(start_art_key).compare(end_key) < 0);
 
@@ -229,46 +228,37 @@ Slice RecordCache::ARTKeyToSlice(const Key& art_key) {
 }
 
 uint64_t RecordCache::SelectForEviction() {
+  uint64_t candidate;
   uint64_t local_clock;
-  uint64_t dirty_candidate;
-  bool have_dirty_candidate = false;
+  uint64_t lookahead = capacity_ < kDefaultEvictionLookahead
+                           ? capacity_
+                           : kDefaultEvictionLookahead;
 
   // Implement the CLOCK algorithm, but if the first eviction
-  // candidate you find is dirty, go around once more in the hopes
+  // candidate you find is dirty, scan ahead by `lookahead` in the hopes
   // of evicting a non-dirty one instead.
   while (true) {
     local_clock = (clock_++) % capacity_;
-    auto entry = &cache_entries[local_clock];
-
-    bool zero_priority = (entry->GetPriority() == 0);
-    bool is_dirty = entry->IsDirty();
-    bool is_candidate = (local_clock == dirty_candidate);
-
-    // Case 1: 0 priority and clean -> evict.
-    if (zero_priority && !is_dirty) {
+    if (cache_entries[local_clock].GetPriority() == 0) {
+      candidate = local_clock;
       break;
     }
-    // Case 2: 0 priority but dirty, don't have a dirty candidate -> set as
-    // dirty candidate and go around.
-    else if (zero_priority && is_dirty && !have_dirty_candidate) {
-      have_dirty_candidate = true;
-      dirty_candidate = local_clock;
-    }
-    // Case 3: Got back to dirty candidate and it still has priority 0 -> evict
-    // this time.
-    else if (zero_priority && have_dirty_candidate && is_candidate) {
-      break;
-    }
-    // Case 4: Got back to dirty candidate but now it has higher priority ->
-    // unmake candidate and continue.
-    else if (!zero_priority && have_dirty_candidate && is_candidate) {
-      have_dirty_candidate = false;
-    }
-
-    entry->DecrementPriority();
+    cache_entries[local_clock].DecrementPriority();
   }
 
-  return local_clock;
+  if (cache_entries[candidate].IsDirty()) {
+    for (auto i = 0; i < lookahead; i++) {
+      local_clock = (clock_++) % capacity_;
+      if ((cache_entries[local_clock].GetPriority() == 0) &&
+          !cache_entries[local_clock].IsDirty()) {
+        candidate = local_clock;
+        break;
+      }
+      cache_entries[local_clock].DecrementPriority();
+    }
+  }
+
+  return candidate;
 }
 
 uint64_t RecordCache::WriteOutIfDirty(uint64_t index) {
@@ -292,7 +282,7 @@ uint64_t RecordCache::WriteOutIfDirty(uint64_t index) {
         key_bounds_(llsm::key_utils::ExtractHead64(key));
     Status s = GetRangeImpl(key_utils::IntKeyAsSlice(lower_bound).as<Slice>(),
                             key_utils::IntKeyAsSlice(upper_bound).as<Slice>(),
-                            &indices, index);
+                            &indices, index, kDefaultWriteOutSubScan);
     for (auto& idx : indices) {
       entry = &cache_entries[idx];
       if (entry->IsDirty()) {

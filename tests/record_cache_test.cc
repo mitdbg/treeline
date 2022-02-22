@@ -111,7 +111,6 @@ TEST(RecordCacheTest, RangeScanWithLength) {
 TEST(RecordCacheTest, RangeScanWithBound) {
   const uint64_t capacity = 100;
   auto rc = RecordCache(capacity);
-  rc.ART_scan_size_ = 6;
 
   for (auto i = 100; i < 150; ++i) {
     std::string key_s = "a" + std::to_string(i);
@@ -127,8 +126,9 @@ TEST(RecordCacheTest, RangeScanWithBound) {
     std::string start_key_s = "a" + std::to_string(i);
     std::string end_key_s = "a" + std::to_string(i + scan_length);
 
-    ASSERT_TRUE(
-        rc.GetRange(Slice(start_key_s), Slice(end_key_s), &results).ok());
+    ASSERT_TRUE(rc.GetRangeImpl(Slice(start_key_s), Slice(end_key_s), &results,
+                                std::nullopt, 6)
+                    .ok());
     uint64_t scanned_recs = results.size();
     ASSERT_EQ(scanned_recs, i < 150 - scan_length ? scan_length : 150 - i);
 
