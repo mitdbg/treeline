@@ -139,6 +139,13 @@ Status Manager::ScanWithEstimates(
                                    PageMode::kShared);
     ++start_seg_page_idx;
   }
+  // Release any page locks that were not released by the loop above (this will
+  // happen if `records_left == 0` before scanning all the read-in pages).
+  for (; start_seg_page_idx < (start_page_idx + est_start_pages_to_read);
+       ++start_seg_page_idx) {
+    lock_manager_->ReleasePageLock(start_seg.sinfo.id(), start_seg_page_idx,
+                                   PageMode::kShared);
+  }
 
   // If we estimated incorrectly and we still have more pages to read in the
   // first segment.
@@ -196,6 +203,11 @@ Status Manager::ScanWithEstimates(
       lock_manager_->ReleasePageLock(curr_seg->sinfo.id(), page_idx,
                                      PageMode::kShared);
       ++page_idx;
+    }
+    // Release any page locks that were not released by the loop above.
+    for (; page_idx < pages_to_read; ++page_idx) {
+      lock_manager_->ReleasePageLock(curr_seg->sinfo.id(), page_idx,
+                                     PageMode::kShared);
     }
 
     // If we underestimated and need to read a few more pages from this
@@ -313,6 +325,13 @@ Status Manager::ScanWhole(
                                    PageMode::kShared);
     ++start_segment_page_idx;
   }
+  // Release any page locks that were not released by the loop above (this will
+  // happen if `records_left == 0` before scanning all the read-in pages).
+  for (; start_segment_page_idx < first_segment_size;
+       ++start_segment_page_idx) {
+    lock_manager_->ReleasePageLock(start_seg.sinfo.id(), start_segment_page_idx,
+                                   PageMode::kShared);
+  }
 
   // No more records needed. Return early.
   if (records_left == 0) {
@@ -349,6 +368,11 @@ Status Manager::ScanWhole(
       lock_manager_->ReleasePageLock(curr_seg->sinfo.id(), page_idx,
                                      PageMode::kShared);
       ++page_idx;
+    }
+    // Release any page locks that were not released by the loop above.
+    for (; page_idx < seg_page_count; ++page_idx) {
+      lock_manager_->ReleasePageLock(curr_seg->sinfo.id(), page_idx,
+                                     PageMode::kShared);
     }
 
     // Go to the next segment.
