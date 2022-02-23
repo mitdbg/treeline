@@ -49,6 +49,10 @@ struct PageGroupedDBOptions {
   // If set to true, the record cache will not be used (all read/write requests
   // will incur I/O).
   bool bypass_cache = false;
+
+  // If true, the record cache will try to batch writes for the same page when
+  // writing out a dirty entry.
+  bool rec_cache_batch_writeout = true;
 };
 
 }  // namespace pg
