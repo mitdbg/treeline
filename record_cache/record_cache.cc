@@ -33,16 +33,29 @@ RecordCache::~RecordCache() {
 Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
                         format::WriteType write_type, uint8_t priority,
                         bool safe) {
+retry:
   uint64_t index;
+#ifndef NDEBUG
+  bool found;
+  if (!override) {
+    found = GetCacheIndex(key, /*exclusive = */ true, &index, safe).ok();
+  } else {
+    found = false;
+    override = false;
+  }
+#else
   bool found = GetCacheIndex(key, /*exclusive = */ true, &index, safe).ok();
+#endif
   char* ptr = nullptr;
+  RecordCacheEntry* entry = nullptr;
 
   // If this key is not cached, need to make room by evicting first.
   if (!found) {
     index = SelectForEviction();
-    if (safe) cache_entries[index].Lock(/*exclusive = */ true);
-    if (cache_entries[index].IsValid()) {
-      if (cache_entries[index].IsDirty()) {
+    entry = &cache_entries[index];
+    if (safe) entry->Lock(/*exclusive = */ true);
+    if (entry->IsValid()) {
+      if (entry->IsDirty()) {
         pg::PageGroupedDBStats::Local().BumpCacheDirtyEvictions();
       } else {
         pg::PageGroupedDBStats::Local().BumpCacheCleanEvictions();
@@ -53,48 +66,63 @@ Status RecordCache::Put(const Slice& key, const Slice& value, bool is_dirty,
       auto t1 = tree_->getThreadInfo();
       tree_->remove(art_key, index + 1, t1);
     }
+  } else {
+    entry = &cache_entries[index];
   }
 
   // If this key is already cached, it is already at least as fresh as any
   // non-dirty copy we might try to overwrite it with.
   if (found && !is_dirty) {
-    if (safe) cache_entries[index].Unlock();
+    if (safe) entry->Unlock();
     return Status::OK();
   }
 
   // Do we need to allocate memory? Only if record is newly-cached, or if the
   // new value is larger.
-  if (found && cache_entries[index].GetValue().size() >= value.size()) {
-    ptr = const_cast<char*>(cache_entries[index].GetKey().data());
+  if (found && entry->GetValue().size() >= value.size()) {
+    ptr = const_cast<char*>(entry->GetKey().data());
   } else {
     FreeIfValid(index);
     ptr = static_cast<char*>(malloc(key.size() + value.size()));
 
     // Update key.
     memcpy(ptr, key.data(), key.size());
-    cache_entries[index].SetKey(Slice(ptr, key.size()));
+    entry->SetKey(Slice(ptr, key.size()));
   }
 
   // Update value.
   memcpy(ptr + key.size(), value.data(), value.size());
-  cache_entries[index].SetValue(Slice(ptr + key.size(), value.size()));
+  entry->SetValue(Slice(ptr + key.size(), value.size()));
 
   // Update metadata.
-  cache_entries[index].SetValidTo(true);
-  cache_entries[index].SetDirtyTo(
-      found ? (is_dirty || cache_entries[index].IsDirty()) : (is_dirty));
-  if (is_dirty) cache_entries[index].SetWriteType(write_type);
-  cache_entries[index].SetPriorityTo(priority);
+  entry->SetValidTo(true);
+  entry->SetDirtyTo(found ? (is_dirty || entry->IsDirty()) : (is_dirty));
+  if (is_dirty) entry->SetWriteType(write_type);
+  entry->SetPriorityTo(priority);
 
   // Update ART.
   if (!found) {
     Key art_key;
     TIDToARTKey(index + 1, art_key);
     auto t2 = tree_->getThreadInfo();
-    tree_->insert(art_key, index + 1, t2);
+    bool success = tree_->insert(art_key, index + 1, t2);
+
+    if (!success) {  // Another thread cached the same key concurrently.
+      // Set this cache entry up for eviction.
+      entry->SetDirtyTo(false);
+      entry->SetPriorityTo(0);
+      if (safe) entry->Unlock();
+
+      // If this was optimistic caching, having a more recent write cached is
+      // "success".
+      if (!is_dirty) return Status::OK();
+
+      // Otherwise, we need to retry this write.
+      goto retry;
+    }
   }
 
-  if (safe) cache_entries[index].Unlock();
+  if (safe) entry->Unlock();
 
   return Status::OK();
 }
