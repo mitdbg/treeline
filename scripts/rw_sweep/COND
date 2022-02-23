@@ -13,7 +13,7 @@ COMMON_OPTIONS = {
   "use_direct_io": True,
   "latency_sample_period": 10,
   "rdb_bloom_bits": 10,
-  "gen_scan_read_percent": 50,  # 50% of the reads are scans
+  "gen_scan_read_percent": 10,  # 10% of the reads are scans
   "use_alex": False,
 }
 
