@@ -49,7 +49,7 @@ class RecordCache {
   // Initializes a record cache in tandem with a database. `capacity` is
   // measured in the number of records.
   //
-  // The last argument can optionally be omitted when using a standalone
+  // The last two arguments can optionally be omitted when using a standalone
   // RecordCache. In that case, no persistence guarantees are provided, and data
   // will be lost when exceeding the size of the record cache.
   RecordCache(uint64_t capacity, WriteOutFn write_out = WriteOutFn(),
