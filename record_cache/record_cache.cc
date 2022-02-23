@@ -44,7 +44,7 @@ retry:
     override = false;
   }
 #else
-  auto found = GetCacheIndex(key, /*exclusive = */ true, &index, safe).ok();
+  bool found = GetCacheIndex(key, /*exclusive = */ true, &index, safe).ok();
 #endif
   char* ptr = nullptr;
   RecordCacheEntry* entry = nullptr;

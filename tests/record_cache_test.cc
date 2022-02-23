@@ -31,7 +31,7 @@ TEST(RecordCacheTest, SimplePutDuplicate) {
 
   ASSERT_TRUE(rc.Put(key, value1, /*is_dirty = */ true).ok());
   rc.override = true;
-  ASSERT_TRUE(rc.Put(key, value2, /*is_dirty =*/true).ok());
+  ASSERT_TRUE(rc.Put(key, value2, /*is_dirty = */ true).ok());
 
   uint64_t index_out;
   ASSERT_TRUE(rc.GetCacheIndex(key, false, &index_out).ok());
