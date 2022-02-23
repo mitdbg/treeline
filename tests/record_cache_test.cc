@@ -21,6 +21,25 @@ TEST(RecordCacheTest, SimplePutGet) {
   rc.cache_entries[index_out].Unlock();
 }
 
+#ifndef NDEBUG
+TEST(RecordCacheTest, SimplePutDuplicate) {
+  const uint64_t capacity = 5;
+  auto rc = RecordCache(capacity);
+  Slice key = "aaa";
+  Slice value1 = "bbb";
+  Slice value2 = "ccc";
+
+  ASSERT_TRUE(rc.Put(key, value1, /*is_dirty = */ true).ok());
+  rc.override = true;
+  ASSERT_TRUE(rc.Put(key, value2, /*is_dirty =*/true).ok());
+
+  uint64_t index_out;
+  ASSERT_TRUE(rc.GetCacheIndex(key, false, &index_out).ok());
+  ASSERT_EQ(value2.compare(rc.cache_entries[index_out].GetValue()), 0);
+  rc.cache_entries[index_out].Unlock();
+}
+#endif
+
 TEST(RecordCacheTest, SimpleMiss) {
   const uint64_t capacity = 5;
   auto rc = RecordCache(capacity);

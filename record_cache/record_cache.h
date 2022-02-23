@@ -164,6 +164,11 @@ class RecordCache {
   // The number of cache entries.
   const uint64_t capacity_;
 
+#ifndef NDEBUG
+  // Debugging flag
+  bool override = false;
+#endif
+
   // The options of the underlying database.
   Options* options_;
 
