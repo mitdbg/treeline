@@ -278,11 +278,10 @@ uint64_t RecordCache::WriteOutIfDirty(uint64_t index) {
   WriteOutBatch batch;
 
   if (key_bounds_) {
-    auto [lower_bound, upper_bound] =
-        key_bounds_(llsm::key_utils::ExtractHead64(key));
-    Status s = GetRangeImpl(key_utils::IntKeyAsSlice(lower_bound).as<Slice>(),
-                            key_utils::IntKeyAsSlice(upper_bound).as<Slice>(),
-                            &indices, index, kDefaultWriteOutSubScan);
+    auto [_, upper_bound] = key_bounds_(llsm::key_utils::ExtractHead64(key));
+    Status s =
+        GetRangeImpl(key, key_utils::IntKeyAsSlice(upper_bound).as<Slice>(),
+                     &indices, index, kDefaultWriteOutSubScan);
     for (auto& idx : indices) {
       entry = &cache_entries[idx];
       if (entry->IsDirty()) {

@@ -1603,9 +1603,16 @@ TEST_F(DBTest, RecordCacheWriteOutBatchingSimple) {
     ASSERT_TRUE(status.ok());
   }
 
-  // All records fit into one page so this should flush all of them.
+  // All records fit into one page, so if we flush the smallest one, this should
+  // flush all of them.
+  uint64_t idx;
+  llsm::Slice smallest_key(
+      reinterpret_cast<const char*>(&lexicographic_keys[0]), kKeySize);
+  status = static_cast<llsm::DBImpl*>(db)->rec_cache_->GetCacheIndex(
+      smallest_key, /*exclusive = */ false, &idx);
+  static_cast<llsm::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
   auto written_out =
-      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(0);
+      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
   ASSERT_EQ(written_out, lexicographic_keys.size());
 }
 
@@ -1651,10 +1658,18 @@ TEST_F(DBTest, RecordCacheWriteOutBatchingMultiPage) {
     ASSERT_TRUE(status.ok());
   }
 
-  // All records currently in the cache go into the same page so this should
-  // flush all of them.
+  // All records currently in the cache go into the same page, so if we flush
+  // the smallest one, this should flush all of them.
+  uint64_t idx;
+  llsm::Slice smallest_key(
+      reinterpret_cast<const char*>(
+          &lexicographic_keys[num_records - records_per_page]),
+      kKeySize);
+  status = static_cast<llsm::DBImpl*>(db)->rec_cache_->GetCacheIndex(
+      smallest_key, /*exclusive = */ false, &idx);
+  static_cast<llsm::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
   auto written_out =
-      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(0);
+      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
   ASSERT_EQ(written_out, records_per_page);
 
   // Helper functions.
@@ -1737,10 +1752,18 @@ TEST_F(DBTest, RecordCacheClearHalfDirty) {
     ASSERT_TRUE(status.ok());
   }
 
-  // All records currently in the cache go into the same page so this should
-  // flush all of them.
+  // All records currently in the cache go into the same page, so if we flush
+  // the smallest one, this should flush all of them.
+  uint64_t idx;
+  llsm::Slice smallest_key(
+      reinterpret_cast<const char*>(
+          &lexicographic_keys[num_records - records_per_page]),
+      kKeySize);
+  status = static_cast<llsm::DBImpl*>(db)->rec_cache_->GetCacheIndex(
+      smallest_key, /*exclusive = */ false, &idx);
+  static_cast<llsm::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
   auto written_out =
-      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(0);
+      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
   ASSERT_EQ(written_out, records_per_page);
 
   // Re-dirty half the cache.
