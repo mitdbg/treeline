@@ -613,13 +613,14 @@ restart:
       uint32_t prefixLength = 0;
       uint32_t minLength =
           key.getKeyLen() < k.getKeyLen() ? key.getKeyLen() : k.getKeyLen();
-      while (key[level + prefixLength] == k[level + prefixLength]) {
-        prefixLength++;
-        if (level + prefixLength >= minLength) { // Duplicate insertion
+      do {
+        if (level + prefixLength >= minLength) {  // Duplicate insertion
           node->writeUnlock();
           return false;
         }
-      }
+        if (key[level + prefixLength] != k[level + prefixLength]) break;
+        prefixLength++;
+      } while (true);
 
       auto n4 = new N4(&k[level], prefixLength);
       n4->insert(k[level + prefixLength], N::setLeaf(tid));
