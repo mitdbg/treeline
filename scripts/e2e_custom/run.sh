@@ -46,6 +46,11 @@ rm -rf $DB_PATH
 args+=("--skip_load")
 cp -r $full_checkpoint_path $DB_PATH
 
+# Update leanstore configuration file to reflect moving the database.
+if [ -e $DB_PATH/$db_type/leanstore.json ]; then
+  sed -i 's|'"$full_checkpoint_path"'|'"$DB_PATH"'|g' $DB_PATH/$db_type/leanstore.json 
+fi
+
 sync $DB_PATH
 
 init_finished=0
