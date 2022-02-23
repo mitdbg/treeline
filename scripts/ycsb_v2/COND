@@ -113,7 +113,7 @@ NUM_PRELOAD_UPDATES = 40000000
 ### Utilities.
 ###
 
-def process_config(db, config, dataset, workload=None):
+def process_config(db, config, dataset, workload=None, dist=None):
   copy = config.copy()
   del copy["cache_mib"]
   del copy["memtable_mib"]
@@ -139,6 +139,11 @@ def process_config(db, config, dataset, workload=None):
   # Sets the key range for inserts.
   copy["gen_range_min"] = dataset["range_min"]
   copy["gen_range_max"] = dataset["range_max"]
+
+  # Running with the defined request counts takes longer than 45 minutes when
+  # the request distribution is uniform. So we cut the request count in half.
+  if dist == "uniform":
+    copy["gen_num_requests"] //= 2
 
   return copy
 
@@ -207,6 +212,9 @@ ALL_EXPERIMENTS = [
   if zipped[3] != "d" or zipped[4] == "zipfian"
 ]
 
+# The subset of experiments that have a zipfian request distribution.
+ALL_ZIPFIAN = list(filter(lambda exp: "zipfian" in exp, ALL_EXPERIMENTS))
+
 # All YCSB experiments.
 combine(
   name="ycsb",
@@ -238,7 +246,7 @@ combine(
 # All zipfian workloads.
 combine(
   name="zipfian",
-  deps=list(filter(lambda exp: "zipfian" in exp, ALL_EXPERIMENTS)),
+  deps=ALL_ZIPFIAN,
 )
 
 # All RocksDB workloads.
@@ -269,8 +277,9 @@ combine(
   ],
 )
 
-# Used for dividing up the experiments across 2 machines. Run this task on
-# machine 1 of 2.
+# The tasks below are used for dividing up the experiments across 2 machines.
+
+# Run on machine 1.
 group(
   name="ycsb-1-of-2",
   deps=[
@@ -280,13 +289,30 @@ group(
   ],
 )
 
-# Used for dividing up the experiments across 2 machines. Run this task on
-# machine 2 of 2.
+# Run on machine 2.
 group(
   name="ycsb-2-of-2",
   deps=[
     exp_name
     for idx, exp_name in enumerate(ALL_EXPERIMENTS)
+    if idx % 2 == 1
+  ],
+)
+
+group(
+  name="zipfian-1-of-2",
+  deps=[
+    exp_name
+    for idx, exp_name in enumerate(ALL_ZIPFIAN)
+    if idx % 2 == 0
+  ],
+)
+
+group(
+  name="zipfian-2-of-2",
+  deps=[
+    exp_name
+    for idx, exp_name in enumerate(ALL_ZIPFIAN)
     if idx % 2 == 1
   ],
 )
@@ -305,7 +331,7 @@ run_experiment_group(
       name="synth-{}-{}-{}-{}-{}".format(db, config["name"], workload, dist, threads),
       options={
         **COMMON_OPTIONS,
-        **process_config(db, config, SYNTH_DATASET, workload),
+        **process_config(db, config, SYNTH_DATASET, workload=workload, dist=dist),
         "db": db,
         "checkpoint_name": "ycsb-synth-{}-{}".format(db, config["name"]),
         "threads": threads,
@@ -341,7 +367,7 @@ for dataset in CUSTOM_DATASETS:
         name="{}-{}-{}-{}-{}-{}".format(dataset["name"], db, config["name"], workload, dist, threads),
         options={
           **COMMON_OPTIONS,
-          **process_config(db, config, dataset, workload),
+          **process_config(db, config, dataset, workload=workload, dist=dist),
           "db": db,
           "checkpoint_name": "ycsb-{}-{}-{}".format(dataset["name"], db, config["name"]),
           "custom_dataset": dataset["path"],
