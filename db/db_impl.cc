@@ -136,7 +136,9 @@ Status DBImpl::InitializeNewDB() {
     rec_cache_ = std::make_unique<RecordCache>(
         options_.record_cache_capacity,
         std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1),
-        std::bind(&DBImpl::GetPageBoundsFor, this, std::placeholders::_1));
+        options_.rec_cache_batch_writeout
+            ? std::bind(&DBImpl::GetPageBoundsFor, this, std::placeholders::_1)
+            : RecordCache::KeyBoundsFn());
 
     model_->PreallocateAndInitialize(buf_mgr_, records,
                                      options_.key_hints.records_per_page());
@@ -183,7 +185,9 @@ Status DBImpl::InitializeExistingDB() {
   rec_cache_ = std::make_unique<RecordCache>(
       options_.record_cache_capacity,
       std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1),
-      std::bind(&DBImpl::GetPageBoundsFor, this, std::placeholders::_1));
+      options_.rec_cache_batch_writeout
+          ? std::bind(&DBImpl::GetPageBoundsFor, this, std::placeholders::_1)
+          : RecordCache::KeyBoundsFn());
 
   model_->ScanFilesAndInitialize(buf_mgr_);
   buf_mgr_->ClearStats();

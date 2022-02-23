@@ -105,6 +105,10 @@ struct Options {
   // Optimistically cache, with a lower priority, all records on the same page
   // as a record requested by the user.
   bool optimistic_caching = true;
+
+  // If true, the record cache will try to batch writes for the same page when
+  // writing out a dirty entry.
+  bool rec_cache_batch_writeout = true;
 };
 
 struct ReadOptions {};

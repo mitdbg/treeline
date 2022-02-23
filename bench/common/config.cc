@@ -147,6 +147,10 @@ DEFINE_bool(pg_bypass_cache, false,
             "If set, PGLLSM will bypass the record cache. All requests will "
             "incur I/O.");
 
+DEFINE_bool(rec_cache_batch_writeout, true,
+            "If true, the record cache will try to batch writes for the same "
+            "page when writing out a dirty entry.");
+
 namespace llsm {
 namespace bench {
 
@@ -221,6 +225,7 @@ llsm::Options BuildLLSMOptions() {
   options.deferral_autotuning = FLAGS_deferral_autotuning;
   options.memory_autotuning = FLAGS_memory_autotuning;
   options.reorg_length = FLAGS_reorg_length;
+  options.rec_cache_batch_writeout = FLAGS_rec_cache_batch_writeout;
   return options;
 }
 
@@ -234,6 +239,7 @@ llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
       (FLAGS_cache_size_mib * 1024 * 1024) / (FLAGS_record_size_bytes);
   options.use_memory_based_io = FLAGS_pg_use_memory_based_io;
   options.bypass_cache = FLAGS_pg_bypass_cache;
+  options.rec_cache_batch_writeout = FLAGS_rec_cache_batch_writeout;
   return options;
 }
 

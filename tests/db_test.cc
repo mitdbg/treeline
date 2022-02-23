@@ -1828,7 +1828,7 @@ TEST_F(DBTest, UpdatesBeyondCacheCapacity) {
     status = db->Put(woptions, key, value2);
     ASSERT_TRUE(status.ok());
   }
-  
+
   const std::string value3(kValueSize, 0xFD);
   for (const auto& key_as_int : lexicographic_keys) {
     llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
@@ -1845,4 +1845,59 @@ TEST_F(DBTest, UpdatesBeyondCacheCapacity) {
     ASSERT_EQ(value_out, value3);
   }
 }
+
+TEST_F(DBTest, RecordCacheWriteOutOverride) {
+  constexpr size_t kKeySize = sizeof(uint64_t);
+  constexpr size_t kValueSize = 8;
+  constexpr size_t kRecordSize = kKeySize + kValueSize;
+
+  // Dummy value used for the records (8 byte key; record is 16B in total).
+  const std::string value(kValueSize, 0xFF);
+
+  llsm::Options options;
+  options.pin_threads = false;
+  options.background_threads = 2;
+  options.key_hints.page_fill_pct = 50;
+  options.key_hints.record_size = kRecordSize;
+  options.key_hints.key_size = kKeySize;
+  options.key_hints.min_key = 0;
+  options.key_hints.key_step_size = 1;
+  // Generate records
+  options.key_hints.num_keys = options.key_hints.records_per_page();
+  options.record_cache_capacity = options.key_hints.records_per_page();
+  options.rec_cache_batch_writeout = false;
+
+  // Generate data used for the write (and later read).
+  const std::vector<uint64_t> lexicographic_keys =
+      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+
+  // Open the DB.
+  llsm::DB* db = nullptr;
+  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(db != nullptr);
+
+  // Write dummy data to the DB.
+  llsm::WriteOptions woptions;
+  woptions.bypass_wal = true;
+  for (const auto& key_as_int : lexicographic_keys) {
+    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Put(woptions, key, value);
+    ASSERT_TRUE(status.ok());
+  }
+
+  // All records fit into one page, so if we flush the smallest one, this should
+  // have flushed all of them if we used batching - but we're not, so it should
+  // flush one record.
+  uint64_t idx;
+  llsm::Slice smallest_key(
+      reinterpret_cast<const char*>(&lexicographic_keys[0]), kKeySize);
+  status = static_cast<llsm::DBImpl*>(db)->rec_cache_->GetCacheIndex(
+      smallest_key, /*exclusive = */ false, &idx);
+  static_cast<llsm::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
+  auto written_out =
+      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
+  ASSERT_EQ(written_out, 1);
+}
+
 }  // namespace
