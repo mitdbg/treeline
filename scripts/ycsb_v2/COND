@@ -258,10 +258,13 @@ combine(
   name="sanity_check",
   deps=[
     ":synth-pg_llsm-64B-a-zipfian-8",
+    ":synth-pg_llsm-64B-b-zipfian-8",
     ":synth-rocksdb-64B-a-zipfian-8",
     ":amzn-pg_llsm-64B-c-zipfian-8",
+    ":amzn-pg_llsm-64B-d-zipfian-8",
     ":amzn-rocksdb-64B-c-zipfian-8",
     ":osm-pg_llsm-64B-e-zipfian-8",
+    ":osm-pg_llsm-64B-f-zipfian-8",
     ":osm-rocksdb-64B-e-zipfian-8",
   ],
 )
