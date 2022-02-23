@@ -31,6 +31,11 @@ if [[ -z $checkpoint_name ]]; then
   exit 1
 fi
 
+if [ -z $COND_OUT ]; then
+  echo >&2 "ERROR: This script is meant to be launched by Conductor."
+  exit 1
+fi
+
 echo >&2 "Detected DB Type: $db_type"
 echo >&2 "Detected checkpoint name: $checkpoint_name"
 
