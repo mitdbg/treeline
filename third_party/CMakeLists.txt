@@ -116,7 +116,7 @@ if(LLSM_BUILD_BENCHMARKS)
   FetchContent_Declare(
     leanstore
     GIT_REPOSITORY git@github.com:mitdbg/leanstore.git
-    GIT_TAG        120771482189f51d5d11d665b4f6935cecab4730
+    GIT_TAG        master-learnedlsm
   )
   set(BUILD_LEANSTORE_FRONTEND OFF)
   FetchContent_MakeAvailable(leanstore)
