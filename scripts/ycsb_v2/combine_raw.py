@@ -56,13 +56,15 @@ def main():
     # Process experiment result configs
     for dep in deps:
         for exp_inst in dep.iterdir():
-            # e.g.: ycsb-synthetic-pg_llsm-64B-a-1
+            # e.g.: synth-pg_llsm-64B-a-zipfian-1
             # NOTE: We don't need to extract the DB because it is already recorded
             #       in the result CSV.
             exp_parts = exp_inst.name.split("-")
-            config = "-".join(exp_parts[1:4])
-            db = exp_parts[2]
-            workload = exp_parts[4]
+            dataset = exp_parts[0]
+            db = exp_parts[1]
+            config = exp_parts[2]
+            workload = exp_parts[3]
+            dist = exp_parts[4]
             threads = int(exp_parts[5])
 
             # Process end-to-end results
@@ -70,9 +72,11 @@ def main():
             df.pop("read_mib_per_s")
             df.pop("write_mib_per_s")
             orig_columns = list(df.columns)
-            df["config"] = config
-            df["workload"] = workload
-            df["threads"] = threads
+            df.insert(0, "dataset", dataset)
+            df.insert(1, "config", config)
+            df.insert(2, "dist", dist)
+            df.insert(3, "workload", workload)
+            df.insert(4, "threads", threads)
 
             # Process iostat results (physical I/O)
             read_kb, written_kb = process_iostat(
@@ -112,13 +116,17 @@ def main():
     # Write out the combined results
     combined = pd.concat(all_results)
     combined.sort_values(
-        ["config", "workload", "db", "threads"],
+        ["dataset", "config", "dist", "db", "workload", "threads"],
         inplace=True,
         ignore_index=True,
     )
+    orig_columns.remove("db")
     combined = combined[
         [
+            "dataset",
             "config",
+            "dist",
+            "db",
             "workload",
             "threads",
             *orig_columns,

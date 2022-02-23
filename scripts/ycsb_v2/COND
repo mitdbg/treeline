@@ -1,0 +1,419 @@
+from itertools import product
+
+WORKLOADS = [
+  "a", "b", "c", "d", "e", "f",
+]
+
+DBS = [
+  "pg_llsm",
+  "rocksdb",
+]
+
+DISTRIBUTIONS = ["zipfian", "uniform"]
+
+THREADS = [1, 2, 4, 8, 16]
+
+CONFIGS = [
+  {
+    "name": "64B",
+    "record_size_bytes": 64,
+
+    # Used by LLSM.
+    "llsm_page_fill_pct": 70,
+
+    # Used by page-grouped LLSM.
+    "records_per_page_goal": 45,
+    "records_per_page_delta": 5,
+
+    # Used by all DBs.
+    # 408 MiB in total (2 x 64 MiB + 280 MiB, ~33% of the dataset)
+    "memtable_mib": 64,
+    "cache_mib": 280,
+
+    # Used to configure the length of the workload.
+    "point_requests": 8000000,
+    "scan_requests": 2400000,
+  },
+  {
+    "name": "1024B",
+    "record_size_bytes": 1024,
+
+    # Used by LLSM.
+    "llsm_page_fill_pct": 50,
+
+    # Used by page-grouped LLSM.
+    "records_per_page_goal": 2,
+    "records_per_page_delta": 1,
+
+    # Used by all DBs.
+    # 3255 MiB in total ~33% of the dataset
+    "memtable_mib": 510,
+    "cache_mib": 2235,
+
+    # Used to configure the length of the workload.
+    "point_requests": 4000000,
+    "scan_requests": 1200000,
+  },
+]
+
+COMMON_OPTIONS = {
+  "bg_threads": 4,
+  "latency_sample_period": 10,
+
+  # Affects RocksDB & LLSM
+  "bypass_wal": True,
+  "use_direct_io": True,
+
+  # Affects RocksDB
+  "rdb_bloom_bits": 10,
+  "rdb_prefix_bloom_size": 3,
+
+  # Affects LLSM
+  "reorg_length": 2,
+  "use_alex": False,
+  "deferral_autotuning": True,
+  "max_deferrals": 1,
+}
+
+SYNTH_DATASET = {
+  "name": "synth",
+  "mem_mult": 1,
+  "range_min": 0,
+  "range_max": 2000000000,
+}
+
+CUSTOM_DATASETS = [
+  {
+    "name": "osm",
+    "path": "'$TP_DATASET_PATH/osm_ny.txt'",
+    # The dataset is this many times larger than the standard 20 M synthetic
+    # dataset we use.
+    "mem_mult": 1.160804,
+    "range_min": 699540,
+    "range_max": 6820987374,
+  },
+  {
+    "name": "amzn",
+    "path": "'$TP_DATASET_PATH/amazon_reviews.txt'",
+    # The dataset is this many times larger than the standard 20 M synthetic
+    # dataset we use.
+    "mem_mult": 1.674881,
+    "range_min": 10001,
+    "range_max": 53096592,
+  },
+]
+
+# Number of uniform updates to make during the preload process. The purpose of
+# these updates is to ensure that RocksDB has sstables present in multiple
+# levels.
+NUM_PRELOAD_UPDATES = 40000000
+
+
+###
+### Utilities.
+###
+
+def process_config(db, config, dataset, workload=None):
+  copy = config.copy()
+  del copy["cache_mib"]
+  del copy["memtable_mib"]
+  del copy["name"]
+  del copy["point_requests"]
+  del copy["scan_requests"]
+
+  # Set the memory configuration.
+  if db == "pg_llsm":
+    copy["cache_size_mib"] = int(dataset["mem_mult"] * (
+      config["cache_mib"] + (2 * config["memtable_mib"])
+    ))
+  else:
+    copy["cache_size_mib"] = int(dataset["mem_mult"] * config["cache_mib"])
+    copy["memtable_size_mib"] = int(dataset["mem_mult"] * config["memtable_mib"])
+
+  # Set the arguments used to customize the workload.
+  if workload is None or workload != "e":
+    copy["gen_num_requests"] = config["point_requests"]
+  else:
+    copy["gen_num_requests"] = config["scan_requests"]
+
+  # Sets the key range for inserts.
+  copy["gen_range_min"] = dataset["range_min"]
+  copy["gen_range_max"] = dataset["range_max"]
+
+  return copy
+
+
+###
+### Get aggregated results.
+###
+
+run_command(
+  name="combine-all",
+  run="python3 combine_raw.py",
+  deps=[
+    ":synth",
+    ":osm",
+    ":amzn",
+  ],
+)
+
+run_command(
+  name="combine-64B",
+  run="python3 combine_raw.py",
+  deps=[":64B"],
+)
+
+run_command(
+  name="combine-1024B",
+  run="python3 combine_raw.py",
+  deps=[":1024B"],
+)
+
+run_command(
+  name="combine-single",
+  run="python3 combine_raw.py",
+  deps=[":single"],
+)
+
+run_command(
+  name="combine-zipfian",
+  run="python3 combine_raw.py",
+  deps=[":zipfian"],
+)
+
+run_command(
+  name="combine-sanity_check",
+  run="python3 combine_raw.py",
+  deps=[":sanity_check"],
+)
+
+
+###
+### YCSB.
+###
+
+ALL_EXPERIMENTS = [
+  ":{}-{}-{}-{}-{}-{}".format(*zipped)
+  for zipped in product(
+    ["synth", "osm", "amzn"],
+    DBS,
+    ["64B", "1024B"],
+    WORKLOADS,
+    DISTRIBUTIONS,
+    THREADS,
+  )
+  # The uniform and zipfian "d" workloads are the same, so we only run one of
+  # them.
+  if zipped[3] != "d" or zipped[4] == "zipfian"
+]
+
+# All YCSB experiments.
+combine(
+  name="ycsb",
+  deps=[
+    ":synth",
+    ":osm",
+    ":amzn",
+  ],
+)
+
+# All 64B workloads.
+combine(
+  name="64B",
+  deps=list(filter(lambda exp: "64B" in exp, ALL_EXPERIMENTS)),
+)
+
+# All 1024B workloads.
+combine(
+  name="1024B",
+  deps=list(filter(lambda exp: "1024B" in exp, ALL_EXPERIMENTS)),
+)
+
+# All single-threaded workloads.
+combine(
+  name="single",
+  deps=list(filter(lambda exp: exp.endswith("-1"), ALL_EXPERIMENTS)),
+)
+
+# All zipfian workloads.
+combine(
+  name="zipfian",
+  deps=list(filter(lambda exp: "zipfian" in exp, ALL_EXPERIMENTS)),
+)
+
+# All RocksDB workloads.
+combine(
+  name="rocksdb",
+  deps=list(filter(lambda exp: "rocksdb" in exp, ALL_EXPERIMENTS)),
+)
+
+# All page-grouped LLSM workloads.
+combine(
+  name="pg_llsm",
+  deps=list(filter(lambda exp: "pg_llsm" in exp, ALL_EXPERIMENTS)),
+)
+
+# A selection of a few workloads to use for testing.
+combine(
+  name="sanity_check",
+  deps=[
+    ":synth-pg_llsm-64B-a-zipfian-8",
+    ":synth-pg_llsm-64B-b-zipfian-8",
+    ":synth-rocksdb-64B-a-zipfian-8",
+    ":amzn-pg_llsm-64B-c-zipfian-8",
+    ":amzn-pg_llsm-64B-d-zipfian-8",
+    ":amzn-rocksdb-64B-c-zipfian-8",
+    ":osm-pg_llsm-64B-e-zipfian-8",
+    ":osm-pg_llsm-64B-f-zipfian-8",
+    ":osm-rocksdb-64B-e-zipfian-8",
+  ],
+)
+
+# Used for dividing up the experiments across 2 machines. Run this task on
+# machine 1 of 2.
+group(
+  name="ycsb-1-of-2",
+  deps=[
+    exp_name
+    for idx, exp_name in enumerate(ALL_EXPERIMENTS)
+    if idx % 2 == 0
+  ],
+)
+
+# Used for dividing up the experiments across 2 machines. Run this task on
+# machine 2 of 2.
+group(
+  name="ycsb-2-of-2",
+  deps=[
+    exp_name
+    for idx, exp_name in enumerate(ALL_EXPERIMENTS)
+    if idx % 2 == 1
+  ],
+)
+
+
+###
+### The actual YCSB experiment definitions.
+###
+
+run_experiment_group(
+  name="synth",
+  run="./run.sh",
+  experiments=[
+    # e.g. synth-pg_llsm-64B-a-zipfian-1
+    ExperimentInstance(
+      name="synth-{}-{}-{}-{}-{}".format(db, config["name"], workload, dist, threads),
+      options={
+        **COMMON_OPTIONS,
+        **process_config(db, config, SYNTH_DATASET, workload),
+        "db": db,
+        "checkpoint_name": "ycsb-synth-{}-{}".format(db, config["name"]),
+        "threads": threads,
+        "gen_template": "workloads/{}.yml".format(workload),
+        "gen_distribution": dist,
+      },
+    )
+    for db, config, workload, dist, threads in product(
+      DBS,
+      CONFIGS,
+      WORKLOADS,
+      DISTRIBUTIONS,
+      THREADS,
+    )
+    # The uniform and zipfian "d" workloads are the same, so just run one.
+    if workload != "d" or dist == "zipfian"
+  ],
+  deps=[
+    # e.g. :preload-synth-pg_llsm-64B
+    ":preload-synth-{}-{}".format(db, config["name"])
+    for db, config in product(DBS, CONFIGS)
+  ],
+)
+
+for dataset in CUSTOM_DATASETS:
+  # `amzn` and `osm`
+  run_experiment_group(
+    name="{}".format(dataset["name"]),
+    run="./run.sh",
+    experiments=[
+      # e.g. amzn-pg_llsm-64B-a-zipfian-1
+      ExperimentInstance(
+        name="{}-{}-{}-{}-{}-{}".format(dataset["name"], db, config["name"], workload, dist, threads),
+        options={
+          **COMMON_OPTIONS,
+          **process_config(db, config, dataset, workload),
+          "db": db,
+          "checkpoint_name": "ycsb-{}-{}-{}".format(dataset["name"], db, config["name"]),
+          "custom_dataset": dataset["path"],
+          "threads": threads,
+          "gen_template": "workloads/{}.yml".format(workload),
+          "gen_distribution": dist,
+        },
+      )
+      for db, config, workload, dist, threads in product(
+        DBS,
+        CONFIGS,
+        WORKLOADS,
+        DISTRIBUTIONS,
+        THREADS,
+      )
+      # The uniform and zipfian "d" workloads are the same, so just run one.
+      if workload != "d" or dist == "zipfian"
+    ],
+    deps=[
+      # e.g. :preload-amzn-pg_llsm-64B
+      ":preload-{}-{}-{}".format(dataset["name"], db, config["name"])
+      for db, config in product(DBS, CONFIGS)
+    ],
+  )
+
+
+###
+### Preload.
+###
+
+# Run all preload tasks.
+group(
+  name="preload",
+  deps=[
+    ":preload-{}-{}-{}".format(*zipped)
+    for zipped in product(
+      ["synth", "osm", "amzn"],
+      DBS,
+      map(lambda c: c["name"], CONFIGS),
+    )
+  ],
+)
+
+for db, config in product(DBS, CONFIGS):
+  run_command(
+    name="preload-synth-{}-{}".format(db, config["name"]),
+    run="./preload.sh",
+    options={
+      **COMMON_OPTIONS,
+      **process_config(db, config, SYNTH_DATASET),
+      "db": db,
+      "checkpoint_name": "ycsb-synth-{}-{}".format(db, config["name"]),
+      "threads": 1,
+      "gen_template": "workloads/setup.yml",
+      # NOTE: This overrides any previously set value.
+      "gen_num_requests": NUM_PRELOAD_UPDATES,
+    },
+  )
+
+  for dataset in CUSTOM_DATASETS:
+    run_command(
+      name="preload-{}-{}-{}".format(dataset["name"], db, config["name"]),
+      run="./preload.sh" ,
+      options={
+        **COMMON_OPTIONS,
+        **process_config(db, config, dataset),
+        "db": db,
+        "checkpoint_name": "ycsb-{}-{}-{}".format(dataset["name"], db, config["name"]),
+        "custom_dataset": dataset["path"],
+        "threads": 1,
+        "gen_template": "workloads/setup.yml",
+        # NOTE: This overrides any previously set value.
+        "gen_num_requests": NUM_PRELOAD_UPDATES,
+      },
+    )
