@@ -81,7 +81,7 @@ class Tree {
       Key* continueKey = nullptr,
       std::optional<uint64_t> index_locked_already = std::nullopt) const;
 
-  void insert(const Key& k, TID tid, ThreadInfo& epocheInfo);
+  bool insert(const Key& k, TID tid, ThreadInfo& epocheInfo);
 
   void remove(const Key& k, TID tid, ThreadInfo& epocheInfo);
 };

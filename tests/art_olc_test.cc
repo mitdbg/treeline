@@ -49,6 +49,18 @@ TEST_F(ARTOLCTest, InsertLookup) {
   }
 }
 
+TEST_F(ARTOLCTest, InsertDuplicate) {
+  auto t = tree->getThreadInfo();
+
+  Key key;
+  loadKey(keys[0], key);
+  ASSERT_TRUE(tree->insert(key, keys[0], t));
+  ASSERT_FALSE(tree->insert(key, keys[0], t));
+
+  auto val = tree->lookup(key, t);
+  ASSERT_EQ(val, keys[0]);
+}
+
 TEST_F(ARTOLCTest, InsertRemove) {
   auto t = tree->getThreadInfo();
 
@@ -123,8 +135,8 @@ TEST_F(ARTOLCTest, StartNumberScan) {
     TID result[scan_length];
     uint64_t found;
 
-    auto val = tree->lookupRange(start_key, result, scan_length,
-                                 found, t, &cache_entries);
+    auto val = tree->lookupRange(start_key, result, scan_length, found, t,
+                                 &cache_entries);
     bool found_is_correct =
         (i < kNumKeys - scan_length) ? scan_length : kNumKeys - i;
     ASSERT_TRUE(found_is_correct);

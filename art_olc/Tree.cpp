@@ -524,7 +524,7 @@ TID Tree::checkKey(const TID tid, const Key& k) const {
   return 0;
 }
 
-void Tree::insert(const Key& k, TID tid, ThreadInfo& epocheInfo) {
+bool Tree::insert(const Key& k, TID tid, ThreadInfo& epocheInfo) {
   EpocheGuard epocheGuard(epocheInfo);
 restart:
   bool needRestart = false;
@@ -579,7 +579,7 @@ restart:
                         node->getPrefixLength() - ((nextLevel - level) + 1));
 
         node->writeUnlock();
-        return;
+        return true;
       }
       case CheckPrefixPessimisticResult::Match:
         break;
@@ -594,7 +594,7 @@ restart:
       N::insertAndUnlock(node, v, parentNode, parentVersion, parentKey, nodeKey,
                          N::setLeaf(tid), needRestart, epocheInfo);
       if (needRestart) goto restart;
-      return;
+      return true;
     }
 
     if (parentNode != nullptr) {
@@ -611,8 +611,14 @@ restart:
 
       level++;
       uint32_t prefixLength = 0;
+      uint32_t minLength =
+          key.getKeyLen() < k.getKeyLen() ? key.getKeyLen() : k.getKeyLen();
       while (key[level + prefixLength] == k[level + prefixLength]) {
         prefixLength++;
+        if (level + prefixLength >= minLength) { // Duplicate insertion
+          node->writeUnlock();
+          return false;
+        }
       }
 
       auto n4 = new N4(&k[level], prefixLength);
@@ -620,7 +626,7 @@ restart:
       n4->insert(key[level + prefixLength], nextNode);
       N::change(node, k[level - 1], n4);
       node->writeUnlock();
-      return;
+      return true;
     }
     level++;
     parentVersion = v;
