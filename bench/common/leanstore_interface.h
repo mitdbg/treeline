@@ -35,6 +35,8 @@ class LeanStoreInterface {
     if (FLAGS_skip_load) {
       FLAGS_recover = true;
       FLAGS_recover_file = FLAGS_db_path + "/leanstore/leanstore.json";
+      std::cerr << "Will recover from file: " << FLAGS_recover_file
+                << std::endl;
     } else {
       FLAGS_persist = true;
       FLAGS_persist_file = FLAGS_db_path + "/leanstore/leanstore.json";
@@ -53,6 +55,7 @@ class LeanStoreInterface {
     } else {
       table_ = &db_->registerBTreeLL("btree");
     }
+    std::cerr << table_ << std::endl;
   }
 
   // Called once after the workload if `InitializeDatabase()` has been called.
@@ -70,6 +73,7 @@ class LeanStoreInterface {
 
   // Load the records into the database.
   void BulkLoad(const ycsbr::BulkLoadTrace& load) {
+    std::cerr << "Called BulkLoad()" << std::endl;
     for (const auto& req : load) {
       if (!Insert(req.key, req.value, req.value_size)) {
         throw std::runtime_error("Failed to bulk load a record!");
@@ -79,6 +83,7 @@ class LeanStoreInterface {
 
   // Update the value at the specified key. Return true if the update succeeded.
   bool Update(ycsbr::Request::Key key, const char* value, size_t value_size) {
+    std::cerr << "Called Update()" << std::endl;
     const llsm::key_utils::IntKeyAsSlice strkey(key);
     auto result = table_->updateSameSize(
         reinterpret_cast<uint8_t*>(
@@ -91,6 +96,7 @@ class LeanStoreInterface {
 
   // Insert the specified key value pair. Return true if the insert succeeded.
   bool Insert(ycsbr::Request::Key key, const char* value, size_t value_size) {
+    std::cerr << "Called Insert()" << std::endl;
     const llsm::key_utils::IntKeyAsSlice strkey(key);
     auto result = table_->insert(
         reinterpret_cast<uint8_t*>(
@@ -102,6 +108,7 @@ class LeanStoreInterface {
 
   // Read the value at the specified key. Return true if the read succeeded.
   bool Read(ycsbr::Request::Key key, std::string* value_out) {
+    std::cerr << "Called Read()" << std::endl;
     const llsm::key_utils::IntKeyAsSlice strkey(key);
     auto result =
         table_->lookup(reinterpret_cast<uint8_t*>(
@@ -109,7 +116,9 @@ class LeanStoreInterface {
                        strkey.as<llsm::Slice>().size(),
                        [&](const u8* payload, u16 payload_length) {
                          value_out->resize(payload_length);
+                         std::cerr << "bleep" << std::endl;
                          memcpy(value_out->data(), payload, payload_length);
+                         std::cerr << "blop" << std::endl;
                        });
     return (result == leanstore::storage::btree::OP_RESULT::OK);
   }
@@ -119,6 +128,7 @@ class LeanStoreInterface {
   bool Scan(
       const ycsbr::Request::Key key, const size_t amount,
       std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {
+    std::cerr << "Called Scan()" << std::endl;
     const llsm::key_utils::IntKeyAsSlice strkey(key);
     size_t scanned = 0;
 
