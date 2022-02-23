@@ -38,8 +38,10 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
       cache_(options.record_cache_capacity,
              std::bind(&PageGroupedDBImpl::WriteBatch, this,
                        std::placeholders::_1),
-             std::bind(&PageGroupedDBImpl::GetPageBoundsFor, this,
-                       std::placeholders::_1)) {}
+             options_.rec_cache_batch_writeout
+                 ? std::bind(&PageGroupedDBImpl::GetPageBoundsFor, this,
+                             std::placeholders::_1)
+                 : RecordCache::KeyBoundsFn()) {}
 
 Status PageGroupedDBImpl::BulkLoad(const std::vector<Record>& records) {
   if (mgr_.has_value()) {
