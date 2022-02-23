@@ -73,6 +73,9 @@ COMMON_OPTIONS = {
   "use_alex": False,
   "deferral_autotuning": True,
   "max_deferrals": 1,
+
+  # Temporary: Disable batching when evicting from the cache.
+  "rec_cache_batch_writeout": False,
 }
 
 SYNTH_DATASET = {
