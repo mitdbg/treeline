@@ -218,6 +218,9 @@ ALL_EXPERIMENTS = [
 # The subset of experiments that have a zipfian request distribution.
 ALL_ZIPFIAN = list(filter(lambda exp: "zipfian" in exp, ALL_EXPERIMENTS))
 
+# The subset of experiments that have a uniform request distribution.
+ALL_UNIFORM = list(filter(lambda exp: "uniform" in exp, ALL_EXPERIMENTS))
+
 # All YCSB experiments.
 combine(
   name="ycsb",
@@ -316,6 +319,24 @@ group(
   deps=[
     exp_name
     for idx, exp_name in enumerate(ALL_ZIPFIAN)
+    if idx % 2 == 1
+  ],
+)
+
+group(
+  name="uniform-1-of-2",
+  deps=[
+    exp_name
+    for idx, exp_name in enumerate(ALL_UNIFORM)
+    if idx % 2 == 0
+  ],
+)
+
+group(
+  name="uniform-2-of-2",
+  deps=[
+    exp_name
+    for idx, exp_name in enumerate(ALL_UNIFORM)
     if idx % 2 == 1
   ],
 )
