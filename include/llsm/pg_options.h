@@ -53,6 +53,10 @@ struct PageGroupedDBOptions {
   // If true, the record cache will try to batch writes for the same page when
   // writing out a dirty entry.
   bool rec_cache_batch_writeout = true;
+
+  // If true, the DB will attempt to flush the dirty writes in the cache in
+  // parallel when it shuts down.
+  bool rec_cache_parallelize_final_flush = false;
 };
 
 }  // namespace pg

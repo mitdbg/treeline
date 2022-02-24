@@ -115,6 +115,15 @@ class RecordCache {
   // entries written out.
   uint64_t ClearCache(bool write_out_dirty = true);
 
+  // Returns all the dirty records in the cache. The caller takes on the
+  // responsibility to write the dirty records to stable storage (i.e., all the
+  // returned records will be marked clean inside the cache).
+  //
+  // This method is NOT thread safe and cannot run concurrently with any other
+  // public methods. The pointers inside the returned records are only valid
+  // until the next call to a public method.
+  std::vector<std::pair<Slice, Slice>> ExtractDirty();
+
  private:
   // The default sizes for ART sub-scans when..
   static const uint64_t kDefaultUserSubScan =
