@@ -340,6 +340,24 @@ group(
   ],
 )
 
+group(
+  name="scans-1-of-2",
+  deps=[
+    exp_name
+    for idx, exp_name in enumerate(ALL_EXPERIMENTS)
+    if idx % 2 == 0 and "-e-" in exp_name
+  ],
+)
+
+group(
+  name="scans-2-of-2",
+  deps=[
+    exp_name
+    for idx, exp_name in enumerate(ALL_EXPERIMENTS)
+    if idx % 2 == 1 and "-e-" in exp_name
+  ],
+)
+
 
 ###
 ### The actual YCSB experiment definitions.
