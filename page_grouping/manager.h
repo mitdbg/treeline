@@ -44,6 +44,10 @@ class Manager {
   // Pre-condition: The batch is sorted in ascending order by key.
   Status PutBatch(const std::vector<std::pair<Key, Slice>>& records);
 
+  // Does the same thing as `PutBatch()` but attempts to parallelize the write.
+  // Pre-condition: The batch is sorted in ascending order by key.
+  Status PutBatchParallel(const std::vector<std::pair<Key, Slice>>& records);
+
   // Will read partial segments.
   Status ScanWithEstimates(
       const Key& start_key, const size_t amount,
@@ -96,6 +100,9 @@ class Manager {
       const std::vector<std::pair<Key, Slice>>& records,
       const PageGroupedDBOptions& options);
   void BulkLoadIntoPagesImpl(const std::vector<Record>& records);
+
+  Status PutBatchImpl(const std::vector<std::pair<Key, Slice>>& records,
+                      size_t start_idx, size_t end_idx);
 
   // Write the range [start_idx, end_idx) into the given segment. The caller
   // must already hold a `kPageWrite` lock on the segment. This method will
