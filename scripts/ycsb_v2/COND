@@ -211,8 +211,7 @@ ALL_EXPERIMENTS = [
     THREADS,
   )
   # The uniform and zipfian "d" workloads are the same, so just run one.
-  # The experiments currently have trouble with multithreaded range scans.
-  if not (zipped[3] == "d" and zipped[4] == "uniform") and not (zipped[3] == "e" and zipped[5] > 1)
+  if not (zipped[3] == "d" and zipped[4] == "uniform")
 ]
 
 # The subset of experiments that have a zipfian request distribution.
@@ -280,33 +279,6 @@ combine(
     ":osm-pg_llsm-64B-e-zipfian-8",
     ":osm-pg_llsm-64B-f-zipfian-8",
     ":osm-rocksdb-64B-e-zipfian-8",
-  ],
-)
-
-# Scan-dominated workloads (YCSB E).
-combine(
-  name="zipfian-scan",
-  deps=[
-    ":{}-{}-{}-e-zipfian-{}".format(*zipped)
-    for zipped in product(
-      ["synth", "osm", "amzn"],
-      DBS,
-      ["64B", "1024B"],
-      THREADS,
-    )
-  ],
-)
-
-combine(
-  name="uniform-scan",
-  deps=[
-    ":{}-{}-{}-e-uniform-{}".format(*zipped)
-    for zipped in product(
-      ["synth", "osm", "amzn"],
-      DBS,
-      ["64B", "1024B"],
-      THREADS,
-    )
   ],
 )
 
