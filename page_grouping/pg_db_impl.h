@@ -35,13 +35,13 @@ class PageGroupedDBImpl : public PageGroupedDB {
   void WriteBatch(const WriteOutBatch& records);
   std::pair<Key,Key> GetPageBoundsFor(Key key);
 
+  std::filesystem::path db_path_;
+  PageGroupedDBOptions options_;
+
   // After opening a "new" DB, this will be empty until `BulkLoad()` is called.
   // Otherwise this is always non-empty.
   std::optional<Manager> mgr_;
   RecordCache cache_;
-
-  std::filesystem::path db_path_;
-  PageGroupedDBOptions options_;
 };
 
 }  // namespace pg
