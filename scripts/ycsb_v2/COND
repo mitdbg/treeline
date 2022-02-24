@@ -210,9 +210,9 @@ ALL_EXPERIMENTS = [
     DISTRIBUTIONS,
     THREADS,
   )
-  # The uniform and zipfian "d" workloads are the same, so we only run one of
-  # them.
-  if zipped[3] != "d" or zipped[4] == "zipfian"
+  # The uniform and zipfian "d" workloads are the same, so just run one.
+  # The experiments currently have trouble with multithreaded range scans.
+  if not (zipped[3] == "d" and zipped[4] == "uniform") and not (zipped[3] == "e" and zipped[5] > 1)
 ]
 
 # The subset of experiments that have a zipfian request distribution.
@@ -371,7 +371,8 @@ run_experiment_group(
       THREADS,
     )
     # The uniform and zipfian "d" workloads are the same, so just run one.
-    if workload != "d" or dist == "zipfian"
+    # The experiments currently have trouble with multithreaded range scans.
+    if not (workload == "d" and dist == "uniform") and not (workload == "e" and threads > 1)
   ],
   deps=[
     # e.g. :preload-synth-pg_llsm-64B
@@ -408,7 +409,8 @@ for dataset in CUSTOM_DATASETS:
         THREADS,
       )
       # The uniform and zipfian "d" workloads are the same, so just run one.
-      if workload != "d" or dist == "zipfian"
+      # The experiments currently have trouble with multithreaded range scans.
+      if not (workload == "d" and dist == "uniform") and not (workload == "e" and threads > 1)
     ],
     deps=[
       # e.g. :preload-amzn-pg_llsm-64B
