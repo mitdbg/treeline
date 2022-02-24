@@ -1,5 +1,6 @@
 import argparse
 import conductor.lib as cond
+import pathlib
 
 ZIPFIAN_DIST = """\
       type: zipfian
@@ -23,7 +24,8 @@ def main():
     args, unknown = parser.parse_known_args()
 
     # Load the template.
-    with open(args.gen_template, "r") as template_file:
+    template_path = pathlib.Path(args.gen_template)
+    with open(template_path, "r") as template_file:
         template = template_file.read()
 
     # If the template does not contain a key in the config, the config value is
@@ -36,6 +38,15 @@ def main():
         if args.gen_distribution == "zipfian"
         else UNIFORM_DIST,
     }
+
+    # HACK: Check if this is a YCSB E workload and adjust the requests so that
+    # 5% of them are dedicated to the insert-only phase.
+    is_ycsb_e = template_path.name == "e.yml"
+    ycsb_e_scan_frac = 0.05
+    if is_ycsb_e:
+        config["num_inserts_before_scan"] = int(args.gen_num_requests * ycsb_e_scan_frac)
+        config["num_requests"] = args.gen_num_requests - config["num_inserts_before_scan"]
+
     workload = template.format(**config)
 
     # Write out the generated workload.

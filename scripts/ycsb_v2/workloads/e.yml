@@ -9,15 +9,18 @@ load:
     range_max: {range_max}
 
 run:
-- num_requests: {num_requests}
-  scan:
-    proportion_pct: 95
-    max_length: 100
-    distribution:
-{distribution}
+# Make all inserts first.
+- num_requests: {num_inserts_before_scan}
   insert:
-    proportion_pct: 5
+    proportion_pct: 100
     distribution:
       type: uniform
       range_min: {range_min}
       range_max: {range_max}
+
+- num_requests: {num_requests}
+  scan:
+    proportion_pct: 100
+    max_length: 100
+    distribution:
+{distribution}
