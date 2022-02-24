@@ -74,7 +74,8 @@ function on_init_finish() {
 trap "on_init_finish" USR1
 
 set +e
-../../build/bench/run_custom \
+timeout 1h \
+  ../../build/bench/run_custom \
   ${args[@]} \
   --workload_config=$COND_OUT/workload.yml \
   --output_path=$COND_OUT \
