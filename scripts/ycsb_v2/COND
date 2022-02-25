@@ -148,6 +148,11 @@ def process_config(db, config, dataset, workload=None, dist=None):
   if dist == "uniform":
     copy["gen_num_requests"] //= 4
 
+  # Enable parallel final flush when the workload does not contain inserts.
+  # The workload is set to None when running a preload, which only has updates.
+  if workload is None or (workload != "d" and workload != "e"):
+    copy["pg_parallelize_final_flush"] = True
+
   return copy
 
 
