@@ -176,15 +176,16 @@ Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {
 
 Status Manager::PutBatchImpl(const std::vector<std::pair<Key, Slice>>& records,
                              const size_t start_idx, const size_t end_idx) {
-  if (records.empty()) return Status::OK();
+  if (start_idx >= end_idx) return Status::OK();
   // TODO: Support deletes.
   size_t left_idx = start_idx;
   while (left_idx < end_idx) {
     const auto segment = index_->SegmentForKeyWithLock(records[left_idx].first,
                                                        SegmentMode::kPageWrite);
     const auto left_it = records.begin() + left_idx;
+    const auto end_it = records.begin() + end_idx;
     const auto cutoff_it =
-        std::lower_bound(left_it, records.end(), segment.upper,
+        std::lower_bound(left_it, end_it, segment.upper,
                          [](const auto& rec, const Key next_segment_start) {
                            return rec.first < next_segment_start;
                          });
@@ -222,9 +223,10 @@ Status Manager::PutBatchParallel(
                            return rec.first < next_page_start;
                          });
     const size_t range_size = cutoff_it - left_it;
-    write_futures.push_back(bg_threads_->Submit([this, &records, left_idx, range_size]() {
-      PutBatchImpl(records, left_idx, left_idx + range_size);
-    }));
+    write_futures.push_back(bg_threads_->Submit(
+        [this, &records, start = left_idx, end = left_idx + range_size]() {
+          PutBatchImpl(records, start, end);
+        }));
     left_idx += range_size;
   }
 

@@ -370,10 +370,11 @@ std::vector<std::pair<Slice, Slice>> RecordCache::ExtractDirty() {
   std::vector<std::pair<Slice, Slice>> dirty_records;
   dirty_records.reserve(capacity_ * 0.75);  // Rough guess.
   for (uint64_t i = 0; i < capacity_; ++i) {
-    if (!cache_entries[i].IsDirty()) {
+    if (!cache_entries[i].IsValid() || !cache_entries[i].IsDirty()) {
       continue;
     }
-    dirty_records.emplace_back(cache_entries[i].GetKey(), cache_entries[i].GetValue());
+    dirty_records.emplace_back(cache_entries[i].GetKey(),
+                               cache_entries[i].GetValue());
     cache_entries[i].SetDirtyTo(false);
   }
   return dirty_records;
