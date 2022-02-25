@@ -43,6 +43,26 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
                              std::placeholders::_1)
                  : RecordCache::KeyBoundsFn()) {}
 
+PageGroupedDBImpl::~PageGroupedDBImpl() {
+  if (!mgr_.has_value()) return;
+  if (!options_.parallelize_final_flush || options_.bypass_cache) return;
+
+  // When the destructor runs, no external threads should be running any methods
+  // on this class. So it is safe invoke non-thread-safe methods here.
+  const auto slice_records = cache_.ExtractDirty();
+  std::vector<std::pair<Key, Slice>> records;
+  records.reserve(slice_records.size());
+  for (const auto& slice_rec : slice_records) {
+    records.emplace_back(key_utils::ExtractHead64(slice_rec.first),
+                         slice_rec.second);
+  }
+  std::sort(records.begin(), records.end(),
+            [](const auto& left, const auto& right) {
+              return left.first < right.first;
+            });
+  mgr_->PutBatchParallel(records);
+}
+
 Status PageGroupedDBImpl::BulkLoad(const std::vector<Record>& records) {
   if (mgr_.has_value()) {
     return Status::NotSupported("Cannot bulk load a non-empty DB.");

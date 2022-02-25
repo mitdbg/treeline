@@ -171,26 +171,71 @@ std::pair<Status, std::vector<pg::Page>> Manager::GetWithPages(
 }
 
 Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {
-  if (records.empty()) return Status::OK();
+  return PutBatchImpl(records, 0, records.size());
+}
+
+Status Manager::PutBatchImpl(const std::vector<std::pair<Key, Slice>>& records,
+                             const size_t start_idx, const size_t end_idx) {
+  if (start_idx >= end_idx) return Status::OK();
   // TODO: Support deletes.
-  size_t start_idx = 0;
-  while (start_idx < records.size()) {
-    const auto segment = index_->SegmentForKeyWithLock(records[start_idx].first,
+  size_t left_idx = start_idx;
+  while (left_idx < end_idx) {
+    const auto segment = index_->SegmentForKeyWithLock(records[left_idx].first,
                                                        SegmentMode::kPageWrite);
-    const auto left_it = records.begin() + start_idx;
+    const auto left_it = records.begin() + left_idx;
+    const auto end_it = records.begin() + end_idx;
     const auto cutoff_it =
-        std::lower_bound(left_it, records.end(), segment.upper,
+        std::lower_bound(left_it, end_it, segment.upper,
                          [](const auto& rec, const Key next_segment_start) {
                            return rec.first < next_segment_start;
                          });
     const size_t range_size = cutoff_it - left_it;
     // `WriteToSegment()` will release the segment lock.
     const size_t num_written =
-        WriteToSegment(segment, records, start_idx, start_idx + range_size);
+        WriteToSegment(segment, records, left_idx, left_idx + range_size);
     // If a reorg intervenes and no records are written, `num_written` will
     // be 0 and the logic in this loop will retry the write.
-    start_idx += num_written;
+    left_idx += num_written;
   }
+  return Status::OK();
+}
+
+Status Manager::PutBatchParallel(
+    const std::vector<std::pair<Key, Slice>>& records) {
+  if (bg_threads_ == nullptr) {
+    // No background workers available; just fall back to a synchronous write.
+    return PutBatchImpl(records, 0, records.size());
+  }
+
+  // TODO: Support deletes.
+  // TODO: This parallelization strategy can lead to a synchronization deadlock
+  // if `PutBatchImpl()` requires a reorg. This is because the segment rewrite
+  // logic uses background threads to issue I/O in parallel, which shares the
+  // same thread pool.
+  std::vector<std::future<void>> write_futures;
+  size_t left_idx = 0;
+  while (left_idx < records.size()) {
+    const auto [_, upper] = GetPageBoundsFor(records[left_idx].first);
+    const auto left_it = records.begin() + left_idx;
+    const auto cutoff_it =
+        std::lower_bound(left_it, records.end(), upper,
+                         [](const auto& rec, const Key next_page_start) {
+                           return rec.first < next_page_start;
+                         });
+    const size_t range_size = cutoff_it - left_it;
+    write_futures.push_back(bg_threads_->Submit(
+        [this, &records, start = left_idx, end = left_idx + range_size]() {
+          PutBatchImpl(records, start, end);
+        }));
+    left_idx += range_size;
+  }
+
+  // Wait for the writes to complete.
+  for (auto& f : write_futures) {
+    f.get();
+  }
+
+  // `PutBatchImpl()` always returns this.
   return Status::OK();
 }
 

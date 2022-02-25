@@ -20,6 +20,7 @@ class PageGroupedDBImpl : public PageGroupedDB {
  public:
   PageGroupedDBImpl(std::filesystem::path db_path, PageGroupedDBOptions options,
                     std::optional<Manager> mgr);
+  ~PageGroupedDBImpl() override;
 
   PageGroupedDBImpl(const PageGroupedDBImpl&) = delete;
   PageGroupedDBImpl& operator=(const PageGroupedDBImpl&) = delete;

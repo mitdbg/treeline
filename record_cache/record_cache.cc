@@ -364,4 +364,20 @@ uint64_t RecordCache::ClearCache(bool write_out_dirty) {
   return count;
 }
 
+std::vector<std::pair<Slice, Slice>> RecordCache::ExtractDirty() {
+  // NOTE: This method is not thread safe and cannot be called concurrently with
+  // any other public method. So we do not take locks.
+  std::vector<std::pair<Slice, Slice>> dirty_records;
+  dirty_records.reserve(capacity_);
+  for (uint64_t i = 0; i < capacity_; ++i) {
+    if (!cache_entries[i].IsValid() || !cache_entries[i].IsDirty()) {
+      continue;
+    }
+    dirty_records.emplace_back(cache_entries[i].GetKey(),
+                               cache_entries[i].GetValue());
+    cache_entries[i].SetDirtyTo(false);
+  }
+  return dirty_records;
+}
+
 }  // namespace llsm
