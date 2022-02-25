@@ -31,8 +31,9 @@ CONFIGS = [
     "cache_mib": 280,
 
     # Used to configure the length of the workload.
-    "point_requests": 8000000,
-    "scan_requests": 2400000,
+    # These values are scaled up by the dataset size multiplier.
+    "point_requests": 15000000,  # 15 million
+    "scan_requests":  1000000,   # 1 million
   },
   {
     "name": "1024B",
@@ -51,8 +52,9 @@ CONFIGS = [
     "cache_mib": 2235,
 
     # Used to configure the length of the workload.
-    "point_requests": 4000000,
-    "scan_requests": 1200000,
+    # These values are scaled up by the dataset size multiplier.
+    "point_requests": 7500000,  # 7.5 million
+    "scan_requests": 500000,    # 500 thousand
   },
 ]
 
@@ -83,7 +85,7 @@ COMMON_OPTIONS = {
 
 SYNTH_DATASET = {
   "name": "synth",
-  "mem_mult": 1,
+  "multiplier": 1,
   "range_min": 0,
   "range_max": 2000000000,
 }
@@ -94,7 +96,7 @@ CUSTOM_DATASETS = [
     "path": "'$TP_DATASET_PATH/osm_ny.txt'",
     # The dataset is this many times larger than the standard 20 M synthetic
     # dataset we use.
-    "mem_mult": 1.160804,
+    "multiplier": 1.160804,
     "range_min": 699540,
     "range_max": 6820987374,
   },
@@ -103,7 +105,7 @@ CUSTOM_DATASETS = [
     "path": "'$TP_DATASET_PATH/amazon_reviews.txt'",
     # The dataset is this many times larger than the standard 20 M synthetic
     # dataset we use.
-    "mem_mult": 1.674881,
+    "multiplier": 1.674881,
     "range_min": 10001,
     "range_max": 53096592,
   },
@@ -119,7 +121,7 @@ NUM_PRELOAD_UPDATES = 40000000
 ### Utilities.
 ###
 
-def process_config(db, config, dataset, workload=None, dist=None):
+def process_config(db, config, dataset, workload=None):
   copy = config.copy()
   del copy["cache_mib"]
   del copy["memtable_mib"]
@@ -129,27 +131,22 @@ def process_config(db, config, dataset, workload=None, dist=None):
 
   # Set the memory configuration.
   if db == "pg_llsm":
-    copy["cache_size_mib"] = int(dataset["mem_mult"] * (
+    copy["cache_size_mib"] = int(dataset["multiplier"] * (
       config["cache_mib"] + (2 * config["memtable_mib"])
     ))
   else:
-    copy["cache_size_mib"] = int(dataset["mem_mult"] * config["cache_mib"])
-    copy["memtable_size_mib"] = int(dataset["mem_mult"] * config["memtable_mib"])
+    copy["cache_size_mib"] = int(dataset["multiplier"] * config["cache_mib"])
+    copy["memtable_size_mib"] = int(dataset["multiplier"] * config["memtable_mib"])
 
   # Set the arguments used to customize the workload.
   if workload is not None and (workload == "e" or workload == "scan_only"):
-    copy["gen_num_requests"] = config["scan_requests"]
+    copy["gen_num_requests"] = int(dataset["multiplier"] * config["scan_requests"])
   else:
-    copy["gen_num_requests"] = config["point_requests"]
+    copy["gen_num_requests"] = int(dataset["multiplier"] * config["point_requests"])
 
   # Sets the key range for inserts.
   copy["gen_range_min"] = dataset["range_min"]
   copy["gen_range_max"] = dataset["range_max"]
-
-  # Running with the defined request counts takes much longer when the request
-  # distribution is uniform. So we reduce the request count by 4x.
-  if dist == "uniform":
-    copy["gen_num_requests"] //= 4
 
   # Enable parallel final flush when the workload does not contain inserts.
   # The workload is set to None when running a preload, which only has updates.
@@ -174,35 +171,16 @@ run_command(
 )
 
 run_command(
-  name="combine-64B",
+  name="combine-main",
   run="python3 combine_raw.py",
-  deps=[":64B"],
+  deps=[":main"],
 )
 
 run_command(
-  name="combine-1024B",
+  name="combine-main-zipfian",
   run="python3 combine_raw.py",
-  deps=[":1024B"],
+  deps=[":main-zipfian"],
 )
-
-run_command(
-  name="combine-single",
-  run="python3 combine_raw.py",
-  deps=[":single"],
-)
-
-run_command(
-  name="combine-zipfian",
-  run="python3 combine_raw.py",
-  deps=[":zipfian"],
-)
-
-run_command(
-  name="combine-sanity_check",
-  run="python3 combine_raw.py",
-  deps=[":sanity_check"],
-)
-
 
 ###
 ### YCSB.
@@ -222,11 +200,25 @@ ALL_EXPERIMENTS = [
   if not (zipped[3] == "d" and zipped[4] == "uniform")
 ]
 
-# The subset of experiments that have a zipfian request distribution.
-ALL_ZIPFIAN = list(filter(lambda exp: "zipfian" in exp, ALL_EXPERIMENTS))
+# "Main" tasks are the ones we prioritize.
 
-# The subset of experiments that have a uniform request distribution.
-ALL_UNIFORM = list(filter(lambda exp: "uniform" in exp, ALL_EXPERIMENTS))
+MAIN = [
+  exp_name
+  for exp_name in ALL_EXPERIMENTS
+  if ("amzn" in exp_name) or ("scan_only" in exp_name)
+]
+
+MAIN_ZIPFIAN = [
+  exp_name for exp_name in MAIN if "zipfian" in exp_name
+]
+
+MAIN_PGLLSM = [
+  exp_name for exp_name in MAIN if "pg_llsm" in exp_name
+]
+
+MAIN_PGLLSM_ZIPFIAN = [
+  exp_name for exp_name in MAIN_PGLLSM if "zipfian" in exp_name
+]
 
 # All YCSB experiments.
 combine(
@@ -238,134 +230,68 @@ combine(
   ],
 )
 
-# All 64B workloads.
-combine(
-  name="64B",
-  deps=list(filter(lambda exp: "64B" in exp, ALL_EXPERIMENTS)),
-)
-
-# All 1024B workloads.
-combine(
-  name="1024B",
-  deps=list(filter(lambda exp: "1024B" in exp, ALL_EXPERIMENTS)),
-)
-
-# All single-threaded workloads.
-combine(
-  name="single",
-  deps=list(filter(lambda exp: exp.endswith("-1"), ALL_EXPERIMENTS)),
-)
-
-# All zipfian workloads.
-combine(
-  name="zipfian",
-  deps=ALL_ZIPFIAN,
-)
-
-# All RocksDB workloads.
-combine(
-  name="rocksdb",
-  deps=list(filter(lambda exp: "rocksdb" in exp, ALL_EXPERIMENTS)),
-)
-
-# All page-grouped LLSM workloads.
-combine(
-  name="pg_llsm",
-  deps=list(filter(lambda exp: "pg_llsm" in exp, ALL_EXPERIMENTS)),
-)
-
-# A selection of a few workloads to use for testing.
-combine(
-  name="sanity_check",
-  deps=[
-    ":synth-pg_llsm-64B-a-zipfian-8",
-    ":synth-pg_llsm-64B-b-zipfian-8",
-    ":synth-rocksdb-64B-a-zipfian-8",
-    ":amzn-pg_llsm-64B-c-zipfian-8",
-    ":amzn-pg_llsm-64B-d-zipfian-8",
-    ":amzn-rocksdb-64B-c-zipfian-8",
-    ":osm-pg_llsm-64B-scan_only-zipfian-8",
-    ":osm-pg_llsm-64B-f-zipfian-8",
-    ":osm-rocksdb-64B-scan_only-zipfian-8",
-  ],
-)
+combine(name="main", deps=MAIN)
+combine(name="main-zipfian", deps=MAIN_ZIPFIAN)
+combine(name="main-pg_llsm", deps=MAIN_PGLLSM)
+combine(name="main-pg_llsm-zipfian", deps=MAIN_PGLLSM_ZIPFIAN)
 
 # The tasks below are used for dividing up the experiments across 2 machines.
 
-# Run on machine 1.
 group(
   name="ycsb-1-of-2",
   deps=[
-    exp_name
-    for idx, exp_name in enumerate(ALL_EXPERIMENTS)
-    if idx % 2 == 0
+    exp_name for exp_name in ALL_EXPERIMENTS if hash(exp_name) % 2 == 0
   ],
 )
 
-# Run on machine 2.
 group(
   name="ycsb-2-of-2",
   deps=[
-    exp_name
-    for idx, exp_name in enumerate(ALL_EXPERIMENTS)
-    if idx % 2 == 1
+    exp_name for exp_name in ALL_EXPERIMENTS if hash(exp_name) % 2 == 1
   ],
 )
 
 group(
-  name="zipfian-1-of-2",
+  name="main-1-of-2",
   deps=[
-    exp_name
-    for idx, exp_name in enumerate(ALL_ZIPFIAN)
-    if idx % 2 == 0
+    exp_name for exp_name in MAIN if hash(exp_name) % 2 == 0
   ],
 )
 
 group(
-  name="zipfian-2-of-2",
+  name="main_zipfian-1-of-2",
   deps=[
-    exp_name
-    for idx, exp_name in enumerate(ALL_ZIPFIAN)
-    if idx % 2 == 1
+    exp_name for exp_name in MAIN_ZIPFIAN if hash(exp_name) % 2 == 0
   ],
 )
 
 group(
-  name="uniform-1-of-2",
+  name="main_pg_llsm_zipfian-1-of-2",
   deps=[
-    exp_name
-    for idx, exp_name in enumerate(ALL_UNIFORM)
-    if idx % 2 == 0
+    exp_name for exp_name in MAIN_PGLLSM_ZIPFIAN if hash(exp_name) % 2 == 0
   ],
 )
 
 group(
-  name="uniform-2-of-2",
+  name="main-2-of-2",
   deps=[
-    exp_name
-    for idx, exp_name in enumerate(ALL_UNIFORM)
-    if idx % 2 == 1
+    exp_name for exp_name in MAIN if hash(exp_name) % 2 == 1
   ],
 )
 
 group(
-  name="scans-1-of-2",
+  name="main_zipfian-2-of-2",
   deps=[
-    exp_name
-    for idx, exp_name in enumerate(ALL_EXPERIMENTS)
-    if idx % 2 == 0 and "-scan_only-" in exp_name
+    exp_name for exp_name in MAIN_ZIPFIAN if hash(exp_name) % 2 == 1
   ],
 )
 
 group(
-  name="scans-2-of-2",
+  name="main_pg_llsm_zipfian-2-of-2",
   deps=[
-    exp_name
-    for idx, exp_name in enumerate(ALL_EXPERIMENTS)
-    if idx % 2 == 1 and "-scan_only-" in exp_name
+    exp_name for exp_name in MAIN_PGLLSM_ZIPFIAN if hash(exp_name) % 2 == 1
   ],
 )
-
 
 ###
 ### The actual YCSB experiment definitions.
@@ -380,7 +306,7 @@ run_experiment_group(
       name="synth-{}-{}-{}-{}-{}".format(db, config["name"], workload, dist, threads),
       options={
         **COMMON_OPTIONS,
-        **process_config(db, config, SYNTH_DATASET, workload=workload, dist=dist),
+        **process_config(db, config, SYNTH_DATASET, workload=workload),
         "db": db,
         "checkpoint_name": "ycsb-synth-{}-{}".format(db, config["name"]),
         "threads": threads,
@@ -416,7 +342,7 @@ for dataset in CUSTOM_DATASETS:
         name="{}-{}-{}-{}-{}-{}".format(dataset["name"], db, config["name"], workload, dist, threads),
         options={
           **COMMON_OPTIONS,
-          **process_config(db, config, dataset, workload=workload, dist=dist),
+          **process_config(db, config, dataset, workload=workload),
           "db": db,
           "checkpoint_name": "ycsb-{}-{}-{}".format(dataset["name"], db, config["name"]),
           "custom_dataset": dataset["path"],
