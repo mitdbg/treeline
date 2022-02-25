@@ -1,7 +1,7 @@
 from itertools import product
 
 WORKLOADS = [
-  "a", "b", "c", "d", "e", "f",
+  "a", "b", "c", "d", "scan_only", "f",
 ]
 
 DBS = [
@@ -134,19 +134,19 @@ def process_config(db, config, dataset, workload=None, dist=None):
     copy["memtable_size_mib"] = int(dataset["mem_mult"] * config["memtable_mib"])
 
   # Set the arguments used to customize the workload.
-  if workload is None or workload != "e":
-    copy["gen_num_requests"] = config["point_requests"]
-  else:
+  if workload is not None and (workload == "e" or workload == "scan_only"):
     copy["gen_num_requests"] = config["scan_requests"]
+  else:
+    copy["gen_num_requests"] = config["point_requests"]
 
   # Sets the key range for inserts.
   copy["gen_range_min"] = dataset["range_min"]
   copy["gen_range_max"] = dataset["range_max"]
 
-  # Running with the defined request counts takes longer than 45 minutes when
-  # the request distribution is uniform. So we cut the request count in half.
+  # Running with the defined request counts takes much longer when the request
+  # distribution is uniform. So we reduce the request count by 4x.
   if dist == "uniform":
-    copy["gen_num_requests"] //= 2
+    copy["gen_num_requests"] //= 4
 
   return copy
 
@@ -276,9 +276,9 @@ combine(
     ":amzn-pg_llsm-64B-c-zipfian-8",
     ":amzn-pg_llsm-64B-d-zipfian-8",
     ":amzn-rocksdb-64B-c-zipfian-8",
-    ":osm-pg_llsm-64B-e-zipfian-8",
+    ":osm-pg_llsm-64B-scan_only-zipfian-8",
     ":osm-pg_llsm-64B-f-zipfian-8",
-    ":osm-rocksdb-64B-e-zipfian-8",
+    ":osm-rocksdb-64B-scan_only-zipfian-8",
   ],
 )
 
@@ -345,7 +345,7 @@ group(
   deps=[
     exp_name
     for idx, exp_name in enumerate(ALL_EXPERIMENTS)
-    if idx % 2 == 0 and "-e-" in exp_name
+    if idx % 2 == 0 and "-scan_only-" in exp_name
   ],
 )
 
@@ -354,7 +354,7 @@ group(
   deps=[
     exp_name
     for idx, exp_name in enumerate(ALL_EXPERIMENTS)
-    if idx % 2 == 1 and "-e-" in exp_name
+    if idx % 2 == 1 and "-scan_only-" in exp_name
   ],
 )
 
