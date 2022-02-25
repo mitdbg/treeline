@@ -146,6 +146,9 @@ DEFINE_bool(pg_use_memory_based_io, false,
 DEFINE_bool(pg_bypass_cache, false,
             "If set, PGLLSM will bypass the record cache. All requests will "
             "incur I/O.");
+DEFINE_bool(pg_parallelize_final_flush, false,
+            "If set, PGLLSM will attempt to parallelize its flush of dirty "
+            "records from the cache when it shuts down.");
 
 DEFINE_bool(rec_cache_batch_writeout, true,
             "If true, the record cache will try to batch writes for the same "
@@ -240,6 +243,7 @@ llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
   options.use_memory_based_io = FLAGS_pg_use_memory_based_io;
   options.bypass_cache = FLAGS_pg_bypass_cache;
   options.rec_cache_batch_writeout = FLAGS_rec_cache_batch_writeout;
+  options.parallelize_final_flush = FLAGS_pg_parallelize_final_flush;
   return options;
 }
 

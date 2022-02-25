@@ -182,7 +182,7 @@ Status Manager::PutBatchImpl(const std::vector<std::pair<Key, Slice>>& records,
   while (left_idx < end_idx) {
     const auto segment = index_->SegmentForKeyWithLock(records[left_idx].first,
                                                        SegmentMode::kPageWrite);
-    const auto left_it = records.begin() + start_idx;
+    const auto left_it = records.begin() + left_idx;
     const auto cutoff_it =
         std::lower_bound(left_it, records.end(), segment.upper,
                          [](const auto& rec, const Key next_segment_start) {

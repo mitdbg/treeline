@@ -56,7 +56,7 @@ struct PageGroupedDBOptions {
 
   // If true, the DB will attempt to flush the dirty writes in the cache in
   // parallel when it shuts down.
-  bool rec_cache_parallelize_final_flush = false;
+  bool parallelize_final_flush = false;
 };
 
 }  // namespace pg

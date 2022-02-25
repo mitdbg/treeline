@@ -93,6 +93,7 @@ DECLARE_uint64(records_per_page_goal);
 DECLARE_uint64(records_per_page_delta);
 DECLARE_bool(pg_use_memory_based_io);
 DECLARE_bool(pg_bypass_cache);
+DECLARE_bool(pg_parallelize_final_flush);
 
 // If true, the record cache will try to batch writes for the same page when
 // writing out a dirty entry.
