@@ -44,7 +44,7 @@ struct PageGroupedDBOptions {
 
   // Optimistically cache, with a lower priority, all records on the same page
   // as a record requested by the user.
-  bool optimistic_caching = true;
+  bool optimistic_caching = false;
 
   // If set to true, the record cache will not be used (all read/write requests
   // will incur I/O).

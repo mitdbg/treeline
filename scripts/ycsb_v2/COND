@@ -76,6 +76,9 @@ COMMON_OPTIONS = {
 
   # Temporary: Disable batching when evicting from the cache.
   "rec_cache_batch_writeout": False,
+
+  # Affects LLSM and page-grouped LLSM
+  "optimistic_rec_caching": False,
 }
 
 SYNTH_DATASET = {
