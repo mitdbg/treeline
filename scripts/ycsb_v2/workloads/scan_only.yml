@@ -1,0 +1,17 @@
+# YCSB "Scan Only"
+# 100% Scans of lengths 1 to 100 (uniformly chosen length).
+
+load:
+  num_records: 20000000
+  distribution:
+    type: uniform
+    range_min: {range_min}
+    range_max: {range_max}
+
+run:
+- num_requests: {num_requests}
+  scan:
+    proportion_pct: 100
+    max_length: 100
+    distribution:
+{distribution}
