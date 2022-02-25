@@ -21,9 +21,18 @@ Tree::~Tree() {
 
 ThreadInfo Tree::getThreadInfo() { return ThreadInfo(this->epoche); }
 
+void yield(int count) {
+  if (count > 3)
+    sched_yield();
+  else
+    _mm_pause();
+}
+
 TID Tree::lookup(const Key& k, ThreadInfo& threadEpocheInfo) const {
   EpocheGuardReadonly epocheGuard(threadEpocheInfo);
+  int restartCount = 0;
 restart:
+  if (restartCount++) yield(restartCount);
   bool needRestart = false;
 
   N* node;
@@ -137,6 +146,7 @@ bool Tree::lookupRange(const Key& start, const Key& end, Key& continueKey,
           parentNode->readUnlockOrRestart(vp, needRestart);
           if (needRestart) {
           readParentAgain:
+            needRestart = false;
             vp = parentNode->readLockOrRestart(needRestart);
             if (needRestart) goto readParentAgain;
 
@@ -254,7 +264,9 @@ bool Tree::lookupRange(const Key& start, const Key& end, Key& continueKey,
         }
       };
 
+  int restartCount = 0;
 restart:
+  if (restartCount++) yield(restartCount);
   bool needRestart = false;
 
   resultsFound = 0;
@@ -394,6 +406,7 @@ bool Tree::lookupRange(const Key& start, TID result[], std::size_t resultSize,
           parentNode->readUnlockOrRestart(vp, needRestart);
           if (needRestart) {
           readParentAgain:
+            needRestart = false;
             vp = parentNode->readLockOrRestart(needRestart);
             if (needRestart) goto readParentAgain;
 
@@ -443,7 +456,9 @@ bool Tree::lookupRange(const Key& start, TID result[], std::size_t resultSize,
         }
       };
 
+  int restartCount = 0;
 restart:
+  if (restartCount++) yield(restartCount);
   bool needRestart = false;
 
   resultsFound = 0;
@@ -526,7 +541,9 @@ TID Tree::checkKey(const TID tid, const Key& k) const {
 
 bool Tree::insert(const Key& k, TID tid, ThreadInfo& epocheInfo) {
   EpocheGuard epocheGuard(epocheInfo);
+  int restartCount = 0;
 restart:
+  if (restartCount++) yield(restartCount);
   bool needRestart = false;
 
   N* node = nullptr;
@@ -609,6 +626,16 @@ restart:
       Key key;
       loadKey(N::getLeaf(nextNode), key);
 
+      // This implementation supports updates to the same key, but we actually
+      // want them to fail, so that we can properly serialize concurrent ART
+      // inserts.
+      /*if (key == k) {
+        // upsert
+        N::change(node, k[level], N::setLeaf(tid));
+        node->writeUnlock();
+        return;
+      }*/
+
       level++;
       uint32_t prefixLength = 0;
       uint32_t minLength =
@@ -636,7 +663,9 @@ restart:
 
 void Tree::remove(const Key& k, TID tid, ThreadInfo& threadInfo) {
   EpocheGuard epocheGuard(threadInfo);
+  int restartCount = 0;
 restart:
+  if (restartCount++) yield(restartCount);
   bool needRestart = false;
 
   N* node = nullptr;
