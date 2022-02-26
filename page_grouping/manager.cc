@@ -496,6 +496,8 @@ std::pair<Key, Key> Manager::GetPageBoundsFor(const Key key) const {
 void Manager::PostStats() const {
   PageGroupedDBStats::Local().SetFreeListBytes(free_->GetSizeFootprint());
   PageGroupedDBStats::Local().SetFreeListEntries(free_->GetNumEntries());
+  PageGroupedDBStats::Local().SetSegmentIndexBytes(index_->GetSizeFootprint());
+  PageGroupedDBStats::Local().SetSegments(index_->GetNumEntries());
 }
 
 }  // namespace pg

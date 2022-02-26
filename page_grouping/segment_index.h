@@ -9,6 +9,7 @@
 #include "lock_manager.h"
 #include "segment_info.h"
 #include "tlx/btree_map.h"
+#include "util/tracking_allocator.h"
 
 namespace llsm {
 namespace pg {
@@ -79,12 +80,19 @@ class SegmentIndex {
     c(index_);
   }
 
+  uint64_t GetSizeFootprint() const;
+  uint64_t GetNumEntries() const;
+
   // Not intended for external use (used by the tests). Not thread safe.
   auto BeginIterator() const { return index_.begin(); }
   auto EndIterator() const { return index_.end(); }
 
  private:
-  using OrderedMap = tlx::btree_map<Key, SegmentInfo>;
+  using OrderedMap = tlx::btree_map<
+      Key, SegmentInfo, std::less<Key>,
+      tlx::btree_default_traits<Key, std::pair<Key, SegmentInfo>>,
+      TrackingAllocator<std::pair<Key, SegmentInfo>>>;
+
   OrderedMap::iterator SegmentForKeyImpl(const Key key);
   OrderedMap::const_iterator SegmentForKeyImpl(const Key key) const;
   Entry IndexIteratorToEntry(OrderedMap::const_iterator it) const;
@@ -94,6 +102,7 @@ class SegmentIndex {
   std::shared_ptr<LockManager> lock_manager_;
 
   mutable std::shared_mutex mutex_;
+  uint64_t bytes_allocated_;
   // TODO: In theory, this can be any ordered key-value data structure (e.g.,
   // ART).
   OrderedMap index_;
