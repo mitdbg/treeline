@@ -26,6 +26,9 @@ int main(int argc, char** argv) {
 
   const std::string filename = argv[1];
   const size_t num_bits_user_id = std::ceil(log2(kNumUniqueUserIds));
+  std::cout << "Number of bits for user id: " << num_bits_user_id << std::endl;
+  std::cout << "Number of bits for timestamp: " << 64 - num_bits_user_id
+            << std::endl;
 
   // Load Wikipedia edit timestamps.
   std::vector<uint64_t> timestamps = load_data<uint64_t>(filename);
@@ -60,13 +63,20 @@ int main(int argc, char** argv) {
   records.reserve(timestamps.size());
 
   std::mt19937 gen(42);
-  zipf_distribution<uint64_t> zipf(kNumUniqueUserIds - 1, /*q=*/1.0);
+  // Generates numbers [1, kNumUniqueUserIds].
+  zipf_distribution<uint64_t> zipf(kNumUniqueUserIds, /*q=*/1.1);
+  // `zipf_distribution` generates numbers such that 1 is the hottest. We use
+  // this vector to make a different number the hottest etc.
+  std::vector<uint64_t> zipf_shuffle(kNumUniqueUserIds);
+  std::iota(zipf_shuffle.begin(), zipf_shuffle.end(), 0);
+  std::shuffle(zipf_shuffle.begin(), zipf_shuffle.end(), gen);
 
   for (uint64_t i = 0; i < timestamps.size(); ++i) {
     uint64_t key = timestamps[i];
 
     // Prepend user id.
-    uint64_t user_id = zipf(gen);
+    const uint64_t idx = zipf(gen) - 1;  // `- 1` to make numbers start from 0.
+    uint64_t user_id = zipf_shuffle[idx];
     user_id = user_id << (64 - num_bits_user_id);
     key = key | user_id;
 
