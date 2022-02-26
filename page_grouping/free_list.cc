@@ -7,7 +7,9 @@
 namespace llsm {
 namespace pg {
 
-FreeList::FreeList() {
+FreeList::FreeList()
+    : bytes_allocated_(0),
+      list_(TrackingAllocator<SegmentList>(bytes_allocated_)) {
   list_.resize(SegmentBuilder::kSegmentPageCounts.size());
 }
 
@@ -37,8 +39,20 @@ void FreeList::AddBatch(const std::vector<SegmentId>& ids) {
   }
 }
 
-void FreeList::AddImpl(SegmentId id) {
-  list_[id.GetFileId()].push(id);
+void FreeList::AddImpl(SegmentId id) { list_[id.GetFileId()].push(id); }
+
+uint64_t FreeList::GetSizeFootprint() const {
+  std::unique_lock<std::mutex> lock(mutex_);
+  return bytes_allocated_ + sizeof(*this);
+}
+
+uint64_t FreeList::GetNumEntries() const {
+  std::unique_lock<std::mutex> lock(mutex_);
+  uint64_t total = 0;
+  for (const auto& l : list_) {
+    total += l.size();
+  }
+  return total;
 }
 
 }  // namespace pg

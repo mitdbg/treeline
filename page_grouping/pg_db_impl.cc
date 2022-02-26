@@ -45,6 +45,8 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
 
 PageGroupedDBImpl::~PageGroupedDBImpl() {
   if (!mgr_.has_value()) return;
+  mgr_->PostStats();
+
   if (!options_.parallelize_final_flush || options_.bypass_cache) return;
 
   // When the destructor runs, no external threads should be running any methods

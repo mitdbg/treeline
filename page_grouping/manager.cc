@@ -8,6 +8,7 @@
 #include "bufmgr/page_memory_allocator.h"
 #include "key.h"
 #include "llsm/pg_db.h"
+#include "llsm/pg_stats.h"
 #include "persist/merge_iterator.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
@@ -490,6 +491,11 @@ std::pair<Key, Key> Manager::GetPageBoundsFor(const Key key) const {
   }
 
   return {lower_bound, upper_bound};
+}
+
+void Manager::PostStats() const {
+  PageGroupedDBStats::Local().SetFreeListBytes(free_->GetSizeFootprint());
+  PageGroupedDBStats::Local().SetFreeListEntries(free_->GetNumEntries());
 }
 
 }  // namespace pg

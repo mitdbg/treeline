@@ -71,6 +71,7 @@ class Manager {
   const std::vector<size_t>& GetWriteCounts() const {
     return w_.write_counts();
   }
+  void PostStats() const;
 
   Manager(const Manager&) = delete;
   Manager& operator=(const Manager&) = delete;
