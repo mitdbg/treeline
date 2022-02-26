@@ -13,50 +13,51 @@ DISTRIBUTIONS = ["zipfian", "uniform"]
 
 THREADS = [1, 2, 4, 8, 16]
 
-CONFIGS = [
-  {
-    "name": "64B",
-    "record_size_bytes": 64,
+CONFIG_64B = {
+  "name": "64B",
+  "record_size_bytes": 64,
 
-    # Used by LLSM.
-    "llsm_page_fill_pct": 70,
+  # Used by LLSM.
+  "llsm_page_fill_pct": 70,
 
-    # Used by page-grouped LLSM.
-    "records_per_page_goal": 45,
-    "records_per_page_delta": 5,
+  # Used by page-grouped LLSM.
+  "records_per_page_goal": 45,
+  "records_per_page_delta": 5,
 
-    # Used by all DBs.
-    # 408 MiB in total (2 x 64 MiB + 280 MiB, ~33% of the dataset)
-    "memtable_mib": 64,
-    "cache_mib": 280,
+  # Used by all DBs.
+  # 408 MiB in total (2 x 64 MiB + 280 MiB, ~33% of the dataset)
+  "memtable_mib": 64,
+  "cache_mib": 280,
 
-    # Used to configure the length of the workload.
-    # These values are scaled up by the dataset size multiplier.
-    "point_requests": 15000000,  # 15 million
-    "scan_requests":  1000000,   # 1 million
-  },
-  {
-    "name": "1024B",
-    "record_size_bytes": 1024,
+  # Used to configure the length of the workload.
+  # These values are scaled up by the dataset size multiplier.
+  "point_requests": 15000000,  # 15 million
+  "scan_requests":  1000000,   # 1 million
+}
 
-    # Used by LLSM.
-    "llsm_page_fill_pct": 50,
+CONFIG_1024B = {
+  "name": "1024B",
+  "record_size_bytes": 1024,
 
-    # Used by page-grouped LLSM.
-    "records_per_page_goal": 2,
-    "records_per_page_delta": 1,
+  # Used by LLSM.
+  "llsm_page_fill_pct": 50,
 
-    # Used by all DBs.
-    # 3255 MiB in total ~33% of the dataset
-    "memtable_mib": 510,
-    "cache_mib": 2235,
+  # Used by page-grouped LLSM.
+  "records_per_page_goal": 2,
+  "records_per_page_delta": 1,
 
-    # Used to configure the length of the workload.
-    # These values are scaled up by the dataset size multiplier.
-    "point_requests": 7500000,  # 7.5 million
-    "scan_requests": 500000,    # 500 thousand
-  },
-]
+  # Used by all DBs.
+  # 3255 MiB in total ~33% of the dataset
+  "memtable_mib": 510,
+  "cache_mib": 2235,
+
+  # Used to configure the length of the workload.
+  # These values are scaled up by the dataset size multiplier.
+  "point_requests": 7500000,  # 7.5 million
+  "scan_requests": 500000,    # 500 thousand
+}
+
+CONFIGS = [CONFIG_64B, CONFIG_1024B]
 
 COMMON_OPTIONS = {
   "bg_threads": 4,
@@ -90,26 +91,27 @@ SYNTH_DATASET = {
   "range_max": 2000000000,
 }
 
-CUSTOM_DATASETS = [
-  {
-    "name": "osm",
-    "path": "'$TP_DATASET_PATH/osm_ny.txt'",
-    # The dataset is this many times larger than the standard 20 M synthetic
-    # dataset we use.
-    "multiplier": 1.160804,
-    "range_min": 699540,
-    "range_max": 6820987374,
-  },
-  {
-    "name": "amzn",
-    "path": "'$TP_DATASET_PATH/amazon_reviews.txt'",
-    # The dataset is this many times larger than the standard 20 M synthetic
-    # dataset we use.
-    "multiplier": 1.674881,
-    "range_min": 10001,
-    "range_max": 53096592,
-  },
-]
+OSM_DATASET = {
+  "name": "osm",
+  "path": "'$TP_DATASET_PATH/osm_ny.txt'",
+  # The dataset is this many times larger than the standard 20 M synthetic
+  # dataset we use.
+  "multiplier": 1.160804,
+  "range_min": 699540,
+  "range_max": 6820987374,
+}
+
+AMZN_DATASET = {
+  "name": "amzn",
+  "path": "'$TP_DATASET_PATH/amazon_reviews.txt'",
+  # The dataset is this many times larger than the standard 20 M synthetic
+  # dataset we use.
+  "multiplier": 1.674881,
+  "range_min": 10001,
+  "range_max": 53096592,
+}
+
+CUSTOM_DATASETS = [OSM_DATASET, AMZN_DATASET]
 
 # Number of uniform updates to make during the preload process. The purpose of
 # these updates is to ensure that RocksDB has sstables present in multiple
@@ -266,6 +268,13 @@ group(
 )
 
 group(
+  name="main_pg_llsm-1-of-2",
+  deps=[
+    exp_name for idx, exp_name in enumerate(MAIN_PGLLSM) if idx % 2 == 0
+  ],
+)
+
+group(
   name="main_pg_llsm_zipfian-1-of-2",
   deps=[
     exp_name for idx, exp_name in enumerate(MAIN_PGLLSM_ZIPFIAN) if idx % 2 == 0
@@ -283,6 +292,13 @@ group(
   name="main_zipfian-2-of-2",
   deps=[
     exp_name for idx, exp_name in enumerate(MAIN_ZIPFIAN) if idx % 2 == 1
+  ],
+)
+
+group(
+  name="main_pg_llsm-2-of-2",
+  deps=[
+    exp_name for idx, exp_name in enumerate(MAIN_PGLLSM) if idx % 2 == 1
   ],
 )
 
@@ -370,6 +386,109 @@ for dataset in CUSTOM_DATASETS:
 
 
 ###
+### Factor analysis (depends on two YCSB experiments).
+###
+
+run_command(
+  name="combine-factor",
+  run="python3 combine_raw.py",
+  args=["--for-factor"],
+  deps=[":factor"]
+)
+
+combine(
+  name="factor",
+  deps=[
+    # No page grouping, no caching.
+    ":factor-nogrp_nocache-a-16",
+    ":factor-nogrp_nocache-scan_only-16",
+    # No page grouping, yes caching.
+    ":factor-nogrp-a-16",
+    ":factor-nogrp-scan_only-16",
+    # Yes page grouping, yes caching.
+    ":amzn-pg_llsm-1024B-a-zipfian-16",
+    ":amzn-pg_llsm-1024B-scan_only-zipfian-16",
+  ],
+)
+
+run_experiment(
+  name="factor-nogrp_nocache-a-16",
+  run="./run.sh",
+  options={
+    **COMMON_OPTIONS,
+    **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET, workload="a"),
+    "db": "pg_llsm",
+    "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
+    "custom_dataset": AMZN_DATASET["path"],
+    "threads": 16,
+    "gen_template": "workloads/a.yml",
+    "gen_distribution": "zipfian",
+    # Disable the cache and page grouping
+    "pg_bypass_cache": True,
+    "pg_use_segments": False,
+  },
+  deps=[":preload-amzn-pg_llsm_nogrp-1024B"],
+)
+
+run_experiment(
+  name="factor-nogrp_nocache-scan_only-16",
+  run="./run.sh",
+  options={
+    **COMMON_OPTIONS,
+    **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET, workload="scan_only"),
+    "db": "pg_llsm",
+    "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
+    "custom_dataset": AMZN_DATASET["path"],
+    "threads": 16,
+    "gen_template": "workloads/scan_only.yml",
+    "gen_distribution": "zipfian",
+    # Disable the cache and page grouping
+    "pg_bypass_cache": True,
+    "pg_use_segments": False,
+  },
+  deps=[":preload-amzn-pg_llsm_nogrp-1024B"],
+)
+
+run_experiment(
+  name="factor-nogrp-a-16",
+  run="./run.sh",
+  options={
+    **COMMON_OPTIONS,
+    **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET, workload="a"),
+    "db": "pg_llsm",
+    "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
+    "custom_dataset": AMZN_DATASET["path"],
+    "threads": 16,
+    "gen_template": "workloads/a.yml",
+    "gen_distribution": "zipfian",
+    # Enable the cache, disable page grouping
+    "pg_bypass_cache": False,
+    "pg_use_segments": False,
+  },
+  deps=[":preload-amzn-pg_llsm_nogrp-1024B"],
+)
+
+run_experiment(
+  name="factor-nogrp-scan_only-16",
+  run="./run.sh",
+  options={
+    **COMMON_OPTIONS,
+    **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET, workload="scan_only"),
+    "db": "pg_llsm",
+    "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
+    "custom_dataset": AMZN_DATASET["path"],
+    "threads": 16,
+    "gen_template": "workloads/scan_only.yml",
+    "gen_distribution": "zipfian",
+    # Enable the cache, disable page grouping
+    "pg_bypass_cache": False,
+    "pg_use_segments": False,
+  },
+  deps=[":preload-amzn-pg_llsm_nogrp-1024B"],
+),
+
+
+###
 ### Preload.
 ###
 
@@ -418,3 +537,22 @@ for db, config in product(DBS, CONFIGS):
         "gen_num_requests": NUM_PRELOAD_UPDATES,
       },
     )
+
+# This is used for the factor analysis experiment.
+run_command(
+  name="preload-amzn-pg_llsm_nogrp-1024B",
+  run="./preload.sh" ,
+  options={
+    **COMMON_OPTIONS,
+    **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET),
+    "db": "pg_llsm",
+    "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
+    "custom_dataset": AMZN_DATASET["path"],
+    "threads": 1,
+    "gen_template": "workloads/setup.yml",
+    # NOTE: This overrides any previously set value.
+    "gen_num_requests": NUM_PRELOAD_UPDATES,
+    # IMPORTANT: Disable page grouping (factor analysis)
+    "pg_use_segments": False,
+  },
+)

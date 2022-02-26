@@ -17,3 +17,11 @@ run_command(
   },
   deps=["//scripts/rw_sweep:combine"],
 )
+
+run_command(
+  name="factor",
+  run="python3 format_factor.py",
+  deps=[
+    "//scripts/ycsb_v2:combine-factor",
+  ]
+)

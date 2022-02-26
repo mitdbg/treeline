@@ -244,8 +244,9 @@ llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
   options.records_per_page_goal = FLAGS_records_per_page_goal;
   options.records_per_page_delta = FLAGS_records_per_page_delta;
   options.num_bg_threads = FLAGS_bg_threads;
-  options.record_cache_capacity =
-      (FLAGS_cache_size_mib * 1024 * 1024) / (FLAGS_record_size_bytes);
+  // Each record cache entry takes 96 bytes of space (metadata).
+  options.record_cache_capacity = (FLAGS_cache_size_mib * 1024ULL * 1024ULL) /
+                                  (FLAGS_record_size_bytes + 96ULL);
   options.use_memory_based_io = FLAGS_pg_use_memory_based_io;
   options.bypass_cache = FLAGS_pg_bypass_cache;
   options.rec_cache_batch_writeout = FLAGS_rec_cache_batch_writeout;
