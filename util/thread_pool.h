@@ -19,8 +19,10 @@ namespace llsm {
 //   - https://github.com/vit-vit/CTPL
 class ThreadPool {
  public:
-  // Create a thread pool with `num_threads` threads.
-  ThreadPool(size_t num_threads);
+  // Create a thread pool with `num_threads` threads. Threads will run
+  // `run_on_exit` just before they terminate.
+  ThreadPool(size_t num_threads,
+             std::function<void()> run_on_exit = std::function<void()>());
 
   // Create a thread pool with `num_threads` threads and pin each thread to the
   // core id specified by `thread_to_core`.
@@ -77,6 +79,7 @@ class ThreadPool {
   bool shutdown_;
   std::queue<std::unique_ptr<Task>> work_queue_;
   std::vector<std::thread> threads_;
+  std::function<void()> run_on_exit_;
 };
 
 template <

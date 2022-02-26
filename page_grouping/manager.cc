@@ -43,7 +43,10 @@ Manager::Manager(fs::path db_path,
     index_->BulkLoadFromEmpty(boundaries.begin(), boundaries.end());
   }
   if (options_.num_bg_threads > 0) {
-    bg_threads_ = std::make_unique<ThreadPool>(options_.num_bg_threads);
+    bg_threads_ = std::make_unique<ThreadPool>(options_.num_bg_threads, []() {
+      // Make sure all locally recorded stats are exposed.
+      PageGroupedDBStats::Local().PostToGlobal();
+    });
   }
 }
 
