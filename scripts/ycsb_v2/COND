@@ -240,56 +240,56 @@ combine(name="main-pg_llsm-zipfian", deps=MAIN_PGLLSM_ZIPFIAN)
 group(
   name="ycsb-1-of-2",
   deps=[
-    exp_name for exp_name in ALL_EXPERIMENTS if hash(exp_name) % 2 == 0
+    exp_name for idx, exp_name in enumerate(ALL_EXPERIMENTS) if idx % 2 == 0
   ],
 )
 
 group(
   name="ycsb-2-of-2",
   deps=[
-    exp_name for exp_name in ALL_EXPERIMENTS if hash(exp_name) % 2 == 1
+    exp_name for idx, exp_name in enumerate(ALL_EXPERIMENTS) if idx % 2 == 1
   ],
 )
 
 group(
   name="main-1-of-2",
   deps=[
-    exp_name for exp_name in MAIN if hash(exp_name) % 2 == 0
+    exp_name for idx, exp_name in enumerate(MAIN) if idx % 2 == 0
   ],
 )
 
 group(
   name="main_zipfian-1-of-2",
   deps=[
-    exp_name for exp_name in MAIN_ZIPFIAN if hash(exp_name) % 2 == 0
+    exp_name for idx, exp_name in enumerate(MAIN_ZIPFIAN) if idx % 2 == 0
   ],
 )
 
 group(
   name="main_pg_llsm_zipfian-1-of-2",
   deps=[
-    exp_name for exp_name in MAIN_PGLLSM_ZIPFIAN if hash(exp_name) % 2 == 0
+    exp_name for idx, exp_name in enumerate(MAIN_PGLLSM_ZIPFIAN) if idx % 2 == 0
   ],
 )
 
 group(
   name="main-2-of-2",
   deps=[
-    exp_name for exp_name in MAIN if hash(exp_name) % 2 == 1
+    exp_name for idx, exp_name in enumerate(MAIN) if idx % 2 == 1
   ],
 )
 
 group(
   name="main_zipfian-2-of-2",
   deps=[
-    exp_name for exp_name in MAIN_ZIPFIAN if hash(exp_name) % 2 == 1
+    exp_name for idx, exp_name in enumerate(MAIN_ZIPFIAN) if idx % 2 == 1
   ],
 )
 
 group(
   name="main_pg_llsm_zipfian-2-of-2",
   deps=[
-    exp_name for exp_name in MAIN_PGLLSM_ZIPFIAN if hash(exp_name) % 2 == 1
+    exp_name for idx, exp_name in enumerate(MAIN_PGLLSM_ZIPFIAN) if idx % 2 == 1
   ],
 )
 
