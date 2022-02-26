@@ -33,7 +33,8 @@ static std::vector<T> load_data(const std::string& filename) {
 
 // Writes `records` to a CSV file.
 static void write_to_csv(const std::vector<Record>& records,
-                         const std::string& filename) {
+                         const std::string& filename,
+                         const bool key_only = false) {
   std::cout << "Writing records to CSV file " << filename << "...";
   std::ofstream out(filename, std::ios_base::trunc);
   if (!out.is_open()) {
@@ -41,7 +42,11 @@ static void write_to_csv(const std::vector<Record>& records,
     exit(EXIT_FAILURE);
   }
   for (const auto& record : records) {
-    out << record.key << "," << record.value << std::endl;
+    if (key_only) {
+      out << record.key << std::endl;
+    } else {
+      out << record.key << "," << record.value << std::endl;
+    }
   }
   out.close();
 

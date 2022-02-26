@@ -84,8 +84,8 @@ int main(int argc, char** argv) {
   }
 
   // Write records to CSV file.
-  const std::string out_filename = filename + "_trace.csv";
-  write_to_csv(records, out_filename);
+  const std::string out_filename = filename + "_trace_keys.csv";
+  write_to_csv(records, out_filename, /*key_only=*/true);
 
   return 0;
 }
