@@ -334,6 +334,7 @@ size_t Manager::WriteToSegment(
       overflow_page.SetOverflow(SegmentId());
       overflow_page_dirty = true;
       index_->SetSegmentOverflow(segment.lower, true);
+      PageGroupedDBStats::Local().BumpOverflowsCreated();
 
       orig_page.SetOverflow(overflow_page_id);
       orig_page_dirty = true;

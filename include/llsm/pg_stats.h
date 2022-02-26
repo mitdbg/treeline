@@ -41,6 +41,7 @@ class PageGroupedDBStats {
   uint64_t GetFreeListBytes() const { return free_list_bytes_; }
   uint64_t GetSegmentIndexBytes() const { return segment_index_bytes_; }
   uint64_t GetLockManagerBytes() const { return lock_manager_bytes_; }
+  uint64_t GetCacheBytes() const { return cache_bytes_; }
 
   void BumpCacheHits() { ++cache_hits_; }
   void BumpCacheMisses() { ++cache_misses_; }
@@ -56,6 +57,7 @@ class PageGroupedDBStats {
   void SetFreeListBytes(uint64_t bytes) { free_list_bytes_ = bytes; }
   void SetSegmentIndexBytes(uint64_t bytes) { segment_index_bytes_ = bytes; }
   void SetLockManagerBytes(uint64_t bytes) { lock_manager_bytes_ = bytes; }
+  void SetCacheBytes(uint64_t bytes) { cache_bytes_ = bytes; }
 
   // Threads must call this method to post their counter values to the global
   // `PageGroupedDBStats` instance.
@@ -85,6 +87,8 @@ class PageGroupedDBStats {
   uint64_t free_list_bytes_;
   uint64_t segment_index_bytes_;
   uint64_t lock_manager_bytes_;
+  // The size footprint of the cache (in bytes).
+  uint64_t cache_bytes_;
 };
 
 }  // namespace pg
