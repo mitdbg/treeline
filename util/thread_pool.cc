@@ -1,11 +1,13 @@
 #include "thread_pool.h"
 
 #include <cassert>
+
 #include "util/affinity.h"
 
 namespace llsm {
 
-ThreadPool::ThreadPool(size_t num_threads) : shutdown_(false) {
+ThreadPool::ThreadPool(size_t num_threads, std::function<void()> run_on_exit)
+    : shutdown_(false), run_on_exit_(std::move(run_on_exit)) {
   assert(num_threads > 0);
   for (size_t i = 0; i < num_threads; ++i) {
     threads_.emplace_back(&ThreadPool::ThreadMain, this);
@@ -18,7 +20,8 @@ ThreadPool::ThreadPool(size_t num_threads,
   assert(num_threads > 0);
   assert(num_threads == thread_to_core.size());
   for (size_t i = 0; i < num_threads; ++i) {
-    threads_.emplace_back(&ThreadPool::ThreadMainOnCore, this, thread_to_core[i]);
+    threads_.emplace_back(&ThreadPool::ThreadMainOnCore, this,
+                          thread_to_core[i]);
   }
 }
 
@@ -53,6 +56,9 @@ void ThreadPool::ThreadMain() {
     }
     (*next_job)();
     next_job.reset(nullptr);
+  }
+  if (run_on_exit_) {
+    run_on_exit_();
   }
 }
 

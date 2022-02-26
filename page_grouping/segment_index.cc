@@ -14,7 +14,9 @@ namespace llsm {
 namespace pg {
 
 SegmentIndex::SegmentIndex(std::shared_ptr<LockManager> lock_manager)
-    : lock_manager_(std::move(lock_manager)) {
+    : lock_manager_(std::move(lock_manager)),
+      bytes_allocated_(0),
+      index_(TrackingAllocator<std::pair<Key, SegmentInfo>>(bytes_allocated_)) {
   assert(lock_manager_ != nullptr);
 }
 
@@ -202,6 +204,16 @@ SegmentIndex::Entry SegmentIndex::IndexIteratorToEntry(
     entry.upper = it->first;
   }
   return entry;
+}
+
+uint64_t SegmentIndex::GetSizeFootprint() const {
+  std::shared_lock<std::shared_mutex> lock(mutex_);
+  return bytes_allocated_ + sizeof(*this);
+}
+
+uint64_t SegmentIndex::GetNumEntries() const {
+  std::shared_lock<std::shared_mutex> lock(mutex_);
+  return index_.size();
 }
 
 }  // namespace pg

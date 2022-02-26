@@ -5,6 +5,7 @@
 #include "../bufmgr/page_memory_allocator.h"
 #include "circular_page_buffer.h"
 #include "llsm/pg_db.h"
+#include "llsm/pg_stats.h"
 #include "manager.h"
 #include "persist/merge_iterator.h"
 #include "persist/page.h"
@@ -180,6 +181,12 @@ Status Manager::RewriteSegments(
     return Status::InvalidArgument(
         "RewriteSegments(): Intervening rewrite altered the segment "
         "boundaries.");
+  }
+
+  // Track rewrite statistics.
+  PageGroupedDBStats::Local().BumpRewrites();
+  for (const auto& seg : segments_to_rewrite) {
+    PageGroupedDBStats::Local().BumpRewrittenPages(seg.sinfo.page_count());
   }
 
   // 2. Load and merge the segments.

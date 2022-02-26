@@ -124,6 +124,11 @@ class RecordCache {
   // until the next call to a public method.
   std::vector<std::pair<Slice, Slice>> ExtractDirty();
 
+  // Get an estimate of the cache's size footprint. The returned size is missing
+  // the size of ART. This method is NOT thread safe and cannot run concurrently
+  // with any other public methods.
+  uint64_t GetSizeFootprintEstimate() const;
+
  private:
   // The default sizes for ART sub-scans when..
   static const uint64_t kDefaultUserSubScan =

@@ -35,6 +35,16 @@ class PGLLSMInterface {
       out << "cache_misses," << stats.GetCacheMisses() << std::endl;
       out << "cache_clean_evictions," << stats.GetCacheCleanEvictions() << std::endl;
       out << "cache_dirty_evictions," << stats.GetCacheDirtyEvictions() << std::endl;
+
+      out << "overflows_created," << stats.GetOverflowsCreated() << std::endl;
+      out << "rewrites," << stats.GetRewrites() << std::endl;
+      out << "rewritten_pages," << stats.GetRewrittenPages() << std::endl;
+
+      out << "segments," << stats.GetSegments() << std::endl;
+      out << "segment_index_bytes," << stats.GetSegmentIndexBytes() << std::endl;
+      out << "free_list_entries," << stats.GetFreeListEntries() << std::endl;
+      out << "free_list_bytes," << stats.GetFreeListBytes() << std::endl;
+      out << "cache_bytes," << stats.GetCacheBytes() << std::endl;
     });
   }
 

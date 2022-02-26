@@ -380,4 +380,19 @@ std::vector<std::pair<Slice, Slice>> RecordCache::ExtractDirty() {
   return dirty_records;
 }
 
+uint64_t RecordCache::GetSizeFootprintEstimate() const {
+  const uint64_t entries = capacity_ * sizeof(RecordCacheEntry);
+  uint64_t entry_payloads = 0;
+  for (uint64_t i = 0; i < capacity_; ++i) {
+    if (!cache_entries[i].IsValid()) {
+      continue;
+    }
+    // It is possible for this to be an underestimate (e.g., if a smaller record
+    // replaced a larger one).
+    entry_payloads += cache_entries[i].GetKey().size();
+    entry_payloads += cache_entries[i].GetValue().size();
+  }
+  return entries + entry_payloads + sizeof(*this);
+}
+
 }  // namespace llsm

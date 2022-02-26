@@ -4,6 +4,7 @@
 #include <cassert>
 #include <functional>
 
+#include "llsm/pg_stats.h"
 #include "util/key.h"
 
 namespace fs = std::filesystem;
@@ -45,6 +46,11 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
 
 PageGroupedDBImpl::~PageGroupedDBImpl() {
   if (!mgr_.has_value()) return;
+
+  // Record statistics before shutting down.
+  mgr_->PostStats();
+  PageGroupedDBStats::Local().SetCacheBytes(cache_.GetSizeFootprintEstimate());
+
   if (!options_.parallelize_final_flush || options_.bypass_cache) return;
 
   // When the destructor runs, no external threads should be running any methods

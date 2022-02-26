@@ -8,6 +8,7 @@
 #include "bufmgr/page_memory_allocator.h"
 #include "key.h"
 #include "llsm/pg_db.h"
+#include "llsm/pg_stats.h"
 #include "persist/merge_iterator.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
@@ -42,7 +43,10 @@ Manager::Manager(fs::path db_path,
     index_->BulkLoadFromEmpty(boundaries.begin(), boundaries.end());
   }
   if (options_.num_bg_threads > 0) {
-    bg_threads_ = std::make_unique<ThreadPool>(options_.num_bg_threads);
+    bg_threads_ = std::make_unique<ThreadPool>(options_.num_bg_threads, []() {
+      // Make sure all locally recorded stats are exposed.
+      PageGroupedDBStats::Local().PostToGlobal();
+    });
   }
 }
 
@@ -333,6 +337,7 @@ size_t Manager::WriteToSegment(
       overflow_page.SetOverflow(SegmentId());
       overflow_page_dirty = true;
       index_->SetSegmentOverflow(segment.lower, true);
+      PageGroupedDBStats::Local().BumpOverflowsCreated();
 
       orig_page.SetOverflow(overflow_page_id);
       orig_page_dirty = true;
@@ -490,6 +495,13 @@ std::pair<Key, Key> Manager::GetPageBoundsFor(const Key key) const {
   }
 
   return {lower_bound, upper_bound};
+}
+
+void Manager::PostStats() const {
+  PageGroupedDBStats::Local().SetFreeListBytes(free_->GetSizeFootprint());
+  PageGroupedDBStats::Local().SetFreeListEntries(free_->GetNumEntries());
+  PageGroupedDBStats::Local().SetSegmentIndexBytes(index_->GetSizeFootprint());
+  PageGroupedDBStats::Local().SetSegments(index_->GetNumEntries());
 }
 
 }  // namespace pg

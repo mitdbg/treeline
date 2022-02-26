@@ -25,13 +25,12 @@ class TrackingAllocator {
       : currently_allocated_bytes_(other.currently_allocated_bytes_) {}
 
   value_type* allocate(std::size_t n) {
-    assert(n == 1);
-    currently_allocated_bytes_ += sizeof(value_type);
+    currently_allocated_bytes_ += n * sizeof(value_type);
     return static_cast<value_type*>(::operator new(n * sizeof(value_type)));
   }
 
-  void deallocate(value_type* p, std::size_t) noexcept {
-    currently_allocated_bytes_ -= sizeof(value_type);
+  void deallocate(value_type* p, std::size_t n) noexcept {
+    currently_allocated_bytes_ -= n * sizeof(value_type);
     ::operator delete(p);
   }
 
