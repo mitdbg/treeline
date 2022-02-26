@@ -154,6 +154,11 @@ DEFINE_bool(rec_cache_batch_writeout, true,
             "If true, the record cache will try to batch writes for the same "
             "page when writing out a dirty entry.");
 
+DEFINE_bool(optimistic_rec_caching, false,
+            "If true, page-grouped LLSM and LLSM will optimistically cache "
+            "records present on a page that was read in, even if the record(s) "
+            "were not necessarily requested.");
+
 namespace llsm {
 namespace bench {
 
@@ -229,6 +234,7 @@ llsm::Options BuildLLSMOptions() {
   options.memory_autotuning = FLAGS_memory_autotuning;
   options.reorg_length = FLAGS_reorg_length;
   options.rec_cache_batch_writeout = FLAGS_rec_cache_batch_writeout;
+  options.optimistic_caching = FLAGS_optimistic_rec_caching;
   return options;
 }
 
@@ -244,6 +250,7 @@ llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
   options.bypass_cache = FLAGS_pg_bypass_cache;
   options.rec_cache_batch_writeout = FLAGS_rec_cache_batch_writeout;
   options.parallelize_final_flush = FLAGS_pg_parallelize_final_flush;
+  options.optimistic_caching = FLAGS_optimistic_rec_caching;
   return options;
 }
 
