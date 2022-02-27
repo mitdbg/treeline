@@ -55,17 +55,7 @@ def memory_usage(db, record_size_bytes):
     return mem
 
 
-run_command(
-  name="plot-zipfian-64",
-  run="python3 plot_e2e.py",
-  options={
-    "distribution": "zipfian",
-    "record_size_bytes": 64,
-    "y_min": 0,
-    "y_max": 500,
-  },
-  deps=[":combine"],
-)
+
 
 run_command(
   name="combine",

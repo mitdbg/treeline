@@ -1,15 +1,13 @@
 import argparse
-
 import conductor.lib as cond
 import matplotlib.pyplot as plt
 import pandas as pd
+from plot_common import COLORS
 
 plt.rcParams["font.size"] = 14
 
-
-DISTRIBUTIONS = ["uniform", "zipfian"]
 DB_FORMAT = {
-    "llsm": "LLSM (ours)",
+    "llsm": "Disk-Based B-Tree",
     "rocksdb": "RocksDB",
 }
 
@@ -23,8 +21,11 @@ def plot_e2e(
     title=None,
     ylim=None,
 ):
+    linewidth = 3.5
+    markersize = 15
+
     fig, ax = plt.subplots(
-        figsize=(6.65, 4),
+        figsize=(6.65, 3),
         tight_layout=True,
         frameon=False,
     )
@@ -42,15 +43,18 @@ def plot_e2e(
         ax.plot(
             data["update_pct"],
             data["krequests_per_s"],
-            marker="o",
-            markersize=5,
+            marker="o" if db == "llsm" else "^",
+            markersize=markersize,
+            linewidth=linewidth,
             label=DB_FORMAT[db],
+            color=COLORS[db] if db == "rocksdb" else "#762439",
         )
     if show_legend:
         ax.legend(
             edgecolor="#000000",
             fancybox=False,
             framealpha=1,
+            loc="lower right",
         )
     ax.set_ylabel("Throughput (kreq/s)")
     ax.set_xlabel("Update Percentage (%)")
@@ -68,7 +72,7 @@ def plot_e2e(
             & (df["update_pct"] == 100)
         ]
         max_val = rel["krequests_per_s"].iloc[0]
-        fig.text(0.82, 0.94, "{:.2f}".format(max_val))
+        fig.text(0.8, 0.93, "{:.2f}".format(max_val))
 
     return fig, ax
 
