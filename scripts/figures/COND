@@ -25,3 +25,68 @@ run_command(
     "//scripts/ycsb_v2:combine-factor",
   ]
 )
+
+# Plot our dataset CDFs.
+combine(
+  name="plot-cdfs",
+  deps=[
+    ":amzn-cdf",
+    ":osm-cdf",
+    ":synth_20m-cdf",
+  ],
+)
+
+run_command(
+  name="amzn-cdf",
+  run="./plot_cdf.sh",
+  args=["--show_ylabel"],
+  options={
+    "name": "amzn",
+    "inset_min": 12000000,
+    "inset_max": 12000015,
+    "dataset_path": "'$TP_DATASET_PATH/amazon_reviews.txt'",
+  },
+  parallelizable=True,
+)
+
+run_command(
+  name="osm-cdf",
+  run="./plot_cdf.sh",
+  options={
+    "name": "osm",
+    "inset_min": 12000000,
+    "inset_max": 12000025,
+    "dataset_path": "'$TP_DATASET_PATH/osm_ny.txt'",
+  },
+  parallelizable=True,
+)
+
+run_command(
+  name="synth_20m-cdf",
+  run="./plot_cdf.sh",
+  options={
+    "name": "synth_20m",
+    "inset_min": 10000000,
+    "inset_max": 10000015,
+    "dataset_path": "'$TP_DATASET_PATH/synth_20m.txt'",
+  },
+  parallelizable=True,
+)
+
+# Plot the page grouping sensitivity study.
+run_command(
+  name="pg_sweep",
+  run="python3 plot_pg_sweep.py",
+  deps=[
+    "//scripts/pg_analysis:process_sweep",
+  ],
+)
+
+# Plot the page grouping segment distributions.
+run_command(
+  name="pg_dist",
+  run="python3 plot_pg_dist.py",
+  deps=[
+    "//scripts/pg_analysis:process_segment_size",
+  ],
+)

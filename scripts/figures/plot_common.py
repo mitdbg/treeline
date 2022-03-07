@@ -8,3 +8,15 @@ DATASET_MAP = {
     "amzn": "Amazon",
     "osm": "OSM",
 }
+
+DATASET_COLORS = {
+    "amzn": "#397624",
+    "osm": "#9fc55a",
+    "synth": "#958934",
+}
+
+DATASET_LINESTYLE = {
+    "amzn": "solid",
+    "osm": "dashed",
+    "synth": "dotted",
+}

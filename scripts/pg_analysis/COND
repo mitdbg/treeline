@@ -1,0 +1,153 @@
+from itertools import product
+
+DATASETS = [
+  {
+    "name": "synth",
+  },
+  {
+    "name": "osm",
+    "path": "'$TP_DATASET_PATH/osm_ny.txt'",
+  },
+  {
+    "name": "amzn",
+    "path": "'$TP_DATASET_PATH/amazon_reviews.txt'",
+  },
+]
+
+BASE_CONFIGS = [
+  {
+    "name": "64B",
+    "records_per_page_goal": 45,
+    "records_per_page_delta": 5,
+  },
+  {
+    "name": "1024B",
+    "records_per_page_goal": 2,
+    "records_per_page_delta": 1,
+  }
+]
+
+COMMON_OPTIONS = {
+  "db": "pg_llsm",
+  "bg_threads": 4,
+  "threads": 1,
+  # This is not a performance benchmark, so we can turn this on to have the
+  # experiments run faster.
+  "pg_use_memory_based_io": True,
+  # Use a fixed record size. The data we're collecting from these experiments
+  # does not depend on the record size.
+  "record_size_bytes": 16,
+}
+
+
+###
+### Utilities.
+###
+
+def dataset_to_options(dataset):
+  if "path" in dataset:
+    return {"custom_dataset": dataset["path"]}
+  else:
+    return {}
+
+def config_to_options(config):
+  copy = config.copy()
+  del copy["name"]
+  return copy
+
+
+run_command(
+  name="process_segment_size",
+  run="python3 process_segment_size.py",
+  deps=[":segment_size"],
+)
+
+run_command(
+  name="process_sweep",
+  run="python3 process_sweep.py",
+  deps=[
+    ":goal_45",
+    ":delta_5",
+  ]
+)
+
+# Run all the experiments.
+group(
+  name="pg_analysis",
+  deps=[
+    ":segment_size",
+    ":goal_45",
+    ":delta_5",
+  ],
+)
+
+
+###
+### Segment size with and without grouping.
+###
+
+run_experiment_group(
+  name="segment_size",
+  run="./run_load.sh",
+  experiments=[
+    ExperimentInstance(
+      name="segment_size-{}-{}-{}".format(
+        dataset["name"],
+        config["name"],
+        "segs" if use_segments else "no_segs",
+      ),
+      options={
+        **COMMON_OPTIONS,
+        **dataset_to_options(dataset),
+        **config_to_options(config),
+        "pg_use_segments": use_segments,
+      },
+      parallelizable=True,
+    )
+    for dataset, config, use_segments in product(
+      DATASETS,
+      BASE_CONFIGS,
+      [False, True],
+    )
+  ],
+)
+
+###
+### Parameter sweeps (sensitivity study).
+###
+
+run_experiment_group(
+  name="goal_45",
+  run="./run_load.sh",
+  experiments=[
+    ExperimentInstance(
+      name="goal_45-{}-{}".format(dataset["name"], delta),
+      options={
+        **COMMON_OPTIONS,
+        **dataset_to_options(dataset),
+        "records_per_page_goal": 45,
+        "records_per_page_delta": delta,
+      },
+      parallelizable=True,
+    )
+    for dataset, delta in product(DATASETS, list(range(2, 21, 2)))
+  ],
+)
+
+run_experiment_group(
+  name="delta_5",
+  run="./run_load.sh",
+  experiments=[
+    ExperimentInstance(
+      name="delta_5-{}-{}".format(dataset["name"], goal),
+      options={
+        **COMMON_OPTIONS,
+        **dataset_to_options(dataset),
+        "records_per_page_goal": goal,
+        "records_per_page_delta": 5,
+      },
+      parallelizable=True,
+    )
+    for dataset, goal in product(DATASETS, list(range(15, 61, 5)))
+  ],
+)
