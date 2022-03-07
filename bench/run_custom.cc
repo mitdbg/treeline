@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <iostream>
+#include <string_view>
 
 #include "bench/common/config.h"
 #include "bench/common/leanstore_interface.h"
@@ -36,6 +37,13 @@ DEFINE_uint64(throughput_sample_period, 0,
 DEFINE_bool(notify_after_init, false,
             "If set to true, this process will send a SIGUSR1 signal to its "
             "parent process after database initialization completes.");
+
+DEFINE_string(
+    custom_inserts, "",
+    "Use this flag to specify custom insert files for use in the workload. The "
+    "names should correspond to names in the workload configuration file. "
+    "Expected format: <name>:<path>. To specify more than one custom insert "
+    "list, separate the entries using a comma.");
 
 template <class DatabaseInterface>
 ycsbr::BenchmarkResult Run(const ycsbr::gen::PhasedWorkload& workload) {
@@ -90,6 +98,36 @@ void PrintExperimentResult(const std::string& db,
   result.PrintAsCSV(std::cout, /*print_header=*/false);
 }
 
+void ProcessCustomInserts(
+    std::unique_ptr<ycsbr::gen::PhasedWorkload>& workload) {
+  if (FLAGS_custom_inserts.empty()) return;
+
+  std::string_view remaining(FLAGS_custom_inserts);
+  while (!remaining.empty()) {
+    const auto pos = remaining.find(',');
+    const auto entry = remaining.substr(0, pos);
+    if (pos == std::string_view::npos) {
+      remaining = std::string_view();
+    } else {
+      remaining = remaining.substr(pos + 1);
+    }
+
+    const auto sep_pos = entry.find(':');
+    if (sep_pos == std::string_view::npos) {
+      throw std::invalid_argument(
+          "Invalid format for --custom_inserts (missing ':' separator).");
+    }
+    const std::string name = std::string(entry.substr(0, sep_pos));
+    const std::string path = std::string(entry.substr(sep_pos + 1));
+    std::vector<ycsbr::Request::Key> keys =
+        LoadDatasetFromTextFile(path, /*warn_on_duplicates=*/FLAGS_verbose);
+    if (keys.empty()) {
+      throw std::invalid_argument("Dataset at " + path + " is empty.");
+    }
+    workload->AddCustomInsertList(name, keys);
+  }
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -115,6 +153,7 @@ int main(int argc, char* argv[]) {
     }
     workload->SetCustomLoadDataset(std::move(keys));
   }
+  ProcessCustomInserts(workload);
 
   // The record size is specified in the workload configuration file. We need
   // to keep this command line option to support the other benchmark drivers
