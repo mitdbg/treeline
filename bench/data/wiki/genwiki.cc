@@ -7,7 +7,7 @@
 #include <random>
 #include <unordered_set>
 
-#include "common.h"
+#include "../common.h"
 #include "zipf_distribution.h"
 
 // Reads in Wikipedia edit timestamp dataset and outputs key-value pairs of the
