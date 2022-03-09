@@ -104,7 +104,8 @@ if(LLSM_BUILD_BENCHMARKS)
       BUILD_IN_SOURCE ON
       INSTALL_COMMAND ""
     )
-    add_library(aio STATIC IMPORTED)
+    add_library(aio STATIC IMPORTED GLOBAL)
+    add_dependencies(aio libaio_src)
     set_target_properties(
       aio PROPERTIES IMPORTED_LOCATION
         ${libaio_src_SOURCE_DIR}/src/libaio.a)
