@@ -24,6 +24,7 @@ DEFINE_bool(skip_workload, false,
             "If set to true, this workload runner will skip running the "
             "workload (it will only run the load portion of the workload).");
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
+
 DEFINE_string(output_path, "",
               "A path to where additional output should be written (e.g., "
               "throughput samples, statistics).");

@@ -34,8 +34,6 @@ class LeanStoreInterface {
     if (FLAGS_skip_load) {
       FLAGS_recover = true;
       FLAGS_recover_file = FLAGS_db_path + "/leanstore/leanstore.json";
-      std::cerr << "Will recover from file: " << FLAGS_recover_file
-                << std::endl;
     } else {
       FLAGS_falloc = 2;  // GiB
       FLAGS_persist = true;
