@@ -7,6 +7,7 @@ WORKLOADS = [
 DBS = [
   "pg_llsm",
   "rocksdb",
+  "leanstore"
 ]
 
 DISTRIBUTIONS = ["zipfian", "uniform"]
