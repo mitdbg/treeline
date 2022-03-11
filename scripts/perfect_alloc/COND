@@ -89,16 +89,20 @@ run_experiment_group(
   experiments=[
     ExperimentInstance(
       name="palloc-{}-{}-{}".format(db, config["name"], dataset["name"]),
-      options={},
       options={
         **COMMON_OPTIONS,
         **process_config(db, config),
+        "db": db,
         "workload_config": "workloads/custom.yml",
         "checkpoint_name": "palloc-{}-{}-{}".format(db, config["name"], dataset["name"]),
         "custom_inserts": "custom:" + dataset["insert_trace_path"],
         "threads": 1,
       },
     )
+    for db, config, dataset in product(DBS, CONFIGS, CUSTOM_DATASETS)
+  ],
+  deps=[
+    ":preload-{}-{}-{}".format(db, config["name"], dataset["name"])
     for db, config, dataset in product(DBS, CONFIGS, CUSTOM_DATASETS)
   ],
 )
@@ -110,6 +114,7 @@ for db, config, dataset in product(DBS, CONFIGS, CUSTOM_DATASETS):
     options={
       **COMMON_OPTIONS,
       **process_config(db, config),
+      "db": db,
       "workload_config": "workloads/setup.yml",
       "checkpoint_name": "palloc-{}-{}-{}".format(db, config["name"], dataset["name"]),
       "custom_dataset": dataset["path"],
