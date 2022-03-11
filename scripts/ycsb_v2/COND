@@ -47,9 +47,9 @@ CONFIG_1024B = {
   "records_per_page_delta": 1,
 
   # Used by all DBs.
-  # 3255 MiB in total ~33% of the dataset
-  "memtable_mib": 510,
-  "cache_mib": 2235,
+  # 6510 MiB in total ~33% of the dataset
+  "memtable_mib": 1024,
+  "cache_mib": 4462,
 
   # Used to configure the length of the workload.
   # These values are scaled up by the dataset size multiplier.
