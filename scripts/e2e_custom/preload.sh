@@ -35,7 +35,7 @@ for val in "${orig_args[@]}"; do
 done
 
 if [[ -z $db_type || -z $checkpoint_name || -z $workload_path ]]; then
-  echo >&2 "Usage: $0 --checkpoint_name=<checkpoint name> --workload_config=<workload path> --db=<all|rocksdb|llsm> [other args passed to run_custom]"
+  echo >&2 "Usage: $0 --checkpoint_name=<checkpoint name> --workload_config=<workload path> --db=<all|rocksdb|llsm|pg_llsm|leanstore> [other args passed to run_custom]"
   exit 1
 fi
 

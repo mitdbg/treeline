@@ -52,14 +52,12 @@ args+=("--notify_after_init")
 full_checkpoint_path=$DB_CHECKPOINT_PATH/$checkpoint_name
 rm -rf $DB_PATH
 
-# LeanStore does not support "reopening" a database. So we do not have
-# checkpoints for LeanStore. Note that we currently **do not** run the "setup"
-# workload on LeanStore (10 M uniform updates).
-if [[ $db_type == "leanstore" ]]; then
-  mkdir $DB_PATH
-else
-  args+=("--skip_load")
-  cp -r $full_checkpoint_path $DB_PATH
+args+=("--skip_load")
+cp -r $full_checkpoint_path $DB_PATH
+
+# Update leanstore configuration file to reflect moving the database.
+if [ -e $DB_PATH/$db_type/leanstore.json ]; then
+  sed -i 's|'"$full_checkpoint_path"'|'"$DB_PATH"'|g' $DB_PATH/$db_type/leanstore.json 
 fi
 
 sync $DB_PATH
