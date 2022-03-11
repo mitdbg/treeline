@@ -155,8 +155,6 @@ Status Manager::RewriteSegments(
     Key segment_base, std::vector<Record>::const_iterator addtl_rec_begin,
     std::vector<Record>::const_iterator addtl_rec_end) {
   std::vector<SegmentIndex::Entry> segments_to_rewrite;
-  std::vector<std::pair<Key, SegmentInfo>> rewritten_segments;
-  std::vector<SegmentId> overflows_to_clear;
 
   if (options_.rewrite_search_radius > 0) {
     segments_to_rewrite = index_->FindAndLockRewriteRegion(
@@ -183,6 +181,16 @@ Status Manager::RewriteSegments(
         "boundaries.");
   }
 
+  return RewriteSegmentsImpl(std::move(segments_to_rewrite), addtl_rec_begin,
+                             addtl_rec_end);
+}
+
+Status Manager::RewriteSegmentsImpl(
+    std::vector<SegmentIndex::Entry> segments_to_rewrite,
+    std::vector<Record>::const_iterator addtl_rec_begin,
+    std::vector<Record>::const_iterator addtl_rec_end) {
+  std::vector<std::pair<Key, SegmentInfo>> rewritten_segments;
+  std::vector<SegmentId> overflows_to_clear;
   // Track rewrite statistics.
   PageGroupedDBStats::Local().BumpRewrites();
   for (const auto& seg : segments_to_rewrite) {
@@ -604,6 +612,34 @@ Status Manager::FlattenChain(
     free_->Add(overflow_page_id);
   }
 
+  return Status::OK();
+}
+
+Status Manager::FlattenRange(const Key start_key, const Key end_key) {
+  static const std::vector<Record> kEmptyRecords;
+
+  Key curr_start = start_key;
+  std::vector<SegmentIndex::Entry> to_rewrite;
+  while (curr_start < end_key) {
+    while (true) {
+      const auto res =
+          index_->FindAndLockNextOverflowRegion(curr_start, end_key);
+      if (res.has_value()) {
+        to_rewrite = std::move(*res);
+        break;
+      }
+      // Need to retry.
+    }
+    if (to_rewrite.empty()) {
+      // Done.
+      return Status::OK();
+    }
+    const Key next_start = to_rewrite.back().upper;
+    RewriteSegmentsImpl(std::move(to_rewrite), kEmptyRecords.begin(),
+                        kEmptyRecords.end());
+    curr_start = next_start;
+    to_rewrite.clear();
+  }
   return Status::OK();
 }
 

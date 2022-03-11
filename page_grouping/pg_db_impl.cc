@@ -218,5 +218,12 @@ std::pair<Key, Key> PageGroupedDBImpl::GetPageBoundsFor(Key key) {
   return mgr_->GetPageBoundsFor(key);
 }
 
+Status PageGroupedDBImpl::FlattenRange(const Key start_key, const Key end_key) {
+  if (!options_.use_segments) {
+    return Status::NotSupported("FlattenRange() only implemented for segments.");
+  }
+  return mgr_->FlattenRange(start_key, end_key);
+}
+
 }  // namespace pg
 }  // namespace llsm

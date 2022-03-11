@@ -66,6 +66,10 @@ class Manager {
   // The lower bound is inclusive and the upper bound is exclusive.
   std::pair<Key, Key> GetPageBoundsFor(const Key key) const;
 
+  // See `PageGroupedDB::FlattenRange()` for details.
+  Status FlattenRange(const Key start_key = 0,
+                      const Key end_key = std::numeric_limits<Key>::max());
+
   // Benchmark statistics.
   const std::vector<size_t>& GetReadCounts() const { return w_.read_counts(); }
   const std::vector<size_t>& GetWriteCounts() const {
@@ -129,6 +133,12 @@ class Manager {
   Status RewriteSegments(Key segment_base,
                          std::vector<Record>::const_iterator addtl_rec_begin,
                          std::vector<Record>::const_iterator addtl_rec_end);
+  // NOTE: `segments_to_rewrite` must consist of contiguous segments and the
+  // caller must already hold the appropriate locks.
+  Status RewriteSegmentsImpl(
+      std::vector<SegmentIndex::Entry> segments_to_rewrite,
+      std::vector<Record>::const_iterator addtl_rec_begin,
+      std::vector<Record>::const_iterator addtl_rec_end);
 
   // Flatten the given page chain and merge in the additional records (which
   // must fall in the key space assigned to the given page chain).

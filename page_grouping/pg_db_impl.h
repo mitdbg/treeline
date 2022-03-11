@@ -32,6 +32,10 @@ class PageGroupedDBImpl : public PageGroupedDB {
       const Key start_key, const size_t num_records,
       std::vector<std::pair<Key, std::string>>* results_out) override;
 
+  Status FlattenRange(
+      const Key start_key = 0,
+      const Key end_key = std::numeric_limits<Key>::max()) override;
+
  private:
   void WriteBatch(const WriteOutBatch& records);
   std::pair<Key,Key> GetPageBoundsFor(Key key);
