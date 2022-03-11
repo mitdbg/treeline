@@ -78,6 +78,9 @@ if(LLSM_BUILD_BENCHMARKS)
   add_executable(pg_shuffle tools/shuffle_pages.cc)
   target_link_libraries(pg_shuffle PRIVATE gflags)
 
+  add_executable(pg_flatten tools/flatten.cc)
+  target_link_libraries(pg_flatten PRIVATE pg_llsm gflags)
+
   # Contains debug tools.
   add_subdirectory(debug)
 

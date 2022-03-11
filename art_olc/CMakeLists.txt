@@ -1,4 +1,4 @@
-target_sources(llsm PRIVATE 
+set(art_sources
   Epoche.cpp
   Epoche.h
   Key.h
@@ -10,3 +10,6 @@ target_sources(llsm PRIVATE
   N256.cpp
   Tree.cpp
   Tree.h)
+
+target_sources(llsm PRIVATE ${art_sources})
+target_sources(pg_llsm PRIVATE ${art_sources})
