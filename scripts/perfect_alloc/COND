@@ -14,9 +14,9 @@ CONFIG_64B = {
   "records_per_page_delta": 5,
 
   # Used by all DBs.
-  # 408 MiB in total (2 x 64 MiB + 280 MiB, ~33% of the dataset)
-  "memtable_mib": 64,
-  "cache_mib": 280,
+  # 18 MiB in total (2 x 4 MiB + 10 MiB)
+  "memtable_mib": 4,
+  "cache_mib": 10,
 }
 
 CONFIG_1024B = {
@@ -28,9 +28,9 @@ CONFIG_1024B = {
   "records_per_page_delta": 1,
 
   # Used by all DBs.
-  # 6510 MiB in total ~33% of the dataset
-  "memtable_mib": 1024,
-  "cache_mib": 4462,
+  # 292 MiB in total
+  "memtable_mib": 64,
+  "cache_mib": 164,
 }
 
 CONFIGS = [CONFIG_64B, CONFIG_1024B]
