@@ -116,7 +116,7 @@ if(LLSM_BUILD_BENCHMARKS)
   FetchContent_Declare(
     leanstore
     GIT_REPOSITORY git@github.com:mitdbg/leanstore.git
-    GIT_TAG        frontend_optional
+    GIT_TAG        master-compatible
   )
   set(BUILD_LEANSTORE_FRONTEND OFF)
   FetchContent_MakeAvailable(leanstore)

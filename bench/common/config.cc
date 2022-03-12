@@ -58,7 +58,7 @@ bool ValidateLLSMPageFillPct(const char* flagname, uint32_t pct) {
 
 }  // namespace
 
-DEFINE_string(db, "all", "Which database(s) to use {all, rocksdb, llsm}.");
+DEFINE_string(db, "all", "Which database(s) to use {all, rocksdb, llsm, leanstore}.");
 DEFINE_validator(db, &ValidateDB);
 
 DEFINE_string(db_path, llsm::bench::GetDefaultDBPath(),
@@ -133,7 +133,6 @@ DEFINE_uint64(reorg_length, 5,
               "reorganization is triggered.");
 
 // Page grouping related flags.
-
 DEFINE_uint64(records_per_page_goal, 45, "Page grouping fill rate goal.");
 DEFINE_uint64(records_per_page_delta, 5,
               "Page grouping model error tolerance.");
@@ -158,6 +157,10 @@ DEFINE_bool(optimistic_rec_caching, false,
             "If true, page-grouped LLSM and LLSM will optimistically cache "
             "records present on a page that was read in, even if the record(s) "
             "were not necessarily requested.");
+
+DEFINE_bool(
+    skip_load, false,
+    "If set to true, the workload runner will skip the initial data load.");
 
 namespace llsm {
 namespace bench {

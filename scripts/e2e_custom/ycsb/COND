@@ -8,7 +8,7 @@ WORKLOADS = [
 DBS = [
   "llsm",
   "rocksdb",
-  # "leanstore",  # Excluded for now
+  "leanstore", 
 ]
 
 THREADS = [1, 2, 4, 8, 16]
