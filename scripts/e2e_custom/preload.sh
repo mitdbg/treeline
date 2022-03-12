@@ -126,6 +126,7 @@ fi
 if [ $db_type == "leanstore" ] || [ $db_type == "all" ]; then
   # Leanstore
   ../../build/bench/run_custom \
+    ${args[@]} \
     --db=leanstore \
     --db_path=$full_checkpoint_path \
     --bg_threads=16 \
@@ -133,6 +134,5 @@ if [ $db_type == "leanstore" ] || [ $db_type == "all" ]; then
     --workload_config=$workload_path \
     --seed=$SEED \
     --verbose \
-    --persist \
-    ${args[@]}
+    --persist 
 fi
