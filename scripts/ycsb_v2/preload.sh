@@ -132,7 +132,7 @@ if [ $db_type == "leanstore" ] || [ $db_type == "all" ]; then
     --db_path=$full_checkpoint_path \
     --bg_threads=16 \
     --bypass_wal=true \
-    --workload_config=$workload_path \
+    --workload_config=$COND_OUT/workload.yml \
     --seed=$SEED \
     --verbose \
     --persist 
