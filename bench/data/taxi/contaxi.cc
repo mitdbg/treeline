@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iostream>
+#include <unordered_set>
 #include <vector>
 
 #include "../common.h"
@@ -41,7 +42,7 @@ int main(int argc, char** argv) {
   const std::string filename = argv[1];
 
   // Read lat/lng coordinates from file and convert to S2 cell ids.
-  std::vector<Record> records;  // S2 cell id, value pairs
+  std::vector<uint64_t> cell_ids;
 
   std::ifstream in(filename);
   if (!in.is_open()) {
@@ -51,7 +52,6 @@ int main(int argc, char** argv) {
 
   std::string line;
   std::vector<std::pair<const char*, const char*>> elements;
-  uint64_t i = 0;
   while (parse_line(in, line, elements)) {
     const double latitude = parse_double(elements[1]);
     const double longitude = parse_double(elements[0]);
@@ -61,8 +61,28 @@ int main(int argc, char** argv) {
         S2LatLng::FromDegrees(latitude, longitude).Normalized();
     const uint64_t cell_id = S2CellId(lat_lng.ToPoint()).id();
 
-    records.push_back({cell_id, i});
-    ++i;
+    cell_ids.push_back(cell_id);
+  }
+
+  // Remove duplicates while retaining the original sort order.
+  std::vector<size_t> cell_ids_unique;
+  cell_ids_unique.reserve(cell_ids.size());
+  std::unordered_set<uint64_t> set;
+  set.reserve(cell_ids.size());
+  for (const uint64_t cell_id : cell_ids) {
+    if (set.find(cell_id) == set.end()) {
+      set.insert(cell_id);
+      cell_ids_unique.push_back(cell_id);
+    }
+  }
+
+  std::cout << "Number of unique cell ids: " << cell_ids_unique.size()
+            << std::endl;
+
+  std::vector<Record> records;  // S2 cell id, value pairs
+  records.reserve(cell_ids_unique.size());
+  for (uint64_t i = 0; i < cell_ids_unique.size(); ++i) {
+    records.push_back({cell_ids_unique[i], i});
   }
 
   // Write records to CSV file.
