@@ -14,6 +14,7 @@
 #include "llsm/status.h"
 #include "record_cache_entry.h"
 #include "util/key.h"
+#include "masstree_wrapper/masstree_wrapper.h"
 
 namespace llsm {
 

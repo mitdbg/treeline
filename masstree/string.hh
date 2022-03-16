@@ -21,6 +21,7 @@
 namespace lcdf {
 
 class String : public String_base<String> {
+  private:
     struct memo_type;
   public:
     struct rep_type;
