@@ -33,7 +33,10 @@ CONFIG_1024B = {
   "cache_mib": 164,
 }
 
-CONFIGS = [CONFIG_64B, CONFIG_1024B]
+CONFIGS = [
+  CONFIG_64B,
+#  CONFIG_1024B,
+]
 
 COMMON_OPTIONS = {
   "bg_threads": 4,
@@ -96,6 +99,7 @@ run_experiment_group(
         "workload_config": "workloads/custom.yml",
         "checkpoint_name": "palloc-{}-{}-{}".format(db, config["name"], dataset["name"]),
         "custom_inserts": "custom:" + dataset["insert_trace_path"],
+        "custom_dataset": dataset["path"],
         "threads": 1,
       },
     )
