@@ -2,7 +2,7 @@ run_command(
   name="ycsb-main",
   run="python3 plot_ycsb.py",
   deps=[
-    "//scripts/ycsb_v2:combine-main-zipfian",
+    "//scripts/ycsb_v2:combine-main",
   ],
 )
 
