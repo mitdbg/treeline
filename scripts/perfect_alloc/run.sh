@@ -62,6 +62,7 @@ sync $DB_PATH
 
 mkdir -p $COND_OUT/no_alloc
 
+echo >&2 "Running the regular insert heavy experiment..."
 ../../build/bench/run_custom \
   ${args[@]} \
   --output_path=$COND_OUT/no_alloc \
@@ -88,9 +89,11 @@ fi
 mkdir -p $COND_OUT/perfect_alloc
 
 # Remove all overflows.
+echo >&2 "Removing all overflows in the generated DB..."
 ../../build/page_grouping/pg_flatten --db_path=$DB_PATH --goal=$goal --delta=$delta
 
 # Run again, this time with "perfect allocation".
+echo >&2 "Now running the \"perfect allocation\" experiment..."
 ../../build/bench/run_custom \
   ${args[@]} \
   --output_path=$COND_OUT/perfect_alloc \
