@@ -8,6 +8,7 @@ target_sources(tester
     coding_test.cc
     db_test.cc
     file_manager_test.cc
+    insert_tracker_test.cc
     manifest_test.cc
     memtable_test.cc
     packed_map_test.cc
