@@ -70,6 +70,17 @@ class SegmentIndex {
   std::vector<Entry> FindAndLockRewriteRegion(const Key segment_base,
                                               uint32_t search_radius) const;
 
+  // Find a contiguous segment range where each segment contains at least one
+  // overflow page and acquire locks in `kReorg` mode on the segments. This
+  // method starts its search from `start_key` and stops its search before
+  // `end_key` (exclusive upper bound).
+  //
+  // If the returned optional is empty, the caller must retry the call. If the
+  // returned optional is non-empty but the vector is empty, it means there are
+  // no overflow pages in the segments starting at and following `start_key`.
+  std::optional<std::vector<Entry>> FindAndLockNextOverflowRegion(
+      const Key start_key, const Key end_key) const;
+
   // Mark whether or not the segment storing `key` has an overflow page.
   void SetSegmentOverflow(const Key key, bool overflow);
 
@@ -93,6 +104,10 @@ class SegmentIndex {
       tlx::btree_default_traits<Key, std::pair<Key, SegmentInfo>>,
       TrackingAllocator<std::pair<Key, SegmentInfo>>>;
 
+  // Returns true iff all the lock acquisitions succeed. `segments_to_lock` must
+  // be sorted by the segments' lower bounds.
+  bool LockSegmentsForRewrite(
+      const std::vector<SegmentIndex::Entry>& segments_to_lock) const;
   OrderedMap::iterator SegmentForKeyImpl(const Key key);
   OrderedMap::const_iterator SegmentForKeyImpl(const Key key) const;
   Entry IndexIteratorToEntry(OrderedMap::const_iterator it) const;

@@ -26,7 +26,8 @@ else()
   add_library(llsm STATIC)
   add_library(pg_llsm STATIC)
 endif()
-target_link_libraries(llsm crc32c tbb)
+target_link_libraries(llsm PRIVATE crc32c tbb)
+target_link_libraries(pg_llsm PRIVATE crc32c tbb)
 target_include_directories(llsm
   PUBLIC include
   PRIVATE .)

@@ -66,6 +66,26 @@ class PageGroupedDB {
   virtual Status GetRange(
       const Key start_key, const size_t num_records,
       std::vector<std::pair<Key, std::string>>* results_out) = 0;
+
+  // Removes all overflow pages in the specified key range. The `end_key` is
+  // exclusive.
+  //
+  // All segments that intersect the specified range that have an overflow page
+  // will be rewritten (to remove the overflow pages). Any segments that
+  // intersect the specified range and do not have an overflow page will not be
+  // modified.
+  //
+  // This method only guarantees that overflow pages in the specified range that
+  // exist at the time this method is called are removed. Any overflow pages
+  // created in the specified range while this method runs (e.g., by concurrent
+  // threads) may be removed, but are not guaranteed to be removed.
+  //
+  // This method is thread-safe. However for performance reasons it should
+  // generally not be called on regions of the key space that are experiencing a
+  // high rate of writes.
+  virtual Status FlattenRange(
+      const Key start_key = 0,
+      const Key end_key = std::numeric_limits<Key>::max()) = 0;
 };
 
 }  // namespace pg
