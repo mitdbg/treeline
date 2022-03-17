@@ -35,7 +35,7 @@ CONFIG_1024B = {
 
 CONFIGS = [
   CONFIG_64B,
-#  CONFIG_1024B,
+  CONFIG_1024B,
 ]
 
 COMMON_OPTIONS = {
@@ -86,12 +86,26 @@ def process_config(db, config):
 
   return copy
 
+combine(
+  name="perfect_alloc_ordered",
+  deps=[
+    ":palloc-pg_llsm-64B-taxi-8",
+    ":palloc-rocksdb-64B-taxi-8",
+    ":palloc-pg_llsm-1024B-taxi-8",
+    ":palloc-rocksdb-1024B-taxi-8",
+    ":palloc-pg_llsm-64B-taxi-1",
+    ":palloc-rocksdb-64B-taxi-1",
+    ":palloc-pg_llsm-1024B-taxi-1",
+    ":palloc-rocksdb-1024B-taxi-1",
+  ],
+)
+
 run_experiment_group(
   name="perfect_alloc",
   run="./run.sh",
   experiments=[
     ExperimentInstance(
-      name="palloc-{}-{}-{}".format(db, config["name"], dataset["name"]),
+      name="palloc-{}-{}-{}-{}".format(db, config["name"], dataset["name"], threads),
       options={
         **COMMON_OPTIONS,
         **process_config(db, config),
@@ -100,10 +114,10 @@ run_experiment_group(
         "checkpoint_name": "palloc-{}-{}-{}".format(db, config["name"], dataset["name"]),
         "custom_inserts": "custom:" + dataset["insert_trace_path"],
         "custom_dataset": dataset["path"],
-        "threads": 8,
+        "threads": threads,
       },
     )
-    for db, config, dataset in product(DBS, CONFIGS, CUSTOM_DATASETS)
+    for db, config, dataset, threads in product(DBS, CONFIGS, CUSTOM_DATASETS, [1, 8])
   ],
   deps=[
     ":preload-{}-{}-{}".format(db, config["name"], dataset["name"])
