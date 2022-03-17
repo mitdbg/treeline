@@ -12,7 +12,7 @@ RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out,
       clock_(0),
       write_out_(std::move(write_out)),
       key_bounds_(std::move(key_bounds)) {
-  tree_ = std::make_unique<ART_OLC::Tree>(TIDToARTKey);
+  tree_ = std::make_unique<MasstreeWrapper<uint64_t>>();
   cache_entries.resize(capacity_);
 }
 
@@ -61,10 +61,7 @@ retry:
         pg::PageGroupedDBStats::Local().BumpCacheCleanEvictions();
       }
       WriteOutIfDirty(index);
-      Key art_key;
-      TIDToARTKey(index + 1, art_key);
-      auto t1 = tree_->getThreadInfo();
-      tree_->remove(art_key, index + 1, t1);
+      tree_->remove_value(entry->GetKey().data(), entry->GetKey().size());
     }
   } else {
     entry = &cache_entries[index];
@@ -102,10 +99,7 @@ retry:
 
   // Update ART.
   if (!found) {
-    Key art_key;
-    TIDToARTKey(index + 1, art_key);
-    auto t2 = tree_->getThreadInfo();
-    bool success = tree_->insert(art_key, index + 1, t2);
+    bool success = tree_->insert_value(key.data(), key.size(), &index);
 
     if (!success) {  // Another thread cached the same key concurrently.
       // Set this cache entry up for eviction.
@@ -135,24 +129,21 @@ Status RecordCache::PutFromRead(const Slice& key, const Slice& value,
 
 Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
                                   uint64_t* index_out, bool safe) const {
-  Key art_key;
-  SliceToARTKey(key, art_key);
-  auto t = tree_->getThreadInfo();
-
   bool locked_successfully = false;
-  TID tid;
+  uint64_t* index_local;
 
   do {
-    tid = tree_->lookup(art_key, t);
-    if (tid == 0) {
+    index_local = tree_->get_value(key.data(), key.size());
+    if (index_local == nullptr) {
       pg::PageGroupedDBStats::Local().BumpCacheMisses();
       return Status::NotFound("Key not in cache");
     }
-    if (safe) locked_successfully = cache_entries[tid - 1].TryLock(exclusive);
+    if (safe)
+      locked_successfully = cache_entries[*index_local].TryLock(exclusive);
   } while (!locked_successfully && safe);
 
-  *index_out = tid - 1;
-  cache_entries[*index_out].IncrementPriority();
+  cache_entries[*index_local].IncrementPriority();
+  index_out = index_local;
 
   pg::PageGroupedDBStats::Local().BumpCacheHits();
   return Status::OK();
@@ -160,22 +151,8 @@ Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
 
 Status RecordCache::GetRange(const Slice& start_key, size_t num_records,
                              std::vector<uint64_t>* indices_out) const {
-  Key art_key;
-  SliceToARTKey(start_key, art_key);
-  auto t = tree_->getThreadInfo();
-
-  TID results_out[num_records];
-
-  // Retrieve & lock in ART.
-  size_t num_found = 0;
-  tree_->lookupRange(art_key, results_out, num_records, num_found, t,
-                     &cache_entries);
-
-  // Place in vector.
-  indices_out->resize(num_found);
-  for (uint64_t i = 0; i < num_found; ++i) {
-    indices_out->at(i) = results_out[i] - 1;
-  }
+  tree_->scan(start_key.data(), start_key.size(), nullptr, 0, true, num_records,
+              indices_out, &cache_entries);
 
   return Status::OK();
 }
@@ -185,48 +162,14 @@ Status RecordCache::GetRange(const Slice& start_key, const Slice& end_key,
   return GetRangeImpl(start_key, end_key, indices_out);
 }
 
-Status RecordCache::GetRangeImpl(const Slice& start_key, const Slice& end_key,
-                                 std::vector<uint64_t>* indices_out,
-                                 std::optional<uint64_t> index_locked_already,
-                                 uint64_t sub_scan_size) const {
-  Key start_art_key;
-  SliceToARTKey(start_key, start_art_key);
-  auto t = tree_->getThreadInfo();
+Status RecordCache::GetRangeImpl(
+    const Slice& start_key, const Slice& end_key,
+    std::vector<uint64_t>* indices_out,
+    std::optional<uint64_t> index_locked_already) const {
+  tree_->scan(start_key.data(), start_key.size(), end_key.data(),
+              end_key.size(), false, 0, indices_out, &cache_entries,
+              index_locked_already);
 
-  TID results_out[sub_scan_size];
-
-  // Retrieve & lock in ART.
-  bool should_scan_more = true;
-  while (should_scan_more) {
-    size_t num_found = 0;
-
-    // The next largest key after `sub_scan_size` keys will be returned in
-    // `start_art_key`, setting up the next iteration.
-    tree_->lookupRange(start_art_key, results_out, sub_scan_size, num_found, t,
-                       &cache_entries, &start_art_key, index_locked_already);
-
-    // Three conditions to scan more:
-    // 1. Didn't return too few records (would happen if we hit the upper key
-    // space bound).
-    // 2. The point from which to continue is beyond the keys we saw.
-    // 3. The point from which to continue is below the `end_key`.
-    should_scan_more =
-        (num_found == sub_scan_size) &&
-        (cache_entries[results_out[sub_scan_size - 1] - 1].GetKey().compare(
-             ARTKeyToSlice(start_art_key)) < 0) &&
-        (ARTKeyToSlice(start_art_key).compare(end_key) < 0);
-
-    // Place in vector.
-    for (uint64_t i = 0; i < num_found; ++i) {
-      auto index = results_out[i] - 1;
-      auto entry = &cache_entries[index];
-      if (should_scan_more || entry->GetKey().compare(end_key) < 0) {
-        indices_out->emplace_back(index);
-      } else {
-        entry->Unlock();
-      }
-    }
-  }
   return Status::OK();
 }
 
@@ -240,19 +183,6 @@ uint64_t RecordCache::WriteOutDirty() {
     cache_entries[i].Unlock();
   }
   return count;
-}
-
-void RecordCache::TIDToARTKey(TID tid, Key& key) {
-  const Slice& slice_key = cache_entries[tid - 1].GetKey();
-  SliceToARTKey(slice_key, key);
-}
-
-void RecordCache::SliceToARTKey(const Slice& slice_key, Key& art_key) {
-  art_key.set(slice_key.data(), slice_key.size());
-}
-
-Slice RecordCache::ARTKeyToSlice(const Key& art_key) {
-  return Slice(reinterpret_cast<const char*>(&art_key[0]), art_key.getKeyLen());
 }
 
 uint64_t RecordCache::SelectForEviction() {
@@ -309,7 +239,7 @@ uint64_t RecordCache::WriteOutIfDirty(uint64_t index) {
     auto [_, upper_bound] = key_bounds_(llsm::key_utils::ExtractHead64(key));
     Status s =
         GetRangeImpl(key, key_utils::IntKeyAsSlice(upper_bound).as<Slice>(),
-                     &indices, index, kDefaultWriteOutSubScan);
+                     &indices, index);
     for (auto& idx : indices) {
       entry = &cache_entries[idx];
       if (entry->IsDirty()) {
