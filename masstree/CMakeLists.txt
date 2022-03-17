@@ -7,11 +7,28 @@ find_library(
   REQUIRED)
 
 set(masstree_sources
+  checkpoint.cc
+  clp.c
   compiler.cc
+  file.cc
+  json.cc
+  kvio.cc
+  kvrandom.cc
+  kvthread.cc
+  log.cc
+  memdebug.cc
+  misc.cc
+  msgpack.cc
+  perfstat.cc
+  query_masstree.cc
 	str.cc
+  straccum.cc
+  string_slice.cc
 	string.cc
-	straccum.cc
-	json.cc)
+  value_array.cc
+  value_string.cc
+  value_versioned_array.cc
+	)
 
 set(common_optimization_options
   -funroll-loops
@@ -33,7 +50,8 @@ add_custom_command(
   VERBATIM)
 
 
-add_library(masstree)
+add_library(masstree STATIC)
+set_source_files_properties(clp.c PROPERTIES LANGUAGE CXX )
 target_sources(masstree PRIVATE ${masstree_sources} ${CMAKE_CURRENT_SOURCE_DIR}/config.h)
 target_compile_options(masstree
   PRIVATE

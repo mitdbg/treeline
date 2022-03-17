@@ -2,6 +2,8 @@
 
 #include "masstree/config.h"
 // DO NOT REORDER (config.h needs to be included before other headers)
+#include <optional>
+
 #include "masstree/compiler.hh"
 #include "masstree/kvthread.hh"
 #include "masstree/masstree.hh"
@@ -251,7 +253,7 @@ class MasstreeWrapper {
 
     const char* const end_key_;
     const std::size_t end_key_length_;
-    const bool scan_by_length_ ;
+    const bool scan_by_length_;
     const uint64_t num_records_;
 
     std::vector<uint64_t>* indices_out_;
@@ -267,7 +269,8 @@ class MasstreeWrapper {
             std::vector<uint64_t>* indices_out,
             std::vector<llsm::RecordCacheEntry>* cache_entries = nullptr,
             std::optional<uint64_t> index_locked_already = std::nullopt) {
-    Str mtkey = (start_key == nullptr ? Str() : Str(start_key, start_key_length));
+    Str mtkey =
+        (start_key == nullptr ? Str() : Str(start_key, start_key_length));
 
     SearchRangeScanner scanner(end_key, end_key_length, scan_by_length,
                                num_records, indices_out, cache_entries,
@@ -286,12 +289,6 @@ class MasstreeWrapper {
 template <typename T>
 __thread typename MasstreeWrapper<T>::table_params::threadinfo_type*
     MasstreeWrapper<T>::ti = nullptr;
-#ifdef GLOBAL_VALUE_DEFINE
-volatile mrcu_epoch_type active_epoch = 1;
-volatile std::uint64_t globalepoch = 1;
-volatile bool recovering = false;
-#else
 extern volatile mrcu_epoch_type active_epoch;
 extern volatile std::uint64_t globalepoch;
 extern volatile bool recovering;
-#endif
