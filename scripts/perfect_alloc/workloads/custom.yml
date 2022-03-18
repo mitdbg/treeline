@@ -5,15 +5,15 @@ load:
     range_min: 1
     range_max: 10000000
 
-# 3 million inserts interleaved with 3 million reads.
+# 3 million inserts interleaved with 125 thousand reads.
 run:
-- num_requests: 6000000
+- num_requests: 3125000
   read:
-    proportion_pct: 50
+    proportion_pct: 4
     distribution:
       type: uniform
   insert:
-    proportion_pct: 50
+    proportion_pct: 96
     distribution:
       type: custom
       name: custom
