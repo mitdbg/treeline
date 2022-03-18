@@ -217,7 +217,7 @@ class MasstreeWrapper {
 
       if (scan_by_length_) {
         ++scanned_so_far_;
-        lock_and_log(*val);
+        lock_and_log(val);
         return true;
       }
 
@@ -231,7 +231,7 @@ class MasstreeWrapper {
           ((res == 0) && (end_key_length_ > static_cast<std::size_t>(key.len)));
 
       if (smaller_than_end_key || same_as_end_key_but_shorter) {
-        lock_and_log(*val);
+        lock_and_log(val);
         return true;
       }
 
@@ -239,15 +239,18 @@ class MasstreeWrapper {
     }
 
    private:
-    void lock_and_log(uint64_t val) {
+    void lock_and_log(llsm::RecordCacheEntry* val) {
       if (cache_entries_ != nullptr) {
+        uint64_t index = val->FindIndexWithin(cache_entries_);
+        
         if (!index_locked_already_.has_value() ||
-            index_locked_already_.value() != val)
-          cache_entries_->at(val).Lock(/*exclusive = */ false);
-        cache_entries_->at(val).IncrementPriority();
-      }
-      if (indices_out_ != nullptr) {
-        indices_out_->emplace_back(val);
+            index_locked_already_.value() != index)
+          val->Lock(/*exclusive = */ false);
+        val->IncrementPriority();
+
+        if (indices_out_ != nullptr) {
+          indices_out_->emplace_back(index);
+        }
       }
     }
 
@@ -272,6 +275,7 @@ class MasstreeWrapper {
     Str mtkey =
         (start_key == nullptr ? Str() : Str(start_key, start_key_length));
 
+    indices_out->clear();
     SearchRangeScanner scanner(end_key, end_key_length, scan_by_length,
                                num_records, indices_out, cache_entries,
                                index_locked_already);

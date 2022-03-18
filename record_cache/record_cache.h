@@ -187,7 +187,7 @@ class RecordCache {
   // records from the same page when writing out a dirty record.
   KeyBoundsFn key_bounds_;
 
-  std::unique_ptr<MasstreeWrapper<uint64_t>> tree_;
+  std::unique_ptr<MasstreeWrapper<RecordCacheEntry>> tree_;
 };
 
 }  // namespace llsm

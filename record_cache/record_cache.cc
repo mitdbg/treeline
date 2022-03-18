@@ -12,7 +12,7 @@ RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out,
       clock_(0),
       write_out_(std::move(write_out)),
       key_bounds_(std::move(key_bounds)) {
-  tree_ = std::make_unique<MasstreeWrapper<uint64_t>>();
+  tree_ = std::make_unique<MasstreeWrapper<RecordCacheEntry>>();
   cache_entries.resize(capacity_);
 }
 
@@ -99,7 +99,7 @@ retry:
 
   // Update ART.
   if (!found) {
-    bool success = tree_->insert_value(key.data(), key.size(), &index);
+    bool success = tree_->insert_value(key.data(), key.size(), entry);
 
     if (!success) {  // Another thread cached the same key concurrently.
       // Set this cache entry up for eviction.
@@ -130,20 +130,19 @@ Status RecordCache::PutFromRead(const Slice& key, const Slice& value,
 Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
                                   uint64_t* index_out, bool safe) const {
   bool locked_successfully = false;
-  uint64_t* index_local;
+  RecordCacheEntry* entry;
 
   do {
-    index_local = tree_->get_value(key.data(), key.size());
-    if (index_local == nullptr) {
+    entry = tree_->get_value(key.data(), key.size());
+    if (entry == nullptr) {
       pg::PageGroupedDBStats::Local().BumpCacheMisses();
       return Status::NotFound("Key not in cache");
     }
-    if (safe)
-      locked_successfully = cache_entries[*index_local].TryLock(exclusive);
+    if (safe) locked_successfully = entry->TryLock(exclusive);
   } while (!locked_successfully && safe);
 
-  cache_entries[*index_local].IncrementPriority();
-  index_out = index_local;
+  entry->IncrementPriority();
+  *index_out = entry->FindIndexWithin(&cache_entries);
 
   pg::PageGroupedDBStats::Local().BumpCacheHits();
   return Status::OK();
