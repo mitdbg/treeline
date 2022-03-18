@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "manager.h"
 #include "plr/data.h"
 #include "plr/greedy.h"
 
@@ -35,10 +36,13 @@ SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
 }
 
 std::vector<Segment> SegmentBuilder::BuildFromDataset(
-    const std::vector<std::pair<Key, Slice>>& dataset) {
+    const std::vector<std::pair<Key, Slice>>& dataset, bool force_add_min_key) {
   // Precondition: The dataset is sorted by key in ascending order.
   std::vector<Segment> segments;
   ResetStream();
+  if (force_add_min_key) {
+    Offer({Manager::kMinReservedKey, Slice()});
+  }
   for (const auto& rec : dataset) {
     auto segs = Offer(rec);
     segments.insert(segments.end(), std::make_move_iterator(segs.begin()),

@@ -37,7 +37,7 @@ std::vector<Record> GetRangeDataset(const Key step, size_t num_records,
                                     const std::string& value) {
   std::vector<size_t> indices;
   indices.resize(num_records);
-  std::iota(indices.begin(), indices.end(), 0ULL);
+  std::iota(indices.begin(), indices.end(), 1ULL);
 
   std::vector<Record> records;
   records.resize(num_records);
@@ -109,7 +109,7 @@ TEST_F(PGDBTest, LoadWriteScanReopenScan) {
 
   // Scan.
   std::vector<Record> expected(dataset);
-  expected[2].second = new_value;
+  expected[1].second = new_value;
   expected.emplace_back(102, new_value);
   expected.emplace_back(1001, new_value);
   std::sort(expected.begin(), expected.end(),
@@ -118,7 +118,7 @@ TEST_F(PGDBTest, LoadWriteScanReopenScan) {
             });
 
   std::vector<std::pair<Key, std::string>> scan_out;
-  ASSERT_TRUE(db->GetRange(0, 2000, &scan_out).ok());
+  ASSERT_TRUE(db->GetRange(1, 2000, &scan_out).ok());
   ASSERT_EQ(scan_out.size(), expected.size());
   for (size_t i = 0; i < scan_out.size(); ++i) {
     ASSERT_EQ(scan_out[i].first, expected[i].first);
@@ -133,7 +133,7 @@ TEST_F(PGDBTest, LoadWriteScanReopenScan) {
 
   // Run the same scan again.
   scan_out.clear();
-  ASSERT_TRUE(db->GetRange(0, 2000, &scan_out).ok());
+  ASSERT_TRUE(db->GetRange(1, 2000, &scan_out).ok());
   ASSERT_EQ(scan_out.size(), expected.size());
   for (size_t i = 0; i < scan_out.size(); ++i) {
     ASSERT_EQ(scan_out[i].first, expected[i].first);
@@ -211,16 +211,69 @@ TEST_F(PGDBTest, LoadParallelFlushReopenScan) {
 
   // Scan.
   std::vector<Record> expected(dataset);
-  expected[2].second = new_value;
-  expected[10].second = new_value;
-  expected[51].second = new_value;
+  expected[1].second = new_value;
+  expected[9].second = new_value;
+  expected[50].second = new_value;
   std::sort(expected.begin(), expected.end(),
             [](const auto& left, const auto& right) {
               return left.first < right.first;
             });
 
   std::vector<std::pair<Key, std::string>> scan_out;
-  ASSERT_TRUE(db->GetRange(0, 2000, &scan_out).ok());
+  ASSERT_TRUE(db->GetRange(1, 2000, &scan_out).ok());
+  ASSERT_EQ(scan_out.size(), expected.size());
+  for (size_t i = 0; i < scan_out.size(); ++i) {
+    ASSERT_EQ(scan_out[i].first, expected[i].first);
+    ASSERT_EQ(expected[i].second.compare(scan_out[i].second), 0);
+  }
+
+  // Close the DB.
+  delete db;
+  db = nullptr;
+}
+
+TEST_F(PGDBTest, InsertSmaller) {
+  PageGroupedDB* db = nullptr;
+  auto options = GetCommonTestOptions();
+  options.records_per_page_goal = 2;
+  options.records_per_page_delta = 1;
+  options.parallelize_final_flush = true;
+  options.num_bg_threads = 3;
+  ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
+  ASSERT_NE(db, nullptr);
+
+  const char kLargeValue[1024] = {};
+  const Slice kLargeValueSlice(kLargeValue, 1024);
+
+  // Load.
+  const std::string value = "Test 1";
+  const std::vector<Record> dataset = {
+      {10, kLargeValueSlice}, {100, kLargeValueSlice}, {200, kLargeValueSlice}};
+  ASSERT_TRUE(db->BulkLoad(dataset).ok());
+
+  // Insert a few keys that are smaller than the previous smallest key.
+  ASSERT_TRUE(db->Put(9, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(8, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(7, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(6, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(5, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(4, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(3, kLargeValueSlice).ok());
+
+  // Reopen.
+  delete db;
+  db = nullptr;
+  ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
+  ASSERT_NE(db, nullptr);
+
+  // Scan the whole DB.
+  std::vector<Record> expected = {
+      {3, kLargeValueSlice},  {4, kLargeValueSlice},  {5, kLargeValueSlice},
+      {6, kLargeValueSlice},  {7, kLargeValueSlice},  {8, kLargeValueSlice},
+      {9, kLargeValueSlice},  {10, kLargeValueSlice}, {100, kLargeValueSlice},
+      {200, kLargeValueSlice}};
+  std::vector<std::pair<Key, std::string>> scan_out;
+  ASSERT_TRUE(db->GetRange(1, 2000, &scan_out).ok());
   ASSERT_EQ(scan_out.size(), expected.size());
   for (size_t i = 0; i < scan_out.size(); ++i) {
     ASSERT_EQ(scan_out[i].first, expected[i].first);

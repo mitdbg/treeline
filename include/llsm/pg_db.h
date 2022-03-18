@@ -21,6 +21,9 @@ using Record = std::pair<Key, Slice>;
 // occurs. Concurrent access to the database is currently not supported.
 //
 // At most one `DB` instance should be used at any time in a single process.
+//
+// This implementation currently only supports unsigned integer keys up to 64
+// bits. Key `0` and key `2^64 - 1` are reserved and should not be used.
 class PageGroupedDB {
  public:
   // Open a database instance stored at `path`.

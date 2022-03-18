@@ -38,7 +38,7 @@ class PageGroupedDBImpl : public PageGroupedDB {
 
  private:
   void WriteBatch(const WriteOutBatch& records);
-  std::pair<Key,Key> GetPageBoundsFor(Key key);
+  std::pair<Key, Key> GetPageBoundsFor(Key key);
 
   std::filesystem::path db_path_;
   PageGroupedDBOptions options_;

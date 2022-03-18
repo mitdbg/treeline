@@ -29,7 +29,11 @@ class SegmentBuilder {
                  const size_t records_per_page_delta);
 
   // Build segments when the entire dataset can fit in memory.
-  std::vector<Segment> BuildFromDataset(const std::vector<Record>& dataset);
+  //
+  // If `force_add_min_key` is true then this method will add a placeholder
+  // record with the key `Manager::kMinReservedKey` and an empty value.
+  std::vector<Segment> BuildFromDataset(const std::vector<Record>& dataset,
+                                        bool force_add_min_key = false);
 
   // Stream-based builder interface. Offer the builder one record at a time.
   std::vector<Segment> Offer(std::pair<Key, Slice> record);

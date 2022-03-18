@@ -130,7 +130,8 @@ void Manager::BulkLoadIntoSegmentsImpl(const std::vector<Record>& records) {
   // 1. Generate the segments.
   SegmentBuilder builder(options_.records_per_page_goal,
                          options_.records_per_page_delta);
-  const auto segments = builder.BuildFromDataset(records);
+  const auto segments =
+      builder.BuildFromDataset(records, /*force_add_min_key=*/true);
   if (options_.write_debug_info) {
     const auto debug_path = db_path_ / kDebugDirName;
     fs::create_directories(debug_path);
