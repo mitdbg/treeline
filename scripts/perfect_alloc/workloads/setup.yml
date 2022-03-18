@@ -2,7 +2,7 @@ load:
   num_records: 6000000
   distribution:
     type: uniform
-    range_min: 0
+    range_min: 1
     range_max: 10000000
 
 # Dummy workload. We only use this config for the dataset.
