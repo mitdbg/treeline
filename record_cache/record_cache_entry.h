@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include <atomic>
+#include <vector>
 
 #include "db/format.h"
 #include "llsm/slice.h"
@@ -64,6 +65,9 @@ class RecordCacheEntry {
   void Lock(const bool exclusive);
   bool TryLock(const bool exclusive);  // Returns true iff successful.
   void Unlock();
+
+  // Retrieves the index of a `RecordCacheEntry` within a vector `vec`.
+  uint64_t FindIndexWithin(std::vector<RecordCacheEntry>* vec);
 
  private:
   // Bitmasks for the metadata field.

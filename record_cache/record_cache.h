@@ -7,11 +7,11 @@
 #include <tuple>
 #include <vector>
 
-#include "art_olc/Tree.h"
 #include "db/format.h"
 #include "db/overflow_chain.h"
 #include "llsm/statistics.h"
 #include "llsm/status.h"
+#include "masstree_wrapper/masstree_wrapper.h"
 #include "record_cache_entry.h"
 #include "util/key.h"
 
@@ -130,29 +130,12 @@ class RecordCache {
   uint64_t GetSizeFootprintEstimate() const;
 
  private:
-  // The default sizes for ART sub-scans when..
-  static const uint64_t kDefaultUserSubScan =
-      64;  // ...the user specifies a range through `end_key`.
-  static const uint64_t kDefaultWriteOutSubScan =
-      4;  // ...we use a range scan for batch write out.
-
-  // Required by the ART constructor. Populates `key` with the key of the record
-  // stored at `tid` - 1 within the record cache. See note below.
-  static void TIDToARTKey(TID tid, Key& key);
-
-  // Populates `art_key` with the record in `slice_key`.
-  static void SliceToARTKey(const Slice& slice_key, Key& art_key);
-
-  // Return a slice with the same contents as `art_key`.
-  static Slice ARTKeyToSlice(const Key& art_key);
-
   // Implements `GetRange` but adds private functionality to avoid locking a
   // specific cache entry (used during writeout).
   Status GetRangeImpl(
       const Slice& start_key, const Slice& end_key,
       std::vector<uint64_t>* indices_out,
-      std::optional<uint64_t> index_locked_already = std::nullopt,
-      uint64_t sub_scan_size = kDefaultUserSubScan) const;
+      std::optional<uint64_t> index_locked_already = std::nullopt) const;
 
   // Selects a cache entry according to the chosen policy, and returns the
   // corresponding index into the `cache_entries` vector. If the entry
@@ -204,15 +187,7 @@ class RecordCache {
   // records from the same page when writing out a dirty record.
   KeyBoundsFn key_bounds_;
 
-  // An index for the cache, using ART with optimistic lock coupling from
-  // https://github.com/flode/ARTSynchronized/tree/master/OptimisticLockCoupling.
-  //
-  // CAUTION: This ART implementation uses the value 0 to denote lookup
-  // misses, so any indexes referring to `cache_entries` are incremented
-  // by 1 to produce the corresponding ART TID. E.g. To indicate that a
-  // record is stored at index 3 in `cache_entries`, we would store the
-  // TID 4 in ART.
-  std::unique_ptr<ART_OLC::Tree> tree_;
+  std::unique_ptr<MasstreeWrapper<RecordCacheEntry>> tree_;
 };
 
 }  // namespace llsm

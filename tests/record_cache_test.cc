@@ -146,7 +146,7 @@ TEST(RecordCacheTest, RangeScanWithBound) {
     std::string end_key_s = "a" + std::to_string(i + scan_length);
 
     ASSERT_TRUE(rc.GetRangeImpl(Slice(start_key_s), Slice(end_key_s), &results,
-                                std::nullopt, 6)
+                                std::nullopt)
                     .ok());
     uint64_t scanned_recs = results.size();
     ASSERT_EQ(scanned_recs, i < 150 - scan_length ? scan_length : 150 - i);
