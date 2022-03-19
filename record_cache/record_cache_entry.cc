@@ -160,7 +160,7 @@ void RecordCacheEntry::Unlock() { pthread_rwlock_unlock(&rwlock_); }
 
 uint64_t RecordCacheEntry::FindIndexWithin(std::vector<RecordCacheEntry>* vec) {
   return ((reinterpret_cast<uint8_t*>(this) -
-           reinterpret_cast<uint8_t*>(&(vec->at(0)))) /
+           reinterpret_cast<uint8_t*>(vec->data())) /
           sizeof(llsm::RecordCacheEntry));
 }
 

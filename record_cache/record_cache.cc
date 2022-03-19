@@ -97,7 +97,6 @@ retry:
   if (is_dirty) entry->SetWriteType(write_type);
   entry->SetPriorityTo(priority);
 
-  // Update ART.
   if (!found) {
     bool success = tree_->insert_value(key.data(), key.size(), entry);
 
