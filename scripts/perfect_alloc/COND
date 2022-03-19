@@ -86,17 +86,11 @@ def process_config(db, config):
 
   return copy
 
-combine(
-  name="perfect_alloc_ordered",
+run_command(
+  name="perfect_alloc_combined",
+  run="python3 combine_raw.py",
   deps=[
-    ":palloc-pg_llsm-64B-taxi-8",
-    ":palloc-rocksdb-64B-taxi-8",
-    ":palloc-pg_llsm-1024B-taxi-8",
-    ":palloc-rocksdb-1024B-taxi-8",
-    ":palloc-pg_llsm-64B-taxi-1",
-    ":palloc-rocksdb-64B-taxi-1",
-    ":palloc-pg_llsm-1024B-taxi-1",
-    ":palloc-rocksdb-1024B-taxi-1",
+    ":perfect_alloc",
   ],
 )
 
