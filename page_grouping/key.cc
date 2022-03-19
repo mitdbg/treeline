@@ -63,7 +63,7 @@ Key FindLowerBoundary(const Key base_key, const plr::Line64& model,
   // not use this key directly due to possible precision errors. Instead, we
   // use it to establish a search bound.
   const Key candidate_boundary =
-      static_cast<Key>(model_inv(page_idx)) + base_key;
+      static_cast<Key>(std::max(0.0, model_inv(page_idx))) + base_key;
   const size_t page_for_candidate =
       PageForKey(base_key, model, page_count, candidate_boundary);
 
@@ -73,14 +73,14 @@ Key FindLowerBoundary(const Key base_key, const plr::Line64& model,
     // `candidate_boundary` is an upper bound for the search space.
     // NOTE: This assumes that `model_inv(page_idx - 1)` produces a strictly
     // lower key.
-    lower = static_cast<Key>(model_inv(page_idx - 1)) + base_key;
+    lower = static_cast<Key>(std::max(0.0, model_inv(page_idx - 1))) + base_key;
     upper = candidate_boundary;
   } else {
     // `candidate_boundary` is a lower bound for the search space.
     // NOTE: This assumes that `model_inv(page_idx + 1)` produces a strictly
     // higher key.
     lower = candidate_boundary;
-    upper = static_cast<Key>(model_inv(page_idx + 1)) + base_key;
+    upper = static_cast<Key>(std::max(0.0, model_inv(page_idx + 1))) + base_key;
   }
   assert(lower < upper);
 
