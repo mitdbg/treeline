@@ -461,12 +461,12 @@ TEST_F(PGManagerTest, InsertOverflowSegments) {
   value.resize(512);
 
   std::vector<std::pair<uint64_t, Slice>> dataset = {
-      {0, value}, {1, value}, {2, value}, {3, value},
-      {4, value}, {5, value}, {6, value}};
+      {1, value}, {2, value}, {3, value}, {4, value},
+      {5, value}, {6, value}, {7, value}};
 
-  std::vector<std::pair<uint64_t, Slice>> inserts = {{7, value},  {8, value},
-                                                     {9, value},  {10, value},
-                                                     {11, value}, {12, value}};
+  std::vector<std::pair<uint64_t, Slice>> inserts = {{8, value},  {9, value},
+                                                     {10, value}, {11, value},
+                                                     {12, value}, {13, value}};
 
   {
     Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
@@ -502,7 +502,7 @@ TEST_F(PGManagerTest, InsertOverflowSegments) {
     combined.insert(combined.end(), inserts.begin(), inserts.end());
 
     std::vector<std::pair<uint64_t, std::string>> scan_out;
-    ASSERT_TRUE(m.Scan(0, 15, &scan_out).ok());
+    ASSERT_TRUE(m.Scan(1, 15, &scan_out).ok());
     ASSERT_EQ(scan_out.size(), combined.size());
     ValidateScanResults(0, combined.size(), combined, scan_out);
   }
@@ -516,12 +516,12 @@ TEST_F(PGManagerTest, InsertOverflowPages) {
   value.resize(512);
 
   std::vector<std::pair<uint64_t, Slice>> dataset = {
-      {0, value}, {1, value}, {2, value}, {3, value},
-      {4, value}, {5, value}, {6, value}};
+      {1, value}, {2, value}, {3, value}, {4, value},
+      {5, value}, {6, value}, {7, value}};
 
-  std::vector<std::pair<uint64_t, Slice>> inserts = {{7, value},  {8, value},
-                                                     {9, value},  {10, value},
-                                                     {11, value}, {12, value}};
+  std::vector<std::pair<uint64_t, Slice>> inserts = {{8, value},  {9, value},
+                                                     {10, value}, {11, value},
+                                                     {12, value}, {13, value}};
 
   {
     Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
@@ -557,7 +557,7 @@ TEST_F(PGManagerTest, InsertOverflowPages) {
     combined.insert(combined.end(), inserts.begin(), inserts.end());
 
     std::vector<std::pair<uint64_t, std::string>> scan_out;
-    ASSERT_TRUE(m.Scan(0, 15, &scan_out).ok());
+    ASSERT_TRUE(m.Scan(1, 15, &scan_out).ok());
     ASSERT_EQ(scan_out.size(), combined.size());
     ValidateScanResults(0, combined.size(), combined, scan_out);
   }

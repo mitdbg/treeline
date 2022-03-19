@@ -31,10 +31,8 @@ std::vector<uint64_t> Datasets::FloydSample(const size_t num_samples,
 const std::vector<uint64_t> Datasets::kSequentialKeys =
     ([](const size_t range) {
       std::vector<uint64_t> results;
-      results.reserve(range);
-      for (uint64_t i = 0; i < range; ++i) {
-        results.push_back(i);
-      }
+      results.resize(range);
+      std::iota(results.begin(), results.end(), 1ULL);
       return results;
     })(1000);
 
@@ -44,7 +42,7 @@ const std::vector<uint64_t> Datasets::kUniformKeys =
       auto res = Datasets::FloydSample(num_samples, min_val, max_val, prng);
       std::sort(res.begin(), res.end());
       return res;
-    })(1000, 0, 1000000);
+    })(1000, 1, 1000000);
 
 }  // namespace pg
 }  // namespace llsm
