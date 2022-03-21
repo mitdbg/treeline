@@ -221,7 +221,7 @@ Status Manager::RewriteSegmentsImpl(
   // Used for recovery.
   const uint32_t sequence_number = next_sequence_number_++;
 
-  CircularPageBuffer page_buf(SegmentBuilder::kSegmentPageCounts.back() * 4);
+  CircularPageBuffer page_buf(SegmentBuilder::SegmentPageCounts().back() * 4);
   SegmentBuilder seg_builder(options_.records_per_page_goal,
                              options_.records_per_page_delta);
 

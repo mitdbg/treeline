@@ -12,15 +12,15 @@ namespace pg {
 class Workspace {
  public:
   Workspace() {
-    read_counts_.resize(SegmentBuilder::kSegmentPageCounts.back(), 0);
-    write_counts_.resize(SegmentBuilder::kSegmentPageCounts.back(), 0);
+    read_counts_.resize(SegmentBuilder::SegmentPageCounts().back(), 0);
+    write_counts_.resize(SegmentBuilder::SegmentPageCounts().back(), 0);
   }
 
   PageBuffer& buffer() {
     if (buf_ != nullptr) return buf_;
     // Add one for the overflow page.
     buf_ = PageMemoryAllocator::Allocate(
-        /*num_pages=*/SegmentBuilder::kSegmentPageCounts.back() + 1);
+        /*num_pages=*/SegmentBuilder::SegmentPageCounts().back() + 1);
     return buf_;
   }
 
@@ -39,9 +39,9 @@ class Workspace {
   // Lazily allocated. Always large enough to hold the largest segment.
   PageBuffer buf_;
 
-  // Tracks the number of page reads/writes of different sizes. The index (plus one)
-  // represents the number of pages read (e.g., index 0 means 1 page, index 1
-  // means 2 pages, etc.).
+  // Tracks the number of page reads/writes of different sizes. The index (plus
+  // one) represents the number of pages read (e.g., index 0 means 1 page, index
+  // 1 means 2 pages, etc.).
   std::vector<size_t> read_counts_;
   std::vector<size_t> write_counts_;
 };

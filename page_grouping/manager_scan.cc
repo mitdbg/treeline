@@ -92,7 +92,7 @@ Status Manager::ScanWithEstimates(
   // The workspace buffer has one extra page at the end for use as the overflow.
   void* overflow_buf =
       w_.buffer().get() +
-      (SegmentBuilder::kSegmentPageCounts.back()) * pg::Page::kSize;
+      (SegmentBuilder::SegmentPageCounts().back()) * pg::Page::kSize;
   Page overflow_page(overflow_buf);
 
   // Scan the first page.
@@ -280,7 +280,7 @@ Status Manager::ScanWhole(
   // The workspace buffer has one extra page at the end for use as the overflow.
   void* overflow_buf =
       w_.buffer().get() +
-      (SegmentBuilder::kSegmentPageCounts.back()) * pg::Page::kSize;
+      (SegmentBuilder::SegmentPageCounts().back()) * pg::Page::kSize;
   Page overflow_page(overflow_buf);
 
   // 3. Scan the first matching page in the segment.

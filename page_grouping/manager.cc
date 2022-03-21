@@ -69,7 +69,7 @@ Manager Manager::Reopen(const fs::path& db,
   // Figure out if there are segments in this DB.
   const bool uses_segments = fs::exists(db / (kSegmentFilePrefix + "1"));
   PageBuffer buf = PageMemoryAllocator::Allocate(
-      /*num_pages=*/SegmentBuilder::kSegmentPageCounts.back());
+      /*num_pages=*/SegmentBuilder::SegmentPageCounts().back());
   Page first_page(buf.get());
 
   std::vector<SegmentFile> segment_files;
@@ -77,9 +77,9 @@ Manager Manager::Reopen(const fs::path& db,
   std::unique_ptr<FreeList> free = std::make_unique<FreeList>();
   uint32_t max_sequence = 0;
 
-  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
+  for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
     if (i > 0 && !uses_segments) break;
-    const size_t pages_per_segment = SegmentBuilder::kSegmentPageCounts[i];
+    const size_t pages_per_segment = SegmentBuilder::SegmentPageCounts()[i];
     segment_files.emplace_back(db / (kSegmentFilePrefix + std::to_string(i)),
                                pages_per_segment, options.use_memory_based_io);
     SegmentFile& sf = segment_files.back();

@@ -59,15 +59,15 @@ void PrintSegmentsAsCSV(std::ostream& out,
 void PrintSegmentSummaryAsCsv(std::ostream& out,
                               const std::vector<Segment>& segments) {
   std::vector<size_t> num_segments;
-  num_segments.resize(SegmentBuilder::kSegmentPageCounts.size());
+  num_segments.resize(SegmentBuilder::SegmentPageCounts().size());
   for (const auto& seg : segments) {
-    const auto it = SegmentBuilder::kPageCountToSegment.find(seg.page_count);
-    assert(it != SegmentBuilder::kPageCountToSegment.end());
+    const auto it = SegmentBuilder::PageCountToSegment().find(seg.page_count);
+    assert(it != SegmentBuilder::PageCountToSegment().end());
     ++num_segments[it->second];
   }
 
   out << "segment_page_count,num_segments" << std::endl;
-  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
+  for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
     out << (1ULL << i) << "," << num_segments[i] << std::endl;
   }
 }
@@ -111,10 +111,10 @@ Manager Manager::BulkLoadIntoSegments(
 
   // Open the segment files before constructing the `Manager`.
   std::vector<SegmentFile> segment_files;
-  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
+  for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
     segment_files.emplace_back(
         db_path / (kSegmentFilePrefix + std::to_string(i)),
-        /*pages_per_segment=*/SegmentBuilder::kSegmentPageCounts[i],
+        /*pages_per_segment=*/SegmentBuilder::SegmentPageCounts()[i],
         options.use_memory_based_io);
   }
 
@@ -232,7 +232,7 @@ std::pair<Key, SegmentInfo> Manager::LoadIntoNewSegment(
 
   // 3. Write the segment to disk.
   const size_t segment_idx =
-      SegmentBuilder::kPageCountToSegment.find(seg.page_count)->second;
+      SegmentBuilder::PageCountToSegment().find(seg.page_count)->second;
   SegmentFile& sf = segment_files_[segment_idx];
 
   // Either use an existing free segment or allocate a new one.

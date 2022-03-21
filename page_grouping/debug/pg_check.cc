@@ -94,7 +94,7 @@ DBState DBState::Load(const fs::path& db_path) {
   const bool uses_segments = fs::exists(db_path / "sf-1");
 
   PageBuffer page_buffer = PageMemoryAllocator::Allocate(
-      /*num_pages=*/SegmentBuilder::kSegmentPageCounts.back());
+      /*num_pages=*/SegmentBuilder::SegmentPageCounts().back());
   void* buf = page_buffer.get();
   pg::Page first_page(buf);
 
@@ -102,9 +102,9 @@ DBState DBState::Load(const fs::path& db_path) {
   std::vector<SegmentState> segments;
   std::vector<FreeSegment> free_segments;
 
-  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
+  for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
     if (i > 0 && !uses_segments) break;
-    const size_t pages_per_segment = SegmentBuilder::kSegmentPageCounts[i];
+    const size_t pages_per_segment = SegmentBuilder::SegmentPageCounts()[i];
     SegmentFile sf(db_path / ("sf-" + std::to_string(i)), pages_per_segment,
                    /*use_memory_based_io=*/true);
 
@@ -335,8 +335,8 @@ void DBState::PrintFreeSegmentsSummary(std::ostream& out) const {
   }
 
   out << std::endl << ">>> Free segments summary" << std::endl;
-  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
-    out << "Length " << SegmentBuilder::kSegmentPageCounts[i] << ": "
+  for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
+    out << "Length " << SegmentBuilder::SegmentPageCounts()[i] << ": "
         << free_counts[i] << std::endl;
   }
 }
@@ -345,14 +345,14 @@ bool DBState::CheckPageRanges() const {
   std::cout << std::endl << ">>> Checking page ranges..." << std::endl;
 
   PageBuffer page_buffer = PageMemoryAllocator::Allocate(
-      /*num_pages=*/SegmentBuilder::kSegmentPageCounts.back());
+      /*num_pages=*/SegmentBuilder::SegmentPageCounts().back());
   void* const buf = page_buffer.get();
 
   std::vector<SegmentFile> segment_files;
-  segment_files.reserve(SegmentBuilder::kSegmentPageCounts.size());
-  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
+  segment_files.reserve(SegmentBuilder::SegmentPageCounts().size());
+  for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
     if (i > 0 && !uses_segments_) break;
-    const size_t pages_per_segment = SegmentBuilder::kSegmentPageCounts[i];
+    const size_t pages_per_segment = SegmentBuilder::SegmentPageCounts()[i];
     segment_files.emplace_back(db_path_ / ("sf-" + std::to_string(i)),
                                pages_per_segment,
                                /*use_memory_based_io=*/true);

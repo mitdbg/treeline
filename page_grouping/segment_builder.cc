@@ -10,15 +10,27 @@ namespace llsm {
 namespace pg {
 
 // The number of pages in each segment. If you change this, change
-// `kPageCountToSegment` too.
-const std::vector<size_t> SegmentBuilder::kSegmentPageCounts = {1, 2, 4, 8, 16};
+// `PageCountToSegment()` below too.
+const std::vector<size_t>& SegmentBuilder::SegmentPageCounts() {
+  // NOTE: We construct and initialize the vector here to avoid the static
+  // initialization order fiasco.
+  // https://en.cppreference.com/w/cpp/language/siof
+  static const std::vector<size_t> kSegmentPageCounts = {1, 2, 4, 8, 16};
+  return kSegmentPageCounts;
+}
 
-const std::unordered_map<size_t, size_t> SegmentBuilder::kPageCountToSegment = {
-    {1, 0}, {2, 1}, {4, 2}, {8, 3}, {16, 4}};
+const std::unordered_map<size_t, size_t>& SegmentBuilder::PageCountToSegment() {
+  // NOTE: We construct and initialize the vector here to avoid the static
+  // initialization order fiasco.
+  // https://en.cppreference.com/w/cpp/language/siof
+  static const std::unordered_map<size_t, size_t> kPageCountToSegment = {
+      {1, 0}, {2, 1}, {4, 2}, {8, 3}, {16, 4}};
+  return kPageCountToSegment;
+}
 
 // The maximum number of pages in any segment.
 static const size_t kMaxSegmentSize =
-    llsm::pg::SegmentBuilder::kSegmentPageCounts.back();
+    llsm::pg::SegmentBuilder::SegmentPageCounts().back();
 
 SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
                                const size_t records_per_page_delta)
@@ -29,8 +41,8 @@ SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
       state_(State::kNeedBase),
       plr_(),
       base_key_(0) {
-  allowed_records_per_segment_.reserve(kSegmentPageCounts.size());
-  for (size_t pages : kSegmentPageCounts) {
+  allowed_records_per_segment_.reserve(SegmentPageCounts().size());
+  for (size_t pages : SegmentPageCounts()) {
     allowed_records_per_segment_.push_back(pages * records_per_page_goal_);
   }
 }
@@ -126,7 +138,7 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
                                            std::move(record));
     }
 
-    const size_t segment_size = kSegmentPageCounts[segment_size_idx];
+    const size_t segment_size = SegmentPageCounts()[segment_size_idx];
     const size_t actual_records_in_segment =
         ComputeNumRecordsInSegment(*line, segment_size_idx);
 
@@ -194,7 +206,7 @@ std::vector<Segment> SegmentBuilder::Finish() {
       return results;
     }
 
-    const size_t segment_size = kSegmentPageCounts[segment_size_idx];
+    const size_t segment_size = SegmentPageCounts()[segment_size_idx];
     const size_t actual_records_in_segment =
         ComputeNumRecordsInSegment(*line, segment_size_idx);
 
@@ -279,7 +291,7 @@ size_t SegmentBuilder::ComputeNumRecordsInSegment(
     const plr::BoundedLine64& model, const int segment_size_idx) const {
   // Compute how many records can we actually fit in the segment based on the
   // model.
-  const size_t segment_size = kSegmentPageCounts[segment_size_idx];
+  const size_t segment_size = SegmentPageCounts()[segment_size_idx];
   assert(segment_size > 1);
 
   const size_t records_in_segment =
