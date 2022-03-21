@@ -98,8 +98,9 @@ class Manager {
  private:
   Manager(std::filesystem::path db_path,
           std::vector<std::pair<Key, SegmentInfo>> boundaries,
-          std::vector<SegmentFile> segment_files, PageGroupedDBOptions options,
-          uint32_t next_sequence_number, std::unique_ptr<FreeList> free);
+          std::vector<std::unique_ptr<SegmentFile>> segment_files,
+          PageGroupedDBOptions options, uint32_t next_sequence_number,
+          std::unique_ptr<FreeList> free);
 
   static Manager BulkLoadIntoSegments(
       const std::filesystem::path& db_path,
@@ -179,7 +180,7 @@ class Manager {
   std::filesystem::path db_path_;
   std::shared_ptr<LockManager> lock_manager_;
   std::unique_ptr<SegmentIndex> index_;
-  std::vector<SegmentFile> segment_files_;
+  std::vector<std::unique_ptr<SegmentFile>> segment_files_;
   uint32_t next_sequence_number_;
   std::unique_ptr<FreeList> free_;
   std::unique_ptr<ThreadPool> bg_threads_;

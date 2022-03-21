@@ -110,12 +110,12 @@ Manager Manager::BulkLoadIntoSegments(
   assert(options.use_segments);
 
   // Open the segment files before constructing the `Manager`.
-  std::vector<SegmentFile> segment_files;
+  std::vector<std::unique_ptr<SegmentFile>> segment_files;
   for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
-    segment_files.emplace_back(
+    segment_files.push_back(std::make_unique<SegmentFile>(
         db_path / (kSegmentFilePrefix + std::to_string(i)),
         /*pages_per_segment=*/SegmentBuilder::SegmentPageCounts()[i],
-        options.use_memory_based_io);
+        options.use_memory_based_io));
   }
 
   Manager m(db_path, {}, std::move(segment_files), options,
@@ -159,10 +159,10 @@ Manager Manager::BulkLoadIntoPages(
     const fs::path& db, const std::vector<std::pair<Key, Slice>>& records,
     const PageGroupedDBOptions& options) {
   // One single file containing 4 KiB pages.
-  std::vector<SegmentFile> segment_files;
-  segment_files.emplace_back(db / (kSegmentFilePrefix + "0"),
-                             /*pages_per_segment=*/1,
-                             options.use_memory_based_io);
+  std::vector<std::unique_ptr<SegmentFile>> segment_files;
+  segment_files.push_back(std::make_unique<SegmentFile>(
+      db / (kSegmentFilePrefix + "0"),
+      /*pages_per_segment=*/1, options.use_memory_based_io));
 
   Manager m(db, {}, std::move(segment_files), options,
             /*next_sequence_number=*/0, std::make_unique<FreeList>());
@@ -233,7 +233,7 @@ std::pair<Key, SegmentInfo> Manager::LoadIntoNewSegment(
   // 3. Write the segment to disk.
   const size_t segment_idx =
       SegmentBuilder::PageCountToSegment().find(seg.page_count)->second;
-  SegmentFile& sf = segment_files_[segment_idx];
+  std::unique_ptr<SegmentFile>& sf = segment_files_[segment_idx];
 
   // Either use an existing free segment or allocate a new one.
   SegmentId seg_id;
@@ -241,12 +241,12 @@ std::pair<Key, SegmentInfo> Manager::LoadIntoNewSegment(
   if (maybe_seg_id.has_value()) {
     seg_id = *maybe_seg_id;
   } else {
-    const size_t byte_offset = sf.AllocateSegment();
+    const size_t byte_offset = sf->AllocateSegment();
     seg_id = SegmentId(/*file_offset=*/segment_idx,
                        /*page_offset=*/byte_offset / pg::Page::kSize);
   }
 
-  sf.WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), seg.page_count);
+  sf->WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), seg.page_count);
   w_.BumpWriteCount(seg.page_count);
   return std::make_pair(
       base_key, SegmentInfo(seg_id, seg.model.has_value()
@@ -258,7 +258,7 @@ std::vector<std::pair<Key, SegmentInfo>> Manager::LoadIntoNewPages(
     const uint32_t sequence_number, const Key lower_bound,
     const Key upper_bound, const std::vector<Record>::const_iterator rec_begin,
     const std::vector<Record>::const_iterator rec_end) {
-  SegmentFile& sf = segment_files_.front();
+  std::unique_ptr<SegmentFile>& sf = segment_files_.front();
   std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
 
   size_t page_start_idx = 0;
@@ -286,11 +286,11 @@ std::vector<std::pair<Key, SegmentInfo>> Manager::LoadIntoNewPages(
     if (maybe_seg_id.has_value()) {
       seg_id = *maybe_seg_id;
     } else {
-      const size_t byte_offset = sf.AllocateSegment();
+      const size_t byte_offset = sf->AllocateSegment();
       seg_id = SegmentId(/*file_id=*/0,
                          /*page_offset=*/byte_offset / pg::Page::kSize);
     }
-    sf.WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), /*num_pages=*/1);
+    sf->WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), /*num_pages=*/1);
     w_.BumpWriteCount(1);
 
     // Record the page boundary.
@@ -318,11 +318,11 @@ std::vector<std::pair<Key, SegmentInfo>> Manager::LoadIntoNewPages(
     if (maybe_seg_id.has_value()) {
       seg_id = *maybe_seg_id;
     } else {
-      const size_t byte_offset = sf.AllocateSegment();
+      const size_t byte_offset = sf->AllocateSegment();
       seg_id = SegmentId(/*file_id=*/0,
                          /*page_offset=*/byte_offset / pg::Page::kSize);
     }
-    sf.WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), /*num_pages=*/1);
+    sf->WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), /*num_pages=*/1);
     w_.BumpWriteCount(1);
 
     segment_boundaries.emplace_back(

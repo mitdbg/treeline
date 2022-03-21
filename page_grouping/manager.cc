@@ -31,7 +31,7 @@ const std::string Manager::kSegmentFilePrefix = "sf-";
 
 Manager::Manager(fs::path db_path,
                  std::vector<std::pair<Key, SegmentInfo>> boundaries,
-                 std::vector<SegmentFile> segment_files,
+                 std::vector<std::unique_ptr<SegmentFile>> segment_files,
                  PageGroupedDBOptions options, uint32_t next_sequence_number,
                  std::unique_ptr<FreeList> free)
     : db_path_(std::move(db_path)),
@@ -72,7 +72,7 @@ Manager Manager::Reopen(const fs::path& db,
       /*num_pages=*/SegmentBuilder::SegmentPageCounts().back());
   Page first_page(buf.get());
 
-  std::vector<SegmentFile> segment_files;
+  std::vector<std::unique_ptr<SegmentFile>> segment_files;
   std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
   std::unique_ptr<FreeList> free = std::make_unique<FreeList>();
   uint32_t max_sequence = 0;
@@ -80,16 +80,17 @@ Manager Manager::Reopen(const fs::path& db,
   for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
     if (i > 0 && !uses_segments) break;
     const size_t pages_per_segment = SegmentBuilder::SegmentPageCounts()[i];
-    segment_files.emplace_back(db / (kSegmentFilePrefix + std::to_string(i)),
-                               pages_per_segment, options.use_memory_based_io);
-    SegmentFile& sf = segment_files.back();
+    segment_files.push_back(std::make_unique<SegmentFile>(
+        db / (kSegmentFilePrefix + std::to_string(i)), pages_per_segment,
+        options.use_memory_based_io));
+    std::unique_ptr<SegmentFile>& sf = segment_files.back();
 
-    const size_t num_segments = sf.NumAllocatedSegments();
+    const size_t num_segments = sf->NumAllocatedSegments();
     const size_t bytes_per_segment = pages_per_segment * Page::kSize;
     for (size_t seg_idx = 0; seg_idx < num_segments; ++seg_idx) {
       // Offset in `id` is the page offset.
       SegmentId id(i, seg_idx * pages_per_segment);
-      sf.ReadPages(seg_idx * bytes_per_segment, buf.get(), pages_per_segment);
+      sf->ReadPages(seg_idx * bytes_per_segment, buf.get(), pages_per_segment);
 
       SegmentWrap sw(buf.get(), pages_per_segment);
       if (!sw.CheckChecksum() || !first_page.IsValid()) {
@@ -352,7 +353,7 @@ size_t Manager::WriteToSegment(
         overflow_page_id = *maybe_free_page;
       } else {
         // Allocate a new free page.
-        const size_t byte_offset = segment_files_[0].AllocateSegment();
+        const size_t byte_offset = segment_files_[0]->AllocateSegment();
         overflow_page_id = SegmentId(0, byte_offset / pg::Page::kSize);
       }
 
@@ -446,27 +447,27 @@ size_t Manager::WriteToSegment(
 void Manager::ReadPage(const SegmentId& seg_id, size_t page_idx,
                        void* buffer) const {
   assert(seg_id.IsValid());
-  const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
-  sf.ReadPages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
-               /*num_pages=*/1);
+  const std::unique_ptr<SegmentFile>& sf = segment_files_[seg_id.GetFileId()];
+  sf->ReadPages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
+                /*num_pages=*/1);
   w_.BumpReadCount(1);
 }
 
 void Manager::WritePage(const SegmentId& seg_id, size_t page_idx,
                         void* buffer) const {
   assert(seg_id.IsValid());
-  const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
-  sf.WritePages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
-                /*num_pages=*/1);
+  const std::unique_ptr<SegmentFile>& sf = segment_files_[seg_id.GetFileId()];
+  sf->WritePages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
+                 /*num_pages=*/1);
   w_.BumpWriteCount(1);
 }
 
 void Manager::ReadSegment(const SegmentId& seg_id) const {
   assert(seg_id.IsValid());
-  const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
-  sf.ReadPages(seg_id.GetOffset() * pg::Page::kSize, w_.buffer().get(),
-               sf.PagesPerSegment());
-  w_.BumpReadCount(sf.PagesPerSegment());
+  const std::unique_ptr<SegmentFile>& sf = segment_files_[seg_id.GetFileId()];
+  sf->ReadPages(seg_id.GetOffset() * pg::Page::kSize, w_.buffer().get(),
+                sf->PagesPerSegment());
+  w_.BumpReadCount(sf->PagesPerSegment());
 }
 
 void Manager::ReadOverflows(

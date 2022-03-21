@@ -352,14 +352,14 @@ bool DBState::CheckPageRanges() const {
       /*num_pages=*/SegmentBuilder::SegmentPageCounts().back());
   void* const buf = page_buffer.get();
 
-  std::vector<SegmentFile> segment_files;
+  std::vector<std::unique_ptr<SegmentFile>> segment_files;
   segment_files.reserve(SegmentBuilder::SegmentPageCounts().size());
   for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
     if (i > 0 && !uses_segments_) break;
     const size_t pages_per_segment = SegmentBuilder::SegmentPageCounts()[i];
-    segment_files.emplace_back(db_path_ / ("sf-" + std::to_string(i)),
-                               pages_per_segment,
-                               /*use_memory_based_io=*/true);
+    segment_files.push_back(std::make_unique<SegmentFile>(
+        db_path_ / ("sf-" + std::to_string(i)), pages_per_segment,
+        /*use_memory_based_io=*/true));
   }
 
   size_t total_pages = 0;
@@ -378,7 +378,7 @@ bool DBState::CheckPageRanges() const {
       continue;
     }
     const auto& sf = segment_files[seg.id.GetFileId()];
-    sf.ReadPages(seg.id.GetOffset() * pg::Page::kSize, buf, seg.page_count);
+    sf->ReadPages(seg.id.GetOffset() * pg::Page::kSize, buf, seg.page_count);
     total_pages += seg.page_count;
     total_pages += seg.overflows.size();
 
@@ -436,8 +436,8 @@ bool DBState::CheckPageRanges() const {
     for (size_t j = 0; j < seg.overflows.size(); ++j) {
       SegmentId overflow = seg.overflows[j];
       const auto& osf = segment_files[overflow.GetFileId()];
-      osf.ReadPages(overflow.GetOffset() * pg::Page::kSize, buf,
-                    /*num_pages=*/1);
+      osf->ReadPages(overflow.GetOffset() * pg::Page::kSize, buf,
+                     /*num_pages=*/1);
       pg::Page opage(buf);
       // HACK: We use at 16 and above to indicate overflow pages; the index is
       // not meaningful.

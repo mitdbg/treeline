@@ -8,6 +8,7 @@
 #include <cassert>
 #include <filesystem>
 #include <iostream>
+#include <mutex>
 #include <string>
 
 #include "bufmgr/page_memory_allocator.h"
@@ -26,7 +27,7 @@
 namespace llsm {
 namespace pg {
 
-// Adapted from db/file.h.
+// Adapted from `db/file.h`. This class is thread-safe.
 class SegmentFile {
   // The number of pages by which to grow a file when needed.
   const size_t kGrowthPages = 256;
@@ -36,16 +37,16 @@ class SegmentFile {
   // Represents an invalid file.
   SegmentFile()
       : fd_(-1),
+        pages_per_segment_(0),
         file_size_(0),
-        next_page_allocation_offset_(0),
-        pages_per_segment_(0) {}
+        next_page_allocation_offset_(0) {}
 
   SegmentFile(const std::filesystem::path& name, size_t pages_per_segment,
               bool use_memory_based_io = false)
       : fd_(-1),
+        pages_per_segment_(pages_per_segment),
         file_size_(0),
-        next_page_allocation_offset_(0),
-        pages_per_segment_(pages_per_segment) {
+        next_page_allocation_offset_(0) {
     assert(pages_per_segment > 0);
     int flags = O_CREAT | O_RDWR;
     if (!use_memory_based_io) {
@@ -104,24 +105,9 @@ class SegmentFile {
   }
 
   SegmentFile(const SegmentFile&) = delete;
+  SegmentFile(const SegmentFile&&) = delete;
   SegmentFile& operator=(const SegmentFile&) = delete;
-
-  SegmentFile(SegmentFile&& other)
-      : fd_(other.fd_),
-        file_size_(other.file_size_),
-        next_page_allocation_offset_(other.next_page_allocation_offset_),
-        pages_per_segment_(other.pages_per_segment_) {
-    other.fd_ = -1;
-  }
-
-  SegmentFile& operator=(SegmentFile&& other) {
-    fd_ = other.fd_;
-    file_size_ = other.file_size_;
-    next_page_allocation_offset_ = other.next_page_allocation_offset_;
-    pages_per_segment_ = other.pages_per_segment_;
-    other.fd_ = -1;
-    return *this;
-  }
+  SegmentFile& operator=(const SegmentFile&&) = delete;
 
   // The number of allocated segments in this file. Some segments may be
   // invalid; these represent "free" segments that can be reused.
@@ -149,15 +135,15 @@ class SegmentFile {
 
   void Sync() const { CHECK_ERROR(fsync(fd_)); }
 
-  // Reserves space for an additional page on the file. This might involve
+  // Reserves space for an additional segment in the file. This might involve
   // growing the file if needed, otherwise it just updates the bookkeeping.
   //
   // Returns the offset of the newly allocated page.
   size_t AllocateSegment() {
+    std::unique_lock<std::mutex> lock(allocation_mutex_);
     size_t allocated_offset = next_page_allocation_offset_;
-    next_page_allocation_offset_ += Page::kSize * pages_per_segment_;
-
     ExpandToIfNeeded(allocated_offset);
+    next_page_allocation_offset_ += Page::kSize * pages_per_segment_;
     return allocated_offset;
   }
 
@@ -181,10 +167,15 @@ class SegmentFile {
                           /*len=*/bytes_to_add));
     file_size_ += bytes_to_add;
   }
+
+  // Never changed after initialization.
   int fd_;
-  size_t file_size_;
-  size_t next_page_allocation_offset_;
   size_t pages_per_segment_;
+
+  // Protected by the mutex.
+  std::mutex allocation_mutex_;
+  size_t file_size_;
+  std::atomic<size_t> next_page_allocation_offset_;
 };
 
 }  // namespace pg
