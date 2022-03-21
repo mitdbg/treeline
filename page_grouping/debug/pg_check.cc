@@ -142,7 +142,11 @@ DBState DBState::Load(const fs::path& db_path) {
       auto& seg = segments.emplace_back();
       seg.id = id;
       seg.base_key = sw.EncodedBaseKey();
-      seg.upper_bound = sw.EncodedUpperKey();
+      // The encoded upper key is always one less than the upper bound
+      // (exclusive). This is because the on-disk page expects an inclusive
+      // upper bound whereas we always use exclusive upper bounds in the page
+      // grouping code.
+      seg.upper_bound = sw.EncodedUpperKey() + 1;
       seg.checksum_valid = sw.CheckChecksum();
       seg.page_count = pages_per_segment;
       seg.sequence_number = sw.GetSequenceNumber();
@@ -181,7 +185,7 @@ bool DBState::CheckSegmentRanges() const {
   std::cout << std::endl << ">>> Checking segment ranges..." << std::endl;
   for (size_t i = 0; i < segments_.size(); ++i) {
     const auto& seg = segments_[i];
-    if (seg.base_key > seg.upper_bound) {
+    if (seg.base_key >= seg.upper_bound) {
       ++internal_range_errors;
       if (FLAGS_verbose) {
         std::cout << "ERROR: Invalid internal segment range. ";
@@ -195,7 +199,7 @@ bool DBState::CheckSegmentRanges() const {
   for (size_t i = 1; i < segments_.size(); ++i) {
     const auto& prev_seg = segments_[i - 1];
     const auto& curr_seg = segments_[i];
-    if (curr_seg.base_key <= prev_seg.upper_bound) {
+    if (curr_seg.base_key < prev_seg.upper_bound) {
       ++cross_segment_errors;
       if (FLAGS_verbose) {
         std::cout << "ERROR: Segment range overlap." << std::endl;
@@ -397,7 +401,7 @@ bool DBState::CheckPageRanges() const {
           }
 
           // Check that the page falls within the segment.
-          if (lower < seg.base_key || upper > seg.upper_bound) {
+          if (lower < seg.base_key || upper >= seg.upper_bound) {
             ++invalid_bounds_for_segment;
             if (FLAGS_verbose) {
               std::cout << "ERROR: Page " << idx << " in segment " << seg.id
