@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
@@ -23,7 +24,11 @@ class InsertTracker {
         num_inserts_(0),
         num_inserts_curr_epoch_(0),
         last_epoch_is_valid_(false),
-        gen_(42) {}
+        next_(kSampleSize),
+        gen_(42) {
+    std::uniform_real_distribution<double> real_dist(0.0, 1.0);
+    w_ = exp(log(real_dist(gen_)) / kSampleSize);
+  }
 
   // Forbid copying and moving.
   InsertTracker(const InsertTracker&) = delete;
@@ -80,11 +85,15 @@ class InsertTracker {
  private:
   // See Algorithm L: https://en.wikipedia.org/wiki/Reservoir_sampling
   void AddKeyToSample(const uint64_t key) {
-    std::uniform_int_distribution<size_t> dist(1, num_inserts_);
-    const size_t j = dist(gen_);
-    if (j <= kSampleSize) {
-      // Replace `j`th item with `key`. Note that `j` is one based.
-      reservoir_sample_[j - 1] = key;
+    if (num_inserts_ == next_) {
+      // Replace random item with `key`.
+      std::uniform_int_distribution<size_t> int_dist(0, kSampleSize - 1);
+      reservoir_sample_[int_dist(gen_)] = key;
+
+      // Update `next_` and `w_`.
+      std::uniform_real_distribution<double> real_dist(0.0, 1.0);
+      next_ += static_cast<size_t>(log(real_dist(gen_)) / (log(1.0 - w_))) + 1;
+      w_ *= exp(log(real_dist(gen_)) / kSampleSize);
     }
   }
 
@@ -174,14 +183,16 @@ class InsertTracker {
   // Whether we have observed at least one epoch, i.e., the last epoch is valid.
   bool last_epoch_is_valid_;
 
-  std::vector<uint64_t> reservoir_sample_;
-
   std::vector<size_t> partition_counters_curr_epoch_;
   std::vector<uint64_t> partition_boundaries_curr_epoch_;
 
   std::vector<size_t> partition_counters_last_epoch_;
   std::vector<uint64_t> partition_boundaries_last_epoch_;
 
+  // Reservoir sampling.
+  std::vector<uint64_t> reservoir_sample_;
+  double w_;
+  size_t next_;
   std::mt19937 gen_;
 };
 
