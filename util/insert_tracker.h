@@ -2,15 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstddef>
-#include <cstdint>
-#include <iostream>
+#include <mutex>
 #include <random>
 #include <vector>
 
 namespace llsm {
-
-// TODO thread safe access
 
 // Size of reservoir sample.
 constexpr size_t kSampleSize = 10000;
@@ -37,6 +33,8 @@ class InsertTracker {
   InsertTracker& operator=(InsertTracker&&) = delete;
 
   void Add(const uint64_t key) {
+    const std::lock_guard<std::mutex> lock(mutex_);
+
     ++num_inserts_;
 
     if (reservoir_sample_.size() < kSampleSize) {
@@ -73,7 +71,9 @@ class InsertTracker {
   // been initialized yet.
   bool GetNumInsertsInKeyRangeForNumFutureEpochs(
       const uint64_t range_start, const uint64_t range_end,
-      const size_t num_future_epochs, size_t* num_inserts_future_epochs) const {
+      const size_t num_future_epochs, size_t* num_inserts_future_epochs) {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    
     size_t num_inserts_last_epoch;
     if (!GetNumInsertsInLastEpoch(range_start, range_end,
                                   &num_inserts_last_epoch)) {
@@ -154,7 +154,7 @@ class InsertTracker {
 
   bool GetNumInsertsInLastEpoch(const uint64_t range_start,
                                 const uint64_t range_end,
-                                size_t* num_inserts_last_epoch) const {
+                                size_t* num_inserts_last_epoch) {
     if (!last_epoch_is_valid_) {
       // Last epoch hasn't been initialized.
       return false;
@@ -203,6 +203,9 @@ class InsertTracker {
   double w_;
   size_t next_;
   std::mt19937 gen_;
+
+  // Global mutex.
+  std::mutex mutex_;
 };
 
 }  // namespace llsm
