@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
+#include <random>
 #include <vector>
 
 namespace llsm {
@@ -18,8 +20,10 @@ class InsertTracker {
                          const size_t num_partitions)
       : num_inserts_per_epoch_(num_inserts_per_epoch),
         num_partitions_(num_partitions),
+        num_inserts_(0),
         num_inserts_curr_epoch_(0),
-        last_epoch_is_valid_(false) {}
+        last_epoch_is_valid_(false),
+        gen_(42) {}
 
   // Forbid copying and moving.
   InsertTracker(const InsertTracker&) = delete;
@@ -28,6 +32,8 @@ class InsertTracker {
   InsertTracker& operator=(InsertTracker&&) = delete;
 
   void Add(const uint64_t key) {
+    ++num_inserts_;
+
     if (reservoir_sample_.size() < kSampleSize) {
       // We are still in the warm-up phase. Fill up the sample.
       reservoir_sample_.push_back(key);
@@ -74,7 +80,12 @@ class InsertTracker {
  private:
   // See Algorithm L: https://en.wikipedia.org/wiki/Reservoir_sampling
   void AddKeyToSample(const uint64_t key) {
-    // TODO
+    std::uniform_int_distribution<size_t> dist(1, num_inserts_);
+    const size_t j = dist(gen_);
+    if (j <= kSampleSize) {
+      // Replace `j`th item with `key`. Note that `j` is one based.
+      reservoir_sample_[j - 1] = key;
+    }
   }
 
   void AddKeyToCurrEpoch(const uint64_t key) {
@@ -155,7 +166,9 @@ class InsertTracker {
   size_t num_inserts_per_epoch_;
   // Number of equi-depth partitions according to the sample.
   size_t num_partitions_;
-  // The current number of inserts, will be incremented with each insert.
+  // Total number of inserts.
+  size_t num_inserts_;
+  // Number of inserts in the current epoch.
   size_t num_inserts_curr_epoch_;
 
   // Whether we have observed at least one epoch, i.e., the last epoch is valid.
@@ -168,6 +181,8 @@ class InsertTracker {
 
   std::vector<size_t> partition_counters_last_epoch_;
   std::vector<uint64_t> partition_boundaries_last_epoch_;
+
+  std::mt19937 gen_;
 };
 
 }  // namespace llsm
