@@ -161,11 +161,20 @@ class InsertTracker {
     }
     *num_inserts_last_epoch = 0;
     for (int i = 0; i < partition_boundaries_last_epoch_.size(); ++i) {
-      if (range_start < partition_boundaries_last_epoch_[i + 1] &&
-          range_end >= partition_boundaries_last_epoch_[i]) {
-        // TODO interpolate within partition (e.g., if 50% of a partition
-        // overlaps)
-        num_inserts_last_epoch += partition_counters_last_epoch_[i];
+      const uint64_t partition_start = partition_boundaries_last_epoch_[i];
+      const uint64_t partition_end = partition_boundaries_last_epoch_[i + 1];
+
+      if (range_start < partition_end && range_end >= partition_start) {
+        // Interpolate within partition (e.g., if 50% of a partition overlaps).
+        const uint64_t partition_range = partition_end - partition_start;
+        const uint64_t query_start = std::max(partition_start, range_start);
+        const uint64_t query_end = std::min(partition_end, range_end);
+        const uint64_t query_range = query_end - query_start;
+        const double overlap =
+            static_cast<double>(query_range) / partition_range;  // (0,1]
+
+        num_inserts_last_epoch +=
+            static_cast<size_t>(partition_counters_last_epoch_[i] * overlap);
       }
     }
   }
