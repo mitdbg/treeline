@@ -2,28 +2,27 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <mutex>
 #include <random>
 #include <vector>
 
 namespace llsm {
 
-// Size of reservoir sample.
-constexpr size_t kSampleSize = 10000;
-
 class InsertTracker {
  public:
   explicit InsertTracker(const size_t num_inserts_per_epoch,
-                         const size_t num_partitions)
+                         const size_t num_partitions, const size_t sample_size)
       : num_inserts_per_epoch_(num_inserts_per_epoch),
         num_partitions_(num_partitions),
         num_inserts_(0),
         num_inserts_curr_epoch_(0),
+        sample_size_(sample_size),
         last_epoch_is_valid_(false),
-        next_(kSampleSize),
+        next_(sample_size_ + 1),
         gen_(42) {
     std::uniform_real_distribution<double> real_dist(0.0, 1.0);
-    w_ = exp(log(real_dist(gen_)) / kSampleSize);
+    w_ = exp(log(real_dist(gen_)) / sample_size_);
   }
 
   // Forbid copying and moving.
@@ -37,11 +36,11 @@ class InsertTracker {
 
     ++num_inserts_;
 
-    if (reservoir_sample_.size() < kSampleSize) {
-      // We are still in the warm-up phase. Fill up the sample.
+    if (reservoir_sample_.size() < sample_size_) {
+      // Fill up the sample.
       reservoir_sample_.push_back(key);
 
-      if (reservoir_sample_.size() == kSampleSize) {
+      if (reservoir_sample_.size() == sample_size_) {
         InitializeCurrEpoch();
       }
 
@@ -67,19 +66,20 @@ class InsertTracker {
   }
 
   // Extrapolates inserts during the last epoch to `num_future_epochs` future
-  // epochs. `range_end` is inclusive. Returns false if the last epoch hasn't
+  // epochs. `range_end` is exclusive. Returns false if the last epoch hasn't
   // been initialized yet.
   bool GetNumInsertsInKeyRangeForNumFutureEpochs(
       const uint64_t range_start, const uint64_t range_end,
       const size_t num_future_epochs, size_t* num_inserts_future_epochs) {
     const std::lock_guard<std::mutex> lock(mutex_);
-    
+
     size_t num_inserts_last_epoch;
     if (!GetNumInsertsInLastEpoch(range_start, range_end,
                                   &num_inserts_last_epoch)) {
       return false;
     }
     *num_inserts_future_epochs = num_inserts_last_epoch * num_future_epochs;
+    return true;
   }
 
  private:
@@ -87,13 +87,13 @@ class InsertTracker {
   void AddKeyToSample(const uint64_t key) {
     if (num_inserts_ == next_) {
       // Replace random item with `key`.
-      std::uniform_int_distribution<size_t> int_dist(0, kSampleSize - 1);
+      std::uniform_int_distribution<size_t> int_dist(0, sample_size_ - 1);
       reservoir_sample_[int_dist(gen_)] = key;
 
       // Update `next_` and `w_`.
       std::uniform_real_distribution<double> real_dist(0.0, 1.0);
       next_ += static_cast<size_t>(log(real_dist(gen_)) / (log(1.0 - w_))) + 1;
-      w_ *= exp(log(real_dist(gen_)) / kSampleSize);
+      w_ *= exp(log(real_dist(gen_)) / sample_size_);
     }
   }
 
@@ -109,8 +109,9 @@ class InsertTracker {
     }
 
     if (it == partition_boundaries_curr_epoch_.end()) {
-      // `key` is out of range (all boundaries are smaller than `key`). We could
-      // also add the key to the last partition in that case...
+      // `key` is out of range (all boundaries are smaller than `key`). Can't
+      // happen since the bonudary of the last partition is uint64_t::max.
+      std::cerr << "Reached unreachable code" << std::endl;
       return;
     }
 
@@ -141,15 +142,9 @@ class InsertTracker {
       partition_boundaries_curr_epoch_[i] = start_key;
     }
 
-    // Add an extra key at the end (upper boundary of last partition).
+    // Add an extra key at the end (uint64_t::max).
     partition_boundaries_curr_epoch_[num_partitions_] =
-        sorted_sample[sorted_sample.size() - 1];
-
-    // TODO should we make the last partition correspond to the sample (and use
-    // the max key in the sample as upper boundary) or use uint64_t::max
-    // instead? The latter would better capture append-only settings => all
-    // inserts would go into the last partition. We would need to make sure that
-    // append-only inserts actually go into the last page...
+        std::numeric_limits<uint64_t>::max();
   }
 
   bool GetNumInsertsInLastEpoch(const uint64_t range_start,
@@ -160,27 +155,32 @@ class InsertTracker {
       return false;
     }
     *num_inserts_last_epoch = 0;
-    for (int i = 0; i < partition_boundaries_last_epoch_.size(); ++i) {
+    for (int i = 0; i < num_partitions_; ++i) {
       const uint64_t partition_start = partition_boundaries_last_epoch_[i];
       const uint64_t partition_end = partition_boundaries_last_epoch_[i + 1];
 
-      if (range_start < partition_end && range_end >= partition_start) {
-        // Interpolate within partition (e.g., if 50% of a partition overlaps).
+      if (range_start < partition_end && range_end > partition_start) {
+        // Interpolate within partition (e.g., if 50% of a partition
+        // overlaps).
         const uint64_t partition_range = partition_end - partition_start;
         const uint64_t query_start = std::max(partition_start, range_start);
         const uint64_t query_end = std::min(partition_end, range_end);
+
         const uint64_t query_range = query_end - query_start;
         const double overlap =
             static_cast<double>(query_range) / partition_range;  // (0,1]
 
-        num_inserts_last_epoch +=
+        const size_t interpolated_inserts =
             static_cast<size_t>(partition_counters_last_epoch_[i] * overlap);
+
+        *num_inserts_last_epoch += interpolated_inserts;
       }
     }
+    return true;
   }
 
-  // The maximum number of inserts per epoch. Once that number has been reached,
-  // we will start a new epoch.
+  // The maximum number of inserts per epoch. Once that number has been
+  // reached, we will start a new epoch.
   size_t num_inserts_per_epoch_;
   // Number of equi-depth partitions according to the sample.
   size_t num_partitions_;
@@ -188,8 +188,11 @@ class InsertTracker {
   size_t num_inserts_;
   // Number of inserts in the current epoch.
   size_t num_inserts_curr_epoch_;
+  // Size of the reservoir sample.
+  size_t sample_size_;
 
-  // Whether we have observed at least one epoch, i.e., the last epoch is valid.
+  // Whether we have observed at least one epoch, i.e., the last epoch is
+  // valid.
   bool last_epoch_is_valid_;
 
   std::vector<size_t> partition_counters_curr_epoch_;
@@ -198,7 +201,7 @@ class InsertTracker {
   std::vector<size_t> partition_counters_last_epoch_;
   std::vector<uint64_t> partition_boundaries_last_epoch_;
 
-  // Reservoir sampling.
+  // Reservoir sample.
   std::vector<uint64_t> reservoir_sample_;
   double w_;
   size_t next_;
