@@ -466,11 +466,9 @@ Status Manager::RewriteSegmentsImpl(
     for (size_t i = 1; i < segments_to_rewrite.size(); ++i) {
       const SegmentId seg_id = segments_to_rewrite[i].sinfo.id();
       WritePage(seg_id, 0, zero);
-      free_->Add(seg_id);
     }
     for (const auto& overflow_to_clear : overflows_to_clear) {
       WritePage(overflow_to_clear, 0, zero);
-      free_->Add(overflow_to_clear);
     }
   }
   std::vector<SegmentId> to_free;
