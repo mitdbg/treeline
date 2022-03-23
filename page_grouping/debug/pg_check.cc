@@ -441,7 +441,11 @@ bool DBState::CheckPageRanges() const {
 
       // Check that this page's lower bound matches the previous page's upper
       // bound. Note that the encoded page boundaries are inclusive.
-      if (idx > 0) {
+      //
+      // We only do this check for indexes in the exclusive range (0, 16). Page
+      // 0 is the first page in the segment. Page 16 and above represent
+      // overflow pages (the index is not meaningful).
+      if (idx > 0 && idx < 16) {
         if (prev_upper + 1 != lower) {
           ++pages_leaving_gaps;
           if (FLAGS_verbose) {
