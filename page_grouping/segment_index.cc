@@ -185,7 +185,7 @@ bool SegmentIndex::LockSegmentsForRewrite(
     std::shared_lock<std::shared_mutex> lock(mutex_);
     auto it = index_.find(segments_to_lock.front().lower);
     for (const auto& seg : segments_to_lock) {
-      if (it == index_.end() || it->first != seg.lower) {
+      if (it == index_.end() || it->first != seg.lower || !(it->second == seg.sinfo)) {
         still_valid = false;
         break;
       }

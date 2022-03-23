@@ -20,13 +20,12 @@ PackedMap<MapSizeBytes>::PackedMap(const uint8_t* lower_key,
                                    unsigned lower_key_length,
                                    const uint8_t* upper_key,
                                    unsigned upper_key_length) {
-  // Verify that `lower_key` < `upper_key`. Having `lower_key` == `upper_key` is
-  // usually an error (cannot store any other keys).
+  // Verify that `lower_key` <= `upper_key`. Note that having `lower_key` ==
+  // `upper_key` means that this page can only store one record.
   const int cmp =
       memcmp(lower_key, upper_key,
              packed_map_detail::Min(lower_key_length, upper_key_length));
-  assert(cmp < 0 || (cmp == 0 && lower_key_length < upper_key_length) ||
-         upper_key_length == 0);
+  assert(cmp <= 0);
 
   SetFences(lower_key, lower_key_length, upper_key, upper_key_length);
 }
