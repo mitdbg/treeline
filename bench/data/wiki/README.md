@@ -11,6 +11,6 @@ Or copy it from tebow:/spinning/kipf/sosd_data/data/wiki_ts_200M_uint64
 mkdir -p build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j
+make -j genwiki
 ./genwiki wiki_ts_200M_uint64
 ```
