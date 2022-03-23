@@ -8,6 +8,7 @@ target_sources(llsm PRIVATE
   crc32c.h
   gcc_macros.h
   inlineskiplist.h
+  insert_tracker.h
   key.h
   packed_map.h
   packed_map-inl.h
