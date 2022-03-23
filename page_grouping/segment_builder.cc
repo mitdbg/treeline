@@ -116,19 +116,15 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
       // would produce a key difference that cannot be represented exactly by a
       // `double` (which we want to avoid).
       line = plr_->Finish();
-      if (!line.has_value()) {
-        // This happens if the PLR builder has only seen one point.
-        assert(processed_records_.size() == 1);
-        std::vector<Segment> results = {CreateSegmentUsing(kNoModel,
-                                                           /*page_count=*/1,
-                                                           /*num_records=*/1)};
-        return DrainRemainingRecordsAndReset(std::move(results),
-                                             std::move(record));
-      }
+      // Note that `line.has_value() == false` is possible here. This happens if
+      // the PLR builder has only seen one record.
     }
 
-    // Figure out how big of a segment we can make, according to the model.
-    const int segment_size_idx = ComputeSegmentSizeIndex(*line);
+    // Figure out how big of a segment we can make, according to the model. If
+    // there is no model (see the comments above), we just try to fill one page
+    // regardless.
+    const int segment_size_idx =
+        line.has_value() ? ComputeSegmentSizeIndex(*line) : -1;
 
     if (segment_size_idx <= 0) {
       // One of two cases:
