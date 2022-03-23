@@ -29,7 +29,11 @@ class SegmentBuilder {
                  const size_t records_per_page_delta);
 
   // Build segments when the entire dataset can fit in memory.
-  std::vector<Segment> BuildFromDataset(const std::vector<Record>& dataset);
+  //
+  // If `force_add_min_key` is true then this method will add a placeholder
+  // record with the key `Manager::kMinReservedKey` and an empty value.
+  std::vector<Segment> BuildFromDataset(const std::vector<Record>& dataset,
+                                        bool force_add_min_key = false);
 
   // Stream-based builder interface. Offer the builder one record at a time.
   std::vector<Segment> Offer(std::pair<Key, Slice> record);
@@ -41,10 +45,10 @@ class SegmentBuilder {
   // The number of pages in each segment.
   // The index of the vector represents the segment "type", and its value
   // represents the number of pages in the segment.
-  static const std::vector<size_t> kSegmentPageCounts;
+  static const std::vector<size_t>& SegmentPageCounts();
 
-  // Maps the page count to the segment "index" (in `kSegmentPageCounts`).
-  static const std::unordered_map<size_t, size_t> kPageCountToSegment;
+  // Maps the page count to the segment "index" (in `SegmentPageCounts()`).
+  static const std::unordered_map<size_t, size_t>& PageCountToSegment();
 
  private:
   // Helper methods used by the stream-based builder interface.

@@ -88,7 +88,7 @@ COMMON_OPTIONS = {
 SYNTH_DATASET = {
   "name": "synth",
   "multiplier": 1,
-  "range_min": 0,
+  "range_min": 1,
   "range_max": 2000000000,
 }
 

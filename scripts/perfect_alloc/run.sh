@@ -52,21 +52,53 @@ args+=("--verbose")
 args+=("--db_path=$DB_PATH")
 args+=("--seed=$SEED")
 args+=("--skip_load")
+args+=("--notify_after_init")
+
+init_finished=0
+
+function on_init_finish() {
+  init_finished=1
+}
+
+# Interrupt the first `wait` below when we receive a `SIGUSR1` signal.
+trap "on_init_finish" USR1
 
 full_checkpoint_path=$DB_CHECKPOINT_PATH/$checkpoint_name
 rm -rf $DB_PATH
 cp -r $full_checkpoint_path $DB_PATH
 sync $DB_PATH
 
-# 1. Run the "no_alloc" case (i.e., without perfect allocation).
+##################################################################################
 
+# 1. Run the "no_alloc" case (i.e., without perfect allocation).
 mkdir -p $COND_OUT/no_alloc
 
+echo >&2 "Running the regular insert heavy experiment..."
+set +e
 ../../build/bench/run_custom \
   ${args[@]} \
   --output_path=$COND_OUT/no_alloc \
-  > $COND_OUT/no_alloc/results.csv
+  > $COND_OUT/no_alloc/results.csv &
+wait %1
 code=$?
+
+# The experiment failed before it finished initialization.
+if [ "$init_finished" -eq "0" ]; then
+  exit $code
+fi
+
+# The DB has finished initializing, so start `iostat`.
+iostat -o JSON -d -y 1 >$COND_OUT/no_alloc/iostat.json &
+iostat_pid=$!
+
+# Wait until the workload completes.
+wait %1
+code=$?
+
+# Stop `iostat`.
+kill -s SIGINT -- $iostat_pid
+wait
+init_finished=0
 
 if [ -e $DB_PATH/$db_type/LOG ]; then
   cp $DB_PATH/$db_type/LOG $COND_OUT/no_alloc/$db_type.log
@@ -83,16 +115,45 @@ if [ $db_type != "pg_llsm" ]; then
   exit 0
 fi
 
-# 2. Run the "perfect_alloc" case.
+##################################################################################
 
+# 2. Run the "perfect_alloc" case.
 mkdir -p $COND_OUT/perfect_alloc
 
 # Remove all overflows.
+echo >&2 "Removing all overflows in the generated DB..."
 ../../build/page_grouping/pg_flatten --db_path=$DB_PATH --goal=$goal --delta=$delta
 
 # Run again, this time with "perfect allocation".
+echo >&2 "Now running the \"perfect allocation\" experiment..."
 ../../build/bench/run_custom \
   ${args[@]} \
   --output_path=$COND_OUT/perfect_alloc \
-  > $COND_OUT/perfect_alloc/results.csv
+  > $COND_OUT/perfect_alloc/results.csv &
+wait %1
 code=$?
+
+# The experiment failed before it finished initialization.
+if [ "$init_finished" -eq "0" ]; then
+  exit $code
+fi
+
+# The DB has finished initializing, so start `iostat`.
+iostat -o JSON -d -y 1 >$COND_OUT/perfect_alloc/iostat.json &
+iostat_pid=$!
+
+# Wait until the workload completes.
+wait %1
+code=$?
+echo "Done!"
+
+# Stop `iostat`.
+kill -s SIGINT -- $iostat_pid
+wait
+
+du -b $DB_PATH >$COND_OUT/perfect_alloc/db_space.log
+
+# Report that the experiment failed if the `run_custom` exit code is not 0
+if [ $code -ne 0 ]; then
+  exit $code
+fi

@@ -94,7 +94,7 @@ DBState DBState::Load(const fs::path& db_path) {
   const bool uses_segments = fs::exists(db_path / "sf-1");
 
   PageBuffer page_buffer = PageMemoryAllocator::Allocate(
-      /*num_pages=*/SegmentBuilder::kSegmentPageCounts.back());
+      /*num_pages=*/SegmentBuilder::SegmentPageCounts().back());
   void* buf = page_buffer.get();
   pg::Page first_page(buf);
 
@@ -102,14 +102,18 @@ DBState DBState::Load(const fs::path& db_path) {
   std::vector<SegmentState> segments;
   std::vector<FreeSegment> free_segments;
 
-  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
+  for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
     if (i > 0 && !uses_segments) break;
-    const size_t pages_per_segment = SegmentBuilder::kSegmentPageCounts[i];
+    const size_t pages_per_segment = SegmentBuilder::SegmentPageCounts()[i];
     SegmentFile sf(db_path / ("sf-" + std::to_string(i)), pages_per_segment,
                    /*use_memory_based_io=*/true);
 
     const size_t num_segments = sf.NumAllocatedSegments();
     const size_t bytes_per_segment = pages_per_segment * pg::Page::kSize;
+
+    std::cout << "Segment file " << i
+              << " last allocated segment's page offset: "
+              << (num_segments * pages_per_segment) << std::endl;
 
     for (size_t seg_idx = 0; seg_idx < num_segments; ++seg_idx) {
       // Offset in `id` is the page offset.
@@ -142,7 +146,11 @@ DBState DBState::Load(const fs::path& db_path) {
       auto& seg = segments.emplace_back();
       seg.id = id;
       seg.base_key = sw.EncodedBaseKey();
-      seg.upper_bound = sw.EncodedUpperKey();
+      // The encoded upper key is always one less than the upper bound
+      // (exclusive). This is because the on-disk page expects an inclusive
+      // upper bound whereas we always use exclusive upper bounds in the page
+      // grouping code.
+      seg.upper_bound = sw.EncodedUpperKey() + 1;
       seg.checksum_valid = sw.CheckChecksum();
       seg.page_count = pages_per_segment;
       seg.sequence_number = sw.GetSequenceNumber();
@@ -181,7 +189,7 @@ bool DBState::CheckSegmentRanges() const {
   std::cout << std::endl << ">>> Checking segment ranges..." << std::endl;
   for (size_t i = 0; i < segments_.size(); ++i) {
     const auto& seg = segments_[i];
-    if (seg.base_key > seg.upper_bound) {
+    if (seg.base_key >= seg.upper_bound) {
       ++internal_range_errors;
       if (FLAGS_verbose) {
         std::cout << "ERROR: Invalid internal segment range. ";
@@ -195,7 +203,7 @@ bool DBState::CheckSegmentRanges() const {
   for (size_t i = 1; i < segments_.size(); ++i) {
     const auto& prev_seg = segments_[i - 1];
     const auto& curr_seg = segments_[i];
-    if (curr_seg.base_key <= prev_seg.upper_bound) {
+    if (curr_seg.base_key < prev_seg.upper_bound) {
       ++cross_segment_errors;
       if (FLAGS_verbose) {
         std::cout << "ERROR: Segment range overlap." << std::endl;
@@ -335,8 +343,8 @@ void DBState::PrintFreeSegmentsSummary(std::ostream& out) const {
   }
 
   out << std::endl << ">>> Free segments summary" << std::endl;
-  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
-    out << "Length " << SegmentBuilder::kSegmentPageCounts[i] << ": "
+  for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
+    out << "Length " << SegmentBuilder::SegmentPageCounts()[i] << ": "
         << free_counts[i] << std::endl;
   }
 }
@@ -345,17 +353,17 @@ bool DBState::CheckPageRanges() const {
   std::cout << std::endl << ">>> Checking page ranges..." << std::endl;
 
   PageBuffer page_buffer = PageMemoryAllocator::Allocate(
-      /*num_pages=*/SegmentBuilder::kSegmentPageCounts.back());
+      /*num_pages=*/SegmentBuilder::SegmentPageCounts().back());
   void* const buf = page_buffer.get();
 
-  std::vector<SegmentFile> segment_files;
-  segment_files.reserve(SegmentBuilder::kSegmentPageCounts.size());
-  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
+  std::vector<std::unique_ptr<SegmentFile>> segment_files;
+  segment_files.reserve(SegmentBuilder::SegmentPageCounts().size());
+  for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
     if (i > 0 && !uses_segments_) break;
-    const size_t pages_per_segment = SegmentBuilder::kSegmentPageCounts[i];
-    segment_files.emplace_back(db_path_ / ("sf-" + std::to_string(i)),
-                               pages_per_segment,
-                               /*use_memory_based_io=*/true);
+    const size_t pages_per_segment = SegmentBuilder::SegmentPageCounts()[i];
+    segment_files.push_back(std::make_unique<SegmentFile>(
+        db_path_ / ("sf-" + std::to_string(i)), pages_per_segment,
+        /*use_memory_based_io=*/true));
   }
 
   size_t total_pages = 0;
@@ -366,6 +374,9 @@ bool DBState::CheckPageRanges() const {
   // Number of pages that contain keys that do not fall within their lower/upper
   // boundaries.
   size_t pages_with_incorrect_keys = 0;
+  // Number of pages whose lower bound does not match the previous page's upper
+  // bound (i.e., the pages leave a gap in the key space).
+  size_t pages_leaving_gaps = 0;
 
   for (size_t i = 0; i < segments_.size(); ++i) {
     const auto& seg = segments_[i];
@@ -374,57 +385,79 @@ bool DBState::CheckPageRanges() const {
       continue;
     }
     const auto& sf = segment_files[seg.id.GetFileId()];
-    sf.ReadPages(seg.id.GetOffset() * pg::Page::kSize, buf, seg.page_count);
+    sf->ReadPages(seg.id.GetOffset() * pg::Page::kSize, buf, seg.page_count);
     total_pages += seg.page_count;
     total_pages += seg.overflows.size();
 
     SegmentWrap sw(buf, seg.page_count);
-    const auto check_page =
-        [&seg, &invalid_key_bounds, &pages_with_incorrect_keys,
-         &invalid_bounds_for_segment](const size_t idx, const pg::Page& page) {
-          // Check page bounds.
-          const Key lower = key_utils::ExtractHead64(page.GetLowerBoundary());
-          const Key upper = key_utils::ExtractHead64(page.GetUpperBoundary());
-          if (lower > upper) {
-            ++invalid_key_bounds;
-            if (FLAGS_verbose) {
-              std::cout << "ERROR: Page " << idx << " in segment " << seg.id
-                        << " has invalid key boundaries. Lower: " << lower
-                        << " Upper: " << upper << std::endl;
-            }
-            // Do not do further validation on this page.
-            return;
-          }
+    Key prev_upper;
+    const auto check_page = [&seg, &invalid_key_bounds,
+                             &pages_with_incorrect_keys,
+                             &invalid_bounds_for_segment, &prev_upper,
+                             &pages_leaving_gaps](const size_t idx,
+                                                  const pg::Page& page) {
+      // Check page bounds.
+      const Key lower = key_utils::ExtractHead64(page.GetLowerBoundary());
+      const Key upper = key_utils::ExtractHead64(page.GetUpperBoundary());
+      if (lower > upper) {
+        ++invalid_key_bounds;
+        if (FLAGS_verbose) {
+          std::cout << "ERROR: Page " << idx << " in segment " << seg.id
+                    << " has invalid key boundaries. Lower: " << lower
+                    << " Upper: " << upper << std::endl;
+        }
+        // Do not do further validation on this page.
+        return;
+      }
 
-          // Check that the page falls within the segment.
-          if (lower < seg.base_key || upper > seg.upper_bound) {
-            ++invalid_bounds_for_segment;
-            if (FLAGS_verbose) {
-              std::cout << "ERROR: Page " << idx << " in segment " << seg.id
-                        << " has key boundaries that exceed the segment's "
-                           "boundaries. Lower: "
-                        << lower << " Upper: " << upper
-                        << " Segment base: " << seg.base_key
-                        << " Segment upper: " << seg.upper_bound << std::endl;
-            }
-          }
+      // Check that the page falls within the segment.
+      if (lower < seg.base_key || upper >= seg.upper_bound) {
+        ++invalid_bounds_for_segment;
+        if (FLAGS_verbose) {
+          std::cout << "ERROR: Page " << idx << " in segment " << seg.id
+                    << " has key boundaries that exceed the segment's "
+                       "boundaries. Lower: "
+                    << lower << " Upper: " << upper
+                    << " Segment base: " << seg.base_key
+                    << " Segment upper: " << seg.upper_bound << std::endl;
+        }
+      }
 
-          // Check that the records in the segment fall within the lower/upper
-          // boundaries.
-          for (auto it = page.GetIterator(); it.Valid(); it.Next()) {
-            const Key k = key_utils::ExtractHead64(page.GetLowerBoundary());
-            if (k < lower || k > upper) {
-              ++pages_with_incorrect_keys;
-              if (FLAGS_verbose) {
-                std::cout << "ERROR: Page " << idx << " in segment " << seg.id
-                          << " a key that falls outside its boundaries. Lower: "
-                          << lower << " Upper: " << upper << " Key: " << k
-                          << std::endl;
-              }
-              break;
-            }
+      // Check that the records in the segment fall within the lower/upper
+      // boundaries.
+      for (auto it = page.GetIterator(); it.Valid(); it.Next()) {
+        const Key k = key_utils::ExtractHead64(page.GetLowerBoundary());
+        if (k < lower || k > upper) {
+          ++pages_with_incorrect_keys;
+          if (FLAGS_verbose) {
+            std::cout << "ERROR: Page " << idx << " in segment " << seg.id
+                      << " has a key that falls outside its boundaries. Lower: "
+                      << lower << " Upper: " << upper << " Key: " << k
+                      << std::endl;
           }
-        };
+          break;
+        }
+      }
+
+      // Check that this page's lower bound matches the previous page's upper
+      // bound. Note that the encoded page boundaries are inclusive.
+      //
+      // We only do this check for indexes in the exclusive range (0, 16). Page
+      // 0 is the first page in the segment. Page 16 and above represent
+      // overflow pages (the index is not meaningful).
+      if (idx > 0 && idx < 16) {
+        if (prev_upper + 1 != lower) {
+          ++pages_leaving_gaps;
+          if (FLAGS_verbose) {
+            std::cout << "ERROR: Page " << idx << " in segment " << seg.id
+                      << " leaves a gap in the key space. Prev upper: "
+                      << prev_upper << " Page lower: " << lower << std::endl;
+          }
+        }
+      }
+
+      prev_upper = upper;
+    };
 
     sw.ForEachPage(check_page);
 
@@ -432,8 +465,8 @@ bool DBState::CheckPageRanges() const {
     for (size_t j = 0; j < seg.overflows.size(); ++j) {
       SegmentId overflow = seg.overflows[j];
       const auto& osf = segment_files[overflow.GetFileId()];
-      osf.ReadPages(overflow.GetOffset() * pg::Page::kSize, buf,
-                    /*num_pages=*/1);
+      osf->ReadPages(overflow.GetOffset() * pg::Page::kSize, buf,
+                     /*num_pages=*/1);
       pg::Page opage(buf);
       // HACK: We use at 16 and above to indicate overflow pages; the index is
       // not meaningful.
@@ -447,9 +480,11 @@ bool DBState::CheckPageRanges() const {
             << invalid_bounds_for_segment << "/" << total_pages << std::endl;
   std::cout << ">>> Pages with incorrect keys: " << pages_with_incorrect_keys
             << "/" << total_pages << std::endl;
+  std::cout << ">>> Pages that leave gaps in the key space: "
+            << pages_leaving_gaps << "/" << total_pages << std::endl;
 
   return invalid_key_bounds + invalid_bounds_for_segment +
-             pages_with_incorrect_keys ==
+             pages_with_incorrect_keys + pages_leaving_gaps ==
          0;
 }
 

@@ -10,7 +10,7 @@ namespace pg {
 FreeList::FreeList()
     : bytes_allocated_(0),
       list_(TrackingAllocator<SegmentList>(bytes_allocated_)) {
-  list_.resize(SegmentBuilder::kSegmentPageCounts.size());
+  list_.resize(SegmentBuilder::SegmentPageCounts().size());
 }
 
 void FreeList::Add(SegmentId id) {
@@ -20,8 +20,8 @@ void FreeList::Add(SegmentId id) {
 
 std::optional<SegmentId> FreeList::Get(const size_t page_count) {
   std::unique_lock<std::mutex> lock(mutex_);
-  const auto it = SegmentBuilder::kPageCountToSegment.find(page_count);
-  assert(it != SegmentBuilder::kPageCountToSegment.end());
+  const auto it = SegmentBuilder::PageCountToSegment().find(page_count);
+  assert(it != SegmentBuilder::PageCountToSegment().end());
   const size_t file_id = it->second;
   if (list_[file_id].empty()) {
     // No free segments. The caller should allocate a new one.

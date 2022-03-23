@@ -219,7 +219,7 @@ TEST_F(PGManagerRewriteTest, InsertMiddleSegments) {
 
     // Read the inserted values using a scan.
     std::vector<std::pair<uint64_t, std::string>> values;
-    m.Scan(0, all_records.size() + 1000000, &values);
+    m.Scan(1, all_records.size() + 1000000, &values);
     ASSERT_EQ(values.size(), all_records.size());
     for (size_t i = 0; i < values.size(); ++i) {
       ASSERT_EQ(values[i].first, all_records[i].first);
@@ -234,7 +234,7 @@ TEST_F(PGManagerRewriteTest, InsertMiddleSegments) {
 
     // Read the inserted values using a scan.
     std::vector<std::pair<uint64_t, std::string>> values;
-    m.Scan(0, all_records.size() + 1000000, &values);
+    m.Scan(1, all_records.size() + 1000000, &values);
     ASSERT_EQ(values.size(), all_records.size());
     for (size_t i = 0; i < values.size(); ++i) {
       ASSERT_EQ(values[i].first, all_records[i].first);
@@ -299,7 +299,7 @@ TEST_F(PGManagerRewriteTest, InsertMiddlePages) {
 
     // Read the inserted values using a scan.
     std::vector<std::pair<uint64_t, std::string>> values;
-    m.Scan(0, all_records.size() + 1000000, &values);
+    m.Scan(1, all_records.size() + 1000000, &values);
     ASSERT_EQ(values.size(), all_records.size());
     for (size_t i = 0; i < values.size(); ++i) {
       ASSERT_EQ(values[i].first, all_records[i].first);
@@ -314,7 +314,7 @@ TEST_F(PGManagerRewriteTest, InsertMiddlePages) {
 
     // Read the inserted values using a scan.
     std::vector<std::pair<uint64_t, std::string>> values;
-    m.Scan(0, all_records.size() + 1000000, &values);
+    m.Scan(1, all_records.size() + 1000000, &values);
     ASSERT_EQ(values.size(), all_records.size());
     for (size_t i = 0; i < values.size(); ++i) {
       ASSERT_EQ(values[i].first, all_records[i].first);

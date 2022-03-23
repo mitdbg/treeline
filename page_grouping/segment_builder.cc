@@ -1,7 +1,9 @@
 #include "segment_builder.h"
 
 #include <algorithm>
+#include <limits>
 
+#include "manager.h"
 #include "plr/data.h"
 #include "plr/greedy.h"
 
@@ -9,15 +11,37 @@ namespace llsm {
 namespace pg {
 
 // The number of pages in each segment. If you change this, change
-// `kPageCountToSegment` too.
-const std::vector<size_t> SegmentBuilder::kSegmentPageCounts = {1, 2, 4, 8, 16};
+// `PageCountToSegment()` below too.
+const std::vector<size_t>& SegmentBuilder::SegmentPageCounts() {
+  // NOTE: We construct and initialize the vector here to avoid the static
+  // initialization order fiasco.
+  // https://en.cppreference.com/w/cpp/language/siof
+  static const std::vector<size_t> kSegmentPageCounts = {1, 2, 4, 8, 16};
+  return kSegmentPageCounts;
+}
 
-const std::unordered_map<size_t, size_t> SegmentBuilder::kPageCountToSegment = {
-    {1, 0}, {2, 1}, {4, 2}, {8, 3}, {16, 4}};
+const std::unordered_map<size_t, size_t>& SegmentBuilder::PageCountToSegment() {
+  // NOTE: We construct and initialize the vector here to avoid the static
+  // initialization order fiasco.
+  // https://en.cppreference.com/w/cpp/language/siof
+  static const std::unordered_map<size_t, size_t> kPageCountToSegment = {
+      {1, 0}, {2, 1}, {4, 2}, {8, 3}, {16, 4}};
+  return kPageCountToSegment;
+}
 
 // The maximum number of pages in any segment.
 static const size_t kMaxSegmentSize =
-    llsm::pg::SegmentBuilder::kSegmentPageCounts.back();
+    llsm::pg::SegmentBuilder::SegmentPageCounts().back();
+
+// This value is a `double`'s maximum representable integer. The PLR algorithm
+// uses `double`s internally and we need the inputs to the PLR (which are
+// integers) to be representable as `double`s.
+//
+// Note that this restriction only affects extremely sparse key spaces (e.g.,
+// when the difference between keys exceeds 2^53). This is because we build
+// linear models over the *differences* between the keys in the segment and the
+// segment's lower bound.
+static constexpr Key kMaxKeyDiff = 1ULL << std::numeric_limits<double>::digits;
 
 SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
                                const size_t records_per_page_delta)
@@ -28,17 +52,20 @@ SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
       state_(State::kNeedBase),
       plr_(),
       base_key_(0) {
-  allowed_records_per_segment_.reserve(kSegmentPageCounts.size());
-  for (size_t pages : kSegmentPageCounts) {
+  allowed_records_per_segment_.reserve(SegmentPageCounts().size());
+  for (size_t pages : SegmentPageCounts()) {
     allowed_records_per_segment_.push_back(pages * records_per_page_goal_);
   }
 }
 
 std::vector<Segment> SegmentBuilder::BuildFromDataset(
-    const std::vector<std::pair<Key, Slice>>& dataset) {
+    const std::vector<std::pair<Key, Slice>>& dataset, bool force_add_min_key) {
   // Precondition: The dataset is sorted by key in ascending order.
   std::vector<Segment> segments;
   ResetStream();
+  if (force_add_min_key) {
+    Offer({Manager::kMinReservedKey, Slice()});
+  }
   for (const auto& rec : dataset) {
     auto segs = Offer(rec);
     segments.insert(segments.end(), std::make_move_iterator(segs.begin()),
@@ -70,8 +97,9 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
 
   } else if (state_ == State::kHasBase) {
     std::optional<plr::BoundedLine64> line;
-    if (processed_records_.size() < max_records_in_segment_) {
-      const Key diff = record.first - base_key_;
+    const Key diff = record.first - base_key_;
+    if (processed_records_.size() < max_records_in_segment_ &&
+        diff <= kMaxKeyDiff) {
       // This algorithm assumes equally sized keys. So we give each record
       // equal weight; a straightfoward approach is just to count up by 1.
       line = plr_->Offer(plr::Point64(diff, processed_records_.size()));
@@ -84,23 +112,19 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
       // error threshold. This current record will go into the next "batch".
 
     } else {
-      // We exceeded the number of records per segment.
+      // We exceeded the number of records per segment or adding this record
+      // would produce a key difference that cannot be represented exactly by a
+      // `double` (which we want to avoid).
       line = plr_->Finish();
-      if (!line.has_value()) {
-        // This only happens if the PLR builder has only seen one point. This is
-        // a degenerate case that occurs when `max_records_in_segment_ == 1`.
-        assert(processed_records_.size() == 1);
-        assert(max_records_in_segment_ == 1);
-        std::vector<Segment> results = {CreateSegmentUsing(kNoModel,
-                                                           /*page_count=*/1,
-                                                           /*num_records=*/1)};
-        return DrainRemainingRecordsAndReset(std::move(results),
-                                             std::move(record));
-      }
+      // Note that `line.has_value() == false` is possible here. This happens if
+      // the PLR builder has only seen one record.
     }
 
-    // Figure out how big of a segment we can make, according to the model.
-    const int segment_size_idx = ComputeSegmentSizeIndex(*line);
+    // Figure out how big of a segment we can make, according to the model. If
+    // there is no model (see the comments above), we just try to fill one page
+    // regardless.
+    const int segment_size_idx =
+        line.has_value() ? ComputeSegmentSizeIndex(*line) : -1;
 
     if (segment_size_idx <= 0) {
       // One of two cases:
@@ -122,7 +146,7 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
                                            std::move(record));
     }
 
-    const size_t segment_size = kSegmentPageCounts[segment_size_idx];
+    const size_t segment_size = SegmentPageCounts()[segment_size_idx];
     const size_t actual_records_in_segment =
         ComputeNumRecordsInSegment(*line, segment_size_idx);
 
@@ -190,7 +214,7 @@ std::vector<Segment> SegmentBuilder::Finish() {
       return results;
     }
 
-    const size_t segment_size = kSegmentPageCounts[segment_size_idx];
+    const size_t segment_size = SegmentPageCounts()[segment_size_idx];
     const size_t actual_records_in_segment =
         ComputeNumRecordsInSegment(*line, segment_size_idx);
 
@@ -275,7 +299,7 @@ size_t SegmentBuilder::ComputeNumRecordsInSegment(
     const plr::BoundedLine64& model, const int segment_size_idx) const {
   // Compute how many records can we actually fit in the segment based on the
   // model.
-  const size_t segment_size = kSegmentPageCounts[segment_size_idx];
+  const size_t segment_size = SegmentPageCounts()[segment_size_idx];
   assert(segment_size > 1);
 
   const size_t records_in_segment =

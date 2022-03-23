@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -22,8 +23,14 @@
 namespace llsm {
 namespace pg {
 
+// This implementation currently only supports unsigned integer keys up to 64
+// bits. `kMinReservedKey` and `kMaxReservedKey` are reserved keys; they should
+// not be used.
 class Manager {
  public:
+  static constexpr Key kMinReservedKey = 0;
+  static constexpr Key kMaxReservedKey = std::numeric_limits<Key>::max();
+
   static Manager LoadIntoNew(const std::filesystem::path& db,
                              const std::vector<std::pair<Key, Slice>>& records,
                              const PageGroupedDBOptions& options);
@@ -91,8 +98,9 @@ class Manager {
  private:
   Manager(std::filesystem::path db_path,
           std::vector<std::pair<Key, SegmentInfo>> boundaries,
-          std::vector<SegmentFile> segment_files, PageGroupedDBOptions options,
-          uint32_t next_sequence_number, std::unique_ptr<FreeList> free);
+          std::vector<std::unique_ptr<SegmentFile>> segment_files,
+          PageGroupedDBOptions options, uint32_t next_sequence_number,
+          std::unique_ptr<FreeList> free);
 
   static Manager BulkLoadIntoSegments(
       const std::filesystem::path& db_path,
@@ -172,7 +180,7 @@ class Manager {
   std::filesystem::path db_path_;
   std::shared_ptr<LockManager> lock_manager_;
   std::unique_ptr<SegmentIndex> index_;
-  std::vector<SegmentFile> segment_files_;
+  std::vector<std::unique_ptr<SegmentFile>> segment_files_;
   uint32_t next_sequence_number_;
   std::unique_ptr<FreeList> free_;
   std::unique_ptr<ThreadPool> bg_threads_;

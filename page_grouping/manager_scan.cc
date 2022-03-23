@@ -82,17 +82,18 @@ Status Manager::ScanWithEstimates(
     lock_manager_->AcquirePageLock(start_seg.sinfo.id(), page_idx,
                                    PageMode::kShared);
   }
-  const SegmentFile& sf = segment_files_[start_seg.sinfo.id().GetFileId()];
+  const std::unique_ptr<SegmentFile>& sf =
+      segment_files_[start_seg.sinfo.id().GetFileId()];
   const size_t segment_byte_offset =
       start_seg.sinfo.id().GetOffset() * Page::kSize;
-  sf.ReadPages(segment_byte_offset + start_page_idx * Page::kSize,
-               w_.buffer().get(), est_start_pages_to_read);
+  sf->ReadPages(segment_byte_offset + start_page_idx * Page::kSize,
+                w_.buffer().get(), est_start_pages_to_read);
   w_.BumpReadCount(est_start_pages_to_read);
 
   // The workspace buffer has one extra page at the end for use as the overflow.
   void* overflow_buf =
       w_.buffer().get() +
-      (SegmentBuilder::kSegmentPageCounts.back()) * pg::Page::kSize;
+      (SegmentBuilder::SegmentPageCounts().back()) * pg::Page::kSize;
   Page overflow_page(overflow_buf);
 
   // Scan the first page.
@@ -153,8 +154,8 @@ Status Manager::ScanWithEstimates(
     // Read 1 page at a time.
     lock_manager_->AcquirePageLock(start_seg.sinfo.id(), start_seg_page_idx,
                                    PageMode::kShared);
-    sf.ReadPages(segment_byte_offset + start_seg_page_idx * Page::kSize,
-                 w_.buffer().get(), /*num_pages=*/1);
+    sf->ReadPages(segment_byte_offset + start_seg_page_idx * Page::kSize,
+                  w_.buffer().get(), /*num_pages=*/1);
     w_.BumpReadCount(1);
     Page page(w_.buffer().get());
     scan_page(page);
@@ -192,8 +193,9 @@ Status Manager::ScanWithEstimates(
       lock_manager_->AcquirePageLock(curr_seg->sinfo.id(), page_idx,
                                      PageMode::kShared);
     }
-    const SegmentFile& sf = segment_files_[curr_seg->sinfo.id().GetFileId()];
-    sf.ReadPages(seg_byte_offset, w_.buffer().get(), pages_to_read);
+    const std::unique_ptr<SegmentFile>& sf =
+        segment_files_[curr_seg->sinfo.id().GetFileId()];
+    sf->ReadPages(seg_byte_offset, w_.buffer().get(), pages_to_read);
     w_.BumpReadCount(pages_to_read);
 
     size_t page_idx = 0;
@@ -216,8 +218,8 @@ Status Manager::ScanWithEstimates(
       lock_manager_->AcquirePageLock(curr_seg->sinfo.id(), page_idx,
                                      PageMode::kShared);
       // Read 1 page at a time.
-      sf.ReadPages(seg_byte_offset + page_idx * Page::kSize, w_.buffer().get(),
-                   /*num_pages=*/1);
+      sf->ReadPages(seg_byte_offset + page_idx * Page::kSize, w_.buffer().get(),
+                    /*num_pages=*/1);
       w_.BumpReadCount(1);
       Page page(w_.buffer().get());
       scan_page(page);
@@ -261,7 +263,8 @@ Status Manager::ScanWhole(
       index_->SegmentForKeyWithLock(start_key, SegmentMode::kPageRead);
 
   // 2. Read the first segment.
-  const SegmentFile& sf = segment_files_[start_seg.sinfo.id().GetFileId()];
+  const std::unique_ptr<SegmentFile>& sf =
+      segment_files_[start_seg.sinfo.id().GetFileId()];
   const size_t first_segment_size = start_seg.sinfo.page_count();
   const size_t segment_byte_offset =
       start_seg.sinfo.id().GetOffset() * Page::kSize;
@@ -274,13 +277,13 @@ Status Manager::ScanWhole(
     lock_manager_->AcquirePageLock(start_seg.sinfo.id(), page_idx,
                                    PageMode::kShared);
   }
-  sf.ReadPages(segment_byte_offset, w_.buffer().get(), first_segment_size);
+  sf->ReadPages(segment_byte_offset, w_.buffer().get(), first_segment_size);
   w_.BumpReadCount(first_segment_size);
 
   // The workspace buffer has one extra page at the end for use as the overflow.
   void* overflow_buf =
       w_.buffer().get() +
-      (SegmentBuilder::kSegmentPageCounts.back()) * pg::Page::kSize;
+      (SegmentBuilder::SegmentPageCounts().back()) * pg::Page::kSize;
   Page overflow_page(overflow_buf);
 
   // 3. Scan the first matching page in the segment.
@@ -357,8 +360,9 @@ Status Manager::ScanWhole(
       lock_manager_->AcquirePageLock(curr_seg->sinfo.id(), page_idx,
                                      PageMode::kShared);
     }
-    const SegmentFile& sf = segment_files_[curr_seg->sinfo.id().GetFileId()];
-    sf.ReadPages(seg_byte_offset, w_.buffer().get(), seg_page_count);
+    const std::unique_ptr<SegmentFile>& sf =
+        segment_files_[curr_seg->sinfo.id().GetFileId()];
+    sf->ReadPages(seg_byte_offset, w_.buffer().get(), seg_page_count);
     w_.BumpReadCount(seg_page_count);
 
     size_t page_idx = 0;

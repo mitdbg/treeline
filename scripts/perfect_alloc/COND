@@ -33,7 +33,10 @@ CONFIG_1024B = {
   "cache_mib": 164,
 }
 
-CONFIGS = [CONFIG_64B, CONFIG_1024B]
+CONFIGS = [
+  CONFIG_64B,
+  CONFIG_1024B,
+]
 
 COMMON_OPTIONS = {
   "bg_threads": 4,
@@ -83,12 +86,20 @@ def process_config(db, config):
 
   return copy
 
+run_command(
+  name="perfect_alloc_combined",
+  run="python3 combine_raw.py",
+  deps=[
+    ":perfect_alloc",
+  ],
+)
+
 run_experiment_group(
   name="perfect_alloc",
   run="./run.sh",
   experiments=[
     ExperimentInstance(
-      name="palloc-{}-{}-{}".format(db, config["name"], dataset["name"]),
+      name="palloc-{}-{}-{}-{}".format(db, config["name"], dataset["name"], threads),
       options={
         **COMMON_OPTIONS,
         **process_config(db, config),
@@ -96,10 +107,11 @@ run_experiment_group(
         "workload_config": "workloads/custom.yml",
         "checkpoint_name": "palloc-{}-{}-{}".format(db, config["name"], dataset["name"]),
         "custom_inserts": "custom:" + dataset["insert_trace_path"],
-        "threads": 1,
+        "custom_dataset": dataset["path"],
+        "threads": threads,
       },
     )
-    for db, config, dataset in product(DBS, CONFIGS, CUSTOM_DATASETS)
+    for db, config, dataset, threads in product(DBS, CONFIGS, CUSTOM_DATASETS, [1, 8])
   ],
   deps=[
     ":preload-{}-{}-{}".format(db, config["name"], dataset["name"])

@@ -37,7 +37,7 @@ std::vector<Record> GetRangeDataset(const Key step, size_t num_records,
                                     const std::string& value) {
   std::vector<size_t> indices;
   indices.resize(num_records);
-  std::iota(indices.begin(), indices.end(), 0ULL);
+  std::iota(indices.begin(), indices.end(), 1ULL);
 
   std::vector<Record> records;
   records.resize(num_records);
@@ -109,7 +109,7 @@ TEST_F(PGDBTest, LoadWriteScanReopenScan) {
 
   // Scan.
   std::vector<Record> expected(dataset);
-  expected[2].second = new_value;
+  expected[1].second = new_value;
   expected.emplace_back(102, new_value);
   expected.emplace_back(1001, new_value);
   std::sort(expected.begin(), expected.end(),
@@ -118,7 +118,7 @@ TEST_F(PGDBTest, LoadWriteScanReopenScan) {
             });
 
   std::vector<std::pair<Key, std::string>> scan_out;
-  ASSERT_TRUE(db->GetRange(0, 2000, &scan_out).ok());
+  ASSERT_TRUE(db->GetRange(1, 2000, &scan_out).ok());
   ASSERT_EQ(scan_out.size(), expected.size());
   for (size_t i = 0; i < scan_out.size(); ++i) {
     ASSERT_EQ(scan_out[i].first, expected[i].first);
@@ -133,7 +133,7 @@ TEST_F(PGDBTest, LoadWriteScanReopenScan) {
 
   // Run the same scan again.
   scan_out.clear();
-  ASSERT_TRUE(db->GetRange(0, 2000, &scan_out).ok());
+  ASSERT_TRUE(db->GetRange(1, 2000, &scan_out).ok());
   ASSERT_EQ(scan_out.size(), expected.size());
   for (size_t i = 0; i < scan_out.size(); ++i) {
     ASSERT_EQ(scan_out[i].first, expected[i].first);
@@ -211,16 +211,16 @@ TEST_F(PGDBTest, LoadParallelFlushReopenScan) {
 
   // Scan.
   std::vector<Record> expected(dataset);
-  expected[2].second = new_value;
-  expected[10].second = new_value;
-  expected[51].second = new_value;
+  expected[1].second = new_value;
+  expected[9].second = new_value;
+  expected[50].second = new_value;
   std::sort(expected.begin(), expected.end(),
             [](const auto& left, const auto& right) {
               return left.first < right.first;
             });
 
   std::vector<std::pair<Key, std::string>> scan_out;
-  ASSERT_TRUE(db->GetRange(0, 2000, &scan_out).ok());
+  ASSERT_TRUE(db->GetRange(1, 2000, &scan_out).ok());
   ASSERT_EQ(scan_out.size(), expected.size());
   for (size_t i = 0; i < scan_out.size(); ++i) {
     ASSERT_EQ(scan_out[i].first, expected[i].first);
@@ -230,6 +230,121 @@ TEST_F(PGDBTest, LoadParallelFlushReopenScan) {
   // Close the DB.
   delete db;
   db = nullptr;
+}
+
+TEST_F(PGDBTest, InsertSmaller) {
+  PageGroupedDB* db = nullptr;
+  auto options = GetCommonTestOptions();
+  options.records_per_page_goal = 2;
+  options.records_per_page_delta = 1;
+  options.parallelize_final_flush = true;
+  options.num_bg_threads = 3;
+  ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
+  ASSERT_NE(db, nullptr);
+
+  const char kLargeValue[1024] = {};
+  const Slice kLargeValueSlice(kLargeValue, 1024);
+
+  // Load.
+  const std::string value = "Test 1";
+  const std::vector<Record> dataset = {
+      {10, kLargeValueSlice}, {100, kLargeValueSlice}, {200, kLargeValueSlice}};
+  ASSERT_TRUE(db->BulkLoad(dataset).ok());
+
+  // Insert a few keys that are smaller than the previous smallest key.
+  ASSERT_TRUE(db->Put(9, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(8, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(7, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(6, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(5, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(4, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(3, kLargeValueSlice).ok());
+
+  // Reopen.
+  delete db;
+  db = nullptr;
+  ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
+  ASSERT_NE(db, nullptr);
+
+  // Scan the whole DB.
+  std::vector<Record> expected = {
+      {3, kLargeValueSlice},  {4, kLargeValueSlice},  {5, kLargeValueSlice},
+      {6, kLargeValueSlice},  {7, kLargeValueSlice},  {8, kLargeValueSlice},
+      {9, kLargeValueSlice},  {10, kLargeValueSlice}, {100, kLargeValueSlice},
+      {200, kLargeValueSlice}};
+  std::vector<std::pair<Key, std::string>> scan_out;
+  ASSERT_TRUE(db->GetRange(1, 2000, &scan_out).ok());
+  ASSERT_EQ(scan_out.size(), expected.size());
+  for (size_t i = 0; i < scan_out.size(); ++i) {
+    ASSERT_EQ(scan_out[i].first, expected[i].first);
+    ASSERT_EQ(expected[i].second.compare(scan_out[i].second), 0);
+  }
+
+  // Close the DB.
+  delete db;
+  db = nullptr;
+}
+
+TEST_F(PGDBTest, BadBulkLoad) {
+  PageGroupedDB* db = nullptr;
+  auto options = GetCommonTestOptions();
+  options.records_per_page_goal = 2;
+  options.records_per_page_delta = 1;
+  options.parallelize_final_flush = true;
+  options.num_bg_threads = 3;
+  ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
+  ASSERT_NE(db, nullptr);
+
+  const std::vector<Record> unsorted = {
+      {9, "Hello"}, {10, "hello"}, {5, "world!"}};
+  const std::vector<Record> duplicates = {
+      {9, "Hello"}, {9, "hello"}, {10, "world!"}};
+  const std::vector<Record> reserved1 = {{0, "Hello"}, {10, "world!"}};
+  const std::vector<Record> reserved2 = {
+      {0, "Hello"}, {std::numeric_limits<uint64_t>::max(), "world!"}};
+  ASSERT_TRUE(db->BulkLoad(unsorted).IsInvalidArgument());
+  ASSERT_TRUE(db->BulkLoad(duplicates).IsInvalidArgument());
+  ASSERT_TRUE(db->BulkLoad(reserved1).IsInvalidArgument());
+  ASSERT_TRUE(db->BulkLoad(reserved2).IsInvalidArgument());
+}
+
+TEST_F(PGDBTest, ReservedKeyUse) {
+  PageGroupedDB* db = nullptr;
+  auto options = GetCommonTestOptions();
+  options.records_per_page_goal = 2;
+  options.records_per_page_delta = 1;
+  options.parallelize_final_flush = true;
+  options.num_bg_threads = 3;
+  ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
+  ASSERT_NE(db, nullptr);
+
+  // Load.
+  const std::string value = "Test 1";
+  const auto dataset = GetRangeDataset(10, 1000, value);
+  ASSERT_TRUE(db->BulkLoad(dataset).ok());
+
+  // Put.
+  ASSERT_TRUE(db->Put(0, value).IsInvalidArgument());
+  ASSERT_TRUE(
+      db->Put(std::numeric_limits<uint64_t>::max(), value).IsInvalidArgument());
+
+  // Get.
+  std::string out;
+  ASSERT_TRUE(db->Get(0, &out).IsNotFound());
+  ASSERT_TRUE(db->Get(std::numeric_limits<uint64_t>::max(), &out).IsNotFound());
+
+  // GetRange (Scan).
+  std::vector<std::pair<Key, std::string>> scan_out;
+  ASSERT_TRUE(db->GetRange(0, 10, &scan_out).IsInvalidArgument());
+  ASSERT_TRUE(db->GetRange(std::numeric_limits<uint64_t>::max(), 10, &scan_out)
+                  .IsInvalidArgument());
+
+  // FlattenRange.
+  ASSERT_TRUE(db->FlattenRange(10, 1).IsInvalidArgument());
+  ASSERT_TRUE(db->FlattenRange(0, 10).IsInvalidArgument());
+  ASSERT_TRUE(db->FlattenRange(std::numeric_limits<uint64_t>::max(),
+                               std::numeric_limits<uint64_t>::max())
+                  .IsInvalidArgument());
 }
 
 }  // namespace

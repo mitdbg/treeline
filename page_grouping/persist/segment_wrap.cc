@@ -12,8 +12,8 @@ namespace pg {
 
 SegmentWrap::SegmentWrap(void* data, const size_t pages_in_segment)
     : data_(data), pages_in_segment_(pages_in_segment) {
-  assert(pages_in_segment_ >= SegmentBuilder::kSegmentPageCounts.front());
-  assert(pages_in_segment_ <= SegmentBuilder::kSegmentPageCounts.back());
+  assert(pages_in_segment_ >= SegmentBuilder::SegmentPageCounts().front());
+  assert(pages_in_segment_ <= SegmentBuilder::SegmentPageCounts().back());
 }
 
 uint32_t SegmentWrap::GetSequenceNumber() const {

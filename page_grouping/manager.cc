@@ -1,9 +1,11 @@
 #include "manager.h"
 
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <optional>
+#include <sstream>
 
 #include "bufmgr/page_memory_allocator.h"
 #include "key.h"
@@ -29,7 +31,7 @@ const std::string Manager::kSegmentFilePrefix = "sf-";
 
 Manager::Manager(fs::path db_path,
                  std::vector<std::pair<Key, SegmentInfo>> boundaries,
-                 std::vector<SegmentFile> segment_files,
+                 std::vector<std::unique_ptr<SegmentFile>> segment_files,
                  PageGroupedDBOptions options, uint32_t next_sequence_number,
                  std::unique_ptr<FreeList> free)
     : db_path_(std::move(db_path)),
@@ -67,27 +69,28 @@ Manager Manager::Reopen(const fs::path& db,
   // Figure out if there are segments in this DB.
   const bool uses_segments = fs::exists(db / (kSegmentFilePrefix + "1"));
   PageBuffer buf = PageMemoryAllocator::Allocate(
-      /*num_pages=*/SegmentBuilder::kSegmentPageCounts.back());
+      /*num_pages=*/SegmentBuilder::SegmentPageCounts().back());
   Page first_page(buf.get());
 
-  std::vector<SegmentFile> segment_files;
+  std::vector<std::unique_ptr<SegmentFile>> segment_files;
   std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
   std::unique_ptr<FreeList> free = std::make_unique<FreeList>();
   uint32_t max_sequence = 0;
 
-  for (size_t i = 0; i < SegmentBuilder::kSegmentPageCounts.size(); ++i) {
+  for (size_t i = 0; i < SegmentBuilder::SegmentPageCounts().size(); ++i) {
     if (i > 0 && !uses_segments) break;
-    const size_t pages_per_segment = SegmentBuilder::kSegmentPageCounts[i];
-    segment_files.emplace_back(db / (kSegmentFilePrefix + std::to_string(i)),
-                               pages_per_segment, options.use_memory_based_io);
-    SegmentFile& sf = segment_files.back();
+    const size_t pages_per_segment = SegmentBuilder::SegmentPageCounts()[i];
+    segment_files.push_back(std::make_unique<SegmentFile>(
+        db / (kSegmentFilePrefix + std::to_string(i)), pages_per_segment,
+        options.use_memory_based_io));
+    std::unique_ptr<SegmentFile>& sf = segment_files.back();
 
-    const size_t num_segments = sf.NumAllocatedSegments();
+    const size_t num_segments = sf->NumAllocatedSegments();
     const size_t bytes_per_segment = pages_per_segment * Page::kSize;
     for (size_t seg_idx = 0; seg_idx < num_segments; ++seg_idx) {
       // Offset in `id` is the page offset.
       SegmentId id(i, seg_idx * pages_per_segment);
-      sf.ReadPages(seg_idx * bytes_per_segment, buf.get(), pages_per_segment);
+      sf->ReadPages(seg_idx * bytes_per_segment, buf.get(), pages_per_segment);
 
       SegmentWrap sw(buf.get(), pages_per_segment);
       if (!sw.CheckChecksum() || !first_page.IsValid()) {
@@ -180,10 +183,14 @@ Status Manager::PutBatch(const std::vector<std::pair<Key, Slice>>& records) {
 
 Status Manager::PutBatchImpl(const std::vector<std::pair<Key, Slice>>& records,
                              const size_t start_idx, const size_t end_idx) {
+  static constexpr size_t kMaxAttempts = 1000;
+
   if (start_idx >= end_idx) return Status::OK();
   // TODO: Support deletes.
   size_t left_idx = start_idx;
+  size_t num_attempts = 0;
   while (left_idx < end_idx) {
+    ++num_attempts;
     const auto segment = index_->SegmentForKeyWithLock(records[left_idx].first,
                                                        SegmentMode::kPageWrite);
     const auto left_it = records.begin() + left_idx;
@@ -200,6 +207,25 @@ Status Manager::PutBatchImpl(const std::vector<std::pair<Key, Slice>>& records,
     // If a reorg intervenes and no records are written, `num_written` will
     // be 0 and the logic in this loop will retry the write.
     left_idx += num_written;
+
+    if (num_written == 0 && num_attempts >= kMaxAttempts) {
+      // This is a defensive check. If the number of attempts exceeds
+      // `kMaxAttempts`, it usually indicates a bug in the segment write path.
+      // Throwing the exception below prevents the DB from looping forever.
+      std::stringstream err_msg;
+      err_msg << "Exceeded the maximum number of write attempts for a batch "
+                 "starting at key 0x"
+              << std::hex << std::uppercase << records[left_idx].first
+              << std::nouppercase << ". Segment lower: 0x" << std::uppercase
+              << segment.lower << std::nouppercase << " Segment upper: 0x"
+              << std::uppercase << segment.upper << std::nouppercase
+              << std::dec;
+      throw std::runtime_error(err_msg.str());
+
+    } else if (num_written > 0) {
+      // We count repeated attempts for records that go to the same segment.
+      num_attempts = 0;
+    }
   }
   return Status::OK();
 }
@@ -327,7 +353,7 @@ size_t Manager::WriteToSegment(
         overflow_page_id = *maybe_free_page;
       } else {
         // Allocate a new free page.
-        const size_t byte_offset = segment_files_[0].AllocateSegment();
+        const size_t byte_offset = segment_files_[0]->AllocateSegment();
         overflow_page_id = SegmentId(0, byte_offset / pg::Page::kSize);
       }
 
@@ -421,27 +447,27 @@ size_t Manager::WriteToSegment(
 void Manager::ReadPage(const SegmentId& seg_id, size_t page_idx,
                        void* buffer) const {
   assert(seg_id.IsValid());
-  const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
-  sf.ReadPages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
-               /*num_pages=*/1);
+  const std::unique_ptr<SegmentFile>& sf = segment_files_[seg_id.GetFileId()];
+  sf->ReadPages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
+                /*num_pages=*/1);
   w_.BumpReadCount(1);
 }
 
 void Manager::WritePage(const SegmentId& seg_id, size_t page_idx,
                         void* buffer) const {
   assert(seg_id.IsValid());
-  const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
-  sf.WritePages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
-                /*num_pages=*/1);
+  const std::unique_ptr<SegmentFile>& sf = segment_files_[seg_id.GetFileId()];
+  sf->WritePages((seg_id.GetOffset() + page_idx) * pg::Page::kSize, buffer,
+                 /*num_pages=*/1);
   w_.BumpWriteCount(1);
 }
 
 void Manager::ReadSegment(const SegmentId& seg_id) const {
   assert(seg_id.IsValid());
-  const SegmentFile& sf = segment_files_[seg_id.GetFileId()];
-  sf.ReadPages(seg_id.GetOffset() * pg::Page::kSize, w_.buffer().get(),
-               sf.PagesPerSegment());
-  w_.BumpReadCount(sf.PagesPerSegment());
+  const std::unique_ptr<SegmentFile>& sf = segment_files_[seg_id.GetFileId()];
+  sf->ReadPages(seg_id.GetOffset() * pg::Page::kSize, w_.buffer().get(),
+                sf->PagesPerSegment());
+  w_.BumpReadCount(sf->PagesPerSegment());
 }
 
 void Manager::ReadOverflows(

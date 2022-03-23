@@ -91,5 +91,6 @@ if(LLSM_BUILD_BENCHMARKS)
     pg_read2
     pg_shuffle
     pg_standalone
+    pg_flatten
   )
 endif()
