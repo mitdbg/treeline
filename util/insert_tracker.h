@@ -9,6 +9,9 @@
 
 namespace llsm {
 
+// Tracks the distribution of an (insert) workload using an equi-depth
+// histogram. The histogram boundaries are set using a sample which is
+// maintained using reservoir sampling.
 class InsertTracker {
  public:
   explicit InsertTracker(const size_t num_inserts_per_epoch,
@@ -31,6 +34,7 @@ class InsertTracker {
   InsertTracker(InsertTracker&&) = delete;
   InsertTracker& operator=(InsertTracker&&) = delete;
 
+  // Tracks an insert. Should be called for each individual insert.
   void Add(const uint64_t key) {
     const std::lock_guard<std::mutex> lock(mutex_);
 
@@ -195,9 +199,10 @@ class InsertTracker {
   // valid.
   bool last_epoch_is_valid_;
 
+  // The following vectors track the number of inserts in the current / last
+  // epoch per partition of the equi-depth histogram.
   std::vector<size_t> partition_counters_curr_epoch_;
   std::vector<uint64_t> partition_boundaries_curr_epoch_;
-
   std::vector<size_t> partition_counters_last_epoch_;
   std::vector<uint64_t> partition_boundaries_last_epoch_;
 
