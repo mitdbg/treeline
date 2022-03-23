@@ -11,7 +11,9 @@ namespace llsm {
 
 // Tracks the distribution of an (insert) workload using an equi-depth
 // histogram. The histogram boundaries are set using a sample which is
-// maintained using reservoir sampling.
+// maintained using reservoir sampling. The inserts are tracked per "epoch"
+// which is defined as a certain number of inserts. Queries always return the
+// statistics of the last completed epoch (if such an epoch exists).
 class InsertTracker {
  public:
   explicit InsertTracker(const size_t num_inserts_per_epoch,
