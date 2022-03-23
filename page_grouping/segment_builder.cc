@@ -1,6 +1,7 @@
 #include "segment_builder.h"
 
 #include <algorithm>
+#include <limits>
 
 #include "manager.h"
 #include "plr/data.h"
@@ -31,6 +32,16 @@ const std::unordered_map<size_t, size_t>& SegmentBuilder::PageCountToSegment() {
 // The maximum number of pages in any segment.
 static const size_t kMaxSegmentSize =
     llsm::pg::SegmentBuilder::SegmentPageCounts().back();
+
+// This value is a `double`'s maximum representable integer. The PLR algorithm
+// uses `double`s internally and we need the inputs to the PLR (which are
+// integers) to be representable as `double`s.
+//
+// Note that this restriction only affects extremely sparse key spaces (e.g.,
+// when the difference between keys exceeds 2^53). This is because we build
+// linear models over the *differences* between the keys in the segment and the
+// segment's lower bound.
+static constexpr Key kMaxKeyDiff = 1ULL << std::numeric_limits<double>::digits;
 
 SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
                                const size_t records_per_page_delta)
@@ -86,8 +97,9 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
 
   } else if (state_ == State::kHasBase) {
     std::optional<plr::BoundedLine64> line;
-    if (processed_records_.size() < max_records_in_segment_) {
-      const Key diff = record.first - base_key_;
+    const Key diff = record.first - base_key_;
+    if (processed_records_.size() < max_records_in_segment_ &&
+        diff <= kMaxKeyDiff) {
       // This algorithm assumes equally sized keys. So we give each record
       // equal weight; a straightfoward approach is just to count up by 1.
       line = plr_->Offer(plr::Point64(diff, processed_records_.size()));
@@ -100,13 +112,13 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
       // error threshold. This current record will go into the next "batch".
 
     } else {
-      // We exceeded the number of records per segment.
+      // We exceeded the number of records per segment or adding this record
+      // would produce a key difference that cannot be represented exactly by a
+      // `double` (which we want to avoid).
       line = plr_->Finish();
       if (!line.has_value()) {
-        // This only happens if the PLR builder has only seen one point. This is
-        // a degenerate case that occurs when `max_records_in_segment_ == 1`.
+        // This happens if the PLR builder has only seen one point.
         assert(processed_records_.size() == 1);
-        assert(max_records_in_segment_ == 1);
         std::vector<Segment> results = {CreateSegmentUsing(kNoModel,
                                                            /*page_count=*/1,
                                                            /*num_records=*/1)};
