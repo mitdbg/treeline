@@ -31,7 +31,8 @@ double parse_double(const std::pair<const char*, const char*>& element) {
 
 // Reads in lng/lat coordinates from a CSV file and converts them to S2 cell ids
 // (64-bit unsigned integers). S2 cell ids represent points on a Hilbert curve
-// (which preserves spatial locality).
+// (which preserves spatial locality). Zeros out most significant 16 bits (for
+// compatibility with our benchmarking framework).
 
 int main(int argc, char** argv) {
   if (argc < 2) {
@@ -70,9 +71,11 @@ int main(int argc, char** argv) {
   std::unordered_set<uint64_t> set;
   set.reserve(cell_ids.size());
   for (const uint64_t cell_id : cell_ids) {
-    if (set.find(cell_id) == set.end()) {
-      set.insert(cell_id);
-      cell_ids_unique.push_back(cell_id);
+    // Zero out most significant 16 bits.
+    const uint64_t zerod_cell_id = (cell_id << 16) >> 16;
+    if (set.find(zerod_cell_id) == set.end()) {
+      set.insert(zerod_cell_id);
+      cell_ids_unique.push_back(zerod_cell_id);
     }
   }
 
