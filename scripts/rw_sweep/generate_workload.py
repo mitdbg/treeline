@@ -9,9 +9,9 @@ record_size_bytes: {record_size_bytes}
 load:
   num_records: {num_records}
   distribution:
-    type: linspace
-    start_key: 1000
-    step_size: 1000
+    type: uniform
+    range_min: 1
+    range_max: 2000000000
 
 """
 

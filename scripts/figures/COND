@@ -15,7 +15,7 @@ run_command(
     "y_min": 0,
     "y_max": 500,
   },
-  deps=["//scripts/rw_sweep:combine"],
+  deps=["//scripts/rw_sweep:combine-figure"],
 )
 
 run_command(

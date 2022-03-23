@@ -75,3 +75,16 @@ if [ $db_type == "llsm" ] || [ $db_type == "all" ]; then
     --use_alex=false \
     ${args[@]}
 fi
+
+if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
+  # PGLLSM - Use memory-based I/O to help the load run faster.
+  ../../build/bench/run_custom \
+    --db=pg_llsm \
+    --db_path=$full_checkpoint_path \
+    --bg_threads=16 \
+    --workload_config=$COND_OUT/workload.yml \
+    --seed=$SEED \
+    --verbose \
+    --pg_use_memory_based_io=true \
+    ${args[@]}
+fi

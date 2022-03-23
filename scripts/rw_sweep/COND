@@ -13,8 +13,15 @@ COMMON_OPTIONS = {
   "use_direct_io": True,
   "latency_sample_period": 10,
   "rdb_bloom_bits": 10,
+  "rdb_prefix_bloom_size": 3,
   "gen_scan_read_percent": 10,  # 10% of the reads are scans
   "use_alex": False,
+}
+
+PG_LLSM_OPTIONS_64 = {
+  "optimistic_rec_caching": False,
+  "records_per_page_goal": 45,
+  "records_per_page_delta": 5,
 }
 
 CONFIGS = [
@@ -29,6 +36,8 @@ CONFIGS = [
     "gen_num_requests": 10000000,  # 10 M
   },
 ]
+
+CONFIG_64 = CONFIGS[0]
 
 MEMORY_CONFIG = {
   64: {
@@ -55,24 +64,15 @@ def memory_usage(db, record_size_bytes):
     return mem
 
 
-
-
+# Run the dependent tasks separately on the correct branches. Then you can run
+# this task (you will need to disable Conductor's git integration).
 run_command(
-  name="combine",
+  name="combine-figure",
   run="python3 combine_raw.py",
-  deps=[":rw_sweep"],
-)
-
-run_command(
-  name="combine-zipfian",
-  run="python3 combine_raw.py",
-  deps=[":rw_sweep-zipfian"],
-)
-
-run_command(
-  name="combine-uniform",
-  run="python3 combine_raw.py",
-  deps=[":rw_sweep-uniform"],
+  deps=[
+    ":rw_sweep_figure-master",
+    ":rw_sweep_figure-version_bufferpool",
+  ],
 )
 
 # All `rw_sweep` experiments with zipfian distributed requests.
@@ -103,13 +103,54 @@ combine(
   ],
 )
 
+run_command(
+  name="combine",
+  run="python3 combine_raw.py",
+  deps=[":rw_sweep"],
+)
+
+run_command(
+  name="combine-zipfian",
+  run="python3 combine_raw.py",
+  deps=[":rw_sweep-zipfian"],
+)
+
+run_command(
+  name="combine-uniform",
+  run="python3 combine_raw.py",
+  deps=[":rw_sweep-uniform"],
+)
+
+# All `rw_sweep` experiments that we use in our figure that must be run on
+# `master`. This is used for running a subset of the experiments.
+combine(
+  name="rw_sweep_figure-master",
+  deps=[
+    ":rw_sweep-{db}-64-{write_split}-zipfian".format(
+      db=db,
+      write_split=write_split,
+    )
+    for db, write_split in product(["rocksdb", "pg_llsm"], WRITE_SPLITS)
+  ],
+)
+
+# All `rw_sweep` experiments that we use in our figure that must be run on
+# `version-bufferpool`. This is used for running a subset of the experiments.
+combine(
+  name="rw_sweep_figure-version-bufferpool",
+  deps=[
+    ":rw_sweep-llsm-64-{}-zipfian".format(write_split)
+    for write_split in WRITE_SPLITS
+  ],
+)
+
+# NOTE: This should run on `master`.
 run_experiment_group(
-  name="rw_sweep",
+  name="rw_sweep-rocksdb",
   run="./run.sh",
   experiments=[
     ExperimentInstance(
-      name="rw_sweep-{db}-{rsb}-{write_split}-{dist}".format(
-        db=db,
+      name="rw_sweep-rocksdb-{rsb}-{write_split}-{dist}".format(
         rsb=config["gen_record_size_bytes"],
         write_split=write_split,
         dist=dist,
@@ -117,35 +158,84 @@ run_experiment_group(
       options={
         **COMMON_OPTIONS,
         **config,
-        **memory_usage(db, config["gen_record_size_bytes"]),
-        "db": db,
+        **memory_usage("rocksdb", config["gen_record_size_bytes"]),
+        "db": "rocksdb",
         "gen_update_percent": write_split,
         "gen_distribution": dist,
-        "checkpoint_name": "rw_sweep-{db}-{rsb}".format(
-          db=db,
+        "checkpoint_name": "rw_sweep-rocksdb-{rsb}".format(
           rsb=config["gen_record_size_bytes"],
         ),
       },
     )
-    for config, db, write_split, dist in product(
+    for config, write_split, dist in product(
       CONFIGS,
-      DB,
       WRITE_SPLITS,
       DISTRIBUTIONS,
     )
   ],
-  deps=[":preload"],
+  deps=[
+    ":preload-rocksdb-64",
+    ":preload-rocksdb-1024",
+  ],
 )
 
-group(
-  name="preload",
-  deps=[
-    ":preload-{db}-{rsb}".format(
-      db=db,
-      rsb=config["gen_record_size_bytes"],
+# NOTE: This needs to run on `version-bufferpool`. This represents our
+# disk-based B-tree.
+run_experiment_group(
+  name="rw_sweep-llsm",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="rw_sweep-llsm-{rsb}-{write_split}-{dist}".format(
+        rsb=config["gen_record_size_bytes"],
+        write_split=write_split,
+        dist=dist,
+      ),
+      options={
+        **COMMON_OPTIONS,
+        **config,
+        **memory_usage("llsm", config["gen_record_size_bytes"]),
+        "db": "llsm",
+        "gen_update_percent": write_split,
+        "gen_distribution": dist,
+        "checkpoint_name": "rw_sweep-llsm-{rsb}".format(
+          rsb=config["gen_record_size_bytes"],
+        ),
+      },
     )
-    for db, config in product(DB, CONFIGS)
+    for config, write_split, dist in product(
+      CONFIGS,
+      WRITE_SPLITS,
+      DISTRIBUTIONS,
+    )
   ],
+  deps=[
+    ":preload-llsm-64",
+    ":preload-llsm-1024",
+  ],
+)
+
+# NOTE: This needs to run on `master`.
+run_experiment_group(
+  name="rw_sweep-pg_llsm",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="rw_sweep-pg_llsm-64-{}-zipfian".format(write_split),
+      options={
+        **COMMON_OPTIONS,
+        **PG_LLSM_OPTIONS_64,
+        **CONFIG_64,
+        **memory_usage("pg_llsm", CONFIG_64["gen_record_size_bytes"]),
+        "db": "pg_llsm",
+        "gen_update_percent": write_split,
+        "gen_distribution": "zipfian",
+        "checkpoint_name": "rw_sweep-pg_llsm-64",
+      },
+    )
+    for write_split in WRITE_SPLITS
+  ],
+  deps=[":preload-pg_llsm-64"],
 )
 
 for db, config in product(DB, CONFIGS):
@@ -159,9 +249,22 @@ for db, config in product(DB, CONFIGS):
     options={
       **config,
       "db": db,
+      "rdb_prefix_bloom_size": 3,
       "checkpoint_name": "rw_sweep-{db}-{rsb}".format(
         db=db,
         rsb=config["gen_record_size_bytes"],
       ),
     },
   )
+
+run_command(
+  name="preload-pg_llsm-64",
+  run="./preload.sh",
+  args=["--gen_for_preload"],
+  options={
+    **PG_LLSM_OPTIONS_64,
+    **CONFIG_64,
+    "db": "pg_llsm",
+    "checkpoint_name": "rw_sweep-pg_llsm-64",
+  },
+)
