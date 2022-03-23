@@ -87,7 +87,7 @@ class PageGroupedDB {
   // generally not be called on regions of the key space that are experiencing a
   // high rate of writes.
   virtual Status FlattenRange(
-      const Key start_key = 0,
+      const Key start_key = 1,
       const Key end_key = std::numeric_limits<Key>::max()) = 0;
 };
 

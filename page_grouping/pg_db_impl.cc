@@ -73,6 +73,34 @@ Status PageGroupedDBImpl::BulkLoad(const std::vector<Record>& records) {
   if (mgr_.has_value()) {
     return Status::NotSupported("Cannot bulk load a non-empty DB.");
   }
+
+  // Validate the input.
+  if (records.empty()) {
+    return Status::InvalidArgument("Cannot bulk load zero records.");
+  }
+  Key prev_key;
+  for (size_t i = 0; i < records.size(); ++i) {
+    const Key curr_key = records[i].first;
+    if (curr_key == Manager::kMinReservedKey ||
+        curr_key == Manager::kMaxReservedKey) {
+      return Status::InvalidArgument(
+          "Detected reserved keys in the records being bulk loaded.");
+    }
+    if (i > 0) {
+      if (prev_key > curr_key) {
+        return Status::InvalidArgument(
+            "The records being bulk loaded must be sorted in ascending order.");
+      }
+      if (prev_key == curr_key) {
+        return Status::InvalidArgument(
+            "Detected a duplicate key during the bulk load. All keys must be "
+            "unique.");
+      }
+    }
+    prev_key = curr_key;
+  }
+
+  // Run the bulk load.
   mgr_ = Manager::LoadIntoNew(db_path_, records, options_);
   return Status::OK();
 }
@@ -81,6 +109,9 @@ Status PageGroupedDBImpl::Put(const Key key, const Slice& value) {
   if (!mgr_.has_value()) {
     return Status::NotSupported(
         "DB must be bulk loaded before any writes are allowed.");
+  }
+  if (key == Manager::kMinReservedKey || key == Manager::kMaxReservedKey) {
+    return Status::InvalidArgument("Cannot Put() a reserved key.");
   }
   if (!options_.bypass_cache) {
     key_utils::IntKeyAsSlice key_slice(key);
@@ -94,6 +125,9 @@ Status PageGroupedDBImpl::Put(const Key key, const Slice& value) {
 
 Status PageGroupedDBImpl::Get(const Key key, std::string* value_out) {
   if (!mgr_.has_value()) return Status::NotFound("DB is empty.");
+  if (key == Manager::kMinReservedKey || key == Manager::kMaxReservedKey) {
+    return Status::NotFound("Reserved keys cannot be used.");
+  }
 
   const key_utils::IntKeyAsSlice key_slice_helper(key);
   const Slice key_slice = key_slice_helper.as<Slice>();
@@ -139,6 +173,11 @@ Status PageGroupedDBImpl::GetRange(
   if (!mgr_.has_value()) {
     results_out->clear();
     return Status::OK();
+  }
+  if (start_key == Manager::kMinReservedKey ||
+      start_key == Manager::kMaxReservedKey) {
+    return Status::InvalidArgument(
+        "The scan start key is reserved and cannot be used.");
   }
 
   const key_utils::IntKeyAsSlice key_slice_helper(start_key);
@@ -220,7 +259,19 @@ std::pair<Key, Key> PageGroupedDBImpl::GetPageBoundsFor(Key key) {
 
 Status PageGroupedDBImpl::FlattenRange(const Key start_key, const Key end_key) {
   if (!options_.use_segments) {
-    return Status::NotSupported("FlattenRange() only implemented for segments.");
+    return Status::NotSupported(
+        "FlattenRange() only implemented for segments.");
+  }
+  if (start_key > end_key) {
+    return Status::InvalidArgument(
+        "The start key cannot be greater than the end key.");
+  }
+  if (start_key == Manager::kMinReservedKey ||
+      start_key == Manager::kMaxReservedKey ||
+      end_key == Manager::kMinReservedKey) {
+    return Status::InvalidArgument(
+        "Cannot use a reserved key as the start key and cannot use the minimum "
+        "reserved key as the end key.");
   }
   return mgr_->FlattenRange(start_key, end_key);
 }

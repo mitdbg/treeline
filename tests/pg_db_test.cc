@@ -285,4 +285,66 @@ TEST_F(PGDBTest, InsertSmaller) {
   db = nullptr;
 }
 
+TEST_F(PGDBTest, BadBulkLoad) {
+  PageGroupedDB* db = nullptr;
+  auto options = GetCommonTestOptions();
+  options.records_per_page_goal = 2;
+  options.records_per_page_delta = 1;
+  options.parallelize_final_flush = true;
+  options.num_bg_threads = 3;
+  ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
+  ASSERT_NE(db, nullptr);
+
+  const std::vector<Record> unsorted = {
+      {9, "Hello"}, {10, "hello"}, {5, "world!"}};
+  const std::vector<Record> duplicates = {
+      {9, "Hello"}, {9, "hello"}, {10, "world!"}};
+  const std::vector<Record> reserved1 = {{0, "Hello"}, {10, "world!"}};
+  const std::vector<Record> reserved2 = {
+      {0, "Hello"}, {std::numeric_limits<uint64_t>::max(), "world!"}};
+  ASSERT_TRUE(db->BulkLoad(unsorted).IsInvalidArgument());
+  ASSERT_TRUE(db->BulkLoad(duplicates).IsInvalidArgument());
+  ASSERT_TRUE(db->BulkLoad(reserved1).IsInvalidArgument());
+  ASSERT_TRUE(db->BulkLoad(reserved2).IsInvalidArgument());
+}
+
+TEST_F(PGDBTest, ReservedKeyUse) {
+  PageGroupedDB* db = nullptr;
+  auto options = GetCommonTestOptions();
+  options.records_per_page_goal = 2;
+  options.records_per_page_delta = 1;
+  options.parallelize_final_flush = true;
+  options.num_bg_threads = 3;
+  ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
+  ASSERT_NE(db, nullptr);
+
+  // Load.
+  const std::string value = "Test 1";
+  const auto dataset = GetRangeDataset(10, 1000, value);
+  ASSERT_TRUE(db->BulkLoad(dataset).ok());
+
+  // Put.
+  ASSERT_TRUE(db->Put(0, value).IsInvalidArgument());
+  ASSERT_TRUE(
+      db->Put(std::numeric_limits<uint64_t>::max(), value).IsInvalidArgument());
+
+  // Get.
+  std::string out;
+  ASSERT_TRUE(db->Get(0, &out).IsNotFound());
+  ASSERT_TRUE(db->Get(std::numeric_limits<uint64_t>::max(), &out).IsNotFound());
+
+  // GetRange (Scan).
+  std::vector<std::pair<Key, std::string>> scan_out;
+  ASSERT_TRUE(db->GetRange(0, 10, &scan_out).IsInvalidArgument());
+  ASSERT_TRUE(db->GetRange(std::numeric_limits<uint64_t>::max(), 10, &scan_out)
+                  .IsInvalidArgument());
+
+  // FlattenRange.
+  ASSERT_TRUE(db->FlattenRange(10, 1).IsInvalidArgument());
+  ASSERT_TRUE(db->FlattenRange(0, 10).IsInvalidArgument());
+  ASSERT_TRUE(db->FlattenRange(std::numeric_limits<uint64_t>::max(),
+                               std::numeric_limits<uint64_t>::max())
+                  .IsInvalidArgument());
+}
+
 }  // namespace

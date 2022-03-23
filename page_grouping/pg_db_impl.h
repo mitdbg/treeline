@@ -33,7 +33,7 @@ class PageGroupedDBImpl : public PageGroupedDB {
       std::vector<std::pair<Key, std::string>>* results_out) override;
 
   Status FlattenRange(
-      const Key start_key = 0,
+      const Key start_key = 1,
       const Key end_key = std::numeric_limits<Key>::max()) override;
 
  private:
