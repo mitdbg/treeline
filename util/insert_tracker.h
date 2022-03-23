@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <iostream>
 #include <mutex>
@@ -16,8 +17,8 @@ namespace llsm {
 // statistics of the last completed epoch (if such an epoch exists).
 class InsertTracker {
  public:
-  explicit InsertTracker(const size_t num_inserts_per_epoch,
-                         const size_t num_partitions, const size_t sample_size)
+  InsertTracker(const size_t num_inserts_per_epoch, const size_t num_partitions,
+                const size_t sample_size, const size_t random_seed = 42)
       : num_inserts_per_epoch_(num_inserts_per_epoch),
         num_partitions_(num_partitions),
         num_inserts_(0),
@@ -25,7 +26,7 @@ class InsertTracker {
         sample_size_(sample_size),
         last_epoch_is_valid_(false),
         next_(sample_size_ + 1),
-        gen_(42) {
+        gen_(random_seed) {
     std::uniform_real_distribution<double> real_dist(0.0, 1.0);
     w_ = exp(log(real_dist(gen_)) / sample_size_);
   }
@@ -118,6 +119,7 @@ class InsertTracker {
       // `key` is out of range (all boundaries are smaller than `key`). Can't
       // happen since the bonudary of the last partition is uint64_t::max.
       std::cerr << "Reached unreachable code" << std::endl;
+      assert(false);
       return;
     }
 
@@ -202,7 +204,8 @@ class InsertTracker {
   bool last_epoch_is_valid_;
 
   // The following vectors track the number of inserts in the current / last
-  // epoch per partition of the equi-depth histogram.
+  // epoch per partition of the equi-depth histogram. The boundary values are
+  // the inclusive lower bounds of each partition.
   std::vector<size_t> partition_counters_curr_epoch_;
   std::vector<uint64_t> partition_boundaries_curr_epoch_;
   std::vector<size_t> partition_counters_last_epoch_;
