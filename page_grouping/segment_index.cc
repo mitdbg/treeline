@@ -164,17 +164,39 @@ SegmentIndex::FindAndLockNextOverflowRegion(const Key start_key,
 
 bool SegmentIndex::LockSegmentsForRewrite(
     const std::vector<SegmentIndex::Entry>& segments_to_lock) const {
+  // There is an unlikely pathological case where the segments we are trying to
+  // lock for a rewrite end up being reused in different parts of the key space.
+  // To avoid causing a deadlock, we attempt to acquire the segment lock a
+  // maximum number of times.
+  static constexpr size_t kMaxAttempts = 1000;
+
   // Acquire locks in order. We do not hold the index latch while doing this
   // because acquiring reorg locks may take time.
   RandExpBackoff backoff(kBackoffSaturate);
+  size_t num_granted = 0;
   for (const auto& seg : segments_to_lock) {
     backoff.Reset();
-    while (true) {
-      const bool lock_granted = lock_manager_->TryAcquireSegmentLock(
+    bool lock_granted = false;
+    for (size_t attempt = 0; attempt < kMaxAttempts; ++attempt) {
+      lock_granted = lock_manager_->TryAcquireSegmentLock(
           seg.sinfo.id(), LockManager::SegmentMode::kReorg);
       if (lock_granted) break;
       backoff.Wait();
     }
+
+    // We exceeded the number of acquisition attempts. Release all granted locks
+    // and retry.
+    if (!lock_granted) {
+      for (size_t i = 0; i < num_granted; ++i) {
+        lock_manager_->ReleaseSegmentLock(segments_to_lock[i].sinfo.id(),
+                                          LockManager::SegmentMode::kReorg);
+      }
+      return false;
+    }
+
+    // Keep track of the number of locks we were granted in case we need to
+    // abort and retry.
+    ++num_granted;
   }
 
   // Check that the locked segments are still valid. All segments should exist
@@ -185,7 +207,8 @@ bool SegmentIndex::LockSegmentsForRewrite(
     std::shared_lock<std::shared_mutex> lock(mutex_);
     auto it = index_.find(segments_to_lock.front().lower);
     for (const auto& seg : segments_to_lock) {
-      if (it == index_.end() || it->first != seg.lower || !(it->second == seg.sinfo)) {
+      if (it == index_.end() || it->first != seg.lower ||
+          !(it->second == seg.sinfo)) {
         still_valid = false;
         break;
       }
@@ -195,6 +218,7 @@ bool SegmentIndex::LockSegmentsForRewrite(
 
   // Caller will need to retry; the segment ranges have changed.
   if (!still_valid) {
+    assert(num_granted == segments_to_lock.size());
     for (const auto& seg : segments_to_lock) {
       lock_manager_->ReleaseSegmentLock(seg.sinfo.id(),
                                         LockManager::SegmentMode::kReorg);
