@@ -112,8 +112,6 @@ run_experiment_group(
       },
     )
     for db, config, dataset, threads in product(DBS, CONFIGS, CUSTOM_DATASETS, [1, 8])
-    # TODO: 8 Threads on the wiki workload appears to cause problems
-    if threads == 1 or dataset["name"] != "wiki"
   ],
   deps=[
     ":preload-{}-{}-{}".format(db, config["name"], dataset["name"])
