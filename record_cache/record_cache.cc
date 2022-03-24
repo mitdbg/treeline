@@ -12,7 +12,7 @@ RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out,
       clock_(0),
       write_out_(std::move(write_out)),
       key_bounds_(std::move(key_bounds)) {
-  tree_ = std::make_unique<MasstreeWrapper<RecordCacheEntry>>();
+  tree_ = std::make_shared<MasstreeWrapper<RecordCacheEntry>>();
   cache_entries.resize(capacity_);
 }
 
