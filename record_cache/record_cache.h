@@ -130,9 +130,7 @@ class RecordCache {
   uint64_t GetSizeFootprintEstimate() const;
 
   // A pointer to the Masstree wrapper used by the cache.
-  std::shared_ptr<MasstreeWrapper<RecordCacheEntry>> GetMasstreePointer() {
-    return tree_;
-  }
+  std::shared_ptr<MasstreeWrapper<RecordCacheEntry>> GetMasstreePointer();
 
  private:
   // Implements `GetRange` but adds private functionality to avoid locking a

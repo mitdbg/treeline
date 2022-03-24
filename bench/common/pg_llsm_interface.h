@@ -19,7 +19,9 @@ class PGLLSMInterface {
   void InitializeWorker(const std::thread::id& id) {
     llsm::pg::PageGroupedDBStats::Local().Reset();
     std::hash<std::thread::id> hasher;
-    db_->GetMasstreePointer()->thread_init(hasher(id));
+    reinterpret_cast<llsm::pg::PageGroupedDBImpl*>(db_)
+        ->GetMasstreePointer()
+        ->thread_init(hasher(id));
   }
 
   void ShutdownWorker(const std::thread::id& id) {
@@ -130,5 +132,5 @@ class PGLLSMInterface {
   }
 
  private:
-  llsm::pg::PageGroupedDBImpl* db_;
+  llsm::pg::PageGroupedDB* db_;
 };

@@ -323,4 +323,9 @@ uint64_t RecordCache::GetSizeFootprintEstimate() const {
   return entries + entry_payloads + sizeof(*this);
 }
 
+std::shared_ptr<MasstreeWrapper<RecordCacheEntry>>
+RecordCache::GetMasstreePointer() {
+  return tree_;
+}
+
 }  // namespace llsm
