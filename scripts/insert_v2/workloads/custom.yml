@@ -1,19 +1,19 @@
 load:
-  num_records: 6000000
+  num_records: 1000000
   distribution:
     type: uniform
     range_min: 1
     range_max: 10000000
 
-# 3 million inserts interleaved with 125 thousand reads.
+# 8 M inserts, 8 M reads
 run:
-- num_requests: 3125000
+- num_requests: 16000000
   read:
-    proportion_pct: 4
+    proportion_pct: 50
     distribution:
       type: uniform
   insert:
-    proportion_pct: 96
+    proportion_pct: 50
     distribution:
       type: custom
       name: custom

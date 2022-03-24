@@ -3,6 +3,7 @@ from itertools import product
 DBS = [
   "pg_llsm",
   "rocksdb",
+  "leanstore",
 ]
 
 CONFIG_64B = {
@@ -57,19 +58,24 @@ COMMON_OPTIONS = {
   "optimistic_rec_caching": False,
 }
 
+FORECASTING_OPTIONS = {
+  # TODO: Set the insert forecasting knobs as needed here.
+}
+
 TAXI_DATASET = {
   "name": "taxi",
-  "path": "'$TP_DATASET_PATH/inserts/taxi_load_6M.txt'",
-  "insert_trace_path": "'$TP_DATASET_PATH/inserts/taxi_insert_3M.txt'",
+  "path": "'$TP_DATASET_PATH/inserts/taxi_load_1M.txt'",
+  "insert_trace_path": "'$TP_DATASET_PATH/inserts/taxi_insert_8M.txt'",
 }
 
 WIKI_DATASET = {
   "name": "wiki",
-  "path": "'$TP_DATASET_PATH/inserts/wiki_ts_load_6M.txt'",
-  "insert_trace_path": "'$TP_DATASET_PATH/inserts/wiki_ts_insert_3M.txt'",
+  "path": "'$TP_DATASET_PATH/inserts/wiki_ts_load_1M.txt'",
+  "insert_trace_path": "'$TP_DATASET_PATH/inserts/wiki_ts_insert_8M.txt'",
 }
 
 CUSTOM_DATASETS = [TAXI_DATASET, WIKI_DATASET]
+
 
 def process_config(db, config):
   copy = config.copy()
@@ -86,11 +92,22 @@ def process_config(db, config):
 
   return copy
 
+
 run_command(
-  name="perfect_alloc_combined",
+  name="perfect_alloc-fast-combined",
   run="python3 combine_raw.py",
   deps=[
-    ":perfect_alloc",
+    ":perfect_alloc-fast",
+  ],
+)
+
+combine(
+  name="perfect_alloc-fast",
+  deps=[
+    ":palloc-rocksdb-1024B-taxi-8",
+    ":palloc-rocksdb-1024B-wiki-8",
+    ":palloc-pg_llsm-1024B-taxi-8",
+    ":palloc-pg_llsm-1024B-wiki-8",
   ],
 )
 
@@ -116,6 +133,34 @@ run_experiment_group(
   deps=[
     ":preload-{}-{}-{}".format(db, config["name"], dataset["name"])
     for db, config, dataset in product(DBS, CONFIGS, CUSTOM_DATASETS)
+  ],
+)
+
+# e.g.: forecasting-1024B-taxi-8
+run_experiment_group(
+  name="forecasting",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="forecasting-{}-{}-{}".format(config["name"], dataset["name"], threads),
+      args=["--no_alloc_only"],
+      options={
+        **COMMON_OPTIONS,
+        **FORECASTING_OPTIONS,
+        **process_config("pg_llsm", config),
+        "db": "pg_llsm",
+        "workload_config": "workloads/custom.yml",
+        "checkpoint_name": "palloc-pg_llsm-{}-{}".format(config["name"], dataset["name"]),
+        "custom_inserts": "custom:" + dataset["insert_trace_path"],
+        "custom_dataset": dataset["path"],
+        "threads": threads,
+      },
+    )
+    for config, dataset, threads in product(CONFIGS, CUSTOM_DATASETS, [1, 8])
+  ],
+  deps=[
+    ":preload-pg_llsm-{}-{}".format(config["name"], dataset["name"])
+    for config, dataset in product(CONFIGS, CUSTOM_DATASETS)
   ],
 )
 

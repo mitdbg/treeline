@@ -90,7 +90,7 @@ def main():
                 read_kb, written_kb = process_iostat(
                     iostat_file=exp_inst / setup / "iostat.json",
                     device="nvme0n1",
-                    trace_out_file=iostat_dir / (exp_inst.name + ".csv"),
+                    trace_out_file=iostat_dir / ("{}_{}.csv".format(exp_inst.name, setup)),
                 )
                 df["phys_read_kb"] = read_kb
                 df["phys_written_kb"] = written_kb

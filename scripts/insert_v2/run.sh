@@ -9,6 +9,7 @@ source ../experiment_config.sh
 # should only be run on trusted input.
 orig_args=($@)
 args=()
+no_alloc_only=false
 for val in "${orig_args[@]}"; do
   phys_arg=$(eval "echo $val")
 
@@ -23,6 +24,12 @@ for val in "${orig_args[@]}"; do
   fi
   if [[ $phys_arg =~ --records_per_page_delta=.+ ]]; then
     delta=${phys_arg:25}
+  fi
+
+  # Skip the "perfect allocation" part of the experiment.
+  if [[ $phys_arg = --no_alloc_only ]]; then
+    no_alloc_only=true
+    continue
   fi
 
   # Extract the checkpoint name, which shouldn't be passed as an argument further.
@@ -110,8 +117,8 @@ if [ $code -ne 0 ]; then
   exit $code
 fi
 
-# The "perfect allocation" case is only for pg_llsm.
-if [ $db_type != "pg_llsm" ]; then
+# Skip the "perfect allocation" case when it is not relevant.
+if [ $db_type != "pg_llsm" ] || [ $no_alloc_only ]; then
   exit 0
 fi
 
