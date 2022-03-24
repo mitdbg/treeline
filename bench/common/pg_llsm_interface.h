@@ -8,6 +8,7 @@
 #include "config.h"
 #include "llsm/pg_db.h"
 #include "llsm/pg_stats.h"
+#include "page_grouping/pg_db_impl.h"
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 
@@ -17,6 +18,8 @@ class PGLLSMInterface {
 
   void InitializeWorker(const std::thread::id& id) {
     llsm::pg::PageGroupedDBStats::Local().Reset();
+    std::hash<std::thread::id> hasher;
+    db_->GetMasstreePointer()->thread_init(hasher(id));
   }
 
   void ShutdownWorker(const std::thread::id& id) {
@@ -31,6 +34,7 @@ class PGLLSMInterface {
     std::ofstream out(out_dir / "counters.csv");
     out << "name,value" << std::endl;
     llsm::pg::PageGroupedDBStats::RunOnGlobal([&out](const auto& stats) {
+      // clang-format off
       out << "cache_hits," << stats.GetCacheHits() << std::endl;
       out << "cache_misses," << stats.GetCacheMisses() << std::endl;
       out << "cache_clean_evictions," << stats.GetCacheCleanEvictions() << std::endl;
@@ -45,6 +49,7 @@ class PGLLSMInterface {
       out << "free_list_entries," << stats.GetFreeListEntries() << std::endl;
       out << "free_list_bytes," << stats.GetFreeListBytes() << std::endl;
       out << "cache_bytes," << stats.GetCacheBytes() << std::endl;
+      // clang-format on
     });
   }
 
@@ -125,5 +130,5 @@ class PGLLSMInterface {
   }
 
  private:
-  llsm::pg::PageGroupedDB* db_;
+  llsm::pg::PageGroupedDBImpl* db_;
 };
