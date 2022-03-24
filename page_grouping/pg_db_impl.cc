@@ -12,6 +12,10 @@ namespace fs = std::filesystem;
 namespace llsm {
 namespace pg {
 
+static thread_local size_t thread_id_ = ([]() {
+  return std::hash<std::thread::id>{}(std::this_thread::get_id());
+})();
+
 Status PageGroupedDB::Open(const PageGroupedDBOptions& options,
                            const std::filesystem::path& db_path,
                            PageGroupedDB** db_out) {
@@ -115,6 +119,7 @@ Status PageGroupedDBImpl::Put(const Key key, const Slice& value) {
     return Status::NotSupported(
         "DB must be bulk loaded before any writes are allowed.");
   }
+  cache_.GetMasstreePointer()->thread_init(thread_id_);
   if (key == Manager::kMinReservedKey || key == Manager::kMaxReservedKey) {
     return Status::InvalidArgument("Cannot Put() a reserved key.");
   }
@@ -130,6 +135,7 @@ Status PageGroupedDBImpl::Put(const Key key, const Slice& value) {
 
 Status PageGroupedDBImpl::Get(const Key key, std::string* value_out) {
   if (!mgr_.has_value()) return Status::NotFound("DB is empty.");
+  cache_.GetMasstreePointer()->thread_init(thread_id_);
   if (key == Manager::kMinReservedKey || key == Manager::kMaxReservedKey) {
     return Status::NotFound("Reserved keys cannot be used.");
   }
@@ -179,6 +185,7 @@ Status PageGroupedDBImpl::GetRange(
     results_out->clear();
     return Status::OK();
   }
+  cache_.GetMasstreePointer()->thread_init(thread_id_);
   if (start_key == Manager::kMinReservedKey ||
       start_key == Manager::kMaxReservedKey) {
     return Status::InvalidArgument(

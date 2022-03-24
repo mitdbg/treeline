@@ -8,7 +8,6 @@
 #include "config.h"
 #include "llsm/pg_db.h"
 #include "llsm/pg_stats.h"
-#include "page_grouping/pg_db_impl.h"
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 
@@ -18,10 +17,6 @@ class PGLLSMInterface {
 
   void InitializeWorker(const std::thread::id& id) {
     llsm::pg::PageGroupedDBStats::Local().Reset();
-    std::hash<std::thread::id> hasher;
-    reinterpret_cast<llsm::pg::PageGroupedDBImpl*>(db_)
-        ->GetMasstreePointer()
-        ->thread_init(hasher(id));
   }
 
   void ShutdownWorker(const std::thread::id& id) {
