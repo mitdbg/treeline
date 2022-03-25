@@ -2,6 +2,7 @@ from itertools import product
 
 JOBS = [
   "psync-4k",
+  "psync-8k",
   "psync-16k",
   "psync-64k",
   "uring-4k",
@@ -49,4 +50,12 @@ group(
     ":write-nvme_ssd_raw-{}".format(jobfile)
     for jobfile in JOBS
   ],
+)
+
+combine(
+  name="rand-sweep",
+  deps=[
+    ":write-nvme_ssd_ext4-{}".format(jobfile)
+    for jobfile in JOBS if "psync" in jobfile
+  ]
 )
