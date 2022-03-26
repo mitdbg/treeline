@@ -105,7 +105,8 @@ Status PageGroupedDBImpl::BulkLoad(const std::vector<Record>& records) {
   return Status::OK();
 }
 
-Status PageGroupedDBImpl::Put(const Key key, const Slice& value) {
+Status PageGroupedDBImpl::Put(const WriteOptions& options, const Key key,
+                              const Slice& value) {
   if (!mgr_.has_value()) {
     return Status::NotSupported(
         "DB must be bulk loaded before any writes are allowed.");

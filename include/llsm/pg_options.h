@@ -59,5 +59,12 @@ struct PageGroupedDBOptions {
   bool parallelize_final_flush = false;
 };
 
+struct WriteOptions {
+  // Optional hint that this write is an update for a key that already exists in
+  // the database. Correctness is unaffecterd even if this flag is set
+  // incorrectly, but performance might be.
+  bool is_update = false;
+};
+
 }  // namespace pg
 }  // namespace llsm

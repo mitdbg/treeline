@@ -71,8 +71,8 @@ TEST_F(PGDBTest, LoadReadWriteRead) {
 
   // Write.
   const std::string new_value = "Test 2";
-  ASSERT_TRUE(db->Put(102, new_value).ok());
-  ASSERT_TRUE(db->Put(20, new_value).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 102, new_value).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 20, new_value).ok());
 
   // Read.
   ASSERT_TRUE(db->Get(10, &out).ok());
@@ -103,9 +103,9 @@ TEST_F(PGDBTest, LoadWriteScanReopenScan) {
 
   // Write.
   const std::string new_value = "Test 2";
-  ASSERT_TRUE(db->Put(102, new_value).ok());
-  ASSERT_TRUE(db->Put(20, new_value).ok());
-  ASSERT_TRUE(db->Put(1001, new_value).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 102, new_value).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 20, new_value).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 1001, new_value).ok());
 
   // Scan.
   std::vector<Record> expected(dataset);
@@ -160,9 +160,9 @@ TEST_F(PGDBTest, ScanAmount) {
 
   // Write (insert).
   const std::string new_value = "Test 2";
-  ASSERT_TRUE(db->Put(101, new_value).ok());
-  ASSERT_TRUE(db->Put(102, new_value).ok());
-  ASSERT_TRUE(db->Put(103, new_value).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 101, new_value).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 102, new_value).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 103, new_value).ok());
 
   const std::vector<Record> expected = {{101, Slice(new_value)},
                                         {102, Slice(new_value)},
@@ -199,9 +199,9 @@ TEST_F(PGDBTest, LoadParallelFlushReopenScan) {
 
   // Write (update).
   const std::string new_value = "Test 2";
-  ASSERT_TRUE(db->Put(100, new_value).ok());
-  ASSERT_TRUE(db->Put(20, new_value).ok());
-  ASSERT_TRUE(db->Put(510, new_value).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 100, new_value).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 20, new_value).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 510, new_value).ok());
 
   // Reopen.
   delete db;
@@ -252,13 +252,13 @@ TEST_F(PGDBTest, InsertSmaller) {
   ASSERT_TRUE(db->BulkLoad(dataset).ok());
 
   // Insert a few keys that are smaller than the previous smallest key.
-  ASSERT_TRUE(db->Put(9, kLargeValueSlice).ok());
-  ASSERT_TRUE(db->Put(8, kLargeValueSlice).ok());
-  ASSERT_TRUE(db->Put(7, kLargeValueSlice).ok());
-  ASSERT_TRUE(db->Put(6, kLargeValueSlice).ok());
-  ASSERT_TRUE(db->Put(5, kLargeValueSlice).ok());
-  ASSERT_TRUE(db->Put(4, kLargeValueSlice).ok());
-  ASSERT_TRUE(db->Put(3, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 9, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 8, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 7, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 6, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 5, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 4, kLargeValueSlice).ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), 3, kLargeValueSlice).ok());
 
   // Reopen.
   delete db;
@@ -324,9 +324,10 @@ TEST_F(PGDBTest, ReservedKeyUse) {
   ASSERT_TRUE(db->BulkLoad(dataset).ok());
 
   // Put.
-  ASSERT_TRUE(db->Put(0, value).IsInvalidArgument());
+  ASSERT_TRUE(db->Put(WriteOptions(), 0, value).IsInvalidArgument());
   ASSERT_TRUE(
-      db->Put(std::numeric_limits<uint64_t>::max(), value).IsInvalidArgument());
+      db->Put(WriteOptions(), std::numeric_limits<uint64_t>::max(), value)
+          .IsInvalidArgument());
 
   // Get.
   std::string out;

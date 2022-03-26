@@ -56,7 +56,8 @@ class PageGroupedDB {
   //
   // It is not an error if `key` already exists in the database; this method
   // will overwrite the value associated with that key.
-  virtual Status Put(const Key key, const Slice& value) = 0;
+  virtual Status Put(const WriteOptions& options, const Key key,
+                     const Slice& value) = 0;
 
   // Retrieve the value corresponding to `key` and store it in `value_out`.
   //
