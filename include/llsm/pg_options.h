@@ -5,7 +5,7 @@
 namespace llsm {
 namespace pg {
 
-  struct InsertTrackerOptions {
+struct InsertForecastingOptions {
   // The number of inserts in each InsertTracker epoch; the total elements of
   // the equi-depth histogram used for insert forecasting.
   size_t num_inserts_per_epoch = 10000;
@@ -16,8 +16,13 @@ namespace pg {
   // The size of the reservoir sample based on which the partition boundaries
   // are set at the beginning of each epoch.
   size_t sample_size = 1000;
-  
+
+  // The random seed to be used by the insert tracker.
   size_t random_seed = 42;
+
+  // Estimated ratio of (number of records in reorg range) / (number of records
+  // that fit in base pages in reorg range).
+  double overestimation_factor = 1.5;
 };
 
 // Options used by the page-grouped database implementation.
@@ -73,8 +78,8 @@ struct PageGroupedDBOptions {
   // parallel when it shuts down.
   bool parallelize_final_flush = false;
 
-  // Options for the insert tracker, which is used for insert forecasting.
-  InsertTrackerOptions tracker;
+  // Options for insert forecasting.
+  InsertForecastingOptions forecasting;
 };
 
 struct WriteOptions {

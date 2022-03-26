@@ -44,8 +44,8 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
                              std::placeholders::_1)
                  : RecordCache::KeyBoundsFn()) {
   tracker_ = std::make_shared<InsertTracker>(
-      options_.tracker.num_inserts_per_epoch, options_.tracker.num_partitions,
-      options_.tracker.sample_size, options_.tracker.random_seed);
+      options_.forecasting.num_inserts_per_epoch, options_.forecasting.num_partitions,
+      options_.forecasting.sample_size, options_.forecasting.random_seed);
   if (mgr_.has_value()) mgr_->SetTracker(tracker_);
 }
 
