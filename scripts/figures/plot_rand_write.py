@@ -77,7 +77,7 @@ def plot_write_results(df, xlim, peak_seq_bw_mb=1100):
     markers = ["o", "^", "s"]
 
     fig, ax = plt.subplots(
-        figsize=(6.65, 3),
+        figsize=(6.65, 2.8),
         tight_layout=True,
         frameon=False,
     )
