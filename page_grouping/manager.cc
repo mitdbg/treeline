@@ -131,6 +131,10 @@ Manager Manager::Reopen(const fs::path& db,
                  std::move(free));
 }
 
+void Manager::SetTracker(std::shared_ptr<InsertTracker> tracker) {
+  tracker_ = tracker;
+}
+
 Status Manager::Get(const Key& key, std::string* value_out) {
   return GetWithPages(key, value_out).first;
 }

@@ -50,7 +50,7 @@ class PageGroupedDBImpl : public PageGroupedDB {
   std::optional<Manager> mgr_;
   RecordCache cache_;
 
-  std::unique_ptr<InsertTracker> tracker_;
+  std::shared_ptr<InsertTracker> tracker_;
 };
 
 }  // namespace pg

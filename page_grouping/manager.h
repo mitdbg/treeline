@@ -17,6 +17,7 @@
 #include "persist/segment_file.h"
 #include "segment_index.h"
 #include "segment_info.h"
+#include "util/insert_tracker.h"
 #include "util/thread_pool.h"
 #include "workspace.h"
 
@@ -37,6 +38,8 @@ class Manager {
 
   static Manager Reopen(const std::filesystem::path& db,
                         const PageGroupedDBOptions& options);
+
+  void SetTracker(std::shared_ptr<InsertTracker> tracker);
 
   Status Get(const Key& key, std::string* value_out);
 
@@ -184,6 +187,7 @@ class Manager {
   uint32_t next_sequence_number_;
   std::unique_ptr<FreeList> free_;
   std::unique_ptr<ThreadPool> bg_threads_;
+  std::shared_ptr<InsertTracker> tracker_;
 
   // Options passed in when the `Manager` was created.
   PageGroupedDBOptions options_;

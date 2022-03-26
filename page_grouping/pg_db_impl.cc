@@ -43,9 +43,10 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
                  ? std::bind(&PageGroupedDBImpl::GetPageBoundsFor, this,
                              std::placeholders::_1)
                  : RecordCache::KeyBoundsFn()) {
-  tracker_ = std::make_unique<InsertTracker>(
+  tracker_ = std::make_shared<InsertTracker>(
       options_.tracker.num_inserts_per_epoch, options_.tracker.num_partitions,
       options_.tracker.sample_size, options_.tracker.random_seed);
+  if (mgr_.has_value()) mgr_->SetTracker(tracker_);
 }
 
 PageGroupedDBImpl::~PageGroupedDBImpl() {
@@ -106,6 +107,7 @@ Status PageGroupedDBImpl::BulkLoad(const std::vector<Record>& records) {
 
   // Run the bulk load.
   mgr_ = Manager::LoadIntoNew(db_path_, records, options_);
+  mgr_->SetTracker(tracker_);
   return Status::OK();
 }
 
