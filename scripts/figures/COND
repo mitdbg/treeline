@@ -90,3 +90,12 @@ run_command(
     "//scripts/pg_analysis:process_segment_size",
   ],
 )
+
+# Plot the fio random write motivational microbenchmark.
+run_command(
+  name="rand_write",
+  run="python3 plot_rand_write.py",
+  deps=[
+    "//scripts/iochar/write:rand-sweep",
+  ],
+)

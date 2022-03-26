@@ -20,3 +20,10 @@ DATASET_LINESTYLE = {
     "osm": "dashed",
     "synth": "dotted",
 }
+
+RAND_WRITE_COLORS = {
+    "4K": "#397624",
+    "8K": "#9fc55a",
+    "16K": "#958934",
+    "peak": "#875826",
+}

@@ -5,7 +5,7 @@ direct=1
 bs=64k
 size=10g
 time_based
-runtime=10
+runtime=30
 overwrite=1
 fdatasync=1
 thread
