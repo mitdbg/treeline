@@ -252,10 +252,8 @@ Status Manager::RewriteSegmentsImpl(
 
     size_t future_num_keys_estimate =
         current_num_keys_estimate + forecasted_inserts;
-    size_t future_goal_actual = max_records_per_page - 2 * future_delta;
-    size_t future_pages = future_num_keys_estimate / future_goal_actual;
 
-    future_goal = current_num_keys_estimate / future_pages;
+    future_goal *= current_num_keys_estimate / future_num_keys_estimate;
   }
 
   //
