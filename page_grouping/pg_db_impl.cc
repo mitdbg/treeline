@@ -42,7 +42,11 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
              options_.rec_cache_batch_writeout
                  ? std::bind(&PageGroupedDBImpl::GetPageBoundsFor, this,
                              std::placeholders::_1)
-                 : RecordCache::KeyBoundsFn()) {}
+                 : RecordCache::KeyBoundsFn()) {
+  tracker_ = std::make_unique<InsertTracker>(
+      options_.tracker.num_inserts_per_epoch, options_.tracker.num_partitions,
+      options_.tracker.sample_size, options_.tracker.random_seed);
+}
 
 PageGroupedDBImpl::~PageGroupedDBImpl() {
   if (!mgr_.has_value()) return;
