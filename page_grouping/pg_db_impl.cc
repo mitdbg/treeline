@@ -118,14 +118,20 @@ Status PageGroupedDBImpl::Put(const WriteOptions& options, const Key key,
   if (key == Manager::kMinReservedKey || key == Manager::kMaxReservedKey) {
     return Status::InvalidArgument("Cannot Put() a reserved key.");
   }
+  Status s;
   if (!options_.bypass_cache) {
     key_utils::IntKeyAsSlice key_slice(key);
-    return cache_.Put(key_slice.as<Slice>(), value, /*is_dirty=*/true,
-                      format::WriteType::kWrite, RecordCache::kDefaultPriority,
-                      /*safe=*/true);
+    s = cache_.Put(key_slice.as<Slice>(), value, /*is_dirty=*/true,
+                   format::WriteType::kWrite, RecordCache::kDefaultPriority,
+                   /*safe=*/true);
   } else {
-    return mgr_->PutBatch({{key, value}});
+    s = mgr_->PutBatch({{key, value}});
   }
+
+  // Track successful genuine inserts.
+  if (s.ok() && !options.is_update) tracker_->Add(key);
+
+  return s;
 }
 
 Status PageGroupedDBImpl::Get(const Key key, std::string* value_out) {
