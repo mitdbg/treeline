@@ -23,6 +23,10 @@ struct InsertForecastingOptions {
   // Estimated ratio of (number of records in reorg range) / (number of records
   // that fit in base pages in reorg range).
   double overestimation_factor = 1.5;
+
+  // During reorganization, the system will leave sufficient space to
+  // accommodate forecasted inserts for the next `num_future_epochs` epochs.
+  size_t num_future_epochs = 1;
 };
 
 // Options used by the page-grouped database implementation.

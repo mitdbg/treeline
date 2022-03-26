@@ -228,8 +228,8 @@ Status Manager::RewriteSegmentsImpl(
   //
   size_t forecasted_inserts = 0;
   bool forecast_exists = tracker_->GetNumInsertsInKeyRangeForNumFutureEpochs(
-      segments_to_rewrite.front().lower, segments_to_rewrite.back().upper, 1,
-      &forecasted_inserts);
+      segments_to_rewrite.front().lower, segments_to_rewrite.back().upper,
+      options_.forecasting.num_future_epochs, &forecasted_inserts);
 
   size_t future_goal = options_.records_per_page_goal;
   size_t future_delta = options_.records_per_page_delta;
