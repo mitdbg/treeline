@@ -244,7 +244,7 @@ Status PageGroupedDBImpl::GetRange(
     --records_left;
   }
 
-  // Release any remaining locks on record cahe entries.
+  // Release any remaining locks on record cache entries.
   while (cache_it != indices.end()) {
     auto& entry = RecordCache::cache_entries[*cache_it];
     entry.Unlock();
