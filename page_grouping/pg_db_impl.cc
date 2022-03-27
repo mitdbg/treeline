@@ -73,11 +73,6 @@ PageGroupedDBImpl::~PageGroupedDBImpl() {
   mgr_->PutBatchParallel(records);
 }
 
-std::shared_ptr<MasstreeWrapper<RecordCacheEntry>>
-PageGroupedDBImpl::GetMasstreePointer() {
-  return cache_.GetMasstreePointer();
-}
-
 Status PageGroupedDBImpl::BulkLoad(const std::vector<Record>& records) {
   if (mgr_.has_value()) {
     return Status::NotSupported("Cannot bulk load a non-empty DB.");
