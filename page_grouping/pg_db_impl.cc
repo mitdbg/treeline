@@ -36,16 +36,17 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
     : db_path_(std::move(db_path)),
       options_(std::move(options)),
       mgr_(std::move(mgr)),
-      cache_(options.record_cache_capacity,
+      cache_(options_.record_cache_capacity,
              std::bind(&PageGroupedDBImpl::WriteBatch, this,
                        std::placeholders::_1),
              options_.rec_cache_batch_writeout
                  ? std::bind(&PageGroupedDBImpl::GetPageBoundsFor, this,
                              std::placeholders::_1)
-                 : RecordCache::KeyBoundsFn()) {
-  tracker_ = std::make_shared<InsertTracker>(
-      options_.forecasting.num_inserts_per_epoch, options_.forecasting.num_partitions,
-      options_.forecasting.sample_size, options_.forecasting.random_seed);
+                 : RecordCache::KeyBoundsFn()),
+      tracker_(std::make_shared<InsertTracker>(
+          options_.forecasting.num_inserts_per_epoch,
+          options_.forecasting.num_partitions, options_.forecasting.sample_size,
+          options_.forecasting.random_seed)) {
   if (mgr_.has_value()) mgr_->SetTracker(tracker_);
 }
 
