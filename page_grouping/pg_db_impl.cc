@@ -43,10 +43,13 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
                  ? std::bind(&PageGroupedDBImpl::GetPageBoundsFor, this,
                              std::placeholders::_1)
                  : RecordCache::KeyBoundsFn()),
-      tracker_(std::make_shared<InsertTracker>(
-          options_.forecasting.num_inserts_per_epoch,
-          options_.forecasting.num_partitions, options_.forecasting.sample_size,
-          options_.forecasting.random_seed)) {
+      tracker_(options_.forecasting.use_insert_forecasting
+                   ? std::make_shared<InsertTracker>(
+                         options_.forecasting.num_inserts_per_epoch,
+                         options_.forecasting.num_partitions,
+                         options_.forecasting.sample_size,
+                         options_.forecasting.random_seed)
+                   : nullptr) {
   if (mgr_.has_value()) mgr_->SetTracker(tracker_);
 }
 
@@ -132,7 +135,7 @@ Status PageGroupedDBImpl::Put(const WriteOptions& options, const Key key,
   }
 
   // Track successful genuine inserts.
-  if (s.ok() && !options.is_update) tracker_->Add(key);
+  if (tracker_ != nullptr && s.ok() && !options.is_update) tracker_->Add(key);
 
   return s;
 }

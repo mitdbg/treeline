@@ -6,6 +6,8 @@ namespace llsm {
 namespace pg {
 
 struct InsertForecastingOptions {
+  bool use_insert_forecasting = true;
+
   // The number of inserts in each InsertTracker epoch; the total elements of
   // the equi-depth histogram used for insert forecasting.
   size_t num_inserts_per_epoch = 10000;

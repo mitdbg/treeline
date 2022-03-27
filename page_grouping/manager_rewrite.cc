@@ -227,9 +227,13 @@ Status Manager::RewriteSegmentsImpl(
   // Insert forecasting
   //
   size_t forecasted_inserts = 0;
-  bool forecast_exists = tracker_->GetNumInsertsInKeyRangeForNumFutureEpochs(
-      segments_to_rewrite.front().lower, segments_to_rewrite.back().upper,
-      options_.forecasting.num_future_epochs, &forecasted_inserts);
+  bool forecast_exists =
+      (tracker_ != nullptr)
+          ? tracker_->GetNumInsertsInKeyRangeForNumFutureEpochs(
+                segments_to_rewrite.front().lower,
+                segments_to_rewrite.back().upper,
+                options_.forecasting.num_future_epochs, &forecasted_inserts)
+          : false;
 
   size_t future_goal = options_.records_per_page_goal;
   size_t future_delta = options_.records_per_page_delta;

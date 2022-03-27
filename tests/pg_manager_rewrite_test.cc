@@ -74,7 +74,6 @@ TEST_F(PGManagerRewriteTest, AppendSegments) {
 
   {
     Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
-    m.SetTracker(std::make_shared<InsertTracker>(10000,10,1000));
     ASSERT_EQ(m.NumSegmentFiles(), 5);
 
     // Make the inserts.
@@ -94,7 +93,6 @@ TEST_F(PGManagerRewriteTest, AppendSegments) {
   // Read from reopened DB.
   {
     Manager m = Manager::Reopen(kDBDir, options);
-    m.SetTracker(std::make_shared<InsertTracker>(10000,10,1000));
     ASSERT_EQ(m.NumSegmentFiles(), 5);
 
     // Read the inserted values using a scan.
@@ -132,7 +130,6 @@ TEST_F(PGManagerRewriteTest, AppendPages) {
 
   {
     Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
-    m.SetTracker(std::make_shared<InsertTracker>(10000,10,1000));
     ASSERT_EQ(m.NumSegmentFiles(), 1);
 
     // Make the inserts.
@@ -152,7 +149,6 @@ TEST_F(PGManagerRewriteTest, AppendPages) {
   // Read from reopened DB.
   {
     Manager m = Manager::Reopen(kDBDir, options);
-    m.SetTracker(std::make_shared<InsertTracker>(10000,10,1000));
     ASSERT_EQ(m.NumSegmentFiles(), 1);
 
     // Read the inserted values using a scan.
@@ -216,7 +212,6 @@ TEST_F(PGManagerRewriteTest, InsertMiddleSegments) {
 
   {
     Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
-    m.SetTracker(std::make_shared<InsertTracker>(10000,10,1000));
     ASSERT_EQ(m.NumSegmentFiles(), 5);
 
     // Make the inserts.
@@ -235,7 +230,6 @@ TEST_F(PGManagerRewriteTest, InsertMiddleSegments) {
   // Read from reopened DB.
   {
     Manager m = Manager::Reopen(kDBDir, options);
-    m.SetTracker(std::make_shared<InsertTracker>(10000,10,1000));
     ASSERT_EQ(m.NumSegmentFiles(), 5);
 
     // Read the inserted values using a scan.
@@ -298,7 +292,6 @@ TEST_F(PGManagerRewriteTest, InsertMiddlePages) {
 
   {
     Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
-    m.SetTracker(std::make_shared<InsertTracker>(10000,10,1000));
     ASSERT_EQ(m.NumSegmentFiles(), 1);
 
     // Make the inserts.
@@ -317,7 +310,6 @@ TEST_F(PGManagerRewriteTest, InsertMiddlePages) {
   // Read from reopened DB.
   {
     Manager m = Manager::Reopen(kDBDir, options);
-    m.SetTracker(std::make_shared<InsertTracker>(10000,10,1000));
     ASSERT_EQ(m.NumSegmentFiles(), 1);
 
     // Read the inserted values using a scan.
