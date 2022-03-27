@@ -132,7 +132,7 @@ Manager Manager::Reopen(const fs::path& db,
 }
 
 void Manager::SetTracker(std::shared_ptr<InsertTracker> tracker) {
-  tracker_ = tracker;
+  tracker_ = std::move(tracker);
 }
 
 Status Manager::Get(const Key& key, std::string* value_out) {
