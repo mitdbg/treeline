@@ -12,6 +12,7 @@
 #include "llsm/slice.h"
 #include "manager.h"
 #include "record_cache/record_cache.h"
+#include "util/insert_tracker.h"
 
 namespace llsm {
 namespace pg {
@@ -26,7 +27,8 @@ class PageGroupedDBImpl : public PageGroupedDB {
   PageGroupedDBImpl& operator=(const PageGroupedDBImpl&) = delete;
 
   Status BulkLoad(const std::vector<Record>& records) override;
-  Status Put(const Key key, const Slice& value) override;
+  Status Put(const WriteOptions& options, const Key key,
+             const Slice& value) override;
   Status Get(const Key key, std::string* value_out) override;
   Status GetRange(
       const Key start_key, const size_t num_records,
@@ -47,6 +49,8 @@ class PageGroupedDBImpl : public PageGroupedDB {
   // Otherwise this is always non-empty.
   std::optional<Manager> mgr_;
   RecordCache cache_;
+
+  std::shared_ptr<InsertTracker> tracker_;
 };
 
 }  // namespace pg

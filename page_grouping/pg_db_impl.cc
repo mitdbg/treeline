@@ -40,13 +40,22 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
     : db_path_(std::move(db_path)),
       options_(std::move(options)),
       mgr_(std::move(mgr)),
-      cache_(options.record_cache_capacity,
+      cache_(options_.record_cache_capacity,
              std::bind(&PageGroupedDBImpl::WriteBatch, this,
                        std::placeholders::_1),
              options_.rec_cache_batch_writeout
                  ? std::bind(&PageGroupedDBImpl::GetPageBoundsFor, this,
                              std::placeholders::_1)
-                 : RecordCache::KeyBoundsFn()) {}
+                 : RecordCache::KeyBoundsFn()),
+      tracker_(options_.forecasting.use_insert_forecasting
+                   ? std::make_shared<InsertTracker>(
+                         options_.forecasting.num_inserts_per_epoch,
+                         options_.forecasting.num_partitions,
+                         options_.forecasting.sample_size,
+                         options_.forecasting.random_seed)
+                   : nullptr) {
+  if (mgr_.has_value()) mgr_->SetTracker(tracker_);
+}
 
 PageGroupedDBImpl::~PageGroupedDBImpl() {
   if (!mgr_.has_value()) return;
@@ -106,10 +115,12 @@ Status PageGroupedDBImpl::BulkLoad(const std::vector<Record>& records) {
 
   // Run the bulk load.
   mgr_ = Manager::LoadIntoNew(db_path_, records, options_);
+  mgr_->SetTracker(tracker_);
   return Status::OK();
 }
 
-Status PageGroupedDBImpl::Put(const Key key, const Slice& value) {
+Status PageGroupedDBImpl::Put(const WriteOptions& options, const Key key,
+                              const Slice& value) {
   if (!mgr_.has_value()) {
     return Status::NotSupported(
         "DB must be bulk loaded before any writes are allowed.");
@@ -118,14 +129,20 @@ Status PageGroupedDBImpl::Put(const Key key, const Slice& value) {
   if (key == Manager::kMinReservedKey || key == Manager::kMaxReservedKey) {
     return Status::InvalidArgument("Cannot Put() a reserved key.");
   }
+  Status s;
   if (!options_.bypass_cache) {
     key_utils::IntKeyAsSlice key_slice(key);
-    return cache_.Put(key_slice.as<Slice>(), value, /*is_dirty=*/true,
-                      format::WriteType::kWrite, RecordCache::kDefaultPriority,
-                      /*safe=*/true);
+    s = cache_.Put(key_slice.as<Slice>(), value, /*is_dirty=*/true,
+                   format::WriteType::kWrite, RecordCache::kDefaultPriority,
+                   /*safe=*/true);
   } else {
-    return mgr_->PutBatch({{key, value}});
+    s = mgr_->PutBatch({{key, value}});
   }
+
+  // Track successful genuine inserts.
+  if (tracker_ != nullptr && s.ok() && !options.is_update) tracker_->Add(key);
+
+  return s;
 }
 
 Status PageGroupedDBImpl::Get(const Key key, std::string* value_out) {

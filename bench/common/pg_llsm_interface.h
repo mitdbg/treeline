@@ -105,12 +105,16 @@ class PGLLSMInterface {
 
   // Update the value at the specified key. Return true if the update succeeded.
   bool Update(ycsbr::Request::Key key, const char* value, size_t value_size) {
-    return Insert(key, value, value_size);
+    llsm::pg::WriteOptions options;
+    options.is_update = true;
+    return db_->Put(options, key, llsm::Slice(value, value_size)).ok();
   }
 
   // Insert the specified key value pair. Return true if the insert succeeded.
   bool Insert(ycsbr::Request::Key key, const char* value, size_t value_size) {
-    return db_->Put(key, llsm::Slice(value, value_size)).ok();
+    llsm::pg::WriteOptions options;
+    options.is_update = false;
+    return db_->Put(options, key, llsm::Slice(value, value_size)).ok();
   }
 
   // Read the value at the specified key. Return true if the read succeeded.

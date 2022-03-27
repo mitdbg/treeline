@@ -58,7 +58,8 @@ bool ValidateLLSMPageFillPct(const char* flagname, uint32_t pct) {
 
 }  // namespace
 
-DEFINE_string(db, "all", "Which database(s) to use {all, rocksdb, llsm, leanstore}.");
+DEFINE_string(db, "all",
+              "Which database(s) to use {all, rocksdb, llsm, leanstore}.");
 DEFINE_validator(db, &ValidateDB);
 
 DEFINE_string(db_path, llsm::bench::GetDefaultDBPath(),
@@ -162,6 +163,32 @@ DEFINE_bool(
     skip_load, false,
     "If set to true, the workload runner will skip the initial data load.");
 
+DEFINE_bool(use_insert_forecasting, true, "Whether to use insert forecasting.");
+
+DEFINE_uint64(
+    num_inserts_per_epoch, 10000,
+    "The number of inserts in each InsertTracker epoch; the total elements of "
+    "the equi-depth histogram used for insert forecasting.");
+
+DEFINE_uint64(num_partitions, 10,
+              "The number of bins in the insert forecasitng histogram.");
+
+DEFINE_uint64(sample_size, 1000,
+              "The size of the reservoir sample based on which the partition "
+              "boundaries are set at the beginning of each epoch.");
+
+DEFINE_uint64(random_seed, 42,
+              "The random seed to be used by the insert tracker.");
+
+DEFINE_double(overestimation_factor, 1.5,
+              "Estimated ratio of (number of records in reorg range) / (number "
+              "of records that fit in base pages in reorg range).");
+
+DEFINE_uint64(
+    num_future_epochs, 1,
+    "During reorganization, the system will leave sufficient space to "
+    "accommodate forecasted inserts for the next `num_future_epochs` epochs.");
+
 namespace llsm {
 namespace bench {
 
@@ -255,6 +282,14 @@ llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
   options.rec_cache_batch_writeout = FLAGS_rec_cache_batch_writeout;
   options.parallelize_final_flush = FLAGS_pg_parallelize_final_flush;
   options.optimistic_caching = FLAGS_optimistic_rec_caching;
+
+  options.forecasting.use_insert_forecasting = FLAGS_use_insert_forecasting;
+  options.forecasting.num_inserts_per_epoch = FLAGS_num_inserts_per_epoch;
+  options.forecasting.num_partitions = FLAGS_num_partitions;
+  options.forecasting.sample_size = FLAGS_sample_size;
+  options.forecasting.random_seed = FLAGS_random_seed;
+  options.forecasting.overestimation_factor = FLAGS_overestimation_factor;
+  options.forecasting.num_future_epochs = FLAGS_num_future_epochs;
   return options;
 }
 

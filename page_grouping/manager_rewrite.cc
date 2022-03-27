@@ -222,14 +222,56 @@ Status Manager::RewriteSegmentsImpl(
   const uint32_t sequence_number = next_sequence_number_++;
 
   CircularPageBuffer page_buf(SegmentBuilder::SegmentPageCounts().back() * 4);
-  SegmentBuilder seg_builder(options_.records_per_page_goal,
-                             options_.records_per_page_delta);
+
+  //
+  // Insert forecasting
+  //
+  size_t forecasted_inserts = 0;
+  bool forecast_exists =
+      (tracker_ != nullptr)
+          ? tracker_->GetNumInsertsInKeyRangeForNumFutureEpochs(
+                segments_to_rewrite.front().lower,
+                segments_to_rewrite.back().upper,
+                options_.forecasting.num_future_epochs, &forecasted_inserts)
+          : false;
+
+  size_t future_goal = options_.records_per_page_goal;
+  size_t future_delta = options_.records_per_page_delta;
+
+  if (forecast_exists) {
+    size_t current_pages = 0;
+    for (auto& seg : segments_to_rewrite) {
+      current_pages += seg.sinfo.page_count();
+    }
+
+    // The default parameter combination must be viable for counting the max
+    // records per page.
+    size_t max_records_per_page =
+        options_.records_per_page_goal + 2 * options_.records_per_page_delta;
+
+    // Estimate total current keys in range, assumming some reocrds in overflows
+    // and some extra records in cache.
+    size_t current_num_keys_estimate =
+        options_.forecasting.overestimation_factor * current_pages *
+        max_records_per_page;
+
+    size_t future_num_keys_estimate =
+        current_num_keys_estimate + forecasted_inserts;
+
+    future_goal *= current_num_keys_estimate / future_num_keys_estimate;
+  }
+
+  //
+  // End insert forecasting
+  //
+
+  SegmentBuilder seg_builder(future_goal, future_delta);
 
   // Keeps track of the pages in memory (the "sliding window"). The pages'
   // backing memory is in `page_buf`. The page chains in the deques are sorted
   // in ascending order (by key).
   //
-  // `pages_to_process` contains page chains that need to be offered to the
+  // `pages_to_process` contains page chains that need to be offered to
   // `SegmentBuilder`. `pages_processed` contains chains that have been offered
   // to the `SegmentBuilder` but who still need to be kept around in memory
   // (because their records have not yet been written to new segments).
