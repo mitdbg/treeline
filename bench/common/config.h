@@ -107,6 +107,31 @@ DECLARE_bool(optimistic_rec_caching);
 // If set to true, the workload runner will skip the initial data load.
 DECLARE_bool(skip_load);
 
+// Whether to use insert forecasting.
+DECLARE_bool(use_insert_forecasting);
+
+// The number of inserts in each InsertTracker epoch; the total elements of
+// the equi-depth histogram used for insert forecasting.
+DECLARE_uint64(num_inserts_per_epoch);
+
+// The number of bins in the insert forecasitng histogram.
+DECLARE_uint64(num_partitions);
+
+// The size of the reservoir sample based on which the partition boundaries
+// are set at the beginning of each epoch.
+DECLARE_uint64(sample_size);
+
+// The random seed to be used by the insert tracker.
+DECLARE_uint64(random_seed);
+
+// Estimated ratio of (number of records in reorg range) / (number of records
+// that fit in base pages in reorg range).
+DECLARE_double(overestimation_factor);
+
+// During reorganization, the system will leave sufficient space to
+// accommodate forecasted inserts for the next `num_future_epochs` epochs.
+DECLARE_uint64(num_future_epochs);
+
 namespace llsm {
 namespace bench {
 
