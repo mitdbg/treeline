@@ -129,6 +129,9 @@ class RecordCache {
   // with any other public methods.
   uint64_t GetSizeFootprintEstimate() const;
 
+  // A pointer to the Masstree wrapper used by the cache.
+  std::shared_ptr<MasstreeWrapper<RecordCacheEntry>> GetMasstreePointer();
+
  private:
   // Implements `GetRange` but adds private functionality to avoid locking a
   // specific cache entry (used during writeout).
@@ -187,7 +190,7 @@ class RecordCache {
   // records from the same page when writing out a dirty record.
   KeyBoundsFn key_bounds_;
 
-  std::unique_ptr<MasstreeWrapper<RecordCacheEntry>> tree_;
+  std::shared_ptr<MasstreeWrapper<RecordCacheEntry>> tree_;
 };
 
 }  // namespace llsm

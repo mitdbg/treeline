@@ -12,7 +12,7 @@ RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out,
       clock_(0),
       write_out_(std::move(write_out)),
       key_bounds_(std::move(key_bounds)) {
-  tree_ = std::make_unique<MasstreeWrapper<RecordCacheEntry>>();
+  tree_ = std::make_shared<MasstreeWrapper<RecordCacheEntry>>();
   cache_entries.resize(capacity_);
 }
 
@@ -321,6 +321,11 @@ uint64_t RecordCache::GetSizeFootprintEstimate() const {
     entry_payloads += cache_entries[i].GetValue().size();
   }
   return entries + entry_payloads + sizeof(*this);
+}
+
+std::shared_ptr<MasstreeWrapper<RecordCacheEntry>>
+RecordCache::GetMasstreePointer() {
+  return tree_;
 }
 
 }  // namespace llsm
