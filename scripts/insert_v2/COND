@@ -59,7 +59,13 @@ COMMON_OPTIONS = {
 }
 
 FORECASTING_OPTIONS = {
-  # TODO: Set the insert forecasting knobs as needed here.
+  "use_insert_forecasting": True,
+  "num_inserts_per_epoch": 10000,
+  "num_partitions": 10,
+  "sample_size": 1000,
+  "random_seed": 42,
+  "overestimation_factor": 1.5,
+  "num_future_epochs": 1,
 }
 
 TAXI_DATASET = {
