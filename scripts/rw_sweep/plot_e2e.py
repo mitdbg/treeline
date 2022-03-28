@@ -11,6 +11,13 @@ DISTRIBUTIONS = ["uniform", "zipfian"]
 DB_FORMAT = {
     "llsm": "LLSM (ours)",
     "rocksdb": "RocksDB",
+    "pg_llsm": "TreeLine",
+}
+
+MARKER = {
+    "llsm": "s",
+    "rocksdb": "^",
+    "pg_llsm": "o",
 }
 
 
@@ -28,7 +35,8 @@ def plot_e2e(
         tight_layout=True,
         frameon=False,
     )
-    dbs = df["db"].unique()
+    # Plotting order: Disk-based B-tree, RocksDB, TreeLine
+    dbs = ["llsm", "rocksdb", "pg_llsm"]
     for db in dbs:
         df_filter = (
             (df["db"] == db)
@@ -44,6 +52,7 @@ def plot_e2e(
             data["krequests_per_s"],
             marker="o",
             markersize=5,
+            marker=MARKER[db],
             label=DB_FORMAT[db],
         )
     if show_legend:
@@ -51,6 +60,7 @@ def plot_e2e(
             edgecolor="#000000",
             fancybox=False,
             framealpha=1,
+            loc="upper left",
         )
     ax.set_ylabel("Throughput (kreq/s)")
     ax.set_xlabel("Update Percentage (%)")
@@ -68,7 +78,7 @@ def plot_e2e(
             & (df["update_pct"] == 100)
         ]
         max_val = rel["krequests_per_s"].iloc[0]
-        fig.text(0.82, 0.94, "{:.2f}".format(max_val))
+        fig.text(0.8, 0.94, "{:.2f}".format(max_val))
 
     return fig, ax
 
