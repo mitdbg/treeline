@@ -80,6 +80,18 @@ DECLARE_bool(use_alex);
 // use of bloom filters.
 DECLARE_uint32(rdb_bloom_bits);
 
+// The number of bytes to include in a prefix bloom filter. This is only used
+// when bloom filters are enabled (see the flag above). Set to 0 to disable the
+// use of prefix bloom filters.
+DECLARE_uint32(rdb_prefix_bloom_size);
+
+// Page grouping configuration options.
+DECLARE_bool(pg_use_segments);
+DECLARE_uint64(records_per_page_goal);
+DECLARE_uint64(records_per_page_delta);
+DECLARE_bool(pg_use_memory_based_io);
+DECLARE_bool(pg_bypass_cache);
+
 namespace llsm {
 namespace bench {
 

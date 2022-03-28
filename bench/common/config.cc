@@ -9,6 +9,7 @@
 
 #include "db/page.h"
 #include "rocksdb/filter_policy.h"
+#include "rocksdb/slice_transform.h"
 #include "rocksdb/table.h"
 
 namespace {
@@ -120,6 +121,10 @@ DEFINE_bool(use_alex, true,
 DEFINE_uint32(rdb_bloom_bits, 0,
               "The number of bloom filter bits to use in RocksDB. Set to 0 to "
               "disable the use of bloom filters.");
+DEFINE_uint32(rdb_prefix_bloom_size, 0,
+              "The number of bytes to include in a prefix bloom filter. This "
+              "is only used when bloom filters are enabled (see the flag "
+              "above). Set to 0 to disable the use of prefix bloom filters.");
 
 // The minimum length of an overflow chain for which reorganization is
 // triggered.
@@ -167,6 +172,18 @@ rocksdb::Options BuildRocksDBOptions() {
     }
     table_options.filter_policy.reset(
         rocksdb::NewBloomFilterPolicy(FLAGS_rdb_bloom_bits, false));
+
+    if (FLAGS_rdb_prefix_bloom_size > 0) {
+      options.prefix_extractor.reset(
+          rocksdb::NewCappedPrefixTransform(FLAGS_rdb_prefix_bloom_size));
+      if (FLAGS_verbose) {
+        std::cerr
+            << "> RocksDB using prefix bloom filters with a prefix of size "
+            << FLAGS_rdb_prefix_bloom_size << std::endl;
+      }
+    } else if (FLAGS_verbose) {
+      std::cerr << "> RocksDB is NOT using prefix bloom filters." << std::endl;
+    }
   } else if (FLAGS_verbose) {
     std::cerr << "> RocksDB is NOT using bloom filters." << std::endl;
   }

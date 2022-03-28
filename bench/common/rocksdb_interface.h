@@ -88,7 +88,9 @@ class RocksDBInterface {
   // Read the value at the specified key. Return true if the read succeeded.
   bool Read(ycsbr::Request::Key key, std::string* value_out) {
     const llsm::key_utils::IntKeyAsSlice strkey(key);
-    const rocksdb::ReadOptions options;
+    rocksdb::ReadOptions options;
+    // See https://github.com/facebook/rocksdb/wiki/Prefix-Seek#adaptive-prefix-mode
+    options.auto_prefix_mode = true;
     auto status = db_->Get(options, strkey.as<rocksdb::Slice>(), value_out);
     return status.ok();
   }
@@ -116,7 +118,9 @@ class RocksDBInterface {
     scan_out->clear();
     scan_out->reserve(amount);
     const llsm::key_utils::IntKeyAsSlice strkey(key);
-    const rocksdb::ReadOptions options;
+    rocksdb::ReadOptions options;
+    // See https://github.com/facebook/rocksdb/wiki/Prefix-Seek#adaptive-prefix-mode
+    options.auto_prefix_mode = true;
     rocksdb::Iterator* it = db_->NewIterator(options);
     it->Seek(strkey.as<rocksdb::Slice>());
     while (it->Valid() && scan_out->size() < amount) {
