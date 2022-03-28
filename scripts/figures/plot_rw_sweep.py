@@ -9,6 +9,13 @@ plt.rcParams["font.size"] = 14
 DB_FORMAT = {
     "llsm": "Disk-Based B-Tree",
     "rocksdb": "RocksDB",
+    "pg_llsm": "TreeLine",
+}
+
+MARKER = {
+    "llsm": "s",
+    "rocksdb": "^",
+    "pg_llsm": "o",
 }
 
 
@@ -29,7 +36,8 @@ def plot_e2e(
         tight_layout=True,
         frameon=False,
     )
-    dbs = df["db"].unique()
+    # Plotting order: Disk-based B-tree, RocksDB, TreeLine
+    dbs = ["llsm", "rocksdb", "pg_llsm"]
     for db in dbs:
         df_filter = (
             (df["db"] == db)
@@ -43,18 +51,18 @@ def plot_e2e(
         ax.plot(
             data["update_pct"],
             data["krequests_per_s"],
-            marker="o" if db == "llsm" else "^",
+            marker=MARKER[db],
             markersize=markersize,
             linewidth=linewidth,
             label=DB_FORMAT[db],
-            color=COLORS[db] if db == "rocksdb" else "#762439",
+            color="#762439" if db == "llsm" else COLORS[db],
         )
     if show_legend:
         ax.legend(
             edgecolor="#000000",
             fancybox=False,
             framealpha=1,
-            loc="lower right",
+            loc="upper left",
         )
     ax.set_ylabel("Throughput (kreq/s)")
     ax.set_xlabel("Update Percentage (%)")
@@ -72,7 +80,7 @@ def plot_e2e(
             & (df["update_pct"] == 100)
         ]
         max_val = rel["krequests_per_s"].iloc[0]
-        fig.text(0.8, 0.93, "{:.2f}".format(max_val))
+        fig.text(0.8, 0.94, "{:.2f}".format(max_val))
 
     return fig, ax
 

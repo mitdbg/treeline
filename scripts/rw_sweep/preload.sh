@@ -78,7 +78,9 @@ fi
 
 if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
   # PGLLSM - Use memory-based I/O to help the load run faster.
+  echo >&2 "Loading the dataset..."
   ../../build/bench/run_custom \
+    ${args[@]} \
     --db=pg_llsm \
     --db_path=$full_checkpoint_path \
     --bg_threads=16 \
@@ -86,5 +88,25 @@ if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
     --seed=$SEED \
     --verbose \
     --pg_use_memory_based_io=true \
-    ${args[@]}
+    --skip_workload
+
+  # 2. Shuffle the on-disk pages.
+  echo >&2 "Done loading. Shuffling the pages now..."
+  ../../build/page_grouping/pg_shuffle \
+    --db_path=$full_checkpoint_path/pg_llsm \
+    --seed=$SEED
+
+  # 3. Run the preload workload.
+  echo >&2 "Done shuffling. Running the setup workload now..."
+  ../../build/bench/run_custom \
+    ${args[@]} \
+    --db=pg_llsm \
+    --bg_threads=16 \
+    --db_path=$full_checkpoint_path \
+    --workload_config=$COND_OUT/workload.yml \
+    --pg_use_memory_based_io \
+    --seed=$SEED \
+    --verbose \
+    --skip_load \
+    --output_path=$COND_OUT
 fi

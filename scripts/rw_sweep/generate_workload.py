@@ -9,16 +9,16 @@ record_size_bytes: {record_size_bytes}
 load:
   num_records: {num_records}
   distribution:
-    type: uniform
-    range_min: 1
-    range_max: 2000000000
+    type: linspace
+    start_key: 1000
+    step_size: 1000
 
 """
 
 ZIPFIAN = """\
     distribution:
       type: zipfian
-      theta: 0.99\
+      theta: 0.79\
 """
 
 UNIFORM = """\

@@ -13,7 +13,7 @@ run_command(
     "distribution": "zipfian",
     "record_size_bytes": 64,
     "y_min": 0,
-    "y_max": 500,
+    "y_max": 650,
   },
   deps=["//scripts/rw_sweep:combine-figure"],
 )
