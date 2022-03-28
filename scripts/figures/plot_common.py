@@ -1,6 +1,7 @@
 COLORS = {
     "pg_llsm": "#397624",
     "rocksdb": "#ffbf00",
+    "leanstore": "#3d949d",
 }
 
 DATASET_MAP = {

@@ -1,7 +1,7 @@
 from itertools import product
 
 WORKLOADS = [
-  "a", "b", "c", "d", "scan_only", "f",
+  "a", "b", "c", "d", "e", "f",
 ]
 
 DBS = [
@@ -77,9 +77,6 @@ COMMON_OPTIONS = {
   "use_alex": False,
   "deferral_autotuning": True,
   "max_deferrals": 1,
-
-  # Temporary: Disable batching when evicting from the cache.
-  "rec_cache_batch_writeout": False,
 
   # Affects LLSM and page-grouped LLSM
   "optimistic_rec_caching": False,
@@ -208,7 +205,7 @@ ALL_EXPERIMENTS = [
 MAIN = [
   exp_name
   for exp_name in ALL_EXPERIMENTS
-  if ("amzn" in exp_name) or ("scan_only" in exp_name)
+  if ("amzn" in exp_name) or ("-e-" in exp_name)
 ]
 
 MAIN_ZIPFIAN = [
@@ -237,6 +234,13 @@ combine(name="main", deps=MAIN)
 combine(name="main-zipfian", deps=MAIN_ZIPFIAN)
 combine(name="main-pg_llsm", deps=MAIN_PGLLSM)
 combine(name="main-pg_llsm-zipfian", deps=MAIN_PGLLSM_ZIPFIAN)
+
+combine(
+  name="main-ycsb-e",
+  deps=[
+    exp_name for exp_name in MAIN if "-e-" in exp_name
+  ],
+)
 
 # The tasks below are used for dividing up the experiments across 2 machines.
 

@@ -13,28 +13,48 @@ plt.rcParams["font.size"] = 18
 
 
 def process_data(raw_results):
+    join_cols = ["dataset", "config", "dist", "workload", "threads"]
+    relevant_cols = [*join_cols, "krequests_per_s"]
+
     pg_llsm = raw_results[raw_results["db"] == "pg_llsm"]
     rocksdb = raw_results[raw_results["db"] == "rocksdb"]
-    pg_llsm_res = pg_llsm[
-        ["dataset", "config", "dist", "workload", "threads", "krequests_per_s"]
-    ]
-    rocksdb_res = rocksdb[
-        ["dataset", "config", "dist", "workload", "threads", "krequests_per_s"]
-    ]
-    combined = pd.merge(
-        pg_llsm_res,
-        rocksdb_res,
-        on=["dataset", "config", "dist", "workload", "threads"],
-        suffixes=["_pg_llsm", "_rocksdb"],
+    leanstore = raw_results[raw_results["db"] == "leanstore"]
+
+    pg_llsm_res = pg_llsm[relevant_cols]
+    rocksdb_res = rocksdb[relevant_cols]
+    leanstore_res = leanstore[relevant_cols]
+
+    pg_llsm_res = pg_llsm_res.rename(
+        columns={"krequests_per_s": "krequests_per_s_pg_llsm"}
     )
-    combined["speedup"] = (
+    rocksdb_res = rocksdb_res.rename(
+        columns={"krequests_per_s": "krequests_per_s_rocksdb"}
+    )
+    leanstore_res = leanstore_res.rename(
+        columns={"krequests_per_s": "krequests_per_s_leanstore"}
+    )
+
+    combined = pd.merge(pg_llsm_res, rocksdb_res, on=join_cols)
+    combined = pd.merge(combined, leanstore_res, on=join_cols)
+    combined["speedup_over_rocksdb"] = (
         combined["krequests_per_s_pg_llsm"] / combined["krequests_per_s_rocksdb"]
+    )
+    combined["speedup_over_leanstore"] = (
+        combined["krequests_per_s_pg_llsm"] / combined["krequests_per_s_leanstore"]
     )
     return combined
 
 
 def plot_scale(
-    ax, data, config, dataset, workload, legend_pos=None, show_ylabel=False, ylim=None
+    ax,
+    data,
+    config,
+    dataset,
+    workload,
+    legend_pos=None,
+    show_ylabel=False,
+    ylim=None,
+    legend_order=None,
 ):
     relevant = data[
         (data["config"] == config)
@@ -45,15 +65,7 @@ def plot_scale(
     linewidth = 3.5
     markersize = 15
 
-    ax.plot(
-        relevant["threads"],
-        relevant["krequests_per_s_pg_llsm"],
-        color=COLORS["pg_llsm"],
-        marker="o",
-        linewidth=linewidth,
-        markersize=markersize,
-        label="TreeLine",
-    )
+    # Always plot TreeLine last so that its line is painted on top.
     ax.plot(
         relevant["threads"],
         relevant["krequests_per_s_rocksdb"],
@@ -63,18 +75,46 @@ def plot_scale(
         markersize=markersize,
         label="RocksDB",
     )
+    ax.plot(
+        relevant["threads"],
+        relevant["krequests_per_s_leanstore"],
+        color=COLORS["leanstore"],
+        marker="s",
+        linewidth=linewidth,
+        markersize=markersize,
+        label="LeanStore",
+    )
+    ax.plot(
+        relevant["threads"],
+        relevant["krequests_per_s_pg_llsm"],
+        color=COLORS["pg_llsm"],
+        marker="o",
+        linewidth=linewidth,
+        markersize=markersize,
+        label="TreeLine",
+    )
 
     ax.set_xlabel("Threads")
     ax.set_xticks(relevant["threads"])
 
     if legend_pos is not None:
-        ax.legend(
+        legend_options = dict(
             loc=legend_pos[0],
             fancybox=False,
-            framealpha=1,
+            framealpha=0.5,
             edgecolor="#000000",
             bbox_to_anchor=legend_pos[1],
         )
+        if legend_order is not None:
+            handles, labels = ax.get_legend_handles_labels()
+            reordered = []
+            for lbl in legend_order:
+                idx = labels.index(lbl)
+                reordered.append(handles[idx])
+            ax.legend(reordered, legend_order, **legend_options)
+        else:
+            ax.legend(**legend_options)
+
     if show_ylabel:
         ax.set_ylabel("Throughput (kreq/s)")
 
@@ -83,8 +123,8 @@ def plot_scale(
 
 
 def compute_summary_stats(data, output_file):
-    def print_geomean_speedup_stat(name, df):
-        speedup = statistics.geometric_mean(df["speedup"])
+    def print_geomean_speedup_stat(name, df, baseline="rocksdb"):
+        speedup = statistics.geometric_mean(df["speedup_over_{}".format(baseline)])
         print(
             "\\newcommand{{\\{}}}{{${:.2f}\\times$}}".format(name, speedup),
             file=output_file,
@@ -94,61 +134,85 @@ def compute_summary_stats(data, output_file):
     rel = data[
         (data["dist"] == "zipfian")
         & (data["dataset"] == "amzn")
+        & (data["workload"] != "e")
         & (data["workload"] != "scan_only")
     ]
-    print_geomean_speedup_stat("ZipfianAllPointMainSpeedup", rel)
+    print_geomean_speedup_stat("ZipfianRDBAllPointMainSpeedup", rel)
+    print_geomean_speedup_stat(
+        "ZipfianLSAllPointMainSpeedup", rel, baseline="leanstore"
+    )
 
     # Amazon Zipfian point workloads (64 B)
     rel = data[
         (data["dist"] == "zipfian")
         & (data["config"] == "64B")
         & (data["dataset"] == "amzn")
+        & (data["workload"] != "e")
         & (data["workload"] != "scan_only")
     ]
-    print_geomean_speedup_stat("ZipfianPointSixtyFourSpeedup", rel)
+    print_geomean_speedup_stat("ZipfianRDBPointSixtyFourSpeedup", rel)
+    print_geomean_speedup_stat(
+        "ZipfianLSPointSixtyFourSpeedup", rel, baseline="leanstore"
+    )
 
     # Amazon Zipfian point workloads (1024 B)
     rel = data[
         (data["dist"] == "zipfian")
         & (data["config"] == "1024B")
         & (data["dataset"] == "amzn")
+        & (data["workload"] != "e")
         & (data["workload"] != "scan_only")
     ]
-    print_geomean_speedup_stat("ZipfianPointOneKilobyteSpeedup", rel)
+    print_geomean_speedup_stat("ZipfianRDBPointOneKilobyteSpeedup", rel)
+    print_geomean_speedup_stat(
+        "ZipfianLSPointOneKilobyteSpeedup", rel, baseline="leanstore"
+    )
 
     print("", file=output_file)
 
-    # 64 B Zipfian Scan Only
+    # 64 B Zipfian Scan
     rel = data[
         (data["dist"] == "zipfian")
         & (data["config"] == "64B")
-        & (data["workload"] == "scan_only")
+        & (data["workload"] == "e")
     ]
-    print_geomean_speedup_stat("ZipfianScanSixtyFourSpeedup", rel)
+    print_geomean_speedup_stat("ZipfianRDBScanSixtyFourSpeedup", rel)
+    print_geomean_speedup_stat(
+        "ZipfianLSScanSixtyFourSpeedup", rel, baseline="leanstore"
+    )
 
-    # 1024 B Zipfian Scan Only
+    # 1024 B Zipfian Scan
     rel = data[
         (data["dist"] == "zipfian")
         & (data["config"] == "1024B")
-        & (data["workload"] == "scan_only")
+        & (data["workload"] == "e")
     ]
-    print_geomean_speedup_stat("ZipfianScanOneKilobyteSpeedup", rel)
+    print_geomean_speedup_stat("ZipfianRDBScanOneKilobyteSpeedup", rel)
+    print_geomean_speedup_stat(
+        "ZipfianLSScanOneKilobyteSpeedup", rel, baseline="leanstore"
+    )
 
-    # 64 B Uniform Scan Only
+    # 64 B Uniform Scan
     rel = data[
         (data["dist"] == "uniform")
         & (data["config"] == "64B")
-        & (data["workload"] == "scan_only")
+        & (data["workload"] == "e")
     ]
-    print_geomean_speedup_stat("UniformScanSixtyFourSpeedup", rel)
+    print_geomean_speedup_stat("UniformRDBScanSixtyFourSpeedup", rel)
+    print_geomean_speedup_stat(
+        "UniformLSScanSixtyFourSpeedup", rel, baseline="leanstore"
+    )
 
-    # 1024 B Uniform Scan Only
+    # 1024 B Uniform Scan
     rel = data[
         (data["dist"] == "uniform")
         & (data["config"] == "1024B")
-        & (data["workload"] == "scan_only")
+        & (data["workload"] == "e")
     ]
-    print_geomean_speedup_stat("UniformScanOneKilobyteSpeedup", rel)
+    print_geomean_speedup_stat("UniformRDBScanOneKilobyteSpeedup", rel)
+    print_geomean_speedup_stat(
+        "UniformLSScanOneKilobyteSpeedup", rel, baseline="leanstore"
+    )
 
     print("", file=output_file)
 
@@ -156,73 +220,136 @@ def compute_summary_stats(data, output_file):
     rel = data[
         (data["dist"] == "zipfian")
         & (data["config"] == "64B")
-        & (data["workload"] == "scan_only")
+        & (data["workload"] == "e")
         & (data["threads"] == 16)
     ]
-    print_geomean_speedup_stat("ZipfianScanSixtyFourSpeedupSixteen", rel)
+    print_geomean_speedup_stat("ZipfianRDBScanSixtyFourSpeedupSixteen", rel)
+    print_geomean_speedup_stat(
+        "ZipfianLSScanSixtyFourSpeedupSixteen", rel, baseline="leanstore"
+    )
 
     # 1024 B Zipfian Scan Only (16)
     rel = data[
         (data["dist"] == "zipfian")
         & (data["config"] == "1024B")
-        & (data["workload"] == "scan_only")
+        & (data["workload"] == "e")
         & (data["threads"] == 16)
     ]
-    print_geomean_speedup_stat("ZipfianScanOneKilobyteSpeedupSixteen", rel)
+    print_geomean_speedup_stat("ZipfianRDBScanOneKilobyteSpeedupSixteen", rel)
+    print_geomean_speedup_stat(
+        "ZipfianLSScanOneKilobyteSpeedupSixteen", rel, baseline="leanstore"
+    )
 
     # 64 B Uniform Scan Only (16)
     rel = data[
         (data["dist"] == "uniform")
         & (data["config"] == "64B")
-        & (data["workload"] == "scan_only")
+        & (data["workload"] == "e")
         & (data["threads"] == 16)
     ]
-    print_geomean_speedup_stat("UniformScanSixtyFourSpeedupSixteen", rel)
+    print_geomean_speedup_stat("UniformRDBScanSixtyFourSpeedupSixteen", rel)
+    print_geomean_speedup_stat(
+        "UniformLSScanSixtyFourSpeedupSixteen", rel, baseline="leanstore"
+    )
 
     # 1024 B Uniform Scan Only (16)
     rel = data[
         (data["dist"] == "uniform")
         & (data["config"] == "1024B")
-        & (data["workload"] == "scan_only")
+        & (data["workload"] == "e")
         & (data["threads"] == 16)
     ]
-    print_geomean_speedup_stat("UniformScanOneKilobyteSpeedupSixteen", rel)
+    print_geomean_speedup_stat("UniformRDBScanOneKilobyteSpeedupSixteen", rel)
+    print_geomean_speedup_stat(
+        "UniformLSScanOneKilobyteSpeedupSixteen", rel, baseline="leanstore"
+    )
 
     print("", file=output_file)
 
     # All uniform point workloads
-    rel = data[(data["dist"] == "uniform") & (data["workload"] != "scan_only")]
-    print_geomean_speedup_stat("UniformPointSpeedup", rel)
+    rel = data[
+        (data["dist"] == "uniform")
+        & (data["workload"] != "e")
+        & (data["workload"] != "scan_only")
+    ]
+    print_geomean_speedup_stat("UniformRDBPointSpeedup", rel)
+    print_geomean_speedup_stat("UniformLSPointSpeedup", rel, baseline="leanstore")
 
     read_heavy = ["b", "c"]
-    read_heavy_filter = ((data["dist"] == "uniform") & (
-        data["workload"].isin(read_heavy))
+    read_heavy_filter = (data["dist"] == "uniform") & (
+        data["workload"].isin(read_heavy)
     )
-    write_heavy_filter = ((data["dist"] == "uniform")
+    write_heavy_filter = (
+        (data["dist"] == "uniform")
+        & (data["workload"] != "e")
         & (data["workload"] != "scan_only")
-        & (~(data["workload"].isin(read_heavy))))
+        & (~(data["workload"].isin(read_heavy)))
+    )
 
     # Uniform read heavy point workloads
     rel = data[read_heavy_filter]
-    print_geomean_speedup_stat("UniformPointReadHeavySpeedup", rel)
+    print_geomean_speedup_stat("UniformRDBPointReadHeavySpeedup", rel)
+    print_geomean_speedup_stat(
+        "UniformLSPointReadHeavySpeedup", rel, baseline="leanstore"
+    )
 
     # Uniform write heavy point workloads
     rel = data[write_heavy_filter]
-    print_geomean_speedup_stat("UniformPointWriteHeavySpeedup", rel)
+    print_geomean_speedup_stat("UniformRDBPointWriteHeavySpeedup", rel)
+    print_geomean_speedup_stat(
+        "UniformLSPointWriteHeavySpeedup", rel, baseline="leanstore"
+    )
 
     print("", file=output_file)
 
     # Uniform read heavy breakdown
     rel = data[read_heavy_filter & (data["config"] == "64B")]
-    print_geomean_speedup_stat("UniformPointReadHeavySixtyFourSpeedup", rel)
+    print_geomean_speedup_stat("UniformRDBPointReadHeavySixtyFourSpeedup", rel)
+    print_geomean_speedup_stat(
+        "UniformLSPointReadHeavySixtyFourSpeedup", rel, baseline="leanstore"
+    )
     rel = data[read_heavy_filter & (data["config"] == "1024B")]
-    print_geomean_speedup_stat("UniformPointReadHeavyOneKilobyteSpeedup", rel)
+    print_geomean_speedup_stat("UniformRDBPointReadHeavyOneKilobyteSpeedup", rel)
+    print_geomean_speedup_stat(
+        "UniformLSPointReadHeavyOneKilobyteSpeedup", rel, baseline="leanstore"
+    )
 
     # Uniform write heavy breakdown
     rel = data[write_heavy_filter & (data["config"] == "64B")]
-    print_geomean_speedup_stat("UniformPointWriteHeavySixtyFourSpeedup", rel)
+    print_geomean_speedup_stat("UniformRDBPointWriteHeavySixtyFourSpeedup", rel)
+    print_geomean_speedup_stat(
+        "UniformLSPointWriteHeavySixtyFourSpeedup", rel, baseline="leanstore"
+    )
     rel = data[write_heavy_filter & (data["config"] == "1024B")]
-    print_geomean_speedup_stat("UniformPointWriteHeavyOneKilobyteSpeedup", rel)
+    print_geomean_speedup_stat("UniformRDBPointWriteHeavyOneKilobyteSpeedup", rel)
+    print_geomean_speedup_stat(
+        "UniformLSPointWriteHeavyOneKilobyteSpeedup", rel, baseline="leanstore"
+    )
+
+    # Best results
+    best_rocksdb = data["speedup_over_rocksdb"].max()
+    best_leanstore = data["speedup_over_leanstore"].max()
+    print("", file=output_file)
+    print(
+        "\\newcommand{{\\BestRocksDBSpeedup}}{{${:.2f}\\times$}}".format(best_rocksdb),
+        file=output_file,
+    )
+    print(
+        "\\newcommand{{\\BestLeanStoreSpeedup}}{{${:.2f}\\times$}}".format(best_leanstore),
+        file=output_file,
+    )
+
+    # Best scan results
+    best_rocksdb_scan = data[data["workload"] == "e"]["speedup_over_rocksdb"].max()
+    best_leanstore_scan = data[data["workload"] == "e"]["speedup_over_leanstore"].max()
+    print(
+        "\\newcommand{{\\BestRocksDBScanSpeedup}}{{${:.2f}\\times$}}".format(best_rocksdb_scan),
+        file=output_file,
+    )
+    print(
+        "\\newcommand{{\\BestLeanStoreScanSpeedup}}{{${:.2f}\\times$}}".format(best_leanstore_scan),
+        file=output_file,
+    )
 
 
 def make_point_plots(args, data, out_dir):
@@ -242,6 +369,7 @@ def make_point_plots(args, data, out_dir):
             legend_pos=("upper left", (-0.035, 1.06)) if show_legend else None,
             show_ylabel=workload == "a",
             ylim=(0, 1700),
+            legend_order=["TreeLine", "RocksDB", "LeanStore"],
         )
         if args.data is not None:
             # Just save one as a preview.
@@ -258,7 +386,7 @@ def make_scan_plots(args, data, out_dir):
     configs = ["64B", "1024B"]
     for config, dataset, dist in product(configs, datasets, ["zipfian", "uniform"]):
         rel = data[data["dist"] == dist]
-        show_legend = dataset == "amzn" and config == "64B" and dist == "zipfian"
+        show_legend = dataset == "amzn" and config == "64B" and dist == "uniform"
         show_ylabel = dataset == "amzn" and config == "64B"
         if show_legend or show_ylabel:
             fig, ax = plt.subplots(figsize=(5, 3.2), tight_layout=True)
@@ -269,10 +397,11 @@ def make_scan_plots(args, data, out_dir):
             rel,
             config=config,
             dataset=dataset,
-            workload="scan_only",
+            workload="e",
             legend_pos=("upper left", (-0.035, 1.06)) if show_legend else None,
             show_ylabel=show_ylabel,
-            ylim=(0, 90) if config == "64B" else (0, 15),
+            ylim=(0, 100) if config == "64B" else (0, 15),
+            legend_order=["TreeLine", "RocksDB", "LeanStore"],
         )
         if args.data is not None:
             # Just save one as a preview.

@@ -39,14 +39,6 @@ def main():
         else UNIFORM_DIST,
     }
 
-    # HACK: Check if this is a YCSB E workload and adjust the requests so that
-    # 5% of them are dedicated to the insert-only phase.
-    is_ycsb_e = template_path.name == "e.yml"
-    ycsb_e_scan_frac = 0.05
-    if is_ycsb_e:
-        config["num_inserts_before_scan"] = int(args.gen_num_requests * ycsb_e_scan_frac)
-        config["num_requests"] = args.gen_num_requests - config["num_inserts_before_scan"]
-
     workload = template.format(**config)
 
     # Write out the generated workload.
