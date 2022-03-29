@@ -252,13 +252,14 @@ Status Manager::RewriteSegmentsImpl(
     // Estimate total current keys in range, assumming some reocrds in overflows
     // and some extra records in cache.
     size_t current_num_keys_estimate =
-        options_.forecasting.overestimation_factor * current_pages *
-        max_records_per_page;
+        options_.forecasting.overestimation_factor *
+        (current_pages * max_records_per_page);
 
     size_t future_num_keys_estimate =
         current_num_keys_estimate + forecasted_inserts;
 
-    future_goal *= current_num_keys_estimate / future_num_keys_estimate;
+    future_goal = std::max(1UL, (future_goal * current_num_keys_estimate) /
+                                    future_num_keys_estimate);
   }
 
   //
