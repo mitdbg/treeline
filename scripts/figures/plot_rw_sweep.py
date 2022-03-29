@@ -58,7 +58,15 @@ def plot_e2e(
             color="#762439" if db == "llsm" else COLORS[db],
         )
     if show_legend:
+        legend_order = ["TreeLine", "Disk-Based B-Tree", "RocksDB"]
+        handles, labels = ax.get_legend_handles_labels()
+        reordered = []
+        for lbl in legend_order:
+            idx = labels.index(lbl)
+            reordered.append(handles[idx])
         ax.legend(
+            reordered,
+            legend_order,
             edgecolor="#000000",
             fancybox=False,
             framealpha=1,
