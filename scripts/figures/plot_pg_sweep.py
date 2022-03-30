@@ -32,7 +32,7 @@ def plot_seg_efficiency(data, vary, show_ylabel=False, show_legend=False):
             loc="lower right",
             bbox_to_anchor=(1.02, -0.02),
         )
-    ax.set_xlabel(vary.capitalize())
+    ax.set_xlabel("Epsilon" if vary == "delta" else vary.capitalize())
     if show_ylabel:
         ax.set_ylabel("Seg. Eff. (%)")
     return fig
