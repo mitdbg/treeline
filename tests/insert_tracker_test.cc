@@ -12,7 +12,7 @@
 
 namespace {
 
-using llsm::InsertTracker;
+using tl::InsertTracker;
 
 TEST(InsertTrackerTest, UpToOneCompletedEpoch) {
   const size_t num_inserts = 100;

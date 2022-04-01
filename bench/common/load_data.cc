@@ -4,7 +4,7 @@
 #include <iostream>
 #include <unordered_set>
 
-namespace llsm {
+namespace tl {
 namespace bench {
 
 std::vector<uint64_t> LoadDatasetFromTextFile(
@@ -25,4 +25,4 @@ std::vector<uint64_t> LoadDatasetFromTextFile(
 }
 
 }  // namespace bench
-}  // namespace llsm
+}  // namespace tl

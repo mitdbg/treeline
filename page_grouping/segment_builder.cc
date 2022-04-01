@@ -7,7 +7,7 @@
 #include "plr/data.h"
 #include "plr/greedy.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // The number of pages in each segment. If you change this, change
@@ -31,7 +31,7 @@ const std::unordered_map<size_t, size_t>& SegmentBuilder::PageCountToSegment() {
 
 // The maximum number of pages in any segment.
 static const size_t kMaxSegmentSize =
-    llsm::pg::SegmentBuilder::SegmentPageCounts().back();
+    tl::pg::SegmentBuilder::SegmentPageCounts().back();
 
 // This value is a `double`'s maximum representable integer. The PLR algorithm
 // uses `double`s internally and we need the inputs to the PLR (which are
@@ -357,4 +357,4 @@ std::optional<Key> SegmentBuilder::CurrentBaseKey() const {
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

@@ -12,14 +12,14 @@ namespace {
 // `PackedMap` cannot actually be exactly 64 KiB. If a `Page` is configured to
 // be larger than what we can represent in a `PackedMap` (e.g., 64 KiB), we set
 // the map's size to its largest possible size (2^16 - 8).
-constexpr size_t MapSize = llsm::pg::Page::kSize >
+constexpr size_t MapSize = tl::pg::Page::kSize >
                                    std::numeric_limits<uint16_t>::max()
                                ? (1 << 16) - 8
-                               : llsm::pg::Page::kSize;
+                               : tl::pg::Page::kSize;
 
-using PackedMap = llsm::pg::PackedMap<MapSize>;
+using PackedMap = tl::pg::PackedMap<MapSize>;
 static_assert(sizeof(PackedMap) == MapSize);
-static_assert(llsm::pg::Page::kSize >= sizeof(PackedMap));
+static_assert(tl::pg::Page::kSize >= sizeof(PackedMap));
 
 inline PackedMap* AsMapPtr(void* data) {
   return reinterpret_cast<PackedMap*>(data);
@@ -31,7 +31,7 @@ inline const PackedMap* AsMapPtr(const void* data) {
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 size_t Page::UsableSize() { return ::PackedMap::kUsableSize; }
@@ -302,4 +302,4 @@ Slice Page::Iterator::value() const {
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

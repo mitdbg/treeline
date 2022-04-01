@@ -20,40 +20,40 @@ add_subdirectory(third_party)
 
 # The Learned LSM embedded database library targets
 if (LLSM_BUILD_SHARED)
-  add_library(llsm SHARED)
-  add_library(pg_llsm SHARED)
+  add_library(tl SHARED)
+  add_library(pg_tl SHARED)
 else()
-  add_library(llsm STATIC)
-  add_library(pg_llsm STATIC)
+  add_library(tl STATIC)
+  add_library(pg_tl STATIC)
 endif()
-target_link_libraries(llsm PRIVATE crc32c tbb masstree)
-target_link_libraries(pg_llsm PRIVATE crc32c tbb masstree)
-target_include_directories(llsm
+target_link_libraries(tl PRIVATE crc32c tbb masstree)
+target_link_libraries(pg_tl PRIVATE crc32c tbb masstree)
+target_include_directories(tl
   PUBLIC include
   PRIVATE .)
-target_include_directories(pg_llsm
+target_include_directories(pg_tl
   PUBLIC include
   PRIVATE .)
 
 # Add API headers to the target for IDE support
-set(llsm_inc include/llsm)
-set(llsm_api
-  ${llsm_inc}/db.h
-  ${llsm_inc}/options.h
-  ${llsm_inc}/record_batch.h
-  ${llsm_inc}/slice.h
-  ${llsm_inc}/statistics.h
-  ${llsm_inc}/status.h
+set(tl_inc include/tl)
+set(tl_api
+  ${tl_inc}/db.h
+  ${tl_inc}/options.h
+  ${tl_inc}/record_batch.h
+  ${tl_inc}/slice.h
+  ${tl_inc}/statistics.h
+  ${tl_inc}/status.h
 )
-target_sources(llsm PUBLIC ${llsm_api})
-set(pg_llsm_api
-  ${llsm_inc}/pg_db.h
-  ${llsm_inc}/pg_options.h
-  ${llsm_inc}/pg_stats.h
-  ${llsm_inc}/slice.h
-  ${llsm_inc}/status.h
+target_sources(tl PUBLIC ${tl_api})
+set(pg_tl_api
+  ${tl_inc}/pg_db.h
+  ${tl_inc}/pg_options.h
+  ${tl_inc}/pg_stats.h
+  ${tl_inc}/slice.h
+  ${tl_inc}/status.h
 )
-target_sources(pg_llsm PUBLIC ${pg_llsm_api})
+target_sources(pg_tl PUBLIC ${pg_tl_api})
 
 # Add our sources by traversing the repository
 add_subdirectory(alex)

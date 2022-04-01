@@ -2,7 +2,7 @@
 
 #include <unordered_map>
 
-namespace llsm {
+namespace tl {
 
 // A FIFO queue that supports fast random-item removal.
 //
@@ -166,4 +166,4 @@ class HashQueue {
   struct HashQueueNode<T>* back_;
 };
 
-}  // namespace llsm
+}  // namespace tl

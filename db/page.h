@@ -3,11 +3,11 @@
 #include <string>
 
 #include "bufmgr/physical_page_id.h"
-#include "llsm/options.h"
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "tl/options.h"
+#include "tl/slice.h"
+#include "tl/status.h"
 
-namespace llsm {
+namespace tl {
 
 // An in-memory representation of LLSM's on-disk "page" format.
 //
@@ -172,4 +172,4 @@ class Page::Iterator {
   mutable std::string key_buffer_;
 };
 
-}  // namespace llsm
+}  // namespace tl

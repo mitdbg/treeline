@@ -1,10 +1,10 @@
-#include "llsm/options.h"
+#include "tl/options.h"
 
 #include <cassert>
 
 #include "db/page.h"
 
-namespace llsm {
+namespace tl {
 
 size_t KeyDistHints::records_per_page() const {
   assert(page_fill_pct > 0 && page_fill_pct <= 100);
@@ -18,4 +18,4 @@ size_t KeyDistHints::num_pages() const {
   return (num_keys / rec_per_page) + ((num_keys % rec_per_page) != 0);
 }
 
-}  // namespace llsm
+}  // namespace tl

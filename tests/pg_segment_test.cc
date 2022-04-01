@@ -4,15 +4,15 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "llsm/slice.h"
+#include "tl/slice.h"
 #include "page_grouping/key.h"
 #include "page_grouping/plr/data.h"
 #include "page_grouping/plr/greedy.h"
 #include "page_grouping/segment_builder.h"
 #include "pg_datasets.h"
 
-using namespace llsm;
-using namespace llsm::pg;
+using namespace tl;
+using namespace tl::pg;
 
 TEST(PLRTest, Sequential) {
   const double delta = 10.0;

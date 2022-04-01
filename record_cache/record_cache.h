@@ -9,13 +9,13 @@
 
 #include "db/format.h"
 #include "db/overflow_chain.h"
-#include "llsm/statistics.h"
-#include "llsm/status.h"
+#include "tl/statistics.h"
+#include "tl/status.h"
 #include "masstree_wrapper/masstree_wrapper.h"
 #include "record_cache_entry.h"
 #include "util/key.h"
 
-namespace llsm {
+namespace tl {
 
 using WriteOutBatch = std::vector<std::tuple<Slice, Slice, format::WriteType>>;
 
@@ -193,4 +193,4 @@ class RecordCache {
   std::shared_ptr<MasstreeWrapper<RecordCacheEntry>> tree_;
 };
 
-}  // namespace llsm
+}  // namespace tl

@@ -4,10 +4,10 @@
 #include <queue>
 #include <vector>
 
-#include "llsm/slice.h"
+#include "tl/slice.h"
 #include "page.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 class PageMergeIterator {
@@ -121,4 +121,4 @@ class PageMergeIterator {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

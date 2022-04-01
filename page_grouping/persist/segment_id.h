@@ -6,11 +6,11 @@
 
 #include "util/calc.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Stores the file and PAGE-offset within the file where a specific segment can
-// be found. This class is adapted from `llsm::PhysicalPageId`.
+// be found. This class is adapted from `tl::PhysicalPageId`.
 class SegmentId {
  public:
   SegmentId() : value_(kInvalidValue) {}
@@ -91,19 +91,19 @@ class SegmentId {
   // the file_id.
   size_t value_;
 
-  friend struct std::hash<llsm::pg::SegmentId>;
+  friend struct std::hash<tl::pg::SegmentId>;
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl
 
 namespace std {
 
-ostream& operator<<(ostream& os, const llsm::pg::SegmentId& id);
+ostream& operator<<(ostream& os, const tl::pg::SegmentId& id);
 
 template <>
-struct hash<llsm::pg::SegmentId> {
-  std::size_t operator()(const llsm::pg::SegmentId& id) const {
+struct hash<tl::pg::SegmentId> {
+  std::size_t operator()(const tl::pg::SegmentId& id) const {
     return std::hash<size_t>()(id.value_);
   }
 };

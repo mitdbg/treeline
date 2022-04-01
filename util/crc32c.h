@@ -9,7 +9,7 @@
 
 #include "crc32c/crc32c.h"
 
-namespace llsm {
+namespace tl {
 namespace crc32c {
 
 // Return the crc32c of `concat(A, data[0,n-1])` where `init_crc` is the crc32c
@@ -43,4 +43,4 @@ inline uint32_t Unmask(uint32_t masked_crc) {
 }
 
 }  // namespace crc32c
-}  // namespace llsm
+}  // namespace tl

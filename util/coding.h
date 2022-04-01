@@ -13,9 +13,9 @@
 #include <cstring>
 #include <string>
 
-#include "llsm/slice.h"
+#include "tl/slice.h"
 
-namespace llsm {
+namespace tl {
 
 // Standard Put... routines append to a string
 void PutFixed32(std::string* dst, uint32_t value);
@@ -115,4 +115,4 @@ inline const char* GetVarint32Ptr(const char* p, const char* limit,
   return GetVarint32PtrFallback(p, limit, value);
 }
 
-}  // namespace llsm
+}  // namespace tl

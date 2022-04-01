@@ -5,7 +5,7 @@
 #include "libcuckoo/cuckoohash_map.hh"
 #include "persist/segment_id.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Used to coordinate concurrent access to segments and pages. The locks granted
@@ -111,4 +111,4 @@ class LockManager {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

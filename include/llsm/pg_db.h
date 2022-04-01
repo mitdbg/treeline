@@ -4,14 +4,14 @@
 #include <utility>
 #include <vector>
 
-#include "llsm/pg_options.h"
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "tl/pg_options.h"
+#include "tl/slice.h"
+#include "tl/status.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
-using Key = llsm::key_utils::KeyHead;
+using Key = tl::key_utils::KeyHead;
 using Record = std::pair<Key, Slice>;
 
 // The public page-grouped Learned LSM (LLSM) database interface, representing
@@ -93,4 +93,4 @@ class PageGroupedDB {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

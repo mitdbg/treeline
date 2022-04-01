@@ -8,7 +8,7 @@
 
 #include "bufmgr/physical_page_id.h"
 
-namespace llsm {
+namespace tl {
 
 // An ordered map with a configurable compile-time fixed size that is strictly
 // less than 64 KiB.
@@ -255,6 +255,6 @@ class PackedMap {
   static constexpr size_t kSlotSize = sizeof(Slot);
 };
 
-}  // namespace llsm
+}  // namespace tl
 
 #include "packed_map-inl.h"

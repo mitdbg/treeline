@@ -9,8 +9,8 @@
 
 #include "bufmgr/page_memory_allocator.h"
 #include "key.h"
-#include "llsm/pg_db.h"
-#include "llsm/pg_stats.h"
+#include "tl/pg_db.h"
+#include "tl/pg_stats.h"
 #include "persist/merge_iterator.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
@@ -20,7 +20,7 @@
 
 namespace fs = std::filesystem;
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 using SegmentMode = LockManager::SegmentMode;
@@ -535,4 +535,4 @@ void Manager::PostStats() const {
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

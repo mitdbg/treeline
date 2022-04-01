@@ -8,7 +8,7 @@
 #include "db/logger.h"
 #include "db/merge_iterators.h"
 
-namespace llsm {
+namespace tl {
 
 OverflowChain FixOverflowChain(PhysicalPageId page_id, bool exclusive,
                                bool unlock_before_returning,
@@ -432,4 +432,4 @@ void MergeBatches(RecordBatch& old_records, const FlushBatch& records,
   }
 }
 
-}  // namespace llsm
+}  // namespace tl

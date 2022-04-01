@@ -20,7 +20,7 @@
 #include <iostream>
 #include <string>
 
-namespace llsm {
+namespace tl {
 
 namespace key_utils {
 // 8-byte prefix of a key, with bytes switched appropriately to maintain
@@ -120,10 +120,10 @@ inline int Slice::compare(const Slice& b) const {
   return r;
 }
 
-}  // namespace llsm
+}  // namespace tl
 
 namespace std {
 
-ostream& operator<<(ostream& os, const llsm::Slice& slice);
+ostream& operator<<(ostream& os, const tl::Slice& slice);
 
 }  // namespace std

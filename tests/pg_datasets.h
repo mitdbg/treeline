@@ -4,7 +4,7 @@
 #include <random>
 #include <vector>
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Fixture datasets for the tests.
@@ -19,4 +19,4 @@ class Datasets {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

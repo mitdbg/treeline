@@ -8,8 +8,8 @@
 #include "bench/common/data.h"
 #include "bench/common/timing.h"
 #include "gflags/gflags.h"
-#include "llsm/db.h"
-#include "llsm/options.h"
+#include "tl/db.h"
+#include "tl/options.h"
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/table.h"
@@ -18,7 +18,7 @@
 namespace {
 
 namespace fs = std::filesystem;
-using llsm::bench::DBType;
+using tl::bench::DBType;
 
 DEFINE_uint64(data_mib, 64, "The amount of user data to write, in MiB.");
 DEFINE_uint64(write_batch_size, 1024,
@@ -26,9 +26,9 @@ DEFINE_uint64(write_batch_size, 1024,
 DEFINE_bool(shuffle, false, "Whether or not to shuffle the generated dataset.");
 
 std::chrono::nanoseconds RunRocksDBExperiment(
-    const llsm::bench::U64Dataset& dataset) {
+    const tl::bench::U64Dataset& dataset) {
   rocksdb::DB* db = nullptr;
-  rocksdb::Options options = llsm::bench::BuildRocksDBOptions();
+  rocksdb::Options options = tl::bench::BuildRocksDBOptions();
   options.PrepareForBulkLoad();
   options.create_if_missing = true;
   options.error_if_exists = true;
@@ -39,7 +39,7 @@ std::chrono::nanoseconds RunRocksDBExperiment(
     throw std::runtime_error("Failed to open RocksDB: " + status.ToString());
   }
 
-  return llsm::bench::MeasureRunTime([db, &dataset]() {
+  return tl::bench::MeasureRunTime([db, &dataset]() {
     rocksdb::WriteOptions woptions;
     woptions.disableWAL = FLAGS_bypass_wal;
     rocksdb::Status status;
@@ -83,25 +83,25 @@ std::chrono::nanoseconds RunRocksDBExperiment(
 }
 
 std::chrono::nanoseconds RunLLSMExperiment(
-    const llsm::bench::U64Dataset& dataset) {
-  llsm::DB* db = nullptr;
-  llsm::Options options = llsm::bench::BuildLLSMOptions();
+    const tl::bench::U64Dataset& dataset) {
+  tl::DB* db = nullptr;
+  tl::Options options = tl::bench::BuildLLSMOptions();
   options.key_hints.num_keys = dataset.size();
 
-  const std::string dbname = FLAGS_db_path + "/llsm";
-  llsm::Status status = llsm::DB::Open(options, dbname, &db);
+  const std::string dbname = FLAGS_db_path + "/tl";
+  tl::Status status = tl::DB::Open(options, dbname, &db);
   if (!status.ok()) {
     throw std::runtime_error("Failed to open LLSM: " + status.ToString());
   }
 
-  return llsm::bench::MeasureRunTime([db, &dataset]() {
-    llsm::WriteOptions woptions;
+  return tl::bench::MeasureRunTime([db, &dataset]() {
+    tl::WriteOptions woptions;
     if (!FLAGS_shuffle) {
       woptions.sorted_load = true;
       woptions.perform_checks = false;
     }
     woptions.bypass_wal = FLAGS_bypass_wal;
-    llsm::Status status;
+    tl::Status status;
     for (const auto& record : dataset) {
       status = db->Put(woptions, record.key(), record.value());
       if (!status.ok()) {
@@ -113,7 +113,7 @@ std::chrono::nanoseconds RunLLSMExperiment(
 }
 
 void PrintExperimentResult(const std::string& db,
-                           const llsm::bench::U64Dataset& dataset,
+                           const tl::bench::U64Dataset& dataset,
                            std::chrono::nanoseconds run_time) {
   const std::chrono::duration<double> run_time_s = run_time;
   const double throughput_mib_per_s = FLAGS_data_mib / run_time_s.count();
@@ -139,14 +139,14 @@ int main(int argc, char* argv[]) {
     std::cerr << "ERROR: The provided --db_path already exists." << std::endl;
     return 1;
   }
-  DBType db = llsm::bench::ParseDBType(FLAGS_db).value();
+  DBType db = tl::bench::ParseDBType(FLAGS_db).value();
 
-  llsm::bench::U64Dataset::GenerateOptions dataset_options;
+  tl::bench::U64Dataset::GenerateOptions dataset_options;
   dataset_options.record_size = FLAGS_record_size_bytes;
   dataset_options.shuffle = FLAGS_shuffle;
   dataset_options.rng_seed = FLAGS_seed;
-  const llsm::bench::U64Dataset dataset =
-      llsm::bench::U64Dataset::Generate(FLAGS_data_mib, dataset_options);
+  const tl::bench::U64Dataset dataset =
+      tl::bench::U64Dataset::Generate(FLAGS_data_mib, dataset_options);
 
   std::cout << "db,data_size_mib,bg_threads,record_size_bytes,throughput_mib_"
                "per_s,throughput_mops_per_s"
@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
       PrintExperimentResult("rocksdb", dataset, RunRocksDBExperiment(dataset));
     }
     if (db == DBType::kAll || db == DBType::kLLSM) {
-      PrintExperimentResult("llsm", dataset, RunLLSMExperiment(dataset));
+      PrintExperimentResult("tl", dataset, RunLLSMExperiment(dataset));
     }
 
     fs::remove_all(FLAGS_db_path);

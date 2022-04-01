@@ -5,7 +5,7 @@
 #include "bufmgr/page_memory_allocator.h"
 #include "segment_builder.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Used to store data local to a specific worker thread.
@@ -47,4 +47,4 @@ class Workspace {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

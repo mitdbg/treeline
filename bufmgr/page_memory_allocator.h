@@ -8,7 +8,7 @@
 
 #include "db/page.h"
 
-namespace llsm {
+namespace tl {
 namespace detail {
 
 class PageBufferDeleter {
@@ -59,4 +59,4 @@ inline PageBuffer PageMemoryAllocator::Allocate(const size_t num_pages) {
   return PageBuffer(reinterpret_cast<char*>(buffer));
 }
 
-}  // namespace llsm
+}  // namespace tl

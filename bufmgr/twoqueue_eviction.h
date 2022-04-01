@@ -8,7 +8,7 @@
 #include "buffer_frame.h"
 #include "hash_queue.h"
 #include "page_eviction_strategy.h"
-namespace llsm {
+namespace tl {
 
 // The 2Q strategy for evicting in-memory pages back to disk.
 //
@@ -67,4 +67,4 @@ class TwoQueueEviction : public PageEvictionStrategy {
   HashQueue<BufferFrame*>* lru_;
 };
 
-}  // namespace llsm
+}  // namespace tl

@@ -6,11 +6,11 @@
 
 #include "timer.h"
 
-namespace llsm {
+namespace tl {
 
 Timer& Timer::GetThreadInstance() {
   thread_local static Timer static_timer;
   return static_timer;
 }
 
-}  // namespace llsm
+}  // namespace tl

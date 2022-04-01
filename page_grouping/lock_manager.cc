@@ -10,7 +10,7 @@ constexpr uint32_t kBackoffSaturate = 12;
 
 }
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 bool LockManager::TryAcquireSegmentLock(const SegmentId& seg_id,
@@ -232,4 +232,4 @@ LockManager::PageLockState::PageLockState(PageMode initial_mode) {
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

@@ -12,7 +12,7 @@ static int SafeIntDivide(int a, int b) {
 }
 
 TEST(ThreadPoolTest, Submit) {
-  llsm::ThreadPool pool(2);
+  tl::ThreadPool pool(2);
   auto f1 = pool.Submit(Square, 5);
   auto f2 = pool.Submit(Square, 1);
   auto f3 = pool.Submit(Square, 10);
@@ -22,7 +22,7 @@ TEST(ThreadPoolTest, Submit) {
 }
 
 TEST(ThreadPoolTest, SubmitWithException) {
-  llsm::ThreadPool pool(3);
+  tl::ThreadPool pool(3);
   auto f1 = pool.Submit(SafeIntDivide, 5, 2);
   auto f2 = pool.Submit(SafeIntDivide, 3, 0);
   auto f3 = pool.Submit(SafeIntDivide, 10, 2);
@@ -40,7 +40,7 @@ TEST(ThreadPoolTest, SubmitNoWait) {
   int val1 = 1;
   int val2 = 10;
   {
-    llsm::ThreadPool pool(2);
+    tl::ThreadPool pool(2);
     pool.SubmitNoWait([&val1]() { val1 += 1; });
     pool.SubmitNoWait([&val2]() { val2 *= val2; });
   }

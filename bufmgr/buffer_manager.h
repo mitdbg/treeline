@@ -15,7 +15,7 @@
 #include "physical_page_id.h"
 #include "sync_hash_table.h"
 
-namespace llsm {
+namespace tl {
 
 // A manager for an in-memory cache of pages.
 //
@@ -166,4 +166,4 @@ class BufferManager {
                                                     // += operator is defined.
 };
 
-}  // namespace llsm
+}  // namespace tl

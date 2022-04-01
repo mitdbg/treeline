@@ -5,7 +5,7 @@
 #include "persist/merge_iterator.h"
 #include "util/key.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 using SegmentMode = LockManager::SegmentMode;
@@ -392,4 +392,4 @@ Status Manager::ScanWhole(
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

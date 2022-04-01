@@ -12,7 +12,7 @@ constexpr uint64_t kWriteTypeBitWidth = 8;
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 
 MemTable::MemTable(const MemTableOptions& moptions)
     : arena_(),
@@ -186,4 +186,4 @@ Slice MemTable::Iterator::KeyFromRecord(const char* raw_record) const {
   return Slice(record->key(), record->key_length);
 }
 
-}  // namespace llsm
+}  // namespace tl

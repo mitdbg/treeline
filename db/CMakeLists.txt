@@ -1,4 +1,4 @@
-target_sources(llsm PRIVATE
+target_sources(tl PRIVATE
   db_impl_range.cc
   db_impl.cc
   db_impl.h

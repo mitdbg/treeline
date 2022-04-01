@@ -5,7 +5,7 @@
 #include <thread>
 
 #include "config.h"
-#include "llsm/db.h"
+#include "tl/db.h"
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 
@@ -27,8 +27,8 @@ class LLSMInterface {
 
   // Called once before the benchmark.
   void InitializeDatabase() {
-    const std::string dbname = FLAGS_db_path + "/llsm";
-    llsm::Options options = llsm::bench::BuildLLSMOptions();
+    const std::string dbname = FLAGS_db_path + "/tl";
+    tl::Options options = tl::bench::BuildLLSMOptions();
     options.key_hints.num_keys = 0;  // Needs to be empty to use bulk load.
     if (num_keys_ <= 1) {
       // We set the step size to at least 1 to ensure any code that relies on
@@ -51,7 +51,7 @@ class LLSMInterface {
       std::cerr << "> Opening LLSM DB at " << dbname << std::endl;
     }
 
-    llsm::Status status = llsm::DB::Open(options, dbname, &db_);
+    tl::Status status = tl::DB::Open(options, dbname, &db_);
     if (!status.ok()) {
       throw std::runtime_error("Failed to start LLSM: " + status.ToString());
     }
@@ -68,21 +68,21 @@ class LLSMInterface {
 
   // Load the records into the database.
   void BulkLoad(const ycsbr::BulkLoadTrace& load) {
-    std::vector<llsm::key_utils::IntKeyAsSlice> keys;
-    std::vector<std::pair<const llsm::Slice, const llsm::Slice>> records;
+    std::vector<tl::key_utils::IntKeyAsSlice> keys;
+    std::vector<std::pair<const tl::Slice, const tl::Slice>> records;
     keys.reserve(load.size());
     records.reserve(load.size());
     for (const auto& req : load) {
       keys.emplace_back(req.key);
-      records.emplace_back(keys.back().as<llsm::Slice>(),
-                           llsm::Slice(req.value, req.value_size));
+      records.emplace_back(keys.back().as<tl::Slice>(),
+                           tl::Slice(req.value, req.value_size));
     }
 
-    llsm::WriteOptions options;
+    tl::WriteOptions options;
     options.bypass_wal = FLAGS_bypass_wal;
     options.sorted_load = true;
 
-    llsm::Status s = db_->BulkLoad(options, records);
+    tl::Status s = db_->BulkLoad(options, records);
 
     if (!s.ok()) {
       throw std::runtime_error("Failed to bulk load records!");
@@ -97,20 +97,20 @@ class LLSMInterface {
 
   // Insert the specified key value pair. Return true if the insert succeeded.
   bool Insert(ycsbr::Request::Key key, const char* value, size_t value_size) {
-    const llsm::key_utils::IntKeyAsSlice strkey(key);
-    llsm::WriteOptions options;
+    const tl::key_utils::IntKeyAsSlice strkey(key);
+    tl::WriteOptions options;
     options.bypass_wal = FLAGS_bypass_wal;
-    llsm::Status status = db_->Put(options, strkey.as<llsm::Slice>(),
-                                   llsm::Slice(value, value_size));
+    tl::Status status = db_->Put(options, strkey.as<tl::Slice>(),
+                                   tl::Slice(value, value_size));
     return status.ok();
   }
 
   // Read the value at the specified key. Return true if the read succeeded.
   bool Read(ycsbr::Request::Key key, std::string* value_out) {
-    const llsm::key_utils::IntKeyAsSlice strkey(key);
-    const llsm::ReadOptions options;
-    llsm::Status status =
-        db_->Get(options, strkey.as<llsm::Slice>(), value_out);
+    const tl::key_utils::IntKeyAsSlice strkey(key);
+    const tl::ReadOptions options;
+    tl::Status status =
+        db_->Get(options, strkey.as<tl::Slice>(), value_out);
     return status.ok();
   }
 
@@ -121,20 +121,20 @@ class LLSMInterface {
       std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {
     scan_out->clear();
     scan_out->reserve(amount);
-    const llsm::key_utils::IntKeyAsSlice strkey(key);
-    const llsm::ReadOptions options;
-    llsm::RecordBatch results;
-    llsm::Status status =
-        db_->GetRange(options, strkey.as<llsm::Slice>(), amount, &results);
+    const tl::key_utils::IntKeyAsSlice strkey(key);
+    const tl::ReadOptions options;
+    tl::RecordBatch results;
+    tl::Status status =
+        db_->GetRange(options, strkey.as<tl::Slice>(), amount, &results);
     for (auto& record : results) {
-      scan_out->emplace_back(llsm::key_utils::ExtractHead64(record.key()),
+      scan_out->emplace_back(tl::key_utils::ExtractHead64(record.key()),
                              std::move(record).ExtractValue());
     }
     return status.ok();
   }
 
  private:
-  llsm::DB* db_;
+  tl::DB* db_;
 
   // These variables are used to provide hints about the key distribution to
   // LLSM when creating a new database. We need these hints because LLSM

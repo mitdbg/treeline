@@ -80,11 +80,11 @@ class LeanStoreInterface {
 
   // Update the value at the specified key. Return true if the update succeeded.
   bool Update(ycsbr::Request::Key key, const char* value, size_t value_size) {
-    const llsm::key_utils::IntKeyAsSlice strkey(key);
+    const tl::key_utils::IntKeyAsSlice strkey(key);
     auto result = table_->updateSameSize(
         reinterpret_cast<uint8_t*>(
-            const_cast<char*>(strkey.as<llsm::Slice>().data())),
-        strkey.as<llsm::Slice>().size(), [&](u8* payload, u16 payload_length) {
+            const_cast<char*>(strkey.as<tl::Slice>().data())),
+        strkey.as<tl::Slice>().size(), [&](u8* payload, u16 payload_length) {
           memcpy(payload, value, payload_length);
         });
     return (result == leanstore::storage::btree::OP_RESULT::OK);
@@ -92,22 +92,22 @@ class LeanStoreInterface {
 
   // Insert the specified key value pair. Return true if the insert succeeded.
   bool Insert(ycsbr::Request::Key key, const char* value, size_t value_size) {
-    const llsm::key_utils::IntKeyAsSlice strkey(key);
+    const tl::key_utils::IntKeyAsSlice strkey(key);
     auto result = table_->insert(
         reinterpret_cast<uint8_t*>(
-            const_cast<char*>(strkey.as<llsm::Slice>().data())),
-        strkey.as<llsm::Slice>().size(),
+            const_cast<char*>(strkey.as<tl::Slice>().data())),
+        strkey.as<tl::Slice>().size(),
         reinterpret_cast<uint8_t*>(const_cast<char*>(value)), value_size);
     return (result == leanstore::storage::btree::OP_RESULT::OK);
   }
 
   // Read the value at the specified key. Return true if the read succeeded.
   bool Read(ycsbr::Request::Key key, std::string* value_out) {
-    const llsm::key_utils::IntKeyAsSlice strkey(key);
+    const tl::key_utils::IntKeyAsSlice strkey(key);
     auto result =
         table_->lookup(reinterpret_cast<uint8_t*>(
-                           const_cast<char*>(strkey.as<llsm::Slice>().data())),
-                       strkey.as<llsm::Slice>().size(),
+                           const_cast<char*>(strkey.as<tl::Slice>().data())),
+                       strkey.as<tl::Slice>().size(),
                        [&](const u8* payload, u16 payload_length) {
                          value_out->resize(payload_length);
                          memcpy(value_out->data(), payload, payload_length);
@@ -120,13 +120,13 @@ class LeanStoreInterface {
   bool Scan(
       const ycsbr::Request::Key key, const size_t amount,
       std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {
-    const llsm::key_utils::IntKeyAsSlice strkey(key);
+    const tl::key_utils::IntKeyAsSlice strkey(key);
     size_t scanned = 0;
 
     auto result = table_->scanAsc(
         reinterpret_cast<uint8_t*>(
-            const_cast<char*>(strkey.as<llsm::Slice>().data())),
-        strkey.as<llsm::Slice>().size(),
+            const_cast<char*>(strkey.as<tl::Slice>().data())),
+        strkey.as<tl::Slice>().size(),
         [&](const u8* key, u16 key_length, const u8* payload,
             u16 payload_length) {
           if (scanned++ >= amount) {

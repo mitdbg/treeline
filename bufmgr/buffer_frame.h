@@ -8,7 +8,7 @@
 #include "db/page.h"
 #include "page_memory_allocator.h"
 
-namespace llsm {
+namespace tl {
 
 // A wrapper for memory pages, containing metadata used by the buffer manager.
 class BufferFrame {
@@ -92,4 +92,4 @@ class BufferFrame {
   std::atomic<size_t> fix_count_;
 };
 
-}  // namespace llsm
+}  // namespace tl

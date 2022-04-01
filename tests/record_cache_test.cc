@@ -5,7 +5,7 @@
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 
 TEST(RecordCacheTest, SimplePutGet) {
   const uint64_t capacity = 5;

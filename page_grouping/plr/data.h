@@ -4,7 +4,7 @@
 #include <cmath>
 #include <optional>
 
-namespace llsm {
+namespace tl {
 namespace pg {
 namespace plr {
 
@@ -98,4 +98,4 @@ using BoundedLine64 = BoundedLine<double>;
 
 }  // namespace plr
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

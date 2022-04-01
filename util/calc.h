@@ -2,7 +2,7 @@
   
   #include <cstdlib>
   
-  namespace llsm {
+  namespace tl {
   
   // Find the smallest power of 2 larger than or equal to `num`
   inline size_t Pow2Ceil(size_t num) {
@@ -18,4 +18,4 @@
     return 1ULL << count;
   }
 
-  } // namespace llsm
+  } // namespace tl

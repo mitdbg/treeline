@@ -9,7 +9,7 @@
 
 #include "../util/calc.h"
 
-namespace llsm {
+namespace tl {
 
 // A hash table with separate chaining that allows concurrent operations to
 // different buckets.
@@ -311,4 +311,4 @@ class SyncHashTable<KeyType, ValueType>::UnsafeIterator {
   pointer curr_;
 };
 
-}  // namespace llsm
+}  // namespace tl

@@ -27,8 +27,8 @@ target_sources(tester
 )
 target_link_libraries(tester
   PRIVATE
-    llsm
-    pg_llsm
+    tl
+    pg_tl
     pg
     gtest
     gtest_main

@@ -5,18 +5,18 @@
 #include <optional>
 
 #include "gtest/gtest.h"
-#include "llsm/status.h"
+#include "tl/status.h"
 #include "util/coding.h"
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 namespace fs = std::filesystem;
 
 class ManifestTest : public testing::Test {
  public:
   const fs::path kManifestFile =
-      "/tmp/llsm-test/MANIFEST-" + std::to_string(std::time(nullptr));
+      "/tmp/tl-test/MANIFEST-" + std::to_string(std::time(nullptr));
 
   void SetUp() override {
     fs::remove_all(kManifestFile.parent_path());

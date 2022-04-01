@@ -11,7 +11,7 @@
 #include <cstdlib>
 #include <memory>
 
-namespace llsm {
+namespace tl {
 
 // Options used to inform the database about the key space (the distribution is
 // assumed to be uniform).
@@ -146,4 +146,4 @@ struct WriteOptions {
   bool sync = false;
 };
 
-}  // namespace llsm
+}  // namespace tl

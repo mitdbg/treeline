@@ -6,19 +6,19 @@
 
 #include "db/page.h"
 #include "gtest/gtest.h"
-#include "llsm/options.h"
+#include "tl/options.h"
 #include "model/alex_model.h"
 #include "util/key.h"
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 
 // *** Tests ***
 
 TEST(FileManagerTest, FileConstruction) {
   const std::string dbpath =
-      "/tmp/llsm-filemgr-test-" + std::to_string(std::time(nullptr));
+      "/tmp/tl-filemgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbpath);
   std::filesystem::create_directory(dbpath);
 
@@ -31,7 +31,7 @@ TEST(FileManagerTest, FileConstruction) {
   BufMgrOptions bm_options;
   bm_options.num_segments = 8;
 
-  const llsm::FileManager file_manager(bm_options, dbpath);
+  const tl::FileManager file_manager(bm_options, dbpath);
 
   // Check created files.
   for (size_t i = 0; i < bm_options.num_segments; ++i) {
@@ -44,7 +44,7 @@ TEST(FileManagerTest, FileConstruction) {
 
 TEST(FileManagerTest, WriteReadSequential) {
   const std::string dbpath =
-      "/tmp/llsm-filemgr-test-" + std::to_string(std::time(nullptr));
+      "/tmp/tl-filemgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbpath);
   std::filesystem::create_directory(dbpath);
 

@@ -27,7 +27,7 @@ bool EnsureNonEmpty(const char* flagname, const std::string& value) {
 }
 
 bool ValidateDB(const char* flagname, const std::string& db) {
-  if (llsm::bench::ParseDBType(db).has_value()) return true;
+  if (tl::bench::ParseDBType(db).has_value()) return true;
   std::cerr << "ERROR: Unknown DB type: " << db << std::endl;
   return false;
 }
@@ -50,7 +50,7 @@ bool ValidateBGThreads(const char* flagname, uint32_t bg_threads) {
 
 bool ValidateLLSMPageFillPct(const char* flagname, uint32_t pct) {
   if (pct >= 1 && pct <= 100) return true;
-  std::cerr << "ERROR: --llsm_page_fill_pct must be a value between 1 and 100 "
+  std::cerr << "ERROR: --tl_page_fill_pct must be a value between 1 and 100 "
                "inclusive."
             << std::endl;
   return false;
@@ -59,10 +59,10 @@ bool ValidateLLSMPageFillPct(const char* flagname, uint32_t pct) {
 }  // namespace
 
 DEFINE_string(db, "all",
-              "Which database(s) to use {all, rocksdb, llsm, leanstore}.");
+              "Which database(s) to use {all, rocksdb, tl, leanstore}.");
 DEFINE_validator(db, &ValidateDB);
 
-DEFINE_string(db_path, llsm::bench::GetDefaultDBPath(),
+DEFINE_string(db_path, tl::bench::GetDefaultDBPath(),
               "The path where the database(s) should be stored.");
 DEFINE_validator(db_path, &EnsureNonEmpty);
 
@@ -87,10 +87,10 @@ DEFINE_bool(use_direct_io, true, "Whether or not to use direct I/O.");
 DEFINE_uint64(memtable_size_mib, 64,
               "The size of the memtable before it should be flushed, in MiB.");
 
-DEFINE_uint32(llsm_page_fill_pct, 50,
+DEFINE_uint32(tl_page_fill_pct, 50,
               "How full each LLSM page should be, as a value between 1 and 100 "
               "inclusive.");
-DEFINE_validator(llsm_page_fill_pct, &ValidateLLSMPageFillPct);
+DEFINE_validator(tl_page_fill_pct, &ValidateLLSMPageFillPct);
 
 DEFINE_uint64(
     io_min_batch_size, 1,
@@ -189,14 +189,14 @@ DEFINE_uint64(
     "During reorganization, the system will leave sufficient space to "
     "accommodate forecasted inserts for the next `num_future_epochs` epochs.");
 
-namespace llsm {
+namespace tl {
 namespace bench {
 
 std::optional<DBType> ParseDBType(const std::string& candidate) {
   static const std::unordered_map<std::string, DBType> kStringToDBType = {
-      {"all", DBType::kAll},         {"llsm", DBType::kLLSM},
+      {"all", DBType::kAll},         {"tl", DBType::kLLSM},
       {"rocksdb", DBType::kRocksDB}, {"leanstore", DBType::kLeanStore},
-      {"kvell", DBType::kKVell},     {"pg_llsm", DBType::kPGLLSM}};
+      {"kvell", DBType::kKVell},     {"pg_tl", DBType::kPGLLSM}};
 
   auto it = kStringToDBType.find(candidate);
   if (it == kStringToDBType.end()) {
@@ -248,14 +248,14 @@ rocksdb::Options BuildRocksDBOptions() {
   return options;
 }
 
-llsm::Options BuildLLSMOptions() {
-  llsm::Options options;
+tl::Options BuildLLSMOptions() {
+  tl::Options options;
   options.buffer_pool_size = FLAGS_cache_size_mib * 1024 * 1024;
   options.memtable_flush_threshold = FLAGS_memtable_size_mib * 1024 * 1024;
   options.use_direct_io = FLAGS_use_direct_io;
   options.background_threads = FLAGS_bg_threads;
   options.key_hints.record_size = FLAGS_record_size_bytes;
-  options.key_hints.page_fill_pct = FLAGS_llsm_page_fill_pct;
+  options.key_hints.page_fill_pct = FLAGS_tl_page_fill_pct;
   options.pin_threads = true;
   options.deferred_io_batch_size = FLAGS_io_min_batch_size;
   options.deferred_io_max_deferrals = FLAGS_max_deferrals;
@@ -268,8 +268,8 @@ llsm::Options BuildLLSMOptions() {
   return options;
 }
 
-llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
-  llsm::pg::PageGroupedDBOptions options;
+tl::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
+  tl::pg::PageGroupedDBOptions options;
   options.use_segments = FLAGS_pg_use_segments;
   options.records_per_page_goal = FLAGS_records_per_page_goal;
   options.records_per_page_delta = FLAGS_records_per_page_delta;
@@ -302,9 +302,9 @@ std::string AppendTimestamp(const std::string& prefix) {
   return output.str();
 }
 
-std::string GetDefaultOutputPath() { return AppendTimestamp("llsm-out"); }
+std::string GetDefaultOutputPath() { return AppendTimestamp("tl-out"); }
 
-std::string GetDefaultDBPath() { return AppendTimestamp("llsm-bench-db"); }
+std::string GetDefaultDBPath() { return AppendTimestamp("tl-bench-db"); }
 
 }  // namespace bench
-}  // namespace llsm
+}  // namespace tl

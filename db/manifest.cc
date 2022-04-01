@@ -40,7 +40,7 @@ constexpr size_t kPayloadOffset = kHeaderSize;
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 
 std::optional<Manifest> Manifest::LoadFrom(
     const std::filesystem::path& manifest_file, Status* status_out) {
@@ -169,4 +169,4 @@ Status Manifest::WriteTo(const std::filesystem::path& manifest_file) const {
   return Status::OK();
 }
 
-}  // namespace llsm
+}  // namespace tl

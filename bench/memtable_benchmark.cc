@@ -6,7 +6,7 @@
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 
 void MemTableInsert_64MiB(benchmark::State& state, bool shuffle) {
   constexpr size_t kDatasetSizeMiB = 64;

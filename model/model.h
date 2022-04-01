@@ -6,10 +6,10 @@
 #include <vector>
 
 #include "bufmgr/buffer_manager.h"
-#include "llsm/slice.h"
+#include "tl/slice.h"
 #include "util/key.h"
 
-namespace llsm {
+namespace tl {
 
 // A model to determine the correct page for a database record based on the key.
 class Model {
@@ -58,4 +58,4 @@ class Model {
   void ScanFilesAndInitialize(const std::shared_ptr<BufferManager>& buf_mgr);
 };
 
-}  // namespace llsm
+}  // namespace tl

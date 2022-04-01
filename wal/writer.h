@@ -7,12 +7,12 @@
 #include <cstdint>
 #include <filesystem>
 
-#include "llsm/options.h"
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "tl/options.h"
+#include "tl/slice.h"
+#include "tl/status.h"
 #include "wal/format.h"
 
-namespace llsm {
+namespace tl {
 namespace wal {
 
 // A helper class for appending entries to a write ahead log (WAL). Instances of
@@ -55,4 +55,4 @@ class Writer {
 };
 
 }  // namespace wal
-}  // namespace llsm
+}  // namespace tl

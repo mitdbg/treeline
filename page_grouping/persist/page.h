@@ -4,11 +4,11 @@
 
 #include "segment_id.h"
 #include "../plr/data.h"
-#include "llsm/options.h"
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "tl/options.h"
+#include "tl/slice.h"
+#include "tl/status.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // An in-memory representation of LLSM's on-disk "page" format.
@@ -195,4 +195,4 @@ class Page::Iterator {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

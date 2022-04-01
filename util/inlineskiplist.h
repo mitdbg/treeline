@@ -50,7 +50,7 @@
 #include "util/gcc_macros.h"
 #include "util/random.h"
 
-namespace llsm {
+namespace tl {
 
 template <class Comparator>
 class InlineSkipList {
@@ -991,4 +991,4 @@ void InlineSkipList<Comparator>::TEST_Validate() const {
   }
 }
 
-}  // namespace llsm
+}  // namespace tl

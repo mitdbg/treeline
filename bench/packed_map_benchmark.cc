@@ -3,12 +3,12 @@
 
 #include "bench/common/data.h"
 #include "benchmark/benchmark.h"
-#include "llsm/slice.h"
+#include "tl/slice.h"
 #include "util/packed_map.h"
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 
 void PackedMapInsert(benchmark::State& state, bool shuffle) {
   constexpr size_t kDatasetSizeMiB = 1;

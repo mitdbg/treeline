@@ -9,12 +9,12 @@
 
 #include <filesystem>
 
-#include "llsm/options.h"
-#include "llsm/record_batch.h"
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "tl/options.h"
+#include "tl/record_batch.h"
+#include "tl/slice.h"
+#include "tl/status.h"
 
-namespace llsm {
+namespace tl {
 
 // The public Learned LSM (LLSM) database interface, representing an embedded,
 // persistent, and ordered key-value store.
@@ -87,4 +87,4 @@ class DB {
   virtual size_t GetNumIndexedPages() const = 0;
 };
 
-}  // namespace llsm
+}  // namespace tl

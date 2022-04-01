@@ -5,9 +5,9 @@
 #include <memory>
 #include <optional>
 
-#include "llsm/status.h"
+#include "tl/status.h"
 
-namespace llsm {
+namespace tl {
 
 // Holds database metadata that is needed when initializing an existing LLSM
 // database. This class is mainly meant to help with serializing and
@@ -61,4 +61,4 @@ class Manifest::Builder {
   uint64_t num_segments_;
 };
 
-}  // namespace llsm
+}  // namespace tl

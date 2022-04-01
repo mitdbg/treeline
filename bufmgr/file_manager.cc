@@ -2,7 +2,7 @@
 
 #include <cassert>
 
-namespace llsm {
+namespace tl {
 
 FileManager::FileManager(const BufMgrOptions& options,
                          std::filesystem::path db_path)
@@ -50,4 +50,4 @@ PhysicalPageId FileManager::AllocatePage() {
   return PhysicalPageId(file_id, offset / Page::kSize);
 }
 
-}  // namespace llsm
+}  // namespace tl

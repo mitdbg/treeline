@@ -2,7 +2,7 @@
 
 #include "db/page.h"
 
-namespace llsm {
+namespace tl {
 
 void Model::PreallocateAndInitialize(
     const std::shared_ptr<BufferManager>& buf_mgr,
@@ -62,4 +62,4 @@ void Model::ScanFilesAndInitialize(
   }
 }
 
-}  // namespace llsm
+}  // namespace tl

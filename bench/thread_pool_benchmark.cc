@@ -43,7 +43,7 @@ namespace {
 void NoOp() {}
 
 void BM_ThreadPoolSubmitOverhead(benchmark::State& state) {
-  llsm::ThreadPool pool(state.range(0));
+  tl::ThreadPool pool(state.range(0));
   std::vector<std::future<void>> futures;
   // Avoid measuring vector resizing
   futures.reserve(5000000);
@@ -59,7 +59,7 @@ void BM_ThreadPoolSubmitOverhead(benchmark::State& state) {
 }
 
 void BM_ThreadPoolSubmitNoWaitOverhead(benchmark::State& state) {
-  llsm::ThreadPool pool(state.range(0));
+  tl::ThreadPool pool(state.range(0));
   for (auto _ : state) {
     pool.SubmitNoWait(NoOp);
   }

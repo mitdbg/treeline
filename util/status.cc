@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
-#include "llsm/status.h"
+#include "tl/status.h"
 
 #include <cstdio>
 
-namespace llsm {
+namespace tl {
 
 const char* Status::CopyState(const char* state) {
   uint32_t size;
@@ -72,4 +72,4 @@ std::string Status::ToString() const {
   }
 }
 
-}  // namespace llsm
+}  // namespace tl

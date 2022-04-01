@@ -9,12 +9,12 @@
 #include <string>
 
 #include "db/format.h"
-#include "llsm/options.h"
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "tl/options.h"
+#include "tl/slice.h"
+#include "tl/status.h"
 #include "wal/writer.h"
 
-namespace llsm {
+namespace tl {
 namespace wal {
 
 // This class provides a high-level interface to LLSM's write-ahead log files,
@@ -181,4 +181,4 @@ class Manager {
 };
 
 }  // namespace wal
-}  // namespace llsm
+}  // namespace tl

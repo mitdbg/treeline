@@ -3,7 +3,7 @@
 #include "../alex/alex.h"
 #include "model.h"
 
-namespace llsm {
+namespace tl {
 
 // A model that uses ALEX to predict the location of keys inside the
 // database.
@@ -47,4 +47,4 @@ class ALEXModel : public Model {
   std::shared_mutex mutex_;
 };
 
-}  // namespace llsm
+}  // namespace tl

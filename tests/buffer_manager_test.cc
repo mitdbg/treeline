@@ -7,13 +7,13 @@
 
 #include "db/page.h"
 #include "gtest/gtest.h"
-#include "llsm/options.h"
+#include "tl/options.h"
 #include "model/alex_model.h"
 #include "util/key.h"
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 
 // *** Tests ***
 
@@ -27,7 +27,7 @@ TEST(BufferManagerTest, CreateValues) {
 
 TEST(BufferManagerTest, WriteReadSequential) {
   const std::string dbname =
-      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
+      "/tmp/tl-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 
@@ -51,7 +51,7 @@ TEST(BufferManagerTest, WriteReadSequential) {
   for (size_t record_id = 0; record_id < records.size();
        record_id += key_hints.records_per_page()) {
     PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
-    llsm::BufferFrame& bf = buffer_manager->FixPage(page_id, true);
+    tl::BufferFrame& bf = buffer_manager->FixPage(page_id, true);
     *reinterpret_cast<PhysicalPageId*>(bf.GetData()) = page_id;
     buffer_manager->UnfixPage(bf, true);
   }
@@ -60,7 +60,7 @@ TEST(BufferManagerTest, WriteReadSequential) {
   for (size_t record_id = 0; record_id < records.size();
        record_id += key_hints.records_per_page()) {
     PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
-    llsm::BufferFrame& bf = buffer_manager->FixPage(page_id, false);
+    tl::BufferFrame& bf = buffer_manager->FixPage(page_id, false);
     ASSERT_EQ(*reinterpret_cast<PhysicalPageId*>(bf.GetData()), page_id);
     buffer_manager->UnfixPage(bf, false);
   }
@@ -70,7 +70,7 @@ TEST(BufferManagerTest, WriteReadSequential) {
 
 TEST(BufferManagerTest, FlushDirty) {
   const std::string dbname =
-      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
+      "/tmp/tl-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 
@@ -98,7 +98,7 @@ TEST(BufferManagerTest, FlushDirty) {
        record_id < few_pages * key_hints.records_per_page();
        record_id += key_hints.records_per_page()) {
     PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
-    llsm::BufferFrame& bf = buffer_manager->FixPage(page_id, true);
+    tl::BufferFrame& bf = buffer_manager->FixPage(page_id, true);
     *reinterpret_cast<PhysicalPageId*>(bf.GetData()) = page_id;
     buffer_manager->UnfixPage(bf, true);
   }
@@ -122,7 +122,7 @@ TEST(BufferManagerTest, FlushDirty) {
 
 TEST(BufferManagerTest, Contains) {
   const std::string dbname =
-      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
+      "/tmp/tl-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
   // Create data.
@@ -148,7 +148,7 @@ TEST(BufferManagerTest, Contains) {
        record_id < few_pages * key_hints.records_per_page();
        record_id += key_hints.records_per_page()) {
     PhysicalPageId page_id = model->KeyToPageId(records.at(record_id).first);
-    llsm::BufferFrame& bf = buffer_manager->FixPage(page_id, true);
+    tl::BufferFrame& bf = buffer_manager->FixPage(page_id, true);
     ASSERT_TRUE(buffer_manager->Contains(page_id));
     buffer_manager->UnfixPage(bf, true);
     ASSERT_TRUE(buffer_manager->Contains(page_id));
@@ -170,7 +170,7 @@ TEST(BufferManagerTest, Contains) {
 
 TEST(BufferManagerTest, IncreaseNumPages) {
   const std::string dbname =
-      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
+      "/tmp/tl-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 
@@ -224,7 +224,7 @@ TEST(BufferManagerTest, IncreaseNumPages) {
 
 TEST(BufferManagerTest, DecreaseNumPages) {
   const std::string dbname =
-      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
+      "/tmp/tl-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 
@@ -288,7 +288,7 @@ TEST(BufferManagerTest, DecreaseNumPages) {
 
 TEST(BufferManagerTest, FixPageIfFrameAvailable) {
   const std::string dbname =
-      "/tmp/llsm-bufmgr-test-" + std::to_string(std::time(nullptr));
+      "/tmp/tl-bufmgr-test-" + std::to_string(std::time(nullptr));
   std::filesystem::remove_all(dbname);
   std::filesystem::create_directory(dbname);
 

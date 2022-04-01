@@ -6,7 +6,7 @@
 #include "persist/segment_id.h"
 #include "plr/data.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 class SegmentInfo {
@@ -59,4 +59,4 @@ class SegmentInfo {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

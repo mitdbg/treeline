@@ -6,7 +6,7 @@
 #include "db/format.h"
 #include "db/memtable.h"
 #include "gflags/gflags.h"
-#include "llsm/options.h"
+#include "tl/options.h"
 #include "util/inlineskiplist.h"
 #include "ycsbr/ycsbr.h"
 
@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
   const size_t num_keys = load.size();
 
   // Create key hints.
-  llsm::KeyDistHints key_hints;
+  tl::KeyDistHints key_hints;
   key_hints.num_keys = load.size();
   key_hints.page_fill_pct = FLAGS_page_fill_pct;
   key_hints.record_size = FLAGS_record_size_bytes;
@@ -88,8 +88,8 @@ int main(int argc, char* argv[]) {
   std::vector<size_t> memtable_entries_per_page(num_pages, 0);
   std::vector<uint64_t> page_deferral_count(num_pages, 0);
   std::vector<bool> flushed_this_time(num_pages, false);
-  llsm::MemTable* memtable = new llsm::MemTable(llsm::MemTableOptions());
-  llsm::MemTable* backup_memtable = new llsm::MemTable(llsm::MemTableOptions());
+  tl::MemTable* memtable = new tl::MemTable(tl::MemTableOptions());
+  tl::MemTable* backup_memtable = new tl::MemTable(tl::MemTableOptions());
   size_t num_flushes = 0;
   size_t num_ios = 0;
   size_t num_reqs = 0;
@@ -104,8 +104,8 @@ int main(int argc, char* argv[]) {
     ++num_inserts;
 
     // Perform the insert
-    memtable->Add(llsm::Slice(reinterpret_cast<const char*>(&req.key), 8),
-                  llsm::Slice(req.value, 8), llsm::format::WriteType::kWrite);
+    memtable->Add(tl::Slice(reinterpret_cast<const char*>(&req.key), 8),
+                  tl::Slice(req.value, 8), tl::format::WriteType::kWrite);
     const size_t insert_page_id =
         *model.get_payload_last_no_greater_than(__builtin_bswap64(req.key));
     ++memtable_entries_per_page[insert_page_id];
@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) {
       // Swap memtables
       delete memtable;
       memtable = backup_memtable;
-      backup_memtable = new llsm::MemTable(llsm::MemTableOptions());
+      backup_memtable = new tl::MemTable(tl::MemTableOptions());
     }
   }
 

@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // An ordered map with a configurable compile-time fixed size that is strictly
@@ -254,6 +254,6 @@ class PackedMap {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl
 
 #include "packed_map-inl.h"

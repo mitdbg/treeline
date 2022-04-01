@@ -5,7 +5,7 @@
 
 #include "data.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 namespace plr {
 
@@ -176,4 +176,4 @@ inline std::optional<BoundedLine<T>> GreedyPLRBuilder<T>::Finish() const {
 
 }  // namespace plr
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

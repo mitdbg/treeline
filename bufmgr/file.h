@@ -9,7 +9,7 @@
 
 #include "bufmgr/page_memory_allocator.h"
 #include "db/page.h"
-#include "llsm/status.h"
+#include "tl/status.h"
 
 #define CHECK_ERROR(call)                                                    \
   do {                                                                       \
@@ -20,7 +20,7 @@
     }                                                                        \
   } while (0)
 
-namespace llsm {
+namespace tl {
 
 class File {
   // The number of pages by which to grow a file when needed.
@@ -113,4 +113,4 @@ class File {
   size_t next_page_allocation_offset_;
 };
 
-}  // namespace llsm
+}  // namespace tl

@@ -4,9 +4,9 @@
 
 #include "bench/common/config.h"
 #include "bench/common/leanstore_interface.h"
-#include "bench/common/llsm_interface.h"
+#include "bench/common/tl_interface.h"
 #include "bench/common/load_data.h"
-#include "bench/common/pg_llsm_interface.h"
+#include "bench/common/pg_tl_interface.h"
 #include "bench/common/rocksdb_interface.h"
 #include "bench/common/startup.h"
 #include "gflags/gflags.h"
@@ -15,7 +15,7 @@
 namespace {
 
 namespace fs = std::filesystem;
-using namespace llsm::bench;
+using namespace tl::bench;
 
 DEFINE_uint32(threads, 1, "The number of threads to use to run the workload.");
 DEFINE_string(workload_config, "",
@@ -136,7 +136,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  DBType db = llsm::bench::ParseDBType(FLAGS_db).value();
+  DBType db = tl::bench::ParseDBType(FLAGS_db).value();
   std::unique_ptr<ycsbr::gen::PhasedWorkload> workload =
       ycsbr::gen::PhasedWorkload::LoadFrom(FLAGS_workload_config, FLAGS_seed,
                                            FLAGS_record_size_bytes);
@@ -171,13 +171,13 @@ int main(int argc, char* argv[]) {
     PrintExperimentResult("rocksdb", Run<RocksDBInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kLLSM) {
-    PrintExperimentResult("llsm", Run<LLSMInterface>(*workload));
+    PrintExperimentResult("tl", Run<LLSMInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kPGLLSM) {
-    PrintExperimentResult("pg_llsm", Run<PGLLSMInterface>(*workload));
+    PrintExperimentResult("pg_tl", Run<PGLLSMInterface>(*workload));
   }
 
   return 0;

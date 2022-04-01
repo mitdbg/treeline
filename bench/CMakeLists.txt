@@ -7,9 +7,9 @@ add_library(bench_common
   common/startup.cc
   common/startup.h
   common/timing.h)
-# Any targets linking to `bench_common` will also link to `llsm` and will be
+# Any targets linking to `bench_common` will also link to `tl` and will be
 # able to include LLSM internal headers.
-target_link_libraries(bench_common PUBLIC llsm)
+target_link_libraries(bench_common PUBLIC tl)
 target_include_directories(bench_common PUBLIC ${PROJECT_SOURCE_DIR})
 
 # All `bench_common` utilities plus configuration utilities used in benchmarks
@@ -22,10 +22,10 @@ add_library(bench_common_config
   common/config.h
   common/kvell_interface.h
   common/leanstore_interface.h
-  common/llsm_interface.h
-  common/pg_llsm_interface.h
+  common/tl_interface.h
+  common/pg_tl_interface.h
   common/rocksdb_interface.h)
-target_link_libraries(bench_common_config PUBLIC bench_common gflags rocksdb leanstore pg_llsm libcuckoo)
+target_link_libraries(bench_common_config PUBLIC bench_common gflags rocksdb leanstore pg_tl libcuckoo)
 
 # Synthetic Write: Measure the write throughput when writing synthetic data.
 # This benchmark compares the Learned LSM database against RocksDB.

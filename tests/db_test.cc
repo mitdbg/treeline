@@ -23,7 +23,7 @@ bool EqualTimespec(const timespec& lhs, const timespec& rhs) {
 
 class DBTest : public testing::Test {
  public:
-  DBTest() : kDBDir("/tmp/llsm-test-" + std::to_string(std::time(nullptr))) {}
+  DBTest() : kDBDir("/tmp/tl-test-" + std::to_string(std::time(nullptr))) {}
   void SetUp() override {
     std::filesystem::remove_all(kDBDir);
     std::filesystem::create_directory(kDBDir);
@@ -34,63 +34,63 @@ class DBTest : public testing::Test {
 };
 
 TEST_F(DBTest, Create) {
-  llsm::DB* db = nullptr;
-  llsm::Options options;
+  tl::DB* db = nullptr;
+  tl::Options options;
   // The test environment may not have many cores.
   options.pin_threads = false;
   options.key_hints.num_keys = 10;
-  auto status = llsm::DB::Open(options, kDBDir, &db);
+  auto status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   delete db;
 }
 
 TEST_F(DBTest, CreateIfMissingDisabled) {
-  llsm::DB* db = nullptr;
-  llsm::Options options;
+  tl::DB* db = nullptr;
+  tl::Options options;
   options.create_if_missing = false;
   options.pin_threads = false;
-  auto status = llsm::DB::Open(options, kDBDir, &db);
+  auto status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.IsInvalidArgument());
   ASSERT_EQ(db, nullptr);
 }
 
 TEST_F(DBTest, ErrorIfExistsEnabled) {
-  llsm::DB* db = nullptr;
-  llsm::Options options;
+  tl::DB* db = nullptr;
+  tl::Options options;
   options.error_if_exists = true;
   options.pin_threads = false;
   options.key_hints.num_keys = 10;
 
   // Create the database and then close it.
-  auto status = llsm::DB::Open(options, kDBDir, &db);
+  auto status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   delete db;
   db = nullptr;
 
   // Attempt to open it again (but with `error_if_exists` set to true).
-  status = llsm::DB::Open(options, kDBDir, &db);
+  status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.IsInvalidArgument());
   ASSERT_EQ(db, nullptr);
 }
 
 TEST_F(DBTest, WriteFlushRead) {
-  llsm::DB* db = nullptr;
-  llsm::Options options;
+  tl::DB* db = nullptr;
+  tl::Options options;
   options.pin_threads = false;
   options.key_hints.num_keys = 10;
-  auto status = llsm::DB::Open(options, kDBDir, &db);
+  auto status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
 
   const uint64_t key_as_int = __builtin_bswap64(1ULL);
   const std::string value = "Hello world!";
-  llsm::Slice key(reinterpret_cast<const char*>(&key_as_int),
+  tl::Slice key(reinterpret_cast<const char*>(&key_as_int),
                   sizeof(key_as_int));
-  status = db->Put(llsm::WriteOptions(), key, value);
+  status = db->Put(tl::WriteOptions(), key, value);
   ASSERT_TRUE(status.ok());
 
   // Should be a record cache read.
   std::string value_out;
-  status = db->Get(llsm::ReadOptions(), key, &value_out);
+  status = db->Get(tl::ReadOptions(), key, &value_out);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value_out, value);
 
@@ -98,7 +98,7 @@ TEST_F(DBTest, WriteFlushRead) {
   ASSERT_TRUE(status.ok());
 
   // Should be a page read (but will be cached in the buffer pool).
-  status = db->Get(llsm::ReadOptions(), key, &value_out);
+  status = db->Get(tl::ReadOptions(), key, &value_out);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value_out, value);
 
@@ -106,23 +106,23 @@ TEST_F(DBTest, WriteFlushRead) {
 }
 
 TEST_F(DBTest, WriteFlushReadNoHint) {
-  llsm::DB* db = nullptr;
-  llsm::Options options;
+  tl::DB* db = nullptr;
+  tl::Options options;
   options.pin_threads = false;
   options.key_hints.num_keys = 0;
-  auto status = llsm::DB::Open(options, kDBDir, &db);
+  auto status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
 
   const uint64_t key_as_int = __builtin_bswap64(1ULL);
   const std::string value = "Hello world!";
-  llsm::Slice key(reinterpret_cast<const char*>(&key_as_int),
+  tl::Slice key(reinterpret_cast<const char*>(&key_as_int),
                   sizeof(key_as_int));
-  status = db->Put(llsm::WriteOptions(), key, value);
+  status = db->Put(tl::WriteOptions(), key, value);
   ASSERT_TRUE(status.ok());
 
   // Should be a record cache read.
   std::string value_out;
-  status = db->Get(llsm::ReadOptions(), key, &value_out);
+  status = db->Get(tl::ReadOptions(), key, &value_out);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value_out, value);
 
@@ -130,7 +130,7 @@ TEST_F(DBTest, WriteFlushReadNoHint) {
   ASSERT_TRUE(status.ok());
 
   // Should be a page read (but will be cached in the buffer pool).
-  status = db->Get(llsm::ReadOptions(), key, &value_out);
+  status = db->Get(tl::ReadOptions(), key, &value_out);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value_out, value);
 
@@ -138,11 +138,11 @@ TEST_F(DBTest, WriteFlushReadNoHint) {
 }
 
 TEST_F(DBTest, WriteThenDelete) {
-  llsm::DB* db = nullptr;
-  llsm::Options options;
+  tl::DB* db = nullptr;
+  tl::Options options;
   options.pin_threads = false;
   options.key_hints.num_keys = 10;
-  auto status = llsm::DB::Open(options, kDBDir, &db);
+  auto status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
 
   const std::string value = "Hello world!";
@@ -151,36 +151,36 @@ TEST_F(DBTest, WriteThenDelete) {
   //////////////////////////////////
   // 1. Everything in the record_cache.
   const uint64_t key_as_int1 = __builtin_bswap64(1ULL);
-  llsm::Slice key1(reinterpret_cast<const char*>(&key_as_int1),
+  tl::Slice key1(reinterpret_cast<const char*>(&key_as_int1),
                    sizeof(key_as_int1));
   // Write
-  status = db->Put(llsm::WriteOptions(), key1, value);
+  status = db->Put(tl::WriteOptions(), key1, value);
   ASSERT_TRUE(status.ok());
 
   // Should be a record cache read.
-  status = db->Get(llsm::ReadOptions(), key1, &value_out);
+  status = db->Get(tl::ReadOptions(), key1, &value_out);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value_out, value);
 
   // Delete
-  status = db->Delete(llsm::WriteOptions(), key1);
+  status = db->Delete(tl::WriteOptions(), key1);
   ASSERT_TRUE(status.ok());
 
   // Should not find it.
-  status = db->Get(llsm::ReadOptions(), key1, &value_out);
+  status = db->Get(tl::ReadOptions(), key1, &value_out);
   ASSERT_TRUE(status.IsNotFound());
 
   //////////////////////////////////
   // 2. Just write is flushed
   const uint64_t key_as_int2 = __builtin_bswap64(2ULL);
-  llsm::Slice key2(reinterpret_cast<const char*>(&key_as_int2),
+  tl::Slice key2(reinterpret_cast<const char*>(&key_as_int2),
                    sizeof(key_as_int2));
   // Write
-  status = db->Put(llsm::WriteOptions(), key2, value);
+  status = db->Put(tl::WriteOptions(), key2, value);
   ASSERT_TRUE(status.ok());
 
   // Should be a record cache read.
-  status = db->Get(llsm::ReadOptions(), key2, &value_out);
+  status = db->Get(tl::ReadOptions(), key2, &value_out);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value_out, value);
 
@@ -189,25 +189,25 @@ TEST_F(DBTest, WriteThenDelete) {
   ASSERT_TRUE(status.ok());
 
   // Delete
-  status = db->Delete(llsm::WriteOptions(), key2);
+  status = db->Delete(tl::WriteOptions(), key2);
   ASSERT_TRUE(status.ok());
 
   // Should not find it.
-  status = db->Get(llsm::ReadOptions(), key2, &value_out);
+  status = db->Get(tl::ReadOptions(), key2, &value_out);
   ASSERT_TRUE(status.IsNotFound());
 
   //////////////////////////////////
   // 3. Both are flushed individually
 
   const uint64_t key_as_int3 = __builtin_bswap64(3ULL);
-  llsm::Slice key3(reinterpret_cast<const char*>(&key_as_int3),
+  tl::Slice key3(reinterpret_cast<const char*>(&key_as_int3),
                    sizeof(key_as_int3));
   // Write
-  status = db->Put(llsm::WriteOptions(), key3, value);
+  status = db->Put(tl::WriteOptions(), key3, value);
   ASSERT_TRUE(status.ok());
 
   // Should be a record cache read.
-  status = db->Get(llsm::ReadOptions(), key3, &value_out);
+  status = db->Get(tl::ReadOptions(), key3, &value_out);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value_out, value);
 
@@ -216,7 +216,7 @@ TEST_F(DBTest, WriteThenDelete) {
   ASSERT_TRUE(status.ok());
 
   // Delete
-  status = db->Delete(llsm::WriteOptions(), key3);
+  status = db->Delete(tl::WriteOptions(), key3);
   ASSERT_TRUE(status.ok());
 
   // Flush
@@ -224,26 +224,26 @@ TEST_F(DBTest, WriteThenDelete) {
   ASSERT_TRUE(status.ok());
 
   // Should not find it.
-  status = db->Get(llsm::ReadOptions(), key3, &value_out);
+  status = db->Get(tl::ReadOptions(), key3, &value_out);
   ASSERT_TRUE(status.IsNotFound());
 
   //////////////////////////////////
   // 4. Both are flushed together
 
   const uint64_t key_as_int4 = __builtin_bswap64(4ULL);
-  llsm::Slice key4(reinterpret_cast<const char*>(&key_as_int4),
+  tl::Slice key4(reinterpret_cast<const char*>(&key_as_int4),
                    sizeof(key_as_int4));
   // Write
-  status = db->Put(llsm::WriteOptions(), key4, value);
+  status = db->Put(tl::WriteOptions(), key4, value);
   ASSERT_TRUE(status.ok());
 
   // Should be a record cache read.
-  status = db->Get(llsm::ReadOptions(), key4, &value_out);
+  status = db->Get(tl::ReadOptions(), key4, &value_out);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value_out, value);
 
   // Delete
-  status = db->Delete(llsm::WriteOptions(), key4);
+  status = db->Delete(tl::WriteOptions(), key4);
   ASSERT_TRUE(status.ok());
 
   // Flush
@@ -251,7 +251,7 @@ TEST_F(DBTest, WriteThenDelete) {
   ASSERT_TRUE(status.ok());
 
   // Should not find it.
-  status = db->Get(llsm::ReadOptions(), key4, &value_out);
+  status = db->Get(tl::ReadOptions(), key4, &value_out);
   ASSERT_TRUE(status.IsNotFound());
 
   delete db;
@@ -260,8 +260,8 @@ TEST_F(DBTest, WriteThenDelete) {
 // TODO: Re-enable test once deferral is ported to the record cache.
 
 // TEST_F(DBTest, DeferByEntries) {
-//   llsm::DB* db = nullptr;
-//   llsm::Options options;
+//   tl::DB* db = nullptr;
+//   tl::Options options;
 //   options.pin_threads = false;
 //   options.key_hints.page_fill_pct = 50;
 //   options.key_hints.record_size = 512;
@@ -270,8 +270,8 @@ TEST_F(DBTest, WriteThenDelete) {
 //   options.key_hints.num_keys = 2 * options.key_hints.records_per_page();
 //   options.deferred_io_batch_size = 40;
 //   options.deferred_io_max_deferrals = 4;
-//   options.buffer_pool_size = llsm::Page::kSize;
-//   auto status = llsm::DB::Open(options, kDBDir, &db);
+//   options.buffer_pool_size = tl::Page::kSize;
+//   auto status = tl::DB::Open(options, kDBDir, &db);
 //   ASSERT_TRUE(status.ok());
 //
 //   const std::string value = "Hello world!";
@@ -279,9 +279,9 @@ TEST_F(DBTest, WriteThenDelete) {
 //
 //   // Write
 //   const uint64_t key_as_int1 = __builtin_bswap64(1ULL);
-//   llsm::Slice key1(reinterpret_cast<const char*>(&key_as_int1),
+//   tl::Slice key1(reinterpret_cast<const char*>(&key_as_int1),
 //                    sizeof(key_as_int1));
-//   status = db->Put(llsm::WriteOptions(), key1, value);
+//   status = db->Put(tl::WriteOptions(), key1, value);
 //   ASSERT_TRUE(status.ok());
 //
 //   // Create a copy
@@ -297,9 +297,9 @@ TEST_F(DBTest, WriteThenDelete) {
 //
 //   // Make sure page is evicted by looking up sth else.
 //   const uint64_t key_as_int9 = __builtin_bswap64(9ULL);
-//   llsm::Slice key9(reinterpret_cast<const char*>(&key_as_int9),
+//   tl::Slice key9(reinterpret_cast<const char*>(&key_as_int9),
 //                    sizeof(key_as_int9));
-//   status = db->Get(llsm::ReadOptions(), key9, &value_out);
+//   status = db->Get(tl::ReadOptions(), key9, &value_out);
 //   ASSERT_TRUE(status.IsNotFound());
 //
 //   // Check that the flush never happened.
@@ -310,9 +310,9 @@ TEST_F(DBTest, WriteThenDelete) {
 //
 //   // Write another to segment 0
 //   const uint64_t key_as_int0 = __builtin_bswap64(0ULL);
-//   llsm::Slice key0(reinterpret_cast<const char*>(&key_as_int0),
+//   tl::Slice key0(reinterpret_cast<const char*>(&key_as_int0),
 //                    sizeof(key_as_int0));
-//   status = db->Put(llsm::WriteOptions(), key0, value);
+//   status = db->Put(tl::WriteOptions(), key0, value);
 //   ASSERT_TRUE(status.ok());
 //
 //   // Flush - should work now
@@ -320,7 +320,7 @@ TEST_F(DBTest, WriteThenDelete) {
 //   ASSERT_TRUE(status.ok());
 //
 //   // Make sure page is evicted by looking up sth else.
-//   status = db->Get(llsm::ReadOptions(), key9, &value_out);
+//   status = db->Get(tl::ReadOptions(), key9, &value_out);
 //   ASSERT_TRUE(status.IsNotFound());
 //
 //   // Check that the flush happened.
@@ -328,10 +328,10 @@ TEST_F(DBTest, WriteThenDelete) {
 //   ASSERT_NE(system(s), 0);
 //
 //   // Can still read them
-//   status = db->Get(llsm::ReadOptions(), key1, &value_out);
+//   status = db->Get(tl::ReadOptions(), key1, &value_out);
 //   ASSERT_TRUE(status.ok());
 //   ASSERT_EQ(value_out, value);
-//   status = db->Get(llsm::ReadOptions(), key0, &value_out);
+//   status = db->Get(tl::ReadOptions(), key0, &value_out);
 //   ASSERT_TRUE(status.ok());
 //   ASSERT_EQ(value_out, value);
 //
@@ -339,8 +339,8 @@ TEST_F(DBTest, WriteThenDelete) {
 // }
 
 // TEST_F(DBTest, DeferByAttempts) {
-//   llsm::DB* db = nullptr;
-//   llsm::Options options;
+//   tl::DB* db = nullptr;
+//   tl::Options options;
 //   options.pin_threads = false;
 //   options.key_hints.page_fill_pct = 50;
 //   options.key_hints.record_size = 512;
@@ -349,8 +349,8 @@ TEST_F(DBTest, WriteThenDelete) {
 //   options.key_hints.num_keys = 2 * options.key_hints.records_per_page();
 //   options.deferred_io_batch_size = 2 * options.key_hints.record_size;
 //   options.deferred_io_max_deferrals = 1;
-//   options.buffer_pool_size = llsm::Page::kSize;
-//   auto status = llsm::DB::Open(options, kDBDir, &db);
+//   options.buffer_pool_size = tl::Page::kSize;
+//   auto status = tl::DB::Open(options, kDBDir, &db);
 //   ASSERT_TRUE(status.ok());
 //
 //   const std::string value = "Hello world!";
@@ -358,9 +358,9 @@ TEST_F(DBTest, WriteThenDelete) {
 //
 //   // Write
 //   const uint64_t key_as_int1 = __builtin_bswap64(1ULL);
-//   llsm::Slice key1(reinterpret_cast<const char*>(&key_as_int1),
+//   tl::Slice key1(reinterpret_cast<const char*>(&key_as_int1),
 //                    sizeof(key_as_int1));
-//   status = db->Put(llsm::WriteOptions(), key1, value);
+//   status = db->Put(tl::WriteOptions(), key1, value);
 //   ASSERT_TRUE(status.ok());
 //
 //   // Create a copy
@@ -376,9 +376,9 @@ TEST_F(DBTest, WriteThenDelete) {
 //
 //   // Make sure page is evicted by looking up sth else.
 //   const uint64_t key_as_int9 = __builtin_bswap64(9ULL);
-//   llsm::Slice key9(reinterpret_cast<const char*>(&key_as_int9),
+//   tl::Slice key9(reinterpret_cast<const char*>(&key_as_int9),
 //                    sizeof(key_as_int9));
-//   status = db->Get(llsm::ReadOptions(), key9, &value_out);
+//   status = db->Get(tl::ReadOptions(), key9, &value_out);
 //   ASSERT_TRUE(status.IsNotFound());
 //
 //   // Check that the flush never happened.
@@ -392,7 +392,7 @@ TEST_F(DBTest, WriteThenDelete) {
 //   ASSERT_TRUE(status.ok());
 //
 //   // Make sure page is evicted by looking up sth else.
-//   status = db->Get(llsm::ReadOptions(), key9, &value_out);
+//   status = db->Get(tl::ReadOptions(), key9, &value_out);
 //   ASSERT_TRUE(status.IsNotFound());
 //
 //   // Check that the flush happened.
@@ -400,7 +400,7 @@ TEST_F(DBTest, WriteThenDelete) {
 //   ASSERT_NE(system(s), 0);
 //
 //   // Can still read
-//   status = db->Get(llsm::ReadOptions(), key1, &value_out);
+//   status = db->Get(tl::ReadOptions(), key1, &value_out);
 //   ASSERT_TRUE(status.ok());
 //   ASSERT_EQ(value_out, value);
 //
@@ -411,32 +411,32 @@ TEST_F(DBTest, WriteReopenRead) {
   const std::string value = "Hello world!";
 
   // Will write 10 records with keys 0 - 9 and value `value`.
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.key_hints.num_keys = 10;
   options.key_hints.record_size = sizeof(uint64_t) + value.size();
   options.key_hints.key_size = sizeof(uint64_t);
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
-  llsm::DB* db = nullptr;
-  auto status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  auto status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int),
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int),
                     sizeof(key_as_int));
-    status = db->Put(llsm::WriteOptions(), key, value);
+    status = db->Put(tl::WriteOptions(), key, value);
     ASSERT_TRUE(status.ok());
   }
 
   // Should be able to read all the data (in memory).
   std::string value_out;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int),
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int),
                     sizeof(key_as_int));
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value, value_out);
   }
@@ -448,15 +448,15 @@ TEST_F(DBTest, WriteReopenRead) {
   // Make sure an error occurs if the database does not exist when we try to
   // reopen it.
   options.create_if_missing = false;
-  status = llsm::DB::Open(options, kDBDir, &db);
+  status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Should be able to read all the data back out (should be from disk).
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int),
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int),
                     sizeof(key_as_int));
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value, value_out);
   }
@@ -475,7 +475,7 @@ TEST_F(DBTest, WriteReopenReadReverse) {
   // A dummy value used for all records (8 byte key; record is 1 KiB in total).
   const std::string value(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -487,19 +487,19 @@ TEST_F(DBTest, WriteReopenReadReverse) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write all the data.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value);
     ASSERT_TRUE(status.ok());
   }
@@ -507,7 +507,7 @@ TEST_F(DBTest, WriteReopenReadReverse) {
   // Close and then reopen the DB.
   delete db;
   db = nullptr;
-  status = llsm::DB::Open(options, kDBDir, &db);
+  status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
@@ -516,8 +516,8 @@ TEST_F(DBTest, WriteReopenReadReverse) {
   const std::vector<uint64_t> relevant_keys = {__builtin_bswap64(0ULL),
                                                __builtin_bswap64(16384ULL)};
   for (const auto& key_as_int : relevant_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value, value_out);
   }
@@ -525,8 +525,8 @@ TEST_F(DBTest, WriteReopenReadReverse) {
   // Now read all the records, but in reverse order.
   for (auto it = lexicographic_keys.rbegin(); it != lexicographic_keys.rend();
        ++it) {
-    llsm::Slice key(reinterpret_cast<const char*>(&(*it)), kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    tl::Slice key(reinterpret_cast<const char*>(&(*it)), kKeySize);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value, value_out);
   }
@@ -543,7 +543,7 @@ TEST_F(DBTest, RangeScan) {
   const std::string value_old(kValueSize, 0xFF);
   const std::string value_new(kValueSize, 0x00);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -555,19 +555,19 @@ TEST_F(DBTest, RangeScan) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
@@ -575,10 +575,10 @@ TEST_F(DBTest, RangeScan) {
   // Scan in memory.
   const size_t start_index = 10;
   const size_t num_records = options.key_hints.num_keys - 10;
-  std::vector<llsm::Record> results;
+  std::vector<tl::Record> results;
   status = db->GetRange(
-      llsm::ReadOptions(),
-      llsm::Slice(
+      tl::ReadOptions(),
+      tl::Slice(
           reinterpret_cast<const char*>(&lexicographic_keys[start_index]), 8),
       num_records, &results);
   ASSERT_TRUE(status.ok());
@@ -597,8 +597,8 @@ TEST_F(DBTest, RangeScan) {
   // Scan from the pages.
   results.clear();
   status = db->GetRange(
-      llsm::ReadOptions(),
-      llsm::Slice(
+      tl::ReadOptions(),
+      tl::Slice(
           reinterpret_cast<const char*>(&lexicographic_keys[start_index]), 8),
       num_records, &results);
   ASSERT_TRUE(status.ok());
@@ -614,7 +614,7 @@ TEST_F(DBTest, RangeScan) {
   // Overwrite half of the existing records (but the writes will be in memory).
   for (size_t i = 0; i < lexicographic_keys.size(); ++i) {
     if (i % 2 != 0) continue;
-    llsm::Slice key(reinterpret_cast<const char*>(&lexicographic_keys[i]),
+    tl::Slice key(reinterpret_cast<const char*>(&lexicographic_keys[i]),
                     kKeySize);
     status = db->Put(woptions, key, value_new);
     ASSERT_TRUE(status.ok());
@@ -624,8 +624,8 @@ TEST_F(DBTest, RangeScan) {
   // pages).
   results.clear();
   status = db->GetRange(
-      llsm::ReadOptions(),
-      llsm::Slice(
+      tl::ReadOptions(),
+      tl::Slice(
           reinterpret_cast<const char*>(&lexicographic_keys[start_index]), 8),
       num_records, &results);
   ASSERT_TRUE(status.ok());
@@ -654,7 +654,7 @@ TEST_F(DBTest, OverflowByRecordNumber) {
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value_old(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -667,19 +667,19 @@ TEST_F(DBTest, OverflowByRecordNumber) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
@@ -688,18 +688,18 @@ TEST_F(DBTest, OverflowByRecordNumber) {
   db->FlushRecordCache(/*disable_deferred_io = */ true);
 
   // Generate data for enough additional writes to definitely overflow (64 KiB)
-  llsm::KeyDistHints extra_key_hints;
+  tl::KeyDistHints extra_key_hints;
   extra_key_hints.num_keys = 4096;
   extra_key_hints.record_size = kKeySize + kValueSize;
   extra_key_hints.key_size = kKeySize;
   extra_key_hints.min_key = 1024;
   extra_key_hints.key_step_size = 1;
   const std::vector<uint64_t> extra_lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+      tl::key_utils::CreateValues<uint64_t>(extra_key_hints);
 
   // Write dummy data to the DB.
   for (const auto& key_as_int : extra_lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
@@ -710,16 +710,16 @@ TEST_F(DBTest, OverflowByRecordNumber) {
   // Read all original keys
   std::string value_out;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_old, value_out);
   }
 
   // Read all extra keys
   for (const auto& key_as_int : extra_lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_old, value_out);
   }
@@ -740,7 +740,7 @@ TEST_F(DBTest, OverflowByLargeValue) {
   // total).
   const std::string value_new(kLongValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.record_size = kKeySize + kValueSize;
@@ -753,19 +753,19 @@ TEST_F(DBTest, OverflowByLargeValue) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
@@ -774,7 +774,7 @@ TEST_F(DBTest, OverflowByLargeValue) {
   db->FlushRecordCache(/*disable_deferred_io = */ true);
 
   // Write extra data to the DB.
-  llsm::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[0])),
+  tl::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[0])),
                   kKeySize);
   status = db->Put(woptions, key, value_new);
   ASSERT_TRUE(status.ok());
@@ -784,7 +784,7 @@ TEST_F(DBTest, OverflowByLargeValue) {
 
   // Read updated value
   std::string value_out;
-  status = db->Get(llsm::ReadOptions(), key, &value_out);
+  status = db->Get(tl::ReadOptions(), key, &value_out);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value_new, value_out);
 
@@ -800,7 +800,7 @@ TEST_F(DBTest, OverflowWithUpdates) {
   const std::string value_old(kValueSize, 0xFF);
   const std::string value_new(kValueSize, 0x00);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -813,36 +813,36 @@ TEST_F(DBTest, OverflowWithUpdates) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Generate data for enough additional writes to definitely overflow (64 KiB)
-  llsm::KeyDistHints extra_key_hints;
+  tl::KeyDistHints extra_key_hints;
   extra_key_hints.num_keys = 4096;
   extra_key_hints.record_size = kKeySize + kValueSize;
   extra_key_hints.key_size = kKeySize;
   extra_key_hints.min_key = 1024;
   extra_key_hints.key_step_size = 1;
   const std::vector<uint64_t> extra_lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+      tl::key_utils::CreateValues<uint64_t>(extra_key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
 
   // Write extra data to the DB.
   for (const auto& key_as_int : extra_lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
@@ -852,7 +852,7 @@ TEST_F(DBTest, OverflowWithUpdates) {
 
   // Update some old keys.
   for (size_t i = 0; i < 2; ++i) {
-    llsm::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])),
+    tl::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])),
                     kKeySize);
     status = db->Put(woptions, key, value_new);
     ASSERT_TRUE(status.ok());
@@ -864,9 +864,9 @@ TEST_F(DBTest, OverflowWithUpdates) {
   // Read all old keys
   std::string value_out;
   for (size_t i = 0; i < lexicographic_keys.size(); ++i) {
-    llsm::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])),
+    tl::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])),
                     kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     if (i < 2) {
       ASSERT_EQ(value_new, value_out);
@@ -878,7 +878,7 @@ TEST_F(DBTest, OverflowWithUpdates) {
   // Update some extra keys.
   for (size_t i = extra_lexicographic_keys.size() - 2;
        i < extra_lexicographic_keys.size(); ++i) {
-    llsm::Slice key(
+    tl::Slice key(
         reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])),
         kKeySize);
     status = db->Put(woptions, key, value_new);
@@ -890,10 +890,10 @@ TEST_F(DBTest, OverflowWithUpdates) {
 
   // Read all extra keys
   for (size_t i = 0; i < extra_lexicographic_keys.size(); ++i) {
-    llsm::Slice key(
+    tl::Slice key(
         reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])),
         kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     if (i < extra_lexicographic_keys.size() - 2) {
       ASSERT_EQ(value_old, value_out);
@@ -914,7 +914,7 @@ TEST_F(DBTest, OverflowWithDeletes) {
   const std::string value_old(kValueSize, 0xFF);
   const std::string value_new(kValueSize, 0x00);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -927,19 +927,19 @@ TEST_F(DBTest, OverflowWithDeletes) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
@@ -948,18 +948,18 @@ TEST_F(DBTest, OverflowWithDeletes) {
   db->FlushRecordCache(/*disable_deferred_io = */ true);
 
   // Generate data for enough additional writes to definitely overflow (64 KiB)
-  llsm::KeyDistHints extra_key_hints;
+  tl::KeyDistHints extra_key_hints;
   extra_key_hints.num_keys = 4096;
   extra_key_hints.record_size = kKeySize + kValueSize;
   extra_key_hints.key_size = kKeySize;
   extra_key_hints.min_key = 1024;
   extra_key_hints.key_step_size = 1;
   const std::vector<uint64_t> extra_lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+      tl::key_utils::CreateValues<uint64_t>(extra_key_hints);
 
   // Write dummy data to the DB.
   for (const auto& key_as_int : extra_lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
@@ -969,8 +969,8 @@ TEST_F(DBTest, OverflowWithDeletes) {
 
   // Delete all original keys
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
-    status = db->Delete(llsm::WriteOptions(), key);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Delete(tl::WriteOptions(), key);
     ASSERT_TRUE(status.ok());
   }
 
@@ -980,15 +980,15 @@ TEST_F(DBTest, OverflowWithDeletes) {
   // Read all extra keys
   std::string value_out;
   for (const auto& key_as_int : extra_lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_old, value_out);
   }
 
   // Reinsert all orginal keys with new value.
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_new);
     ASSERT_TRUE(status.ok());
   }
@@ -998,8 +998,8 @@ TEST_F(DBTest, OverflowWithDeletes) {
 
   // Read all reinserted keys
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_new, value_out);
   }
@@ -1015,7 +1015,7 @@ TEST_F(DBTest, OverflowChain) {
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value_old(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1028,19 +1028,19 @@ TEST_F(DBTest, OverflowChain) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
@@ -1050,18 +1050,18 @@ TEST_F(DBTest, OverflowChain) {
 
   // Generate data for enough additional writes to overflow multiple times (8
   // KiB)
-  llsm::KeyDistHints extra_key_hints;
+  tl::KeyDistHints extra_key_hints;
   extra_key_hints.num_keys = 512;
   extra_key_hints.record_size = kKeySize + kValueSize;
   extra_key_hints.key_size = kKeySize;
   extra_key_hints.min_key = 64;
   extra_key_hints.key_step_size = 1;
   const std::vector<uint64_t> extra_lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+      tl::key_utils::CreateValues<uint64_t>(extra_key_hints);
 
   // Write dummy data to the DB.
   for (const auto& key_as_int : extra_lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
@@ -1073,10 +1073,10 @@ TEST_F(DBTest, OverflowChain) {
   std::string value_out;
   for (size_t i = extra_lexicographic_keys.size() - 5;
        i < extra_lexicographic_keys.size(); ++i) {
-    llsm::Slice key(
+    tl::Slice key(
         reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])),
         kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_old, value_out);
   }
@@ -1093,7 +1093,7 @@ TEST_F(DBTest, RangeScanOverflow) {
   // Dummy value used for the records (8 byte key; record is 512 B in total).
   const std::string value(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1106,20 +1106,20 @@ TEST_F(DBTest, RangeScanOverflow) {
 
   // Generate the keys used in the initial write.
   std::vector<uint64_t> initial_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
   std::shuffle(initial_keys.begin(), initial_keys.end(), rng);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : initial_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value);
     ASSERT_TRUE(status.ok());
   }
@@ -1128,19 +1128,19 @@ TEST_F(DBTest, RangeScanOverflow) {
   db->FlushRecordCache(/*disable_deferred_io=*/true);
 
   // Generate data to overflow the first page.
-  llsm::KeyDistHints extra_key_hints;
+  tl::KeyDistHints extra_key_hints;
   extra_key_hints.record_size = kKeySize + kValueSize;
   extra_key_hints.key_size = kKeySize;
   extra_key_hints.num_keys = 2 * extra_key_hints.records_per_page();
   extra_key_hints.min_key = 1;
   extra_key_hints.key_step_size = 1;
   std::vector<uint64_t> extra_keys =
-      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+      tl::key_utils::CreateValues<uint64_t>(extra_key_hints);
   std::shuffle(extra_keys.begin(), extra_keys.end(), rng);
 
   // Write dummy data to the DB.
   for (const auto& key_as_int : extra_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value);
     ASSERT_TRUE(status.ok());
   }
@@ -1153,12 +1153,12 @@ TEST_F(DBTest, RangeScanOverflow) {
   const uint64_t page1_key = __builtin_bswap64(99999000ULL);
   status = db->Put(
       woptions,
-      llsm::Slice(reinterpret_cast<const char*>(&page0_key), sizeof(page0_key)),
+      tl::Slice(reinterpret_cast<const char*>(&page0_key), sizeof(page0_key)),
       value);
   ASSERT_TRUE(status.ok());
   status = db->Put(
       woptions,
-      llsm::Slice(reinterpret_cast<const char*>(&page1_key), sizeof(page1_key)),
+      tl::Slice(reinterpret_cast<const char*>(&page1_key), sizeof(page1_key)),
       value);
   ASSERT_TRUE(status.ok());
 
@@ -1176,10 +1176,10 @@ TEST_F(DBTest, RangeScanOverflow) {
 
   // Read all the records using a single range scan. This scan will include
   // records in the record cache as well as in page chains.
-  std::vector<llsm::Record> results;
+  std::vector<tl::Record> results;
   status = db->GetRange(
-      llsm::ReadOptions(),
-      llsm::Slice(reinterpret_cast<const char*>(&(all_keys.front())),
+      tl::ReadOptions(),
+      tl::Slice(reinterpret_cast<const char*>(&(all_keys.front())),
                   sizeof(uint64_t)),
       all_keys.size(), &results);
   ASSERT_TRUE(status.ok());
@@ -1187,7 +1187,7 @@ TEST_F(DBTest, RangeScanOverflow) {
 
   // Ensure all the records were returned in the correct order.
   for (size_t i = 0; i < results.size(); ++i) {
-    llsm::Slice key(reinterpret_cast<const char*>(&(all_keys[i])),
+    tl::Slice key(reinterpret_cast<const char*>(&(all_keys[i])),
                     sizeof(uint64_t));
     ASSERT_TRUE(key.compare(results[i].key()) == 0);
     ASSERT_EQ(results[i].value(), value);
@@ -1205,7 +1205,7 @@ TEST_F(DBTest, ReorgOverflowChain) {
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value_old(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1218,11 +1218,11 @@ TEST_F(DBTest, ReorgOverflowChain) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Generate data for enough additional writes to trigger overflow.
   constexpr size_t kNumOverflows = 10;
-  llsm::KeyDistHints extra_key_hints;
+  tl::KeyDistHints extra_key_hints;
   extra_key_hints.page_fill_pct = 50;
   extra_key_hints.record_size = kRecordSize;
   extra_key_hints.key_size = kKeySize;
@@ -1230,56 +1230,56 @@ TEST_F(DBTest, ReorgOverflowChain) {
   extra_key_hints.key_step_size = 1;
   extra_key_hints.num_keys = kNumOverflows * extra_key_hints.records_per_page();
   const std::vector<uint64_t> extra_lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+      tl::key_utils::CreateValues<uint64_t>(extra_key_hints);
 
   // Make cache large enough to hold everything.
   options.record_cache_capacity = extra_key_hints.num_keys;
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
 
   // Flush the writes to the pages.
   auto written_out =
-      static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+      static_cast<tl::DBImpl*>(db)->rec_cache_->ClearCache(true);
   ASSERT_EQ(written_out, options.key_hints.records_per_page());
 
   // Write additional dummy data to the DB.
   for (const auto& key_as_int : extra_lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
 
   // Flush the writes to the pages (should cause overflow).
-  written_out = static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  written_out = static_cast<tl::DBImpl*>(db)->rec_cache_->ClearCache(true);
   ASSERT_EQ(written_out, options.record_cache_capacity);
 
   // Read all keys from new pages
   std::string value_out;
   for (size_t i = 0; i < lexicographic_keys.size(); ++i) {
-    llsm::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])),
+    tl::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])),
                     kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_old, value_out);
   }
   for (size_t i = 0; i < extra_lexicographic_keys.size(); ++i) {
-    llsm::Slice key(
+    tl::Slice key(
         reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])),
         kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_old, value_out);
   }
@@ -1302,7 +1302,7 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value_old(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1315,11 +1315,11 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Generate data for enough additional writes to trigger overflow.
   constexpr size_t kNumOverflows = 10;
-  llsm::KeyDistHints extra_key_hints;
+  tl::KeyDistHints extra_key_hints;
   extra_key_hints.page_fill_pct = 50;
   extra_key_hints.record_size = kRecordSize;
   extra_key_hints.key_size = kKeySize;
@@ -1327,57 +1327,57 @@ TEST_F(DBTest, ReorgOverflowChainNoHint) {
   extra_key_hints.key_step_size = 1;
   extra_key_hints.num_keys = kNumOverflows * extra_key_hints.records_per_page();
   const std::vector<uint64_t> extra_lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(extra_key_hints);
+      tl::key_utils::CreateValues<uint64_t>(extra_key_hints);
 
   // Make cache large enough to hold everything.
   options.record_cache_capacity = extra_key_hints.num_keys;
 
   // Open the DB.
-  llsm::DB* db = nullptr;
+  tl::DB* db = nullptr;
   options.key_hints.num_keys = 0;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
 
   // Flush the writes to the pages.
   auto written_out =
-      static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+      static_cast<tl::DBImpl*>(db)->rec_cache_->ClearCache(true);
   ASSERT_EQ(written_out, options.key_hints.records_per_page());
 
   // Write additional dummy data to the DB.
   for (const auto& key_as_int : extra_lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value_old);
     ASSERT_TRUE(status.ok());
   }
 
   // Flush the writes to the pages (should cause overflow).
-  written_out = static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  written_out = static_cast<tl::DBImpl*>(db)->rec_cache_->ClearCache(true);
   ASSERT_EQ(written_out, options.record_cache_capacity);
 
   // Read all keys from new pages
   std::string value_out;
   for (size_t i = 0; i < lexicographic_keys.size(); ++i) {
-    llsm::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])),
+    tl::Slice key(reinterpret_cast<const char*>(&(lexicographic_keys[i])),
                     kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_old, value_out);
   }
   for (size_t i = 0; i < extra_lexicographic_keys.size(); ++i) {
-    llsm::Slice key(
+    tl::Slice key(
         reinterpret_cast<const char*>(&(extra_lexicographic_keys[i])),
         kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_old, value_out);
   }
@@ -1397,7 +1397,7 @@ TEST_F(DBTest, BulkLoad) {
   constexpr size_t kValueSize = 8;
   const std::string value(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1410,23 +1410,23 @@ TEST_F(DBTest, BulkLoad) {
 
   // Generate data used for the bulk load (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
-  std::vector<std::pair<const llsm::Slice, const llsm::Slice>> records;
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
+  std::vector<std::pair<const tl::Slice, const tl::Slice>> records;
 
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
-    records.push_back(std::make_pair(key, llsm::Slice(value)));
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    records.push_back(std::make_pair(key, tl::Slice(value)));
   }
 
   // Open the DB without hints.
   options.key_hints.num_keys = 0;
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Bulk load all the records
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.sorted_load = true;
   status = db->BulkLoad(woptions, records);
   ASSERT_TRUE(status.ok());
@@ -1434,7 +1434,7 @@ TEST_F(DBTest, BulkLoad) {
   // Read them back
   std::string value_out;
   for (size_t i = 0; i < records.size(); ++i) {
-    status = db->Get(llsm::ReadOptions(), records[i].first, &value_out);
+    status = db->Get(tl::ReadOptions(), records[i].first, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value, value_out);
   }
@@ -1445,7 +1445,7 @@ TEST_F(DBTest, BulkLoadFailureModes) {
   constexpr size_t kValueSize = 8;
   const std::string value(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1458,22 +1458,22 @@ TEST_F(DBTest, BulkLoadFailureModes) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
-  std::vector<std::pair<const llsm::Slice, const llsm::Slice>> records;
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
+  std::vector<std::pair<const tl::Slice, const tl::Slice>> records;
 
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     records.push_back(std::make_pair(key, value));
   }
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DB::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DB::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write a single record to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   status = db->Put(woptions, records[0].first, records[0].second);
   ASSERT_TRUE(status.ok());
@@ -1505,7 +1505,7 @@ TEST_F(DBTest, PageBoundsConsistency) {
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1519,45 +1519,45 @@ TEST_F(DBTest, PageBoundsConsistency) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DBImpl::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value);
     ASSERT_TRUE(status.ok());
   }
 
   std::string value_out;
-  llsm::PageBuffer page_out = llsm::PageMemoryAllocator::Allocate(1);
+  tl::PageBuffer page_out = tl::PageMemoryAllocator::Allocate(1);
 
   for (size_t i = 0; i < lexicographic_keys.size(); ++i) {
-    llsm::Slice key(reinterpret_cast<const char*>(&lexicographic_keys[i]),
+    tl::Slice key(reinterpret_cast<const char*>(&lexicographic_keys[i]),
                     kKeySize);
-    status = static_cast<llsm::DBImpl*>(db)->GetWithPage(
-        llsm::ReadOptions(), key, &value_out, &page_out);
+    status = static_cast<tl::DBImpl*>(db)->GetWithPage(
+        tl::ReadOptions(), key, &value_out, &page_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value, value_out);
 
     // Check that the page boundaries stored on disk are consistent with the
     // ones computed from the model.
-    const llsm::key_utils::KeyHead stored_lower =
-        llsm::key_utils::ExtractHead64(
-            llsm::Page(page_out.get()).GetLowerBoundary());
-    const llsm::key_utils::KeyHead stored_upper =
-        llsm::key_utils::ExtractHead64(
-            llsm::Page(page_out.get()).GetUpperBoundary());
+    const tl::key_utils::KeyHead stored_lower =
+        tl::key_utils::ExtractHead64(
+            tl::Page(page_out.get()).GetLowerBoundary());
+    const tl::key_utils::KeyHead stored_upper =
+        tl::key_utils::ExtractHead64(
+            tl::Page(page_out.get()).GetUpperBoundary());
 
     const auto [computed_lower, computed_upper] =
-        static_cast<llsm::DBImpl*>(db)->GetPageBoundsFor(
+        static_cast<tl::DBImpl*>(db)->GetPageBoundsFor(
             __builtin_bswap64(lexicographic_keys[i]));
     ASSERT_EQ(computed_lower, stored_lower);
     ASSERT_EQ(computed_upper, stored_upper);
@@ -1572,7 +1572,7 @@ TEST_F(DBTest, RecordCacheWriteOutBatchingSimple) {
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1586,19 +1586,19 @@ TEST_F(DBTest, RecordCacheWriteOutBatchingSimple) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DBImpl::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value);
     ASSERT_TRUE(status.ok());
   }
@@ -1606,13 +1606,13 @@ TEST_F(DBTest, RecordCacheWriteOutBatchingSimple) {
   // All records fit into one page, so if we flush the smallest one, this should
   // flush all of them.
   uint64_t idx;
-  llsm::Slice smallest_key(
+  tl::Slice smallest_key(
       reinterpret_cast<const char*>(&lexicographic_keys[0]), kKeySize);
-  status = static_cast<llsm::DBImpl*>(db)->rec_cache_->GetCacheIndex(
+  status = static_cast<tl::DBImpl*>(db)->rec_cache_->GetCacheIndex(
       smallest_key, /*exclusive = */ false, &idx);
-  static_cast<llsm::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
+  static_cast<tl::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
   auto written_out =
-      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
+      static_cast<tl::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
   ASSERT_EQ(written_out, lexicographic_keys.size());
 }
 
@@ -1624,7 +1624,7 @@ TEST_F(DBTest, RecordCacheWriteOutBatchingMultiPage) {
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1641,19 +1641,19 @@ TEST_F(DBTest, RecordCacheWriteOutBatchingMultiPage) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DBImpl::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value);
     ASSERT_TRUE(status.ok());
   }
@@ -1661,15 +1661,15 @@ TEST_F(DBTest, RecordCacheWriteOutBatchingMultiPage) {
   // All records currently in the cache go into the same page, so if we flush
   // the smallest one, this should flush all of them.
   uint64_t idx;
-  llsm::Slice smallest_key(
+  tl::Slice smallest_key(
       reinterpret_cast<const char*>(
           &lexicographic_keys[num_records - records_per_page]),
       kKeySize);
-  status = static_cast<llsm::DBImpl*>(db)->rec_cache_->GetCacheIndex(
+  status = static_cast<tl::DBImpl*>(db)->rec_cache_->GetCacheIndex(
       smallest_key, /*exclusive = */ false, &idx);
-  static_cast<llsm::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
+  static_cast<tl::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
   auto written_out =
-      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
+      static_cast<tl::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
   ASSERT_EQ(written_out, records_per_page);
 
   // Helper functions.
@@ -1677,12 +1677,12 @@ TEST_F(DBTest, RecordCacheWriteOutBatchingMultiPage) {
                                                records_per_page, &status, &db,
                                                &woptions,
                                                value](const uint64_t n) {
-    static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache();
+    static_cast<tl::DBImpl*>(db)->rec_cache_->ClearCache();
     const std::string value2(kValueSize, 0xFF);
     for (auto i = 0; i < (num_pages / n); ++i) {
       for (auto j = 0; j < n; ++j) {
         const auto& key_as_int = lexicographic_keys[i * records_per_page + j];
-        llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+        tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
         status = db->Put(woptions, key, value2);
         ASSERT_TRUE(status.ok());
       }
@@ -1694,7 +1694,7 @@ TEST_F(DBTest, RecordCacheWriteOutBatchingMultiPage) {
     auto written_total = 0;
     for (auto i = 0; i < options.record_cache_capacity; ++i) {
       auto written_out =
-          static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(i);
+          static_cast<tl::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(i);
       ASSERT_TRUE((written_out == n) || (written_out == 0));
       written_total += written_out;
     }
@@ -1718,7 +1718,7 @@ TEST_F(DBTest, RecordCacheClearHalfDirty) {
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1735,19 +1735,19 @@ TEST_F(DBTest, RecordCacheClearHalfDirty) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DBImpl::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value);
     ASSERT_TRUE(status.ok());
   }
@@ -1755,27 +1755,27 @@ TEST_F(DBTest, RecordCacheClearHalfDirty) {
   // All records currently in the cache go into the same page, so if we flush
   // the smallest one, this should flush all of them.
   uint64_t idx;
-  llsm::Slice smallest_key(
+  tl::Slice smallest_key(
       reinterpret_cast<const char*>(
           &lexicographic_keys[num_records - records_per_page]),
       kKeySize);
-  status = static_cast<llsm::DBImpl*>(db)->rec_cache_->GetCacheIndex(
+  status = static_cast<tl::DBImpl*>(db)->rec_cache_->GetCacheIndex(
       smallest_key, /*exclusive = */ false, &idx);
-  static_cast<llsm::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
+  static_cast<tl::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
   auto written_out =
-      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
+      static_cast<tl::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
   ASSERT_EQ(written_out, records_per_page);
 
   // Re-dirty half the cache.
   for (auto i = 0; i < options.record_cache_capacity / 2; ++i) {
     const auto& key_as_int = lexicographic_keys[i];
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value);
     ASSERT_TRUE(status.ok());
   }
 
   // This should write out the dirty half.
-  written_out = static_cast<llsm::DBImpl*>(db)->rec_cache_->ClearCache(true);
+  written_out = static_cast<tl::DBImpl*>(db)->rec_cache_->ClearCache(true);
   ASSERT_EQ(written_out, options.record_cache_capacity / 2);
 }
 
@@ -1787,7 +1787,7 @@ TEST_F(DBTest, UpdatesBeyondCacheCapacity) {
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1804,19 +1804,19 @@ TEST_F(DBTest, UpdatesBeyondCacheCapacity) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DBImpl::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value);
     ASSERT_TRUE(status.ok());
   }
@@ -1824,14 +1824,14 @@ TEST_F(DBTest, UpdatesBeyondCacheCapacity) {
   // Perform many updates, beyond the cache capacity.
   const std::string value2(kValueSize, 0xFE);
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value2);
     ASSERT_TRUE(status.ok());
   }
 
   const std::string value3(kValueSize, 0xFD);
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value3);
     ASSERT_TRUE(status.ok());
   }
@@ -1839,8 +1839,8 @@ TEST_F(DBTest, UpdatesBeyondCacheCapacity) {
   // Read back
   std::string value_out;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
-    status = db->Get(llsm::ReadOptions(), key, &value_out);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    status = db->Get(tl::ReadOptions(), key, &value_out);
     ASSERT_TRUE(status.ok());
     ASSERT_EQ(value_out, value3);
   }
@@ -1854,7 +1854,7 @@ TEST_F(DBTest, RecordCacheWriteOutOverride) {
   // Dummy value used for the records (8 byte key; record is 16B in total).
   const std::string value(kValueSize, 0xFF);
 
-  llsm::Options options;
+  tl::Options options;
   options.pin_threads = false;
   options.background_threads = 2;
   options.key_hints.page_fill_pct = 50;
@@ -1869,19 +1869,19 @@ TEST_F(DBTest, RecordCacheWriteOutOverride) {
 
   // Generate data used for the write (and later read).
   const std::vector<uint64_t> lexicographic_keys =
-      llsm::key_utils::CreateValues<uint64_t>(options.key_hints);
+      tl::key_utils::CreateValues<uint64_t>(options.key_hints);
 
   // Open the DB.
-  llsm::DB* db = nullptr;
-  llsm::Status status = llsm::DBImpl::Open(options, kDBDir, &db);
+  tl::DB* db = nullptr;
+  tl::Status status = tl::DBImpl::Open(options, kDBDir, &db);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(db != nullptr);
 
   // Write dummy data to the DB.
-  llsm::WriteOptions woptions;
+  tl::WriteOptions woptions;
   woptions.bypass_wal = true;
   for (const auto& key_as_int : lexicographic_keys) {
-    llsm::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
+    tl::Slice key(reinterpret_cast<const char*>(&key_as_int), kKeySize);
     status = db->Put(woptions, key, value);
     ASSERT_TRUE(status.ok());
   }
@@ -1890,13 +1890,13 @@ TEST_F(DBTest, RecordCacheWriteOutOverride) {
   // have flushed all of them if we used batching - but we're not, so it should
   // flush one record.
   uint64_t idx;
-  llsm::Slice smallest_key(
+  tl::Slice smallest_key(
       reinterpret_cast<const char*>(&lexicographic_keys[0]), kKeySize);
-  status = static_cast<llsm::DBImpl*>(db)->rec_cache_->GetCacheIndex(
+  status = static_cast<tl::DBImpl*>(db)->rec_cache_->GetCacheIndex(
       smallest_key, /*exclusive = */ false, &idx);
-  static_cast<llsm::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
+  static_cast<tl::DBImpl*>(db)->rec_cache_->cache_entries[idx].Unlock();
   auto written_out =
-      static_cast<llsm::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
+      static_cast<tl::DBImpl*>(db)->rec_cache_->WriteOutIfDirty(idx);
   ASSERT_EQ(written_out, 1);
 }
 

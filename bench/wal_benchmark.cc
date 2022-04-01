@@ -54,13 +54,13 @@
 #include "db/memtable.h"
 #include "db/options.h"
 #include "gflags/gflags.h"
-#include "llsm/options.h"
+#include "tl/options.h"
 #include "util/coding.h"
 #include "wal/writer.h"
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 namespace fs = std::filesystem;
 
 bool ValidateLog(const char* flagname, const std::string& path) {
@@ -244,7 +244,7 @@ void MemTableSingle_64MiB(benchmark::State& state, bool use_log, bool sync) {
   WriteOptions write_options;
   write_options.sync = sync;
   for (auto _ : state) {
-    MemTable mtable(llsm::MemTableOptions{});
+    MemTable mtable(tl::MemTableOptions{});
     for (const auto& record : dataset) {
       if (use_log) {
         s = writer.AddEntry(
@@ -287,7 +287,7 @@ void MemTableBatch_64MiB(benchmark::State& state, bool use_log, bool sync) {
   WriteOptions write_options;
   write_options.sync = sync;
   for (auto _ : state) {
-    MemTable mtable(llsm::MemTableOptions{});
+    MemTable mtable(tl::MemTableOptions{});
     WriteBatch batch;
     for (const auto& record : dataset) {
       batch.Put(record.key(), record.value());

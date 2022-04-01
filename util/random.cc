@@ -12,7 +12,7 @@
 #include <thread>
 #include <utility>
 
-namespace llsm {
+namespace tl {
 
 Random* Random::GetTLSInstance() {
   static thread_local Random* tls_instance;
@@ -45,4 +45,4 @@ std::string Random::RandomString(int len) {
   return ret;
 }
 
-}  // namespace llsm
+}  // namespace tl

@@ -35,7 +35,7 @@ bool ParseLogVersion(const std::string& filename, uint64_t* version_out) {
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 namespace wal {
 
 Manager::Manager(fs::path log_dir_path)
@@ -331,4 +331,4 @@ fs::path Manager::LogPathForVersion(uint64_t version) const {
 }
 
 }  // namespace wal
-}  // namespace llsm
+}  // namespace tl

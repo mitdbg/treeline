@@ -2,7 +2,7 @@
 
 #include <cstdlib>
 
-namespace llsm {
+namespace tl {
 
 // Options used to instruct the database on how to handle memtable flushing and
 // deferral.
@@ -35,4 +35,4 @@ struct FlushOptions {
   size_t deferred_io_max_deferrals = 0;
 };
 
-} // namespace llsm
+} // namespace tl

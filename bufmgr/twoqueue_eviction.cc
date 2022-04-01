@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-namespace llsm {
+namespace tl {
 
 // Create a new eviction strategy.
 TwoQueueEviction::TwoQueueEviction(size_t num_elements) {
@@ -80,4 +80,4 @@ void TwoQueueEviction::PrintState() {
   std::cout << "---------------------------" << std::endl;
 }
 
-}  // namespace llsm
+}  // namespace tl

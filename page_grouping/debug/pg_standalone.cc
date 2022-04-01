@@ -8,21 +8,21 @@
 #include "../segment_builder.h"
 #include "bench/common/load_data.h"
 #include "gflags/gflags.h"
-#include "llsm/slice.h"
+#include "tl/slice.h"
 
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
 DEFINE_uint32(goal, 45, "Records per page goal.");
 DEFINE_uint32(delta, 10, "Records per page delta.");
 
-using namespace llsm;
-using namespace llsm::pg;
+using namespace tl;
+using namespace tl::pg;
 
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
   const size_t max_records_per_page = FLAGS_goal + 2 * FLAGS_delta;
   const size_t min_records_per_page = FLAGS_goal - 2 * FLAGS_delta;
 
-  std::vector<uint64_t> keys = llsm::bench::LoadDatasetFromTextFile(
+  std::vector<uint64_t> keys = tl::bench::LoadDatasetFromTextFile(
       FLAGS_custom_dataset, /*warn_on_duplicates=*/true);
   std::sort(keys.begin(), keys.end());
   std::cerr << "> Loaded a custom dataset with " << keys.size() << " keys."

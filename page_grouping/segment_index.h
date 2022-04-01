@@ -5,13 +5,13 @@
 #include <shared_mutex>
 #include <utility>
 
-#include "llsm/pg_db.h"
+#include "tl/pg_db.h"
 #include "lock_manager.h"
 #include "segment_info.h"
 #include "tlx/btree_map.h"
 #include "util/tracking_allocator.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Maps keys to segments.
@@ -124,4 +124,4 @@ class SegmentIndex {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

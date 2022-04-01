@@ -4,7 +4,7 @@
 
 #include <random>
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Used for implementing randomized exponential backoff as a spin-wait.
@@ -40,4 +40,4 @@ class RandExpBackoff {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

@@ -38,7 +38,7 @@
 // we can skip to the next block boundary to continue reading records (to
 // hopefully minimize the amount of lost data).
 
-namespace llsm {
+namespace tl {
 namespace wal {
 
 enum class RecordType : uint8_t {
@@ -80,4 +80,4 @@ inline constexpr size_t kBlockSize = 32 * 1024;
 inline constexpr size_t kHeaderSize = 4 + 2 + 1;
 
 }  // namespace wal
-}  // namespace llsm
+}  // namespace tl

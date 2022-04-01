@@ -1,4 +1,4 @@
-target_sources(llsm PRIVATE
+target_sources(tl PRIVATE
   buffer_frame.cc
   buffer_frame.h
   buffer_manager.cc

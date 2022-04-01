@@ -8,7 +8,7 @@
 #include <random>
 #include <vector>
 
-namespace llsm {
+namespace tl {
 
 // Tracks the distribution of an (insert) workload using an equi-depth
 // histogram. The histogram boundaries are set using a sample which is
@@ -221,4 +221,4 @@ class InsertTracker {
   std::mutex mutex_;
 };
 
-}  // namespace llsm
+}  // namespace tl

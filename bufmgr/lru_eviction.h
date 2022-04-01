@@ -9,7 +9,7 @@
 #include "hash_queue.h"
 #include "page_eviction_strategy.h"
 
-namespace llsm {
+namespace tl {
 
 // The LRU strategy for evicting in-memory pages back to disk.
 //
@@ -54,4 +54,4 @@ class LRUEviction : public PageEvictionStrategy {
   std::unique_ptr<HashQueue<BufferFrame*>> lru_;
 };
 
-}  // namespace llsm
+}  // namespace tl

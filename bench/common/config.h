@@ -5,15 +5,15 @@
 #include <string>
 
 #include "gflags/gflags.h"
-#include "llsm/options.h"
-#include "llsm/pg_options.h"
+#include "tl/options.h"
+#include "tl/pg_options.h"
 #include "rocksdb/options.h"
 
 // This header declares all the common configuration flags used across the LLSM
 // benchmarks as well as a few utility functions that use these flags.
 
-// Which database(s) to use in the benchmark {all, rocksdb, llsm, kvell,
-// pg_llsm}.
+// Which database(s) to use in the benchmark {all, rocksdb, tl, kvell,
+// pg_tl}.
 DECLARE_string(db);
 
 // The path where the database(s) should be stored.
@@ -45,7 +45,7 @@ DECLARE_uint64(memtable_size_mib);
 
 // How full each LLSM page should be, as a value between 1 and 100
 // inclusive.
-DECLARE_uint32(llsm_page_fill_pct);
+DECLARE_uint32(tl_page_fill_pct);
 
 // The minimum number of operations to a given page that need to be encoutered
 // while flushing a memtable in order to trigger a flush.
@@ -132,7 +132,7 @@ DECLARE_double(overestimation_factor);
 // accommodate forecasted inserts for the next `num_future_epochs` epochs.
 DECLARE_uint64(num_future_epochs);
 
-namespace llsm {
+namespace tl {
 namespace bench {
 
 // An enum that represents the `db` flag above.
@@ -147,11 +147,11 @@ enum class DBType : uint32_t {
 
 // Returns the `DBType` enum value associated with a given string.
 // - "all" maps to `kAll`
-// - "llsm" maps to `kLLSM`
+// - "tl" maps to `kLLSM`
 // - "rocksdb" maps to `kRocksDB`
 // - "leanstore" maps to `kLeanStore`
 // - "kvell" maps to `kKVell`
-// - "pg_llsm" maps to `kPGLLSM`
+// - "pg_tl" maps to `kPGLLSM`
 // All other strings map to an empty `std::optional`.
 std::optional<DBType> ParseDBType(const std::string& candidate);
 
@@ -161,11 +161,11 @@ rocksdb::Options BuildRocksDBOptions();
 
 // Returns options that can be used to start LLSM with the configuration
 // specified by the flags set above.
-llsm::Options BuildLLSMOptions();
+tl::Options BuildLLSMOptions();
 
 // Returns options that can be used to start page-grouped LLSM with the
 // configuration specified by the flags set above.
-llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions();
+tl::pg::PageGroupedDBOptions BuildPGLLSMOptions();
 
 // Appends a human-readable timestamp to the provided `prefix` string.
 // e.g.: AppendTimestamp("test") -> "test+2021-05-10+11-10-12".
@@ -182,4 +182,4 @@ std::string GetDefaultOutputPath();
 std::string GetDefaultDBPath();
 
 }  // namespace bench
-}  // namespace llsm
+}  // namespace tl

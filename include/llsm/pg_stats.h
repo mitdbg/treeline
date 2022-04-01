@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <mutex>
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // This class stores counters used by the page-grouped LLSM database.
@@ -92,4 +92,4 @@ class PageGroupedDBStats {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

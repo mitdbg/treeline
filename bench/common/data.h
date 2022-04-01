@@ -5,9 +5,9 @@
 #include <memory>
 #include <vector>
 
-#include "llsm/slice.h"
+#include "tl/slice.h"
 
-namespace llsm {
+namespace tl {
 namespace bench {
 
 // An immutable collection of key-value records where each key is a 64-bit
@@ -89,4 +89,4 @@ class U64Dataset::Record {
 };
 
 }  // namespace bench
-}  // namespace llsm
+}  // namespace tl

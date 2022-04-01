@@ -2,7 +2,7 @@
 
 #include <cassert>
 
-namespace llsm {
+namespace tl {
 
 void Logger::Initialize(const std::filesystem::path& db_path) {
   Logger& logger = Instance();
@@ -33,4 +33,4 @@ void Logger::Log(const char* format, ...) {
   va_end(ap);
 }
 
-}  // namespace llsm
+}  // namespace tl

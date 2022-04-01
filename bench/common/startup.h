@@ -1,6 +1,6 @@
 #pragma once
 
-namespace llsm {
+namespace tl {
 namespace bench {
 
 // Called by the benchmark driver to notify its parent process when it has
@@ -12,4 +12,4 @@ namespace bench {
 void SendReadySignalToParent();
 
 }  // namespace bench
-}  // namespace llsm
+}  // namespace tl

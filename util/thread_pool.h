@@ -9,7 +9,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace llsm {
+namespace tl {
 
 // A thread pool that supports thread-to-core pinning.
 //
@@ -116,4 +116,4 @@ void ThreadPool::SubmitNoWait(Function&& f, Args&&... args) {
   cv_.notify_one();
 }
 
-}  // namespace llsm
+}  // namespace tl

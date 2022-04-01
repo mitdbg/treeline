@@ -4,7 +4,7 @@
 #include "tlx/btree_map.h"
 #include "util/tracking_allocator.h"
 
-namespace llsm {
+namespace tl {
 
 // A model that uses a TLX B+ Tree to predict the location of keys inside the
 // database.
@@ -53,4 +53,4 @@ class BTreeModel : public Model {
   std::shared_mutex mutex_;
 };
 
-}  // namespace llsm
+}  // namespace tl

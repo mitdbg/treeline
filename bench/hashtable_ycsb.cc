@@ -148,7 +148,7 @@ class SyncHashTableInterface {
 
   // Load the records into the database.
   void BulkLoad(const ycsbr::BulkLoadTrace& records) {
-    map_ = std::make_unique<llsm::SyncHashTable<std::string, std::string>>(
+    map_ = std::make_unique<tl::SyncHashTable<std::string, std::string>>(
         records.size(), FLAGS_sht_partitions);
     for (const auto& rec : records) Insert(rec.key, rec.value, rec.value_size);
   }
@@ -182,7 +182,7 @@ class SyncHashTableInterface {
   }
 
  private:
-  std::unique_ptr<llsm::SyncHashTable<std::string, std::string>> map_;
+  std::unique_ptr<tl::SyncHashTable<std::string, std::string>> map_;
 };
 
 class CuckooHashMapInterface {
