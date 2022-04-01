@@ -14,7 +14,7 @@
 namespace {
 
 // All manifest files start with these four bytes.
-const std::string kSignature = u8"TL";
+const std::string kSignature = u8"TLDB";
 
 // The current manifest file format version. This value should be incremented
 // when a breaking change is made to the file format.
