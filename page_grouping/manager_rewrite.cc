@@ -226,7 +226,7 @@ Status Manager::RewriteSegmentsImpl(
   //
   // Insert forecasting
   //
-  size_t forecasted_inserts = 0;
+  double forecasted_inserts = 0;
   bool forecast_exists =
       (tracker_ != nullptr)
           ? tracker_->GetNumInsertsInKeyRangeForNumFutureEpochs(
@@ -251,15 +251,16 @@ Status Manager::RewriteSegmentsImpl(
 
     // Estimate total current keys in range, assumming some reocrds in overflows
     // and some extra records in cache.
-    size_t current_num_keys_estimate =
+    double current_num_keys_estimate =
         options_.forecasting.overestimation_factor *
         (current_pages * max_records_per_page);
 
-    size_t future_num_keys_estimate =
+    double future_num_keys_estimate =
         current_num_keys_estimate + forecasted_inserts;
 
-    future_goal = std::max(1UL, (future_goal * current_num_keys_estimate) /
-                                    future_num_keys_estimate);
+    future_goal = std::max(
+        1UL, static_cast<size_t>(future_goal * current_num_keys_estimate /
+                                 future_num_keys_estimate));
   }
 
   //
