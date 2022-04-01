@@ -82,16 +82,16 @@ std::chrono::nanoseconds RunRocksDBExperiment(
   });
 }
 
-std::chrono::nanoseconds RunLLSMExperiment(
+std::chrono::nanoseconds RunTLExperiment(
     const tl::bench::U64Dataset& dataset) {
   tl::DB* db = nullptr;
-  tl::Options options = tl::bench::BuildLLSMOptions();
+  tl::Options options = tl::bench::BuildTLOptions();
   options.key_hints.num_keys = dataset.size();
 
   const std::string dbname = FLAGS_db_path + "/tl";
   tl::Status status = tl::DB::Open(options, dbname, &db);
   if (!status.ok()) {
-    throw std::runtime_error("Failed to open LLSM: " + status.ToString());
+    throw std::runtime_error("Failed to open TL: " + status.ToString());
   }
 
   return tl::bench::MeasureRunTime([db, &dataset]() {
@@ -105,7 +105,7 @@ std::chrono::nanoseconds RunLLSMExperiment(
     for (const auto& record : dataset) {
       status = db->Put(woptions, record.key(), record.value());
       if (!status.ok()) {
-        throw std::runtime_error("Failed to write record to LLSM.");
+        throw std::runtime_error("Failed to write record to TL.");
       }
     }
     delete db;
@@ -158,8 +158,8 @@ int main(int argc, char* argv[]) {
     if (db == DBType::kAll || db == DBType::kRocksDB) {
       PrintExperimentResult("rocksdb", dataset, RunRocksDBExperiment(dataset));
     }
-    if (db == DBType::kAll || db == DBType::kLLSM) {
-      PrintExperimentResult("tl", dataset, RunLLSMExperiment(dataset));
+    if (db == DBType::kAll || db == DBType::kTL) {
+      PrintExperimentResult("tl", dataset, RunTLExperiment(dataset));
     }
 
     fs::remove_all(FLAGS_db_path);

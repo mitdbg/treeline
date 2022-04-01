@@ -128,7 +128,7 @@ void ProcessCustomInserts(
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  gflags::SetUsageMessage("Run generated workloads on LLSM and RocksDB.");
+  gflags::SetUsageMessage("Run generated workloads on TL and RocksDB.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
   if (FLAGS_workload_config.empty()) {
     std::cerr << "ERROR: Please provide a workload configuration file."
@@ -170,14 +170,14 @@ int main(int argc, char* argv[]) {
   if (db == DBType::kAll || db == DBType::kRocksDB) {
     PrintExperimentResult("rocksdb", Run<RocksDBInterface>(*workload));
   }
-  if (db == DBType::kAll || db == DBType::kLLSM) {
-    PrintExperimentResult("tl", Run<LLSMInterface>(*workload));
+  if (db == DBType::kAll || db == DBType::kTL) {
+    PrintExperimentResult("tl", Run<TLInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(*workload));
   }
-  if (db == DBType::kAll || db == DBType::kPGLLSM) {
-    PrintExperimentResult("pg_tl", Run<PGLLSMInterface>(*workload));
+  if (db == DBType::kAll || db == DBType::kPGTL) {
+    PrintExperimentResult("pg_tl", Run<PGTLInterface>(*workload));
   }
 
   return 0;

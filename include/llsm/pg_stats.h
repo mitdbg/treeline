@@ -6,7 +6,7 @@
 namespace tl {
 namespace pg {
 
-// This class stores counters used by the page-grouped LLSM database.
+// This class stores counters used by the page-grouped TL database.
 //
 // This class only supports counters that can be aggregated across threads. The
 // counters are meant to be manipulated using thread local instances and then

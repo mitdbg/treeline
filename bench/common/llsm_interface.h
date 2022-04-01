@@ -9,14 +9,14 @@
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 
-class LLSMInterface {
+class TLInterface {
  public:
-  LLSMInterface() : db_(nullptr), min_key_(0), max_key_(0), num_keys_(1) {}
+  TLInterface() : db_(nullptr), min_key_(0), max_key_(0), num_keys_(1) {}
 
   void InitializeWorker(const std::thread::id& id) {}
   void ShutdownWorker(const std::thread::id& id) {}
 
-  // Set the key distribution hints needed by LLSM to start up.
+  // Set the key distribution hints needed by TL to start up.
   void SetKeyDistHints(uint64_t min_key, uint64_t max_key, uint64_t num_keys) {
     min_key_ = min_key;
     max_key_ = max_key;
@@ -28,7 +28,7 @@ class LLSMInterface {
   // Called once before the benchmark.
   void InitializeDatabase() {
     const std::string dbname = FLAGS_db_path + "/tl";
-    tl::Options options = tl::bench::BuildLLSMOptions();
+    tl::Options options = tl::bench::BuildTLOptions();
     options.key_hints.num_keys = 0;  // Needs to be empty to use bulk load.
     if (num_keys_ <= 1) {
       // We set the step size to at least 1 to ensure any code that relies on
@@ -44,16 +44,16 @@ class LLSMInterface {
     }
 
     if (FLAGS_verbose) {
-      std::cerr << "> LLSM memtable flush threshold: "
+      std::cerr << "> TL memtable flush threshold: "
                 << options.memtable_flush_threshold << " bytes" << std::endl;
-      std::cerr << "> LLSM buffer pool size: " << options.buffer_pool_size
+      std::cerr << "> TL buffer pool size: " << options.buffer_pool_size
                 << " bytes" << std::endl;
-      std::cerr << "> Opening LLSM DB at " << dbname << std::endl;
+      std::cerr << "> Opening TL DB at " << dbname << std::endl;
     }
 
     tl::Status status = tl::DB::Open(options, dbname, &db_);
     if (!status.ok()) {
-      throw std::runtime_error("Failed to start LLSM: " + status.ToString());
+      throw std::runtime_error("Failed to start TL: " + status.ToString());
     }
   }
 
@@ -137,8 +137,8 @@ class LLSMInterface {
   tl::DB* db_;
 
   // These variables are used to provide hints about the key distribution to
-  // LLSM when creating a new database. We need these hints because LLSM
+  // TL when creating a new database. We need these hints because TL
   // currently does not support adjusting itself to a changing key distribution.
-  // TODO: Remove these once LLSM can start up without requiring hints.
+  // TODO: Remove these once TL can start up without requiring hints.
   uint64_t min_key_, max_key_, num_keys_;
 };

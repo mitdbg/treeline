@@ -35,7 +35,7 @@ class PageMemoryAllocator {
   static void SetAlignmentFor(const std::filesystem::path& path);
 
  private:
-  // To support efficient direct I/O, LLSM needs to align its memory buffers to
+  // To support efficient direct I/O, TL needs to align its memory buffers to
   // the block size of the underlying file system. When `SetAlignmentFor()` is
   // called, it will attempt to automatically determine the file system's block
   // size for the given path. In the unlikely event that the method is unable to

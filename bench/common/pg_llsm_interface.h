@@ -11,9 +11,9 @@
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 
-class PGLLSMInterface {
+class PGTLInterface {
  public:
-  PGLLSMInterface() : db_(nullptr) {}
+  PGTLInterface() : db_(nullptr) {}
 
   void InitializeWorker(const std::thread::id& id) {
     tl::pg::PageGroupedDBStats::Local().Reset();
@@ -53,22 +53,22 @@ class PGLLSMInterface {
   // Called once before the benchmark.
   void InitializeDatabase() {
     const std::string dbname = FLAGS_db_path + "/pg_tl";
-    auto options = tl::bench::BuildPGLLSMOptions();
+    auto options = tl::bench::BuildPGTLOptions();
     if (options.use_memory_based_io) {
-      std::cerr << "> WARNING: PGLLSM is using \"memory-based I/O\". "
+      std::cerr << "> WARNING: PGTL is using \"memory-based I/O\". "
                    "Performance results may be inflated."
                 << std::endl;
     }
     if (FLAGS_verbose) {
-      std::cerr << "> PGLLSM using segments: "
+      std::cerr << "> PGTL using segments: "
                 << (options.use_segments ? "true" : "false") << std::endl;
-      std::cerr << "> PGLLSM record cache size (# records): "
+      std::cerr << "> PGTL record cache size (# records): "
                 << options.record_cache_capacity << std::endl;
-      std::cerr << "> PGLLSM records per page goal: "
+      std::cerr << "> PGTL records per page goal: "
                 << options.records_per_page_goal << std::endl;
-      std::cerr << "> PGLLSM records per page delta: "
+      std::cerr << "> PGTL records per page delta: "
                 << options.records_per_page_delta << std::endl;
-      std::cerr << "> Opening PGLLSM DB at " << dbname << std::endl;
+      std::cerr << "> Opening PGTL DB at " << dbname << std::endl;
     }
 
     tl::pg::PageGroupedDBStats::RunOnGlobal(
@@ -76,7 +76,7 @@ class PGLLSMInterface {
     const tl::Status status =
         tl::pg::PageGroupedDB::Open(options, dbname, &db_);
     if (!status.ok()) {
-      throw std::runtime_error("Failed to start PGLLSM: " + status.ToString());
+      throw std::runtime_error("Failed to start PGTL: " + status.ToString());
     }
   }
 

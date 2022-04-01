@@ -9,7 +9,7 @@
 #include "tl/pg_options.h"
 #include "rocksdb/options.h"
 
-// This header declares all the common configuration flags used across the LLSM
+// This header declares all the common configuration flags used across the TL
 // benchmarks as well as a few utility functions that use these flags.
 
 // Which database(s) to use in the benchmark {all, rocksdb, tl, kvell,
@@ -30,7 +30,7 @@ DECLARE_uint32(seed);
 DECLARE_uint32(record_size_bytes);
 
 // The size of the database's in-memory cache, in MiB.
-// For LLSM, this is the size of its buffer pool.
+// For TL, this is the size of its buffer pool.
 // For RocksDB, this is the size of its block cache.
 DECLARE_uint64(cache_size_mib);
 
@@ -43,7 +43,7 @@ DECLARE_bool(use_direct_io);
 // The size of the memtable before it should be flushed, in MiB.
 DECLARE_uint64(memtable_size_mib);
 
-// How full each LLSM page should be, as a value between 1 and 100
+// How full each TL page should be, as a value between 1 and 100
 // inclusive.
 DECLARE_uint32(tl_page_fill_pct);
 
@@ -75,7 +75,7 @@ DECLARE_uint32(latency_sample_period);
 // triggered.
 DECLARE_uint64(reorg_length);
 
-// If true, LLSM will use an ALEXModel. Otherwise, it will use a BTreeModel.
+// If true, TL will use an ALEXModel. Otherwise, it will use a BTreeModel.
 DECLARE_bool(use_alex);
 
 // The number of bloom filter bits to use in RocksDB. Set to 0 to disable the
@@ -99,7 +99,7 @@ DECLARE_bool(pg_parallelize_final_flush);
 // writing out a dirty entry.
 DECLARE_bool(rec_cache_batch_writeout);
 
-// If true, page-grouped LLSM and LLSM will optimistically cache records present
+// If true, page-grouped TL and TL will optimistically cache records present
 // on a page that was read in, even if the record(s) were not necessarily
 // requested.
 DECLARE_bool(optimistic_rec_caching);
@@ -138,20 +138,20 @@ namespace bench {
 // An enum that represents the `db` flag above.
 enum class DBType : uint32_t {
   kAll = 0,
-  kLLSM = 1,
+  kTL = 1,
   kRocksDB = 2,
   kLeanStore = 3,
   kKVell = 4,
-  kPGLLSM = 5
+  kPGTL = 5
 };
 
 // Returns the `DBType` enum value associated with a given string.
 // - "all" maps to `kAll`
-// - "tl" maps to `kLLSM`
+// - "tl" maps to `kTL`
 // - "rocksdb" maps to `kRocksDB`
 // - "leanstore" maps to `kLeanStore`
 // - "kvell" maps to `kKVell`
-// - "pg_tl" maps to `kPGLLSM`
+// - "pg_tl" maps to `kPGTL`
 // All other strings map to an empty `std::optional`.
 std::optional<DBType> ParseDBType(const std::string& candidate);
 
@@ -159,13 +159,13 @@ std::optional<DBType> ParseDBType(const std::string& candidate);
 // specified by the flags set above.
 rocksdb::Options BuildRocksDBOptions();
 
-// Returns options that can be used to start LLSM with the configuration
+// Returns options that can be used to start TL with the configuration
 // specified by the flags set above.
-tl::Options BuildLLSMOptions();
+tl::Options BuildTLOptions();
 
-// Returns options that can be used to start page-grouped LLSM with the
+// Returns options that can be used to start page-grouped TL with the
 // configuration specified by the flags set above.
-tl::pg::PageGroupedDBOptions BuildPGLLSMOptions();
+tl::pg::PageGroupedDBOptions BuildPGTLOptions();
 
 // Appends a human-readable timestamp to the provided `prefix` string.
 // e.g.: AppendTimestamp("test") -> "test+2021-05-10+11-10-12".

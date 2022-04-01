@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.17)
 project(learnedlsm LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17)
 
-option(LLSM_BUILD_TESTS "Set to build the Learned LSM test suite." OFF)
-option(LLSM_BUILD_BENCHMARKS "Set to build the Learned LSM benchmarks." OFF)
-option(LLSM_BUILD_SHARED "Set to build the Learned LSM database as a shared library." OFF)
+option(TL_BUILD_TESTS "Set to build the Learned LSM test suite." OFF)
+option(TL_BUILD_BENCHMARKS "Set to build the Learned LSM benchmarks." OFF)
+option(TL_BUILD_SHARED "Set to build the Learned LSM database as a shared library." OFF)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")  # Needed for ALEX
 
@@ -19,7 +19,7 @@ find_library(tbb tbb)
 add_subdirectory(third_party)
 
 # The Learned LSM embedded database library targets
-if (LLSM_BUILD_SHARED)
+if (TL_BUILD_SHARED)
   add_library(tl SHARED)
   add_library(pg_tl SHARED)
 else()
@@ -71,12 +71,12 @@ add_subdirectory(wal)
 add_subdirectory(page_grouping)
 
 # Build the tests iff requested
-if(LLSM_BUILD_TESTS)
+if(TL_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
 
 # Build the benchmarks iff requested
-if(LLSM_BUILD_BENCHMARKS)
+if(TL_BUILD_BENCHMARKS)
   add_subdirectory(bench)
 endif()

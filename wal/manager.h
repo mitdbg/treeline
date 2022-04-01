@@ -17,7 +17,7 @@
 namespace tl {
 namespace wal {
 
-// This class provides a high-level interface to LLSM's write-ahead log files,
+// This class provides a high-level interface to TL's write-ahead log files,
 // providing methods that help with replaying the log and then writing to the
 // log. The write-ahead log is segmented across multiple versioned files, so
 // this manager helps provide a single logical interface over the log files.

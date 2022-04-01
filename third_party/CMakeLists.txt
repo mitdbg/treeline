@@ -21,7 +21,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(libcuckoo)
 
-if(LLSM_BUILD_TESTS)
+if(TL_BUILD_TESTS)
   # Google Tests: Fetch it iff we need to build the test suite
   FetchContent_Declare(
     googletest
@@ -31,7 +31,7 @@ if(LLSM_BUILD_TESTS)
   FetchContent_MakeAvailable(googletest)
 endif()
 
-if(LLSM_BUILD_BENCHMARKS)
+if(TL_BUILD_BENCHMARKS)
   FetchContent_Declare(
     gflags
     GIT_REPOSITORY https://github.com/gflags/gflags

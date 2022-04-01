@@ -373,7 +373,7 @@ TEST_F(WALTest, BadRecordType) {
   IncrementByte(6, 100);
   FixChecksum(0, 3);
   ASSERT_EQ("EOF", Read());
-  // LevelDB expects 3 dropped bytes, but LLSM expects 10. This is because LLSM
+  // LevelDB expects 3 dropped bytes, but TL expects 10. This is because TL
   // immediately drops the record if it does not recognize the record type.
   ASSERT_EQ(10, DroppedBytes());
   ASSERT_EQ("OK", MatchError("unknown record type"));

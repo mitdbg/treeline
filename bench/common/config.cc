@@ -42,13 +42,13 @@ bool ValidateRecordSize(const char* flagname, uint32_t record_size) {
 
 bool ValidateBGThreads(const char* flagname, uint32_t bg_threads) {
   if (bg_threads >= 2) return true;
-  std::cerr << "ERROR: --bg_threads must be at least 2 (LLSM needs at least 2 "
+  std::cerr << "ERROR: --bg_threads must be at least 2 (TL needs at least 2 "
                "background threads)."
             << std::endl;
   return false;
 }
 
-bool ValidateLLSMPageFillPct(const char* flagname, uint32_t pct) {
+bool ValidateTLPageFillPct(const char* flagname, uint32_t pct) {
   if (pct >= 1 && pct <= 100) return true;
   std::cerr << "ERROR: --tl_page_fill_pct must be a value between 1 and 100 "
                "inclusive."
@@ -78,8 +78,8 @@ DEFINE_validator(record_size_bytes, &ValidateRecordSize);
 DEFINE_uint64(cache_size_mib, 64,
               "The size of the database's in memory cache, in MiB.");
 
-DEFINE_uint32(bg_threads, 2,  // LLSM needs at least 2 background threads.
-              "The number background threads that RocksDB/LLSM should use.");
+DEFINE_uint32(bg_threads, 2,  // TL needs at least 2 background threads.
+              "The number background threads that RocksDB/TL should use.");
 DEFINE_validator(bg_threads, &ValidateBGThreads);
 
 DEFINE_bool(use_direct_io, true, "Whether or not to use direct I/O.");
@@ -88,9 +88,9 @@ DEFINE_uint64(memtable_size_mib, 64,
               "The size of the memtable before it should be flushed, in MiB.");
 
 DEFINE_uint32(tl_page_fill_pct, 50,
-              "How full each LLSM page should be, as a value between 1 and 100 "
+              "How full each TL page should be, as a value between 1 and 100 "
               "inclusive.");
-DEFINE_validator(tl_page_fill_pct, &ValidateLLSMPageFillPct);
+DEFINE_validator(tl_page_fill_pct, &ValidateTLPageFillPct);
 
 DEFINE_uint64(
     io_min_batch_size, 1,
@@ -116,7 +116,7 @@ DEFINE_uint32(latency_sample_period, 1,
 DEFINE_validator(latency_sample_period, &EnsureNonZero);
 
 DEFINE_bool(use_alex, true,
-            "If true, LLSM will use an ALEXModel. Otherwise, it will use a "
+            "If true, TL will use an ALEXModel. Otherwise, it will use a "
             "BTreeModel.");
 
 DEFINE_uint32(rdb_bloom_bits, 0,
@@ -141,13 +141,13 @@ DEFINE_bool(pg_use_segments, true,
             "If set to false, all segments will be a single page (emulates not "
             "using page grouping).");
 DEFINE_bool(pg_use_memory_based_io, false,
-            "If set, PGLLSM will use memory-based I/O (only meant for setup; "
+            "If set, PGTL will use memory-based I/O (only meant for setup; "
             "not for use during evaluation).");
 DEFINE_bool(pg_bypass_cache, false,
-            "If set, PGLLSM will bypass the record cache. All requests will "
+            "If set, PGTL will bypass the record cache. All requests will "
             "incur I/O.");
 DEFINE_bool(pg_parallelize_final_flush, false,
-            "If set, PGLLSM will attempt to parallelize its flush of dirty "
+            "If set, PGTL will attempt to parallelize its flush of dirty "
             "records from the cache when it shuts down.");
 
 DEFINE_bool(rec_cache_batch_writeout, true,
@@ -155,7 +155,7 @@ DEFINE_bool(rec_cache_batch_writeout, true,
             "page when writing out a dirty entry.");
 
 DEFINE_bool(optimistic_rec_caching, false,
-            "If true, page-grouped LLSM and LLSM will optimistically cache "
+            "If true, page-grouped TL and TL will optimistically cache "
             "records present on a page that was read in, even if the record(s) "
             "were not necessarily requested.");
 
@@ -194,9 +194,9 @@ namespace bench {
 
 std::optional<DBType> ParseDBType(const std::string& candidate) {
   static const std::unordered_map<std::string, DBType> kStringToDBType = {
-      {"all", DBType::kAll},         {"tl", DBType::kLLSM},
+      {"all", DBType::kAll},         {"tl", DBType::kTL},
       {"rocksdb", DBType::kRocksDB}, {"leanstore", DBType::kLeanStore},
-      {"kvell", DBType::kKVell},     {"pg_tl", DBType::kPGLLSM}};
+      {"kvell", DBType::kKVell},     {"pg_tl", DBType::kPGTL}};
 
   auto it = kStringToDBType.find(candidate);
   if (it == kStringToDBType.end()) {
@@ -217,7 +217,7 @@ rocksdb::Options BuildRocksDBOptions() {
   cache_options.capacity = FLAGS_cache_size_mib * 1024 * 1024;
   rocksdb::BlockBasedTableOptions table_options;
   table_options.block_size =
-      Page::kSize;  // Use the same block size as LLSM's pages.
+      Page::kSize;  // Use the same block size as TL's pages.
   table_options.checksum = rocksdb::kNoChecksum;
   table_options.block_cache = rocksdb::NewLRUCache(cache_options);
   if (FLAGS_rdb_bloom_bits > 0) {
@@ -248,7 +248,7 @@ rocksdb::Options BuildRocksDBOptions() {
   return options;
 }
 
-tl::Options BuildLLSMOptions() {
+tl::Options BuildTLOptions() {
   tl::Options options;
   options.buffer_pool_size = FLAGS_cache_size_mib * 1024 * 1024;
   options.memtable_flush_threshold = FLAGS_memtable_size_mib * 1024 * 1024;
@@ -268,7 +268,7 @@ tl::Options BuildLLSMOptions() {
   return options;
 }
 
-tl::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
+tl::pg::PageGroupedDBOptions BuildPGTLOptions() {
   tl::pg::PageGroupedDBOptions options;
   options.use_segments = FLAGS_pg_use_segments;
   options.records_per_page_goal = FLAGS_records_per_page_goal;

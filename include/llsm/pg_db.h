@@ -14,7 +14,7 @@ namespace pg {
 using Key = tl::key_utils::KeyHead;
 using Record = std::pair<Key, Slice>;
 
-// The public page-grouped Learned LSM (LLSM) database interface, representing
+// The public page-grouped Learned LSM (TL) database interface, representing
 // an embedded, persistent, and ordered key-value store.
 //
 // All methods return an OK status on success, and a non-OK status if an error

@@ -9,7 +9,7 @@
 
 namespace tl {
 
-// Holds database metadata that is needed when initializing an existing LLSM
+// Holds database metadata that is needed when initializing an existing TL
 // database. This class is mainly meant to help with serializing and
 // deserializing the manifest.
 class Manifest {

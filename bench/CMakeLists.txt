@@ -1,4 +1,4 @@
-# Common utilities used in the LLSM benchmarks.
+# Common utilities used in the TL benchmarks.
 add_library(bench_common
   common/data.cc
   common/data.h
@@ -8,12 +8,12 @@ add_library(bench_common
   common/startup.h
   common/timing.h)
 # Any targets linking to `bench_common` will also link to `tl` and will be
-# able to include LLSM internal headers.
+# able to include TL internal headers.
 target_link_libraries(bench_common PUBLIC tl)
 target_include_directories(bench_common PUBLIC ${PROJECT_SOURCE_DIR})
 
 # All `bench_common` utilities plus configuration utilities used in benchmarks
-# comparing LLSM against RocksDB.
+# comparing TL against RocksDB.
 #
 # We use this additional library target because not all benchmark executables
 # need to link to RocksDB and gflags (e.g., `microbench`).
@@ -32,7 +32,7 @@ target_link_libraries(bench_common_config PUBLIC bench_common gflags rocksdb lea
 add_executable(synth_write synth_write.cc)
 target_link_libraries(synth_write bench_common_config)
 
-# YCSB: Run extracted YCSB workloads against LLSM and RocksDB.
+# YCSB: Run extracted YCSB workloads against TL and RocksDB.
 add_executable(ycsb ycsb.cc)
 target_link_libraries(ycsb bench_common_config ycsbr)
 
@@ -40,7 +40,7 @@ target_link_libraries(ycsb bench_common_config ycsbr)
 add_executable(hashtable_ycsb hashtable_ycsb.cc)
 target_link_libraries(hashtable_ycsb Threads::Threads gflags ycsbr)
 
-# Microbench: An executable containing all of LLSM's microbenchmarks.
+# Microbench: An executable containing all of TL's microbenchmarks.
 add_executable(microbench
   memtable_benchmark.cc
   packed_map_benchmark.cc
@@ -71,7 +71,7 @@ target_link_libraries(wal bench_common gflags benchmark::benchmark)
 add_executable(bufmgr_benchmark buffer_manager_benchmark.cc)
 target_link_libraries(bufmgr_benchmark bench_common_config gflags ycsbr benchmark::benchmark)
 
-# Run Custom: An executable that runs YSCBR-generated workloads against LLSM
+# Run Custom: An executable that runs YSCBR-generated workloads against TL
 # and RocksDB.
 add_executable(run_custom run_custom.cc)
 target_link_libraries(run_custom bench_common_config ycsbr-gen)
