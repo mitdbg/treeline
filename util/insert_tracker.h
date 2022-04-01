@@ -77,10 +77,10 @@ class InsertTracker {
   // been initialized yet.
   bool GetNumInsertsInKeyRangeForNumFutureEpochs(
       const uint64_t range_start, const uint64_t range_end,
-      const size_t num_future_epochs, size_t* num_inserts_future_epochs) {
+      const size_t num_future_epochs, double* num_inserts_future_epochs) {
     const std::lock_guard<std::mutex> lock(mutex_);
 
-    size_t num_inserts_last_epoch;
+    double num_inserts_last_epoch;
     if (!GetNumInsertsInLastEpoch(range_start, range_end,
                                   &num_inserts_last_epoch)) {
       return false;
@@ -157,7 +157,7 @@ class InsertTracker {
 
   bool GetNumInsertsInLastEpoch(const uint64_t range_start,
                                 const uint64_t range_end,
-                                size_t* num_inserts_last_epoch) {
+                                double* num_inserts_last_epoch) {
     if (!last_epoch_is_valid_) {
       // Last epoch hasn't been initialized.
       return false;
@@ -178,8 +178,8 @@ class InsertTracker {
         const double overlap =
             static_cast<double>(query_range) / partition_range;  // (0,1]
 
-        const size_t interpolated_inserts =
-            static_cast<size_t>(partition_counters_last_epoch_[i] * overlap);
+        const double interpolated_inserts =
+            partition_counters_last_epoch_[i] * overlap;
 
         *num_inserts_last_epoch += interpolated_inserts;
       }

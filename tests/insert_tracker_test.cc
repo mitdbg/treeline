@@ -26,7 +26,7 @@ TEST(InsertTrackerTest, UpToOneCompletedEpoch) {
   InsertTracker tracker(num_inserts_per_epoch, num_partitions, sample_size);
 
   // Not completed yet.
-  size_t num_inserts_future_epochs;
+  double num_inserts_future_epochs;
   ASSERT_FALSE(tracker.GetNumInsertsInKeyRangeForNumFutureEpochs(
       0, std::numeric_limits<uint64_t>::max(), /*num_future_epochs=*/1,
       &num_inserts_future_epochs));
@@ -60,7 +60,7 @@ TEST(InsertTrackerTest, OneCompletedEpochOnePartition) {
     tracker.Add(i);
   }
 
-  size_t num_inserts_future_epochs;
+  double num_inserts_future_epochs;
   ASSERT_TRUE(tracker.GetNumInsertsInKeyRangeForNumFutureEpochs(
       0, std::numeric_limits<uint64_t>::max(), /*num_future_epochs=*/1,
       &num_inserts_future_epochs));
@@ -78,7 +78,7 @@ TEST(InsertTrackerTest, OneCompletedEpochTwoPartitions) {
     tracker.Add(i % 10);
   }
 
-  size_t num_inserts_future_epochs;
+  double num_inserts_future_epochs;
   ASSERT_TRUE(tracker.GetNumInsertsInKeyRangeForNumFutureEpochs(
       0, 5, /*num_future_epochs=*/1, &num_inserts_future_epochs));
   ASSERT_EQ(num_inserts_future_epochs, 45);
@@ -101,7 +101,7 @@ TEST(InsertTrackerTest, OneCompletedEpochTwoPartitionsInterpolate) {
   }
 
   // 100% overlap.
-  size_t num_inserts_future_epochs;
+  double num_inserts_future_epochs;
   ASSERT_TRUE(tracker.GetNumInsertsInKeyRangeForNumFutureEpochs(
       0, 5, /*num_future_epochs=*/1, &num_inserts_future_epochs));
   ASSERT_EQ(num_inserts_future_epochs, 45);
@@ -129,7 +129,7 @@ TEST(InsertTrackerTest, TwoCompletedEpochsOnePartition) {
   }
 
   // One completed epoch.
-  size_t num_inserts_future_epochs;
+  double num_inserts_future_epochs;
   ASSERT_TRUE(tracker.GetNumInsertsInKeyRangeForNumFutureEpochs(
       0, std::numeric_limits<uint64_t>::max(), /*num_future_epochs=*/1,
       &num_inserts_future_epochs));
