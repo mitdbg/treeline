@@ -132,6 +132,7 @@ run_experiment_group(
         "custom_inserts": "custom:" + dataset["insert_trace_path"],
         "custom_dataset": dataset["path"],
         "threads": threads,
+        "use_insert_forecasting": False,
       },
     )
     for db, config, dataset, threads in product(DBS, CONFIGS, CUSTOM_DATASETS, [1, 8])
