@@ -3,7 +3,7 @@ from itertools import product
 DBS = [
   "pg_llsm",
   "rocksdb",
-  "leanstore",
+  #"leanstore",
 ]
 
 CONFIG_64B = {
@@ -18,6 +18,20 @@ CONFIG_64B = {
   # 18 MiB in total (2 x 4 MiB + 10 MiB)
   "memtable_mib": 4,
   "cache_mib": 10,
+}
+
+CONFIG_512B = {
+  "name": "512B",
+  "record_size_bytes": 512,
+
+  # Used by page-grouped LLSM.
+  "records_per_page_goal": 4,
+  "records_per_page_delta": 1,
+
+  # Used by all DBs.
+  # 146 MiB in total
+  "memtable_mib": 32,
+  "cache_mib": 82,
 }
 
 CONFIG_1024B = {
@@ -36,6 +50,7 @@ CONFIG_1024B = {
 
 CONFIGS = [
   CONFIG_64B,
+  CONFIG_512B,
   CONFIG_1024B,
 ]
 
@@ -52,7 +67,7 @@ COMMON_OPTIONS = {
   "rdb_prefix_bloom_size": 3,
 
   # Temporary: Disable batching when evicting from the cache.
-  "rec_cache_batch_writeout": False,
+  "rec_cache_batch_writeout": True,
 
   # Affects LLSM and page-grouped LLSM
   "optimistic_rec_caching": False,
@@ -60,12 +75,12 @@ COMMON_OPTIONS = {
 
 FORECASTING_OPTIONS = {
   "use_insert_forecasting": True,
-  "num_inserts_per_epoch": 10000,
-  "num_partitions": 10,
-  "sample_size": 1000,
+  "num_inserts_per_epoch": 100000,
+  "num_partitions": 20000,
+  "sample_size": 200000,
   "random_seed": 42,
-  "overestimation_factor": 1.5,
-  "num_future_epochs": 1,
+  "overestimation_factor": 1,
+  "num_future_epochs": 100,
 }
 
 TAXI_DATASET = {
