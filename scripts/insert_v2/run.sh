@@ -118,7 +118,7 @@ if [ $code -ne 0 ]; then
 fi
 
 # Skip the "perfect allocation" case when it is not relevant.
-if [ $db_type != "pg_llsm" ] || [ $no_alloc_only ]; then
+if [ $db_type != "pg_llsm" ] || [ $no_alloc_only = true ]; then
   exit 0
 fi
 
