@@ -138,20 +138,25 @@ namespace bench {
 // An enum that represents the `db` flag above.
 enum class DBType : uint32_t {
   kAll = 0,
-  kTL = 1,
+  kTreeLine = 1,
   kRocksDB = 2,
   kLeanStore = 3,
   kKVell = 4,
-  kPGTL = 5
+  kPGTreeLine = 5
 };
 
 // Returns the `DBType` enum value associated with a given string.
 // - "all" maps to `kAll`
-// - "tl" maps to `kTL`
+// - "tl" maps to `kTreeLine`
 // - "rocksdb" maps to `kRocksDB`
 // - "leanstore" maps to `kLeanStore`
 // - "kvell" maps to `kKVell`
-// - "pg_tl" maps to `kPGTL`
+// - "pg_tl" maps to `kPGTreeLine`
+//
+// For legacy support, the following strings also map to `DBType` values.
+// - "llsm" maps to `kTreeLine`
+// - "pg_llsm" maps to `kPGTreeLine`
+//
 // All other strings map to an empty `std::optional`.
 std::optional<DBType> ParseDBType(const std::string& candidate);
 

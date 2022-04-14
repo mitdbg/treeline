@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
   if (db == DBType::kAll || db == DBType::kRocksDB) {
     PrintExperimentResult("rocksdb", Run<RocksDBInterface>(*workload));
   }
-  if (db == DBType::kAll || db == DBType::kTL) {
+  if (db == DBType::kAll || db == DBType::kTreeLine) {
     PrintExperimentResult("tl", Run<TLInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kLeanStore) {

@@ -158,7 +158,7 @@ int main(int argc, char* argv[]) {
     if (db == DBType::kAll || db == DBType::kRocksDB) {
       PrintExperimentResult("rocksdb", dataset, RunRocksDBExperiment(dataset));
     }
-    if (db == DBType::kAll || db == DBType::kTL) {
+    if (db == DBType::kAll || db == DBType::kTreeLine) {
       PrintExperimentResult("tl", dataset, RunTLExperiment(dataset));
     }
 
