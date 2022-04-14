@@ -56,7 +56,7 @@ target_sources(pg_tl PRIVATE
 )
 target_link_libraries(pg_tl PRIVATE pg)
 
-# The original TL source also uses the record cache, which depends on
+# The original TreeLine source also uses the record cache, which depends on
 # definitions in `pg_stats.cc`.
 target_sources(tl PRIVATE pg_stats.cc)
 

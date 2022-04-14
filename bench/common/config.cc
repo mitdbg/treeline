@@ -42,9 +42,10 @@ bool ValidateRecordSize(const char* flagname, uint32_t record_size) {
 
 bool ValidateBGThreads(const char* flagname, uint32_t bg_threads) {
   if (bg_threads >= 2) return true;
-  std::cerr << "ERROR: --bg_threads must be at least 2 (TL needs at least 2 "
-               "background threads)."
-            << std::endl;
+  std::cerr
+      << "ERROR: --bg_threads must be at least 2 (TreeLine needs at least 2 "
+         "background threads)."
+      << std::endl;
   return false;
 }
 
@@ -78,8 +79,9 @@ DEFINE_validator(record_size_bytes, &ValidateRecordSize);
 DEFINE_uint64(cache_size_mib, 64,
               "The size of the database's in memory cache, in MiB.");
 
-DEFINE_uint32(bg_threads, 2,  // TL needs at least 2 background threads.
-              "The number background threads that RocksDB/TL should use.");
+DEFINE_uint32(
+    bg_threads, 2,  // TreeLine needs at least 2 background threads.
+    "The number background threads that RocksDB/TreeLine should use.");
 DEFINE_validator(bg_threads, &ValidateBGThreads);
 
 DEFINE_bool(use_direct_io, true, "Whether or not to use direct I/O.");
@@ -87,9 +89,10 @@ DEFINE_bool(use_direct_io, true, "Whether or not to use direct I/O.");
 DEFINE_uint64(memtable_size_mib, 64,
               "The size of the memtable before it should be flushed, in MiB.");
 
-DEFINE_uint32(tl_page_fill_pct, 50,
-              "How full each TL page should be, as a value between 1 and 100 "
-              "inclusive.");
+DEFINE_uint32(
+    tl_page_fill_pct, 50,
+    "How full each TreeLine page should be, as a value between 1 and 100 "
+    "inclusive.");
 DEFINE_validator(tl_page_fill_pct, &ValidateTLPageFillPct);
 
 DEFINE_uint64(
@@ -116,7 +119,7 @@ DEFINE_uint32(latency_sample_period, 1,
 DEFINE_validator(latency_sample_period, &EnsureNonZero);
 
 DEFINE_bool(use_alex, true,
-            "If true, TL will use an ALEXModel. Otherwise, it will use a "
+            "If true, TreeLine will use an ALEXModel. Otherwise, it will use a "
             "BTreeModel.");
 
 DEFINE_uint32(rdb_bloom_bits, 0,
@@ -140,24 +143,27 @@ DEFINE_uint64(records_per_page_delta, 5,
 DEFINE_bool(pg_use_segments, true,
             "If set to false, all segments will be a single page (emulates not "
             "using page grouping).");
-DEFINE_bool(pg_use_memory_based_io, false,
-            "If set, PGTL will use memory-based I/O (only meant for setup; "
-            "not for use during evaluation).");
-DEFINE_bool(pg_bypass_cache, false,
-            "If set, PGTL will bypass the record cache. All requests will "
-            "incur I/O.");
+DEFINE_bool(
+    pg_use_memory_based_io, false,
+    "If set, PGTreeLine will use memory-based I/O (only meant for setup; "
+    "not for use during evaluation).");
+DEFINE_bool(
+    pg_bypass_cache, false,
+    "If set, PGTreeLine will bypass the record cache. All requests will "
+    "incur I/O.");
 DEFINE_bool(pg_parallelize_final_flush, false,
-            "If set, PGTL will attempt to parallelize its flush of dirty "
+            "If set, PGTreeLine will attempt to parallelize its flush of dirty "
             "records from the cache when it shuts down.");
 
 DEFINE_bool(rec_cache_batch_writeout, true,
             "If true, the record cache will try to batch writes for the same "
             "page when writing out a dirty entry.");
 
-DEFINE_bool(optimistic_rec_caching, false,
-            "If true, page-grouped TL and TL will optimistically cache "
-            "records present on a page that was read in, even if the record(s) "
-            "were not necessarily requested.");
+DEFINE_bool(
+    optimistic_rec_caching, false,
+    "If true, page-grouped TreeLine and TreeLine will optimistically cache "
+    "records present on a page that was read in, even if the record(s) "
+    "were not necessarily requested.");
 
 DEFINE_bool(
     skip_load, false,
@@ -223,7 +229,7 @@ rocksdb::Options BuildRocksDBOptions() {
   cache_options.capacity = FLAGS_cache_size_mib * 1024 * 1024;
   rocksdb::BlockBasedTableOptions table_options;
   table_options.block_size =
-      Page::kSize;  // Use the same block size as TL's pages.
+      Page::kSize;  // Use the same block size as TreeLine's pages.
   table_options.checksum = rocksdb::kNoChecksum;
   table_options.block_cache = rocksdb::NewLRUCache(cache_options);
   if (FLAGS_rdb_bloom_bits > 0) {

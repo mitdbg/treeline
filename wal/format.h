@@ -7,8 +7,8 @@
 #include <cstdint>
 #include <cstdlib>
 
-// TL's write-ahead log (WAL) on-disk format is identical to LevelDB's WAL
-// on-disk format. TL uses a slightly modified version of LevelDB's log
+// TreeLine's write-ahead log (WAL) on-disk format is identical to LevelDB's WAL
+// on-disk format. TreeLine uses a slightly modified version of LevelDB's log
 // writer/reader code to write to and read from the log.
 //
 // The log format stores entries as arbitrarily-sized byte strings (i.e., the

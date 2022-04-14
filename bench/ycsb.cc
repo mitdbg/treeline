@@ -71,7 +71,7 @@ void PrintExperimentResult(const std::string& db,
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  gflags::SetUsageMessage("Run YCSB workloads on TL and RocksDB.");
+  gflags::SetUsageMessage("Run YCSB workloads on TreeLine and RocksDB.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
 
   DBType db = tl::bench::ParseDBType(FLAGS_db).value();

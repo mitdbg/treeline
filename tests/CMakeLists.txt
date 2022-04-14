@@ -35,7 +35,7 @@ target_link_libraries(tester
     Threads::Threads
     crc32c
 )
-# Allow tests to also include TL internal headers
+# Allow tests to also include TreeLine internal headers
 target_include_directories(tester PRIVATE ${PROJECT_SOURCE_DIR})
 
 # Register our tests with CTest

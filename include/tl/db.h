@@ -79,7 +79,7 @@ class DB {
   // will be an effective "no-op" in this case.
   virtual Status Delete(const WriteOptions& options, const Slice& key) = 0;
 
-  // Manually request TL to flush the data stored in its record cache to
+  // Manually request TreeLine to flush the data stored in its record cache to
   // persistent storage. This method will block until the flush completes.
   virtual Status FlushRecordCache(const bool disable_deferred_io) = 0;
 

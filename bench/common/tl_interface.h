@@ -16,7 +16,7 @@ class TLInterface {
   void InitializeWorker(const std::thread::id& id) {}
   void ShutdownWorker(const std::thread::id& id) {}
 
-  // Set the key distribution hints needed by TL to start up.
+  // Set the key distribution hints needed by TreeLine to start up.
   void SetKeyDistHints(uint64_t min_key, uint64_t max_key, uint64_t num_keys) {
     min_key_ = min_key;
     max_key_ = max_key;
@@ -44,16 +44,17 @@ class TLInterface {
     }
 
     if (FLAGS_verbose) {
-      std::cerr << "> TL memtable flush threshold: "
+      std::cerr << "> TreeLine memtable flush threshold: "
                 << options.memtable_flush_threshold << " bytes" << std::endl;
-      std::cerr << "> TL buffer pool size: " << options.buffer_pool_size
+      std::cerr << "> TreeLine buffer pool size: " << options.buffer_pool_size
                 << " bytes" << std::endl;
-      std::cerr << "> Opening TL DB at " << dbname << std::endl;
+      std::cerr << "> Opening TreeLine DB at " << dbname << std::endl;
     }
 
     tl::Status status = tl::DB::Open(options, dbname, &db_);
     if (!status.ok()) {
-      throw std::runtime_error("Failed to start TL: " + status.ToString());
+      throw std::runtime_error("Failed to start TreeLine: " +
+                               status.ToString());
     }
   }
 
@@ -100,8 +101,8 @@ class TLInterface {
     const tl::key_utils::IntKeyAsSlice strkey(key);
     tl::WriteOptions options;
     options.bypass_wal = FLAGS_bypass_wal;
-    tl::Status status = db_->Put(options, strkey.as<tl::Slice>(),
-                                   tl::Slice(value, value_size));
+    tl::Status status =
+        db_->Put(options, strkey.as<tl::Slice>(), tl::Slice(value, value_size));
     return status.ok();
   }
 
@@ -109,8 +110,7 @@ class TLInterface {
   bool Read(ycsbr::Request::Key key, std::string* value_out) {
     const tl::key_utils::IntKeyAsSlice strkey(key);
     const tl::ReadOptions options;
-    tl::Status status =
-        db_->Get(options, strkey.as<tl::Slice>(), value_out);
+    tl::Status status = db_->Get(options, strkey.as<tl::Slice>(), value_out);
     return status.ok();
   }
 
@@ -137,8 +137,8 @@ class TLInterface {
   tl::DB* db_;
 
   // These variables are used to provide hints about the key distribution to
-  // TL when creating a new database. We need these hints because TL
+  // TreeLine when creating a new database. We need these hints because TreeLine
   // currently does not support adjusting itself to a changing key distribution.
-  // TODO: Remove these once TL can start up without requiring hints.
+  // TODO: Remove these once TreeLine can start up without requiring hints.
   uint64_t min_key_, max_key_, num_keys_;
 };

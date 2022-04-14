@@ -4,11 +4,11 @@
 
 #include "bench/common/config.h"
 #include "bench/common/leanstore_interface.h"
-#include "bench/common/tl_interface.h"
 #include "bench/common/load_data.h"
 #include "bench/common/pg_tl_interface.h"
 #include "bench/common/rocksdb_interface.h"
 #include "bench/common/startup.h"
+#include "bench/common/tl_interface.h"
 #include "gflags/gflags.h"
 #include "ycsbr/gen.h"
 
@@ -128,7 +128,7 @@ void ProcessCustomInserts(
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  gflags::SetUsageMessage("Run generated workloads on TL and RocksDB.");
+  gflags::SetUsageMessage("Run generated workloads on TreeLine and RocksDB.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
   if (FLAGS_workload_config.empty()) {
     std::cerr << "ERROR: Please provide a workload configuration file."
@@ -176,7 +176,7 @@ int main(int argc, char* argv[]) {
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(*workload));
   }
-  if (db == DBType::kAll || db == DBType::kPGTL) {
+  if (db == DBType::kAll || db == DBType::kPGTreeLine) {
     PrintExperimentResult("pg_tl", Run<PGTLInterface>(*workload));
   }
 

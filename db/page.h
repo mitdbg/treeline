@@ -9,11 +9,11 @@
 
 namespace tl {
 
-// An in-memory representation of TL's on-disk "page" format.
+// An in-memory representation of TreeLine's on-disk "page" format.
 //
 // This class is a thin wrapper that helps with manipulating the contents of a
 // page when it is loaded into memory. A page is the "unit" of storage we use to
-// actually store the keys and values inserted into an TL database.
+// actually store the keys and values inserted into an TreeLine database.
 //
 // A `Page` object does not actually own the buffer where it stores its data. As
 // a result, users must ensure that the `data` buffer used to construct a `Page`
