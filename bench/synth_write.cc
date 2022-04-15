@@ -82,16 +82,16 @@ std::chrono::nanoseconds RunRocksDBExperiment(
   });
 }
 
-std::chrono::nanoseconds RunTLExperiment(
+std::chrono::nanoseconds RunTreeLineExperiment(
     const tl::bench::U64Dataset& dataset) {
   tl::DB* db = nullptr;
-  tl::Options options = tl::bench::BuildTLOptions();
+  tl::Options options = tl::bench::BuildTreeLineOptions();
   options.key_hints.num_keys = dataset.size();
 
   const std::string dbname = FLAGS_db_path + "/tl";
   tl::Status status = tl::DB::Open(options, dbname, &db);
   if (!status.ok()) {
-    throw std::runtime_error("Failed to open TL: " + status.ToString());
+    throw std::runtime_error("Failed to open TreeLine: " + status.ToString());
   }
 
   return tl::bench::MeasureRunTime([db, &dataset]() {
@@ -105,7 +105,7 @@ std::chrono::nanoseconds RunTLExperiment(
     for (const auto& record : dataset) {
       status = db->Put(woptions, record.key(), record.value());
       if (!status.ok()) {
-        throw std::runtime_error("Failed to write record to TL.");
+        throw std::runtime_error("Failed to write record to TreeLine.");
       }
     }
     delete db;
@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
       PrintExperimentResult("rocksdb", dataset, RunRocksDBExperiment(dataset));
     }
     if (db == DBType::kAll || db == DBType::kTreeLine) {
-      PrintExperimentResult("tl", dataset, RunTLExperiment(dataset));
+      PrintExperimentResult("tl", dataset, RunTreeLineExperiment(dataset));
     }
 
     fs::remove_all(FLAGS_db_path);

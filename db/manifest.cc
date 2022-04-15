@@ -18,7 +18,7 @@ const std::string kSignature = u8"TLDB";
 
 // The current manifest file format version. This value should be incremented
 // when a breaking change is made to the file format.
-constexpr uint32_t kFormatVersion = 2;
+constexpr uint32_t kFormatVersion = 3;
 
 // Manifest file format
 // ====================

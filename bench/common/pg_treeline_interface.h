@@ -53,22 +53,22 @@ class PGTreeLineInterface {
   // Called once before the benchmark.
   void InitializeDatabase() {
     const std::string dbname = FLAGS_db_path + "/pg_tl";
-    auto options = tl::bench::BuildPGTLOptions();
+    auto options = tl::bench::BuildPGTreeLineOptions();
     if (options.use_memory_based_io) {
-      std::cerr << "> WARNING: PGTL is using \"memory-based I/O\". "
+      std::cerr << "> WARNING: PGTreeLine is using \"memory-based I/O\". "
                    "Performance results may be inflated."
                 << std::endl;
     }
     if (FLAGS_verbose) {
-      std::cerr << "> PGTL using segments: "
+      std::cerr << "> PGTreeLine using segments: "
                 << (options.use_segments ? "true" : "false") << std::endl;
-      std::cerr << "> PGTL record cache size (# records): "
+      std::cerr << "> PGTreeLine record cache size (# records): "
                 << options.record_cache_capacity << std::endl;
-      std::cerr << "> PGTL records per page goal: "
+      std::cerr << "> PGTreeLine records per page goal: "
                 << options.records_per_page_goal << std::endl;
-      std::cerr << "> PGTL records per page delta: "
+      std::cerr << "> PGTreeLine records per page delta: "
                 << options.records_per_page_delta << std::endl;
-      std::cerr << "> Opening PGTL DB at " << dbname << std::endl;
+      std::cerr << "> Opening PGTreeLine DB at " << dbname << std::endl;
     }
 
     tl::pg::PageGroupedDBStats::RunOnGlobal(
@@ -76,7 +76,8 @@ class PGTreeLineInterface {
     const tl::Status status =
         tl::pg::PageGroupedDB::Open(options, dbname, &db_);
     if (!status.ok()) {
-      throw std::runtime_error("Failed to start PGTL: " + status.ToString());
+      throw std::runtime_error("Failed to start PGTreeLine: " +
+                               status.ToString());
     }
   }
 

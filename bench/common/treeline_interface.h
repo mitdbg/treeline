@@ -28,7 +28,7 @@ class TreeLineInterface {
   // Called once before the benchmark.
   void InitializeDatabase() {
     const std::string dbname = FLAGS_db_path + "/tl";
-    tl::Options options = tl::bench::BuildTLOptions();
+    tl::Options options = tl::bench::BuildTreeLineOptions();
     options.key_hints.num_keys = 0;  // Needs to be empty to use bulk load.
     if (num_keys_ <= 1) {
       // We set the step size to at least 1 to ensure any code that relies on
@@ -48,7 +48,7 @@ class TreeLineInterface {
                 << options.memtable_flush_threshold << " bytes" << std::endl;
       std::cerr << "> TreeLine buffer pool size: " << options.buffer_pool_size
                 << " bytes" << std::endl;
-      std::cerr << "> Opening TreeLine DB at " << dbname << std::endl;
+      std::cerr << "> Opening TreeLine at " << dbname << std::endl;
     }
 
     tl::Status status = tl::DB::Open(options, dbname, &db_);

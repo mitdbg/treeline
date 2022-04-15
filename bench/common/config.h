@@ -166,11 +166,11 @@ rocksdb::Options BuildRocksDBOptions();
 
 // Returns options that can be used to start TreeLine with the configuration
 // specified by the flags set above.
-tl::Options BuildTLOptions();
+tl::Options BuildTreeLineOptions();
 
 // Returns options that can be used to start page-grouped TreeLine with the
 // configuration specified by the flags set above.
-tl::pg::PageGroupedDBOptions BuildPGTLOptions();
+tl::pg::PageGroupedDBOptions BuildPGTreeLineOptions();
 
 // Appends a human-readable timestamp to the provided `prefix` string.
 // e.g.: AppendTimestamp("test") -> "test+2021-05-10+11-10-12".

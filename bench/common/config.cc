@@ -260,7 +260,7 @@ rocksdb::Options BuildRocksDBOptions() {
   return options;
 }
 
-tl::Options BuildTLOptions() {
+tl::Options BuildTreeLineOptions() {
   tl::Options options;
   options.buffer_pool_size = FLAGS_cache_size_mib * 1024 * 1024;
   options.memtable_flush_threshold = FLAGS_memtable_size_mib * 1024 * 1024;
@@ -280,7 +280,7 @@ tl::Options BuildTLOptions() {
   return options;
 }
 
-tl::pg::PageGroupedDBOptions BuildPGTLOptions() {
+tl::pg::PageGroupedDBOptions BuildPGTreeLineOptions() {
   tl::pg::PageGroupedDBOptions options;
   options.use_segments = FLAGS_pg_use_segments;
   options.records_per_page_goal = FLAGS_records_per_page_goal;
