@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "tl/options.h"
-#include "tl/status.h"
+#include "treeline/options.h"
+#include "treeline/status.h"
 #include "wal/manager.h"
 
 namespace {

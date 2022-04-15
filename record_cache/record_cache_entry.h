@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "db/format.h"
-#include "tl/slice.h"
+#include "treeline/slice.h"
 
 namespace tl {
 

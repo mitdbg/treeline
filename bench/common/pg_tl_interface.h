@@ -6,8 +6,8 @@
 #include <thread>
 
 #include "config.h"
-#include "tl/pg_db.h"
-#include "tl/pg_stats.h"
+#include "treeline/pg_db.h"
+#include "treeline/pg_stats.h"
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 

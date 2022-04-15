@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <utility>
 
-#include "tl/pg_db.h"
-#include "tl/slice.h"
+#include "treeline/pg_db.h"
+#include "treeline/slice.h"
 #include "plr/data.h"
 
 namespace tl {

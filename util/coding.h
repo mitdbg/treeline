@@ -13,7 +13,7 @@
 #include <cstring>
 #include <string>
 
-#include "tl/slice.h"
+#include "treeline/slice.h"
 
 namespace tl {
 

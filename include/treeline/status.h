@@ -17,7 +17,7 @@
 #include <string>
 #include <errno.h>
 
-#include "tl/slice.h"
+#include "treeline/slice.h"
 
 namespace tl {
 

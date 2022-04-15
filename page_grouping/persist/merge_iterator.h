@@ -4,7 +4,7 @@
 #include <queue>
 #include <vector>
 
-#include "tl/slice.h"
+#include "treeline/slice.h"
 #include "page.h"
 
 namespace tl {

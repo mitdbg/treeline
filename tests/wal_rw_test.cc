@@ -11,7 +11,7 @@
 #include <string>
 
 #include "gtest/gtest.h"
-#include "tl/options.h"
+#include "treeline/options.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
 #include "util/random.h"

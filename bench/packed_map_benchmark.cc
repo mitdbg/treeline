@@ -3,7 +3,7 @@
 
 #include "bench/common/data.h"
 #include "benchmark/benchmark.h"
-#include "tl/slice.h"
+#include "treeline/slice.h"
 #include "util/packed_map.h"
 
 namespace {

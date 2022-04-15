@@ -4,7 +4,7 @@
 #include <cassert>
 #include <functional>
 
-#include "tl/pg_stats.h"
+#include "treeline/pg_stats.h"
 #include "util/key.h"
 
 namespace fs = std::filesystem;

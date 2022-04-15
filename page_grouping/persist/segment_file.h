@@ -12,7 +12,7 @@
 #include <string>
 
 #include "bufmgr/page_memory_allocator.h"
-#include "tl/status.h"
+#include "treeline/status.h"
 #include "page.h"
 
 #define CHECK_ERROR(call)                                                    \

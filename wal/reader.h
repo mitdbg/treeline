@@ -9,8 +9,8 @@
 #include <memory>
 #include <string>
 
-#include "tl/slice.h"
-#include "tl/status.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 #include "wal/format.h"
 
 namespace tl {

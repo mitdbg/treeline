@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "tl/slice.h"
+#include "treeline/slice.h"
 
 namespace {
 

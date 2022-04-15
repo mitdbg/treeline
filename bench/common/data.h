@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 
-#include "tl/slice.h"
+#include "treeline/slice.h"
 
 namespace tl {
 namespace bench {

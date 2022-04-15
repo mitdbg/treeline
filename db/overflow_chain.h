@@ -3,8 +3,8 @@
 
 #include "bufmgr/buffer_manager.h"
 #include "format.h"
-#include "tl/record_batch.h"
-#include "tl/statistics.h"
+#include "treeline/record_batch.h"
+#include "treeline/statistics.h"
 #include "model/model.h"
 
 namespace tl {

@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "key.h"
-#include "tl/pg_db.h"
-#include "tl/pg_options.h"
+#include "treeline/pg_db.h"
+#include "treeline/pg_options.h"
 #include "manager.h"
 #include "persist/segment_wrap.h"
 #include "util/key.h"

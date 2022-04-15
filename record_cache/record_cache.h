@@ -9,8 +9,8 @@
 
 #include "db/format.h"
 #include "db/overflow_chain.h"
-#include "tl/statistics.h"
-#include "tl/status.h"
+#include "treeline/statistics.h"
+#include "treeline/status.h"
 #include "masstree_wrapper/masstree_wrapper.h"
 #include "record_cache_entry.h"
 #include "util/key.h"

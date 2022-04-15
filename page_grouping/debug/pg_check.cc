@@ -15,7 +15,7 @@
 #include "../persist/segment_wrap.h"
 #include "../segment_builder.h"
 #include "gflags/gflags.h"
-#include "tl/pg_options.h"
+#include "treeline/pg_options.h"
 
 DEFINE_string(db_path, "", "Path to the database to check.");
 DEFINE_bool(verbose, false,

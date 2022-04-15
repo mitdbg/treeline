@@ -10,8 +10,8 @@
 #include <vector>
 
 #include "config.h"
-#include "tl/pg_options.h"
-#include "tl/slice.h"
+#include "treeline/pg_options.h"
+#include "treeline/slice.h"
 #include "manager.h"
 #include "ycsbr/ycsbr.h"
 

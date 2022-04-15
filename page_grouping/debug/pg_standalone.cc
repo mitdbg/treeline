@@ -8,7 +8,7 @@
 #include "../segment_builder.h"
 #include "bench/common/load_data.h"
 #include "gflags/gflags.h"
-#include "tl/slice.h"
+#include "treeline/slice.h"
 
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
 DEFINE_uint32(goal, 45, "Records per page goal.");

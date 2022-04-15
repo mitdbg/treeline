@@ -3,9 +3,9 @@
 #include <string>
 
 #include "bufmgr/physical_page_id.h"
-#include "tl/options.h"
-#include "tl/slice.h"
-#include "tl/status.h"
+#include "treeline/options.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 
 namespace tl {
 

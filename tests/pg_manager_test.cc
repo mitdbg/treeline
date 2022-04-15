@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "tl/pg_options.h"
-#include "tl/slice.h"
+#include "treeline/pg_options.h"
+#include "treeline/slice.h"
 #include "page_grouping/key.h"
 #include "page_grouping/manager.h"
 #include "page_grouping/segment_info.h"

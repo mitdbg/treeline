@@ -3,7 +3,7 @@
 #include <limits>
 
 #include "gflags/gflags.h"
-#include "tl/pg_db.h"
+#include "treeline/pg_db.h"
 
 DEFINE_string(db_path, "", "Path to the database directory.");
 DEFINE_uint64(

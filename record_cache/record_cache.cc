@@ -1,6 +1,6 @@
 #include "record_cache.h"
 
-#include "tl/pg_stats.h"
+#include "treeline/pg_stats.h"
 
 namespace tl {
 

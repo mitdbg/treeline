@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "key.h"
-#include "tl/slice.h"
+#include "treeline/slice.h"
 #include "plr/data.h"
 #include "plr/greedy.h"
 

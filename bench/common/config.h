@@ -6,8 +6,8 @@
 
 #include "gflags/gflags.h"
 #include "rocksdb/options.h"
-#include "tl/options.h"
-#include "tl/pg_options.h"
+#include "treeline/options.h"
+#include "treeline/pg_options.h"
 
 // This header declares all the common configuration flags used across the
 // TreeLine benchmarks as well as a few utility functions that use these flags.

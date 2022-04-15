@@ -1,4 +1,4 @@
-#include "tl/pg_db.h"
+#include "treeline/pg_db.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "tl/pg_options.h"
+#include "treeline/pg_options.h"
 
 namespace {
 

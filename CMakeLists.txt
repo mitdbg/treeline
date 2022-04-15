@@ -36,7 +36,7 @@ target_include_directories(pg_tl
   PRIVATE .)
 
 # Add API headers to the target for IDE support
-set(tl_inc include/tl)
+set(tl_inc include/treeline)
 set(tl_api
   ${tl_inc}/db.h
   ${tl_inc}/options.h

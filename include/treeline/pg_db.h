@@ -4,9 +4,9 @@
 #include <utility>
 #include <vector>
 
-#include "tl/pg_options.h"
-#include "tl/slice.h"
-#include "tl/status.h"
+#include "treeline/pg_options.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 
 namespace tl {
 namespace pg {

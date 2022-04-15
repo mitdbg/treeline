@@ -3,8 +3,8 @@
 #include <cstring>
 #include <vector>
 
-#include "tl/options.h"
-#include "tl/slice.h"
+#include "treeline/options.h"
+#include "treeline/slice.h"
 
 namespace tl {
 namespace key_utils {

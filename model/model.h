@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "bufmgr/buffer_manager.h"
-#include "tl/slice.h"
+#include "treeline/slice.h"
 #include "util/key.h"
 
 namespace tl {

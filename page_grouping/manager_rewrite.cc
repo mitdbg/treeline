@@ -4,8 +4,8 @@
 
 #include "../bufmgr/page_memory_allocator.h"
 #include "circular_page_buffer.h"
-#include "tl/pg_db.h"
-#include "tl/pg_stats.h"
+#include "treeline/pg_db.h"
+#include "treeline/pg_stats.h"
 #include "manager.h"
 #include "persist/merge_iterator.h"
 #include "persist/page.h"

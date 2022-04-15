@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "tl/slice.h"
+#include "treeline/slice.h"
 #include "page_grouping/key.h"
 #include "page_grouping/plr/data.h"
 #include "page_grouping/plr/greedy.h"

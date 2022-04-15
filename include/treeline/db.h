@@ -9,10 +9,10 @@
 
 #include <filesystem>
 
-#include "tl/options.h"
-#include "tl/record_batch.h"
-#include "tl/slice.h"
-#include "tl/status.h"
+#include "treeline/options.h"
+#include "treeline/record_batch.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 
 namespace tl {
 

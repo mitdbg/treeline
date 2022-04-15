@@ -9,9 +9,9 @@
 #include <string>
 
 #include "db/format.h"
-#include "tl/options.h"
-#include "tl/slice.h"
-#include "tl/status.h"
+#include "treeline/options.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 #include "wal/writer.h"
 
 namespace tl {

@@ -4,7 +4,7 @@
 #include "common/config.h"
 #include "db/page.h"
 #include "gflags/gflags.h"
-#include "tl/options.h"
+#include "treeline/options.h"
 #include "ycsbr/ycsbr.h"
 
 namespace {

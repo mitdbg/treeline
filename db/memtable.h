@@ -4,8 +4,8 @@
 
 #include "db/format.h"
 #include "db/options.h"
-#include "tl/slice.h"
-#include "tl/status.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 #include "util/arena.h"
 #include "util/inlineskiplist.h"
 

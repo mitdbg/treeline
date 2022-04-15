@@ -54,7 +54,7 @@
 #include "db/memtable.h"
 #include "db/options.h"
 #include "gflags/gflags.h"
-#include "tl/options.h"
+#include "treeline/options.h"
 #include "util/coding.h"
 #include "wal/writer.h"
 

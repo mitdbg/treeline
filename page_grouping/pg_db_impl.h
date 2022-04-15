@@ -7,9 +7,9 @@
 #include <vector>
 
 #include "db/format.h"
-#include "tl/pg_db.h"
-#include "tl/pg_options.h"
-#include "tl/slice.h"
+#include "treeline/pg_db.h"
+#include "treeline/pg_options.h"
+#include "treeline/slice.h"
 #include "manager.h"
 #include "record_cache/record_cache.h"
 #include "util/insert_tracker.h"
