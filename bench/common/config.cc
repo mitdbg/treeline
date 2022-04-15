@@ -201,11 +201,11 @@ namespace bench {
 std::optional<DBType> ParseDBType(const std::string& candidate) {
   static const std::unordered_map<std::string, DBType> kStringToDBType = {
       {"all", DBType::kAll},
-      {"tl", DBType::kTreeLine},
+      {"treeline", DBType::kTreeLine},
       {"rocksdb", DBType::kRocksDB},
       {"leanstore", DBType::kLeanStore},
       {"kvell", DBType::kKVell},
-      {"pg_tl", DBType::kPGTreeLine},
+      {"pg_treeline", DBType::kPGTreeLine},
       // For legacy support.
       {"llsm", DBType::kTreeLine},
       {"pg_llsm", DBType::kPGTreeLine}};

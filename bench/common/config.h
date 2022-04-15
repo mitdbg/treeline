@@ -147,11 +147,11 @@ enum class DBType : uint32_t {
 
 // Returns the `DBType` enum value associated with a given string.
 // - "all" maps to `kAll`
-// - "tl" maps to `kTreeLine`
+// - "treeline" maps to `kTreeLine`
 // - "rocksdb" maps to `kRocksDB`
 // - "leanstore" maps to `kLeanStore`
 // - "kvell" maps to `kKVell`
-// - "pg_tl" maps to `kPGTreeLine`
+// - "pg_treeline" maps to `kPGTreeLine`
 //
 // For legacy support, the following strings also map to `DBType` values.
 // - "llsm" maps to `kTreeLine`

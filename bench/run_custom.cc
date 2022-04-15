@@ -5,10 +5,10 @@
 #include "bench/common/config.h"
 #include "bench/common/leanstore_interface.h"
 #include "bench/common/load_data.h"
-#include "bench/common/pg_tl_interface.h"
+#include "bench/common/pg_treeline_interface.h"
 #include "bench/common/rocksdb_interface.h"
 #include "bench/common/startup.h"
-#include "bench/common/tl_interface.h"
+#include "bench/common/treeline_interface.h"
 #include "gflags/gflags.h"
 #include "ycsbr/gen.h"
 
@@ -171,13 +171,13 @@ int main(int argc, char* argv[]) {
     PrintExperimentResult("rocksdb", Run<RocksDBInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kTreeLine) {
-    PrintExperimentResult("tl", Run<TLInterface>(*workload));
+    PrintExperimentResult("tl", Run<TreeLineInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kPGTreeLine) {
-    PrintExperimentResult("pg_tl", Run<PGTLInterface>(*workload));
+    PrintExperimentResult("pg_tl", Run<PGTreeLineInterface>(*workload));
   }
 
   return 0;

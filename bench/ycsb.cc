@@ -6,7 +6,7 @@
 #include "bench/common/config.h"
 #include "bench/common/kvell_interface.h"
 #include "bench/common/leanstore_interface.h"
-#include "bench/common/tl_interface.h"
+#include "bench/common/treeline_interface.h"
 #include "bench/common/rocksdb_interface.h"
 #include "gflags/gflags.h"
 #include "ycsbr/ycsbr.h"
@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
     PrintExperimentResult("rocksdb", Run<RocksDBInterface>(load, workload));
   }
   if (db == DBType::kAll || db == DBType::kTreeLine) {
-    PrintExperimentResult("tl", Run<TLInterface>(load, workload));
+    PrintExperimentResult("tl", Run<TreeLineInterface>(load, workload));
   }
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(load, workload));

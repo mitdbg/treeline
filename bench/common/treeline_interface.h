@@ -9,9 +9,9 @@
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 
-class TLInterface {
+class TreeLineInterface {
  public:
-  TLInterface() : db_(nullptr), min_key_(0), max_key_(0), num_keys_(1) {}
+  TreeLineInterface() : db_(nullptr), min_key_(0), max_key_(0), num_keys_(1) {}
 
   void InitializeWorker(const std::thread::id& id) {}
   void ShutdownWorker(const std::thread::id& id) {}

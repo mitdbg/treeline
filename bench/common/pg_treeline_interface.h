@@ -11,9 +11,9 @@
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 
-class PGTLInterface {
+class PGTreeLineInterface {
  public:
-  PGTLInterface() : db_(nullptr) {}
+  PGTreeLineInterface() : db_(nullptr) {}
 
   void InitializeWorker(const std::thread::id& id) {
     tl::pg::PageGroupedDBStats::Local().Reset();

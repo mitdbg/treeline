@@ -22,8 +22,8 @@ add_library(bench_common_config
   common/config.h
   common/kvell_interface.h
   common/leanstore_interface.h
-  common/tl_interface.h
-  common/pg_tl_interface.h
+  common/treeline_interface.h
+  common/pg_treeline_interface.h
   common/rocksdb_interface.h)
 target_link_libraries(bench_common_config PUBLIC
   bench_common

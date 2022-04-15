@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 option(TL_BUILD_TESTS "Set to build the TreeLine test suite." OFF)
 option(TL_BUILD_BENCHMARKS "Set to build the TreeLine benchmarks." OFF)
-option(TL_BUILD_SHARED "Set to build the TreeLine database as a shared library." OFF)
+option(TL_BUILD_SHARED "Set to build TreeLine as a shared library." OFF)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")  # Needed for ALEX
 
