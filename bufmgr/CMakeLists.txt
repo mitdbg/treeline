@@ -1,4 +1,4 @@
-target_sources(tl PRIVATE
+target_sources(treeline PRIVATE
   buffer_frame.cc
   buffer_frame.h
   buffer_manager.cc

@@ -27,8 +27,8 @@ target_sources(tester
 )
 target_link_libraries(tester
   PRIVATE
-    tl
-    pg_tl
+    treeline
+    pg_treeline
     pg
     gtest
     gtest_main

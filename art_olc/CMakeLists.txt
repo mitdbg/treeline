@@ -11,5 +11,5 @@ set(art_sources
   Tree.cpp
   Tree.h)
 
-target_sources(tl PRIVATE ${art_sources})
-target_sources(pg_tl PRIVATE ${art_sources})
+target_sources(treeline PRIVATE ${art_sources})
+target_sources(pg_treeline PRIVATE ${art_sources})

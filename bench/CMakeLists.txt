@@ -7,9 +7,9 @@ add_library(bench_common
   common/startup.cc
   common/startup.h
   common/timing.h)
-# Any targets linking to `bench_common` will also link to `tl` and will be
+# Any targets linking to `bench_common` will also link to `treeline` and will be
 # able to include TreeLine internal headers.
-target_link_libraries(bench_common PUBLIC tl)
+target_link_libraries(bench_common PUBLIC treeline)
 target_include_directories(bench_common PUBLIC ${PROJECT_SOURCE_DIR})
 
 # All `bench_common` utilities plus configuration utilities used in benchmarks
@@ -25,7 +25,13 @@ add_library(bench_common_config
   common/tl_interface.h
   common/pg_tl_interface.h
   common/rocksdb_interface.h)
-target_link_libraries(bench_common_config PUBLIC bench_common gflags rocksdb leanstore pg_tl libcuckoo)
+target_link_libraries(bench_common_config PUBLIC
+  bench_common
+  gflags
+  rocksdb
+  leanstore
+  pg_treeline
+  libcuckoo)
 
 # Synthetic Write: Measure the write throughput when writing synthetic data.
 # This benchmark compares TreeLine against RocksDB.
