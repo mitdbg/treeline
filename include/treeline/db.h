@@ -16,7 +16,7 @@
 
 namespace tl {
 
-// The public Learned LSM (TL) database interface, representing an embedded,
+// The public TreeLine database interface, representing an embedded,
 // persistent, and ordered key-value store.
 //
 // All methods can be called concurrently without requiring external mutual

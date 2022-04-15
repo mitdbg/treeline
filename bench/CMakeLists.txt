@@ -28,7 +28,7 @@ add_library(bench_common_config
 target_link_libraries(bench_common_config PUBLIC bench_common gflags rocksdb leanstore pg_tl libcuckoo)
 
 # Synthetic Write: Measure the write throughput when writing synthetic data.
-# This benchmark compares the Learned LSM database against RocksDB.
+# This benchmark compares TreeLine against RocksDB.
 add_executable(synth_write synth_write.cc)
 target_link_libraries(synth_write bench_common_config)
 

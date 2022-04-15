@@ -1,6 +1,6 @@
 ![](https://github.com/mitdbg/learnedlsm/actions/workflows/ci.yml/badge.svg)
 
-# Learned LSM
+# TreeLine
 An embedded key-value store for modern SSDs.
 
 ## Building from source
