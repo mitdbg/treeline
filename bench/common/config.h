@@ -99,7 +99,7 @@ DECLARE_bool(pg_parallelize_final_flush);
 // writing out a dirty entry.
 DECLARE_bool(rec_cache_batch_writeout);
 
-// If true, page-grouped TreeLine and TreeLine will optimistically cache records
+// If true, PGTreeLine and TreeLine will optimistically cache records
 // present on a page that was read in, even if the record(s) were not
 // necessarily requested.
 DECLARE_bool(optimistic_rec_caching);

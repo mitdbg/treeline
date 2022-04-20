@@ -159,11 +159,10 @@ DEFINE_bool(rec_cache_batch_writeout, true,
             "If true, the record cache will try to batch writes for the same "
             "page when writing out a dirty entry.");
 
-DEFINE_bool(
-    optimistic_rec_caching, false,
-    "If true, page-grouped TreeLine and TreeLine will optimistically cache "
-    "records present on a page that was read in, even if the record(s) "
-    "were not necessarily requested.");
+DEFINE_bool(optimistic_rec_caching, false,
+            "If true, PGTreeLine and TreeLine will optimistically cache "
+            "records present on a page that was read in, even if the record(s) "
+            "were not necessarily requested.");
 
 DEFINE_bool(
     skip_load, false,
