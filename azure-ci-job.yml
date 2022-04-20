@@ -64,8 +64,8 @@ jobs:
           # takes a lot of resources to build.
           cmakeArgs: >
             -DCMAKE_BUILD_TYPE=${{ parameters.buildType }}
-            -DLLSM_BUILD_TESTS=ON
-            -DLLSM_BUILD_BENCHMARKS=OFF
+            -DTL_BUILD_TESTS=ON
+            -DTL_BUILD_BENCHMARKS=OFF
             ..
 
       - bash: make -j
