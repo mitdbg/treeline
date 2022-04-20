@@ -13,8 +13,8 @@
 
 namespace {
 
-// All manifest files start with these four bytes.
-const std::string kSignature = u8"TLDB";
+// All manifest files start with these two bytes.
+const std::string kSignature = u8"TL";
 
 // The current manifest file format version. This value should be incremented
 // when a breaking change is made to the file format.
@@ -23,7 +23,7 @@ constexpr uint32_t kFormatVersion = 3;
 // Manifest file format
 // ====================
 // [Header]
-// Signature (4 bytes)
+// Signature (2 bytes)
 // Format version (uint32; 4 bytes)
 // Payload size (uint32; 4 bytes)
 // CRC32C checksum of the payload (4 bytes)
@@ -32,10 +32,10 @@ constexpr uint32_t kFormatVersion = 3;
 // Number of pages (uint64; 8 bytes)
 // Number of segments (uint64; 8 bytes)
 
-constexpr size_t kHeaderSize = 16;
-constexpr size_t kFormatVersionOffset = 4;
-constexpr size_t kPayloadSizeOffset = 8;
-constexpr size_t kChecksumOffset = 12;
+constexpr size_t kHeaderSize = 14;
+constexpr size_t kFormatVersionOffset = 2;
+constexpr size_t kPayloadSizeOffset = 6;
+constexpr size_t kChecksumOffset = 10;
 constexpr size_t kPayloadOffset = kHeaderSize;
 
 }  // namespace

@@ -116,7 +116,7 @@ TEST_F(ManifestTest, UnsupportedFormatVersion) {
     // truncating the file.
     std::fstream file(kManifestFile, std::ios_base::in | std::ios_base::out |
                                          std::ios_base::binary);
-    file.seekp(4, std::ios_base::beg);
+    file.seekp(2, std::ios_base::beg);
     char buf[4];
     EncodeFixed32(buf, 0);
     file.write(buf, 4);
