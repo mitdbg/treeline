@@ -6,7 +6,7 @@
 #include "bench/common/config.h"
 #include "bench/common/kvell_interface.h"
 #include "bench/common/leanstore_interface.h"
-#include "bench/common/llsm_interface.h"
+#include "bench/common/treeline_interface.h"
 #include "bench/common/rocksdb_interface.h"
 #include "gflags/gflags.h"
 #include "ycsbr/ycsbr.h"
@@ -14,7 +14,7 @@
 namespace {
 
 namespace fs = std::filesystem;
-using llsm::bench::DBType;
+using tl::bench::DBType;
 
 DEFINE_string(load_path, "", "Path to the bulk load workload file, if needed.");
 DEFINE_string(workload_path, "", "Path to the workload file.");
@@ -71,10 +71,10 @@ void PrintExperimentResult(const std::string& db,
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  gflags::SetUsageMessage("Run YCSB workloads on LLSM and RocksDB.");
+  gflags::SetUsageMessage("Run YCSB workloads on TreeLine and RocksDB.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
 
-  DBType db = llsm::bench::ParseDBType(FLAGS_db).value();
+  DBType db = tl::bench::ParseDBType(FLAGS_db).value();
 
   std::optional<ycsbr::BulkLoadTrace> load;
   if (!FLAGS_load_path.empty()) {
@@ -100,8 +100,8 @@ int main(int argc, char* argv[]) {
   if (db == DBType::kAll || db == DBType::kRocksDB) {
     PrintExperimentResult("rocksdb", Run<RocksDBInterface>(load, workload));
   }
-  if (db == DBType::kAll || db == DBType::kLLSM) {
-    PrintExperimentResult("llsm", Run<LLSMInterface>(load, workload));
+  if (db == DBType::kAll || db == DBType::kTreeLine) {
+    PrintExperimentResult("tl", Run<TreeLineInterface>(load, workload));
   }
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(load, workload));

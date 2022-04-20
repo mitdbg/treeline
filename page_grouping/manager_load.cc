@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "key.h"
-#include "llsm/pg_db.h"
-#include "llsm/pg_options.h"
+#include "treeline/pg_db.h"
+#include "treeline/pg_options.h"
 #include "manager.h"
 #include "persist/segment_wrap.h"
 #include "util/key.h"
@@ -14,8 +14,8 @@ namespace fs = std::filesystem;
 
 namespace {
 
-using namespace llsm;
-using namespace llsm::pg;
+using namespace tl;
+using namespace tl::pg;
 
 const std::string kSegmentSummaryCsvFileName = "segment_summary.csv";
 const std::string kDebugDirName = "debug";
@@ -101,7 +101,7 @@ std::vector<Key> ComputePageLowerBoundaries(const Segment& seg) {
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 Manager Manager::BulkLoadIntoSegments(
@@ -333,4 +333,4 @@ std::vector<std::pair<Key, SegmentInfo>> Manager::LoadIntoNewPages(
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

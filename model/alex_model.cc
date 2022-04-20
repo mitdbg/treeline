@@ -7,7 +7,7 @@
 #include "util/coding.h"
 #include "util/key.h"
 
-namespace llsm {
+namespace tl {
 
 // Uses the model to predict a page_id given a `key` that is within the
 // correct range (lower bounds `key`).
@@ -90,4 +90,4 @@ size_t ALEXModel::GetSizeBytes() {
   return size_bytes;
 }
 
-}  // namespace llsm
+}  // namespace tl

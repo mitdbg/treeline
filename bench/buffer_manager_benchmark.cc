@@ -4,7 +4,7 @@
 #include "common/config.h"
 #include "db/page.h"
 #include "gflags/gflags.h"
-#include "llsm/options.h"
+#include "treeline/options.h"
 #include "ycsbr/ycsbr.h"
 
 namespace {
@@ -39,18 +39,18 @@ void SimulateBM(benchmark::State& state, bool large_buffer) {
       ycsbr::BulkLoadTrace::LoadFromFile(FLAGS_load_path, loptions);
 
   // Create key hints.
-  llsm::KeyDistHints key_hints;
+  tl::KeyDistHints key_hints;
   key_hints.num_keys = load.size();
-  key_hints.page_fill_pct = FLAGS_llsm_page_fill_pct;
+  key_hints.page_fill_pct = FLAGS_tl_page_fill_pct;
   key_hints.record_size = record_size;
 
   // Initialize an alex instance.
-  alex::Alex<uint64_t, llsm::PhysicalPageId> model;
+  alex::Alex<uint64_t, tl::PhysicalPageId> model;
   size_t records_per_page = key_hints.records_per_page();
   size_t i = 0;
   for (const auto& req : load) {
     if (i % records_per_page == 0) {
-      llsm::PhysicalPageId page_id(0, i / records_per_page);
+      tl::PhysicalPageId page_id(0, i / records_per_page);
       model.insert(__builtin_bswap64(req.key), page_id);
     }
     ++i;
@@ -65,17 +65,17 @@ void SimulateBM(benchmark::State& state, bool large_buffer) {
       ycsbr::Trace::LoadFromFile(FLAGS_workload_path, woptions);
 
   // Pre-calculate page numbers appropriately
-  std::vector<llsm::PhysicalPageId> page_ids;
+  std::vector<tl::PhysicalPageId> page_ids;
   for (const auto& req : workload) {
     page_ids.push_back(
         *model.get_payload_last_no_greater_than(__builtin_bswap64(req.key)));
   }
 
   // Create buffer manager options.
-  llsm::BufMgrOptions bm_options;
+  tl::BufMgrOptions bm_options;
   bm_options.simulation_mode = true;
   bm_options.buffer_pool_size = large_buffer
-                                    ? model.size() * llsm::Page::kSize
+                                    ? model.size() * tl::Page::kSize
                                     : 64 * 1024 * 1024;
 
   // Bookkeeping
@@ -83,7 +83,7 @@ void SimulateBM(benchmark::State& state, bool large_buffer) {
   double numIOs = 0;
 
   for (auto _ : state) {
-    llsm::BufferManager buf_mgr(bm_options, db_path);
+    tl::BufferManager buf_mgr(bm_options, db_path);
     for (const auto& page_id : page_ids) {
       auto& bf = buf_mgr.FixPage(page_id, /*exclusive = */ true);
       if (bf.IsNewlyFixed()) ++numIOs;

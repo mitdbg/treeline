@@ -33,7 +33,7 @@
 #include "util/arena.h"
 #include "util/random.h"
 
-namespace llsm {
+namespace tl {
 
 class Arena;
 
@@ -376,4 +376,4 @@ bool SkipList<Key, Comparator>::Contains(const Key& key) const {
   }
 }
 
-}  // namespace llsm
+}  // namespace tl

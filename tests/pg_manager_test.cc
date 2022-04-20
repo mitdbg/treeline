@@ -4,23 +4,23 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "llsm/pg_options.h"
-#include "llsm/slice.h"
+#include "treeline/pg_options.h"
+#include "treeline/slice.h"
 #include "page_grouping/key.h"
 #include "page_grouping/manager.h"
 #include "page_grouping/segment_info.h"
 #include "pg_datasets.h"
 #include "util/key.h"
 
-using namespace llsm;
-using namespace llsm::pg;
+using namespace tl;
+using namespace tl::pg;
 
 namespace {
 
 class PGManagerTest : public testing::Test {
  public:
   PGManagerTest()
-      : kDBDir("/tmp/llsm-pg-test-" + std::to_string(std::time(nullptr))) {}
+      : kDBDir("/tmp/tl-pg-test-" + std::to_string(std::time(nullptr))) {}
   void SetUp() override {
     std::filesystem::remove_all(kDBDir);
     std::filesystem::create_directory(kDBDir);

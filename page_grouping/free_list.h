@@ -10,7 +10,7 @@
 #include "../util/tracking_allocator.h"
 #include "persist/segment_id.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Keeps track of available locations on disk for segments of different sizes.
@@ -39,4 +39,4 @@ class FreeList {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

@@ -2,7 +2,7 @@
 
 #include <pthread.h>
 
-namespace llsm {
+namespace tl {
 
 BufferFrame::BufferFrame() {
   data_ = PageMemoryAllocator::Allocate(/* num_pages = */ 1);
@@ -73,4 +73,4 @@ size_t BufferFrame::DecFixCount() {
 size_t BufferFrame::GetFixCount() const { return fix_count_; }
 size_t BufferFrame::ClearFixCount() { return fix_count_ = 0; }
 
-}  // namespace llsm
+}  // namespace tl

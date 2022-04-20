@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <vector>
 
-namespace llsm {
+namespace tl {
 namespace bench {
 
 // The expected file format is a sequence of integers separated by newlines.
@@ -13,4 +13,4 @@ std::vector<uint64_t> LoadDatasetFromTextFile(
     const std::filesystem::path& dataset_path, bool warn_on_duplicates = false);
 
 }  // namespace bench
-}  // namespace llsm
+}  // namespace tl

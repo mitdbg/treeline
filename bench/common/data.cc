@@ -6,7 +6,7 @@
 
 #include "util/random.h"
 
-namespace llsm {
+namespace tl {
 namespace bench {
 
 U64Dataset::U64Dataset(std::vector<uint64_t> keys,
@@ -88,4 +88,4 @@ U64Dataset U64Dataset::Generate(size_t size_mib, const U64Dataset::GenerateOptio
 }
 
 }  // namespace bench
-}  // namespace llsm
+}  // namespace tl

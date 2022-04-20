@@ -4,12 +4,12 @@
 
 #include "db/format.h"
 #include "db/options.h"
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 #include "util/arena.h"
 #include "util/inlineskiplist.h"
 
-namespace llsm {
+namespace tl {
 
 // An ordered in-memory table storing "recent" writes and deletes.
 //
@@ -191,4 +191,4 @@ class MemTable::Iterator {
   Table::Iterator it_;
 };
 
-}  // namespace llsm
+}  // namespace tl

@@ -2,7 +2,7 @@
 
 #include "db/merge_iterators.h"
 
-namespace llsm {
+namespace tl {
 
 Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
                         const size_t num_records, RecordBatch* results_out) {
@@ -128,4 +128,4 @@ Status DBImpl::GetRange(const ReadOptions& options, const Slice& start_key,
   return Status::OK();
 }
 
-}  // namespace llsm
+}  // namespace tl

@@ -4,17 +4,17 @@
 #include <utility>
 #include <vector>
 
-#include "llsm/pg_options.h"
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "treeline/pg_options.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
-using Key = llsm::key_utils::KeyHead;
+using Key = tl::key_utils::KeyHead;
 using Record = std::pair<Key, Slice>;
 
-// The public page-grouped Learned LSM (LLSM) database interface, representing
+// The public page-grouped TreeLine database interface, representing
 // an embedded, persistent, and ordered key-value store.
 //
 // All methods return an OK status on success, and a non-OK status if an error
@@ -93,4 +93,4 @@ class PageGroupedDB {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

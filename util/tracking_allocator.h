@@ -5,7 +5,7 @@
 // The boilerplate in this file is CC4 licenced code.
 // https://howardhinnant.github.io/allocator_boilerplate.html
 
-namespace llsm {
+namespace tl {
 
 template <class T>
 class TrackingAllocator {
@@ -46,4 +46,4 @@ class TrackingAllocator {
   uint64_t& currently_allocated_bytes_;
 };
 
-}  // namespace llsm
+}  // namespace tl

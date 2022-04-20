@@ -2,7 +2,7 @@
 
 #include <sys/statvfs.h>
 
-namespace llsm {
+namespace tl {
 
 size_t PageMemoryAllocator::alignment_ = PageMemoryAllocator::kDefaultAlignment;
 
@@ -18,4 +18,4 @@ void PageMemoryAllocator::SetAlignmentFor(const std::filesystem::path& path) {
   }
 }
 
-}  // namespace llsm
+}  // namespace tl

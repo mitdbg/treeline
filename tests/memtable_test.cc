@@ -4,12 +4,12 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "llsm/status.h"
+#include "treeline/status.h"
 
 namespace {
 
-using namespace llsm;
-using namespace llsm::format;
+using namespace tl;
+using namespace tl::format;
 
 TEST(MemTableTest, SimpleReadWrite) {
   MemTableOptions moptions;

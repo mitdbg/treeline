@@ -1,4 +1,4 @@
-target_sources(llsm PRIVATE
+target_sources(treeline PRIVATE
   alex_model.cc
   alex_model.h
   btree_model.h

@@ -4,12 +4,12 @@
 #include <cassert>
 #include <functional>
 
-#include "llsm/pg_stats.h"
+#include "treeline/pg_stats.h"
 #include "util/key.h"
 
 namespace fs = std::filesystem;
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 static thread_local size_t thread_id_ = ([]() {
@@ -309,4 +309,4 @@ Status PageGroupedDBImpl::FlattenRange(const Key start_key, const Key end_key) {
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

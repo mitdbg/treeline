@@ -195,7 +195,7 @@ class MasstreeWrapper {
         const char* const end_key, const std::size_t end_key_length,
         bool scan_by_length, uint64_t num_records,
         std::vector<uint64_t>* indices_out,
-        std::vector<llsm::RecordCacheEntry>* cache_entries = nullptr,
+        std::vector<tl::RecordCacheEntry>* cache_entries = nullptr,
         std::optional<uint64_t> index_locked_already = std::nullopt)
         : end_key_(end_key),
           end_key_length_(end_key_length),
@@ -239,7 +239,7 @@ class MasstreeWrapper {
     }
 
    private:
-    void lock_and_log(llsm::RecordCacheEntry* val) {
+    void lock_and_log(tl::RecordCacheEntry* val) {
       if (cache_entries_ != nullptr) {
         uint64_t index = val->FindIndexWithin(cache_entries_);
         
@@ -260,7 +260,7 @@ class MasstreeWrapper {
     const uint64_t num_records_;
 
     std::vector<uint64_t>* indices_out_;
-    std::vector<llsm::RecordCacheEntry>* cache_entries_;
+    std::vector<tl::RecordCacheEntry>* cache_entries_;
     std::optional<uint64_t> index_locked_already_;
 
     uint64_t scanned_so_far_ = 0;
@@ -270,7 +270,7 @@ class MasstreeWrapper {
             const char* const end_key, const std::size_t end_key_length,
             bool scan_by_length, uint64_t num_records,
             std::vector<uint64_t>* indices_out,
-            std::vector<llsm::RecordCacheEntry>* cache_entries = nullptr,
+            std::vector<tl::RecordCacheEntry>* cache_entries = nullptr,
             std::optional<uint64_t> index_locked_already = std::nullopt) {
     Str mtkey =
         (start_key == nullptr ? Str() : Str(start_key, start_key_length));

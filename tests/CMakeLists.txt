@@ -27,15 +27,15 @@ target_sources(tester
 )
 target_link_libraries(tester
   PRIVATE
-    llsm
-    pg_llsm
+    treeline
+    pg_treeline
     pg
     gtest
     gtest_main
     Threads::Threads
     crc32c
 )
-# Allow tests to also include LLSM internal headers
+# Allow tests to also include TreeLine internal headers
 target_include_directories(tester PRIVATE ${PROJECT_SOURCE_DIR})
 
 # Register our tests with CTest

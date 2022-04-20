@@ -3,10 +3,10 @@
 #include <cstring>
 #include <vector>
 
-#include "llsm/options.h"
-#include "llsm/slice.h"
+#include "treeline/options.h"
+#include "treeline/slice.h"
 
-namespace llsm {
+namespace tl {
 namespace key_utils {
 
 // Returns the data pointed to by `p` as if it is a pointer to type `T`.
@@ -147,4 +147,4 @@ class IntKeyAsSlice {
 };
 
 }  // namespace key_utils
-}  // namespace llsm
+}  // namespace tl

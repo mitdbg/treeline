@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace llsm {
+namespace tl {
 
 // A memory arena, which is useful for making many small allocations.
 // NOTE: Allocate() and AllocateAligned() are not thread-safe; they require
@@ -65,4 +65,4 @@ inline char* Arena::Allocate(size_t bytes) {
   return AllocateFallback(bytes);
 }
 
-}  // namespace llsm
+}  // namespace tl

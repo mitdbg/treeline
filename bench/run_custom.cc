@@ -4,18 +4,18 @@
 
 #include "bench/common/config.h"
 #include "bench/common/leanstore_interface.h"
-#include "bench/common/llsm_interface.h"
 #include "bench/common/load_data.h"
-#include "bench/common/pg_llsm_interface.h"
+#include "bench/common/pg_treeline_interface.h"
 #include "bench/common/rocksdb_interface.h"
 #include "bench/common/startup.h"
+#include "bench/common/treeline_interface.h"
 #include "gflags/gflags.h"
 #include "ycsbr/gen.h"
 
 namespace {
 
 namespace fs = std::filesystem;
-using namespace llsm::bench;
+using namespace tl::bench;
 
 DEFINE_uint32(threads, 1, "The number of threads to use to run the workload.");
 DEFINE_string(workload_config, "",
@@ -128,7 +128,7 @@ void ProcessCustomInserts(
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  gflags::SetUsageMessage("Run generated workloads on LLSM and RocksDB.");
+  gflags::SetUsageMessage("Run generated workloads on TreeLine and RocksDB.");
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
   if (FLAGS_workload_config.empty()) {
     std::cerr << "ERROR: Please provide a workload configuration file."
@@ -136,7 +136,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  DBType db = llsm::bench::ParseDBType(FLAGS_db).value();
+  DBType db = tl::bench::ParseDBType(FLAGS_db).value();
   std::unique_ptr<ycsbr::gen::PhasedWorkload> workload =
       ycsbr::gen::PhasedWorkload::LoadFrom(FLAGS_workload_config, FLAGS_seed,
                                            FLAGS_record_size_bytes);
@@ -170,14 +170,14 @@ int main(int argc, char* argv[]) {
   if (db == DBType::kAll || db == DBType::kRocksDB) {
     PrintExperimentResult("rocksdb", Run<RocksDBInterface>(*workload));
   }
-  if (db == DBType::kAll || db == DBType::kLLSM) {
-    PrintExperimentResult("llsm", Run<LLSMInterface>(*workload));
+  if (db == DBType::kAll || db == DBType::kTreeLine) {
+    PrintExperimentResult("tl", Run<TreeLineInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(*workload));
   }
-  if (db == DBType::kAll || db == DBType::kPGLLSM) {
-    PrintExperimentResult("pg_llsm", Run<PGLLSMInterface>(*workload));
+  if (db == DBType::kAll || db == DBType::kPGTreeLine) {
+    PrintExperimentResult("pg_tl", Run<PGTreeLineInterface>(*workload));
   }
 
   return 0;

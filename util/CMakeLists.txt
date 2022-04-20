@@ -1,4 +1,4 @@
-target_sources(llsm PRIVATE
+target_sources(treeline PRIVATE
   affinity.h
   arena.cc
   arena.h

@@ -3,7 +3,7 @@
 #include <limits>
 
 #include "gflags/gflags.h"
-#include "llsm/pg_db.h"
+#include "treeline/pg_db.h"
 
 DEFINE_string(db_path, "", "Path to the database directory.");
 DEFINE_uint64(
@@ -17,8 +17,8 @@ DEFINE_uint32(goal, 45,
 DEFINE_uint32(delta, 5,
               "Passed to PageGroupedDBOptions::records_per_page_delta.");
 
-using namespace llsm;
-using namespace llsm::pg;
+using namespace tl;
+using namespace tl::pg;
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("Runs FlattenRange() on a page-grouped database.");

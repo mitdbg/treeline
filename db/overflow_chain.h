@@ -3,11 +3,11 @@
 
 #include "bufmgr/buffer_manager.h"
 #include "format.h"
-#include "llsm/record_batch.h"
-#include "llsm/statistics.h"
+#include "treeline/record_batch.h"
+#include "treeline/statistics.h"
 #include "model/model.h"
 
-namespace llsm {
+namespace tl {
 
 using OverflowChain = std::shared_ptr<std::vector<BufferFrame*>>;
 
@@ -52,4 +52,4 @@ void ExtractOldRecords(OverflowChain chain, RecordBatch* old_records);
 void MergeBatches(RecordBatch& old_records, const FlushBatch& records,
                   FlushBatch* merged);
 
-}  // namespace llsm
+}  // namespace tl

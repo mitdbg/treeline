@@ -5,8 +5,8 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "llsm/pg_options.h"
-#include "llsm/slice.h"
+#include "treeline/pg_options.h"
+#include "treeline/slice.h"
 #include "page_grouping/key.h"
 #include "page_grouping/manager.h"
 #include "page_grouping/segment_info.h"
@@ -14,13 +14,13 @@
 
 namespace {
 
-using namespace llsm;
-using namespace llsm::pg;
+using namespace tl;
+using namespace tl::pg;
 
 class PGManagerRewriteTest : public testing::Test {
  public:
   PGManagerRewriteTest()
-      : kDBDir("/tmp/llsm-pg-test-" + std::to_string(std::time(nullptr))) {}
+      : kDBDir("/tmp/tl-pg-test-" + std::to_string(std::time(nullptr))) {}
   void SetUp() override {
     std::filesystem::remove_all(kDBDir);
     std::filesystem::create_directory(kDBDir);

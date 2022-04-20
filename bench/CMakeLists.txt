@@ -1,4 +1,4 @@
-# Common utilities used in the LLSM benchmarks.
+# Common utilities used in the TreeLine benchmarks.
 add_library(bench_common
   common/data.cc
   common/data.h
@@ -7,13 +7,13 @@ add_library(bench_common
   common/startup.cc
   common/startup.h
   common/timing.h)
-# Any targets linking to `bench_common` will also link to `llsm` and will be
-# able to include LLSM internal headers.
-target_link_libraries(bench_common PUBLIC llsm)
+# Any targets linking to `bench_common` will also link to `treeline` and will be
+# able to include TreeLine internal headers.
+target_link_libraries(bench_common PUBLIC treeline)
 target_include_directories(bench_common PUBLIC ${PROJECT_SOURCE_DIR})
 
 # All `bench_common` utilities plus configuration utilities used in benchmarks
-# comparing LLSM against RocksDB.
+# comparing TreeLine against RocksDB.
 #
 # We use this additional library target because not all benchmark executables
 # need to link to RocksDB and gflags (e.g., `microbench`).
@@ -22,17 +22,23 @@ add_library(bench_common_config
   common/config.h
   common/kvell_interface.h
   common/leanstore_interface.h
-  common/llsm_interface.h
-  common/pg_llsm_interface.h
+  common/treeline_interface.h
+  common/pg_treeline_interface.h
   common/rocksdb_interface.h)
-target_link_libraries(bench_common_config PUBLIC bench_common gflags rocksdb leanstore pg_llsm libcuckoo)
+target_link_libraries(bench_common_config PUBLIC
+  bench_common
+  gflags
+  rocksdb
+  leanstore
+  pg_treeline
+  libcuckoo)
 
 # Synthetic Write: Measure the write throughput when writing synthetic data.
-# This benchmark compares the Learned LSM database against RocksDB.
+# This benchmark compares TreeLine against RocksDB.
 add_executable(synth_write synth_write.cc)
 target_link_libraries(synth_write bench_common_config)
 
-# YCSB: Run extracted YCSB workloads against LLSM and RocksDB.
+# YCSB: Run extracted YCSB workloads against TreeLine and RocksDB.
 add_executable(ycsb ycsb.cc)
 target_link_libraries(ycsb bench_common_config ycsbr)
 
@@ -40,7 +46,7 @@ target_link_libraries(ycsb bench_common_config ycsbr)
 add_executable(hashtable_ycsb hashtable_ycsb.cc)
 target_link_libraries(hashtable_ycsb Threads::Threads gflags ycsbr)
 
-# Microbench: An executable containing all of LLSM's microbenchmarks.
+# Microbench: An executable containing all of TreeLine's microbenchmarks.
 add_executable(microbench
   memtable_benchmark.cc
   packed_map_benchmark.cc
@@ -71,7 +77,7 @@ target_link_libraries(wal bench_common gflags benchmark::benchmark)
 add_executable(bufmgr_benchmark buffer_manager_benchmark.cc)
 target_link_libraries(bufmgr_benchmark bench_common_config gflags ycsbr benchmark::benchmark)
 
-# Run Custom: An executable that runs YSCBR-generated workloads against LLSM
+# Run Custom: An executable that runs YSCBR-generated workloads against TreeLine
 # and RocksDB.
 add_executable(run_custom run_custom.cc)
 target_link_libraries(run_custom bench_common_config ycsbr-gen)

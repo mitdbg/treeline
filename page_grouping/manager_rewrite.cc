@@ -4,8 +4,8 @@
 
 #include "../bufmgr/page_memory_allocator.h"
 #include "circular_page_buffer.h"
-#include "llsm/pg_db.h"
-#include "llsm/pg_stats.h"
+#include "treeline/pg_db.h"
+#include "treeline/pg_stats.h"
 #include "manager.h"
 #include "persist/merge_iterator.h"
 #include "persist/page.h"
@@ -14,8 +14,8 @@
 
 namespace {
 
-using namespace llsm;
-using namespace llsm::pg;
+using namespace tl;
+using namespace tl::pg;
 
 using SegmentMode = LockManager::SegmentMode;
 using PageMode = LockManager::PageMode;
@@ -148,7 +148,7 @@ bool ValidRangeForSegment(const Key lower, const Key upper,
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 Status Manager::RewriteSegments(
@@ -686,4 +686,4 @@ Status Manager::FlattenRange(const Key start_key, const Key end_key) {
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

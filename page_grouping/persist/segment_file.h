@@ -12,7 +12,7 @@
 #include <string>
 
 #include "bufmgr/page_memory_allocator.h"
-#include "llsm/status.h"
+#include "treeline/status.h"
 #include "page.h"
 
 #define CHECK_ERROR(call)                                                    \
@@ -24,7 +24,7 @@
     }                                                                        \
   } while (0)
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Adapted from `db/file.h`. This class is thread-safe.
@@ -179,4 +179,4 @@ class SegmentFile {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

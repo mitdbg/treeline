@@ -16,7 +16,7 @@
 #include <sstream>
 #include <thread>
 
-namespace llsm {
+namespace tl {
 
 class PosixLogger {
  public:
@@ -122,4 +122,4 @@ class PosixLogger {
   std::FILE* const fp_;
 };
 
-}  // namespace llsm
+}  // namespace tl

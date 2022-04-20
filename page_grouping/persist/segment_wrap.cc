@@ -7,7 +7,7 @@
 #include "util/crc32c.h"
 #include "util/key.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 SegmentWrap::SegmentWrap(void* data, const size_t pages_in_segment)
@@ -102,4 +102,4 @@ Key SegmentWrap::EncodedUpperKey() const {
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

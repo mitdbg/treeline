@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-namespace llsm {
+namespace tl {
 namespace bench {
 
 template<typename Callable>
@@ -14,4 +14,4 @@ static std::chrono::nanoseconds MeasureRunTime(Callable callable) {
 }
 
 }  // namespace bench
-}  // namespace llsm
+}  // namespace tl

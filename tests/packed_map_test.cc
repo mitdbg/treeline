@@ -8,12 +8,12 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "llsm/slice.h"
+#include "treeline/slice.h"
 
 namespace {
 
-using llsm::PackedMap;
-using llsm::Slice;
+using tl::PackedMap;
+using tl::Slice;
 
 template <uint16_t Size>
 class PackedMapShim {
@@ -199,7 +199,7 @@ TEST(PackedMapTest, VariableSizeInsertAndRead) {
       {"amuchmuchlongerkey", ""},  // Length 0 payloads are allowed
       {"abcdefg", "hello"},
       {"abc", "hello world 123"},
-      {"azzza", "llsm"},
+      {"azzza", "tl"},
       {"abcdefghijklmnopqrstuvwxyz", "abcdefghijklmnopqrstuvwxyz"},
       {"azaza", "abc"},
   };
@@ -208,7 +208,7 @@ TEST(PackedMapTest, VariableSizeInsertAndRead) {
   ASSERT_TRUE(lower_slice.compare(upper_slice) <= 0);
   for (const auto& record : records) {
     // Sanity check: make sure our keys satisfy `lower` <= `key` <= `upper. We
-    // use llsm::Slice::compare() since it uses lexicographic ordering.
+    // use tl::Slice::compare() since it uses lexicographic ordering.
     ASSERT_TRUE(lower_slice.compare(record.first) <= 0);
     ASSERT_TRUE(upper_slice.compare(record.first) >= 0);
     // Now actually insert the record. The insertion should succeed.

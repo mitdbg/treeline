@@ -4,7 +4,7 @@
 
 #include "arena.h"
 
-namespace llsm {
+namespace tl {
 
 static const int kBlockSize = 4096;
 
@@ -63,4 +63,4 @@ char* Arena::AllocateNewBlock(size_t block_bytes) {
   return result;
 }
 
-}  // namespace llsm
+}  // namespace tl

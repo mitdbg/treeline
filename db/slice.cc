@@ -1,8 +1,8 @@
-#include "llsm/slice.h"
+#include "treeline/slice.h"
 
 namespace std {
 
-ostream& operator<<(ostream& os, const llsm::Slice& slice) {
+ostream& operator<<(ostream& os, const tl::Slice& slice) {
   std::string s;
   for (int i = 0; i < slice.size(); ++i) {
     s += "(";

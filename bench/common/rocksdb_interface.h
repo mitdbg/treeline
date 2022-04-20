@@ -24,7 +24,7 @@ class RocksDBInterface {
   // Called once before the benchmark.
   void InitializeDatabase() {
     const std::string dbname = FLAGS_db_path + "/rocksdb";
-    rocksdb::Options options = llsm::bench::BuildRocksDBOptions();
+    rocksdb::Options options = tl::bench::BuildRocksDBOptions();
     options.create_if_missing = true;
     if (FLAGS_verbose) {
       std::cerr << "> RocksDB memtable flush threshold: "
@@ -58,7 +58,7 @@ class RocksDBInterface {
     constexpr size_t batch_size = 1024;
 
     for (const auto& rec : records) {
-      const llsm::key_utils::IntKeyAsSlice strkey(rec.key);
+      const tl::key_utils::IntKeyAsSlice strkey(rec.key);
       status =
           batch.Put(strkey.as<rocksdb::Slice>(),
                     rocksdb::Slice(reinterpret_cast<const char*>(&(rec.value)),
@@ -89,7 +89,7 @@ class RocksDBInterface {
 
   // Read the value at the specified key. Return true if the read succeeded.
   bool Read(ycsbr::Request::Key key, std::string* value_out) {
-    const llsm::key_utils::IntKeyAsSlice strkey(key);
+    const tl::key_utils::IntKeyAsSlice strkey(key);
     rocksdb::ReadOptions options;
     // See https://github.com/facebook/rocksdb/wiki/Prefix-Seek#adaptive-prefix-mode
     options.auto_prefix_mode = true;
@@ -99,7 +99,7 @@ class RocksDBInterface {
 
   // Insert the specified key value pair. Return true if the insert succeeded.
   bool Insert(ycsbr::Request::Key key, const char* value, size_t value_size) {
-    const llsm::key_utils::IntKeyAsSlice strkey(key);
+    const tl::key_utils::IntKeyAsSlice strkey(key);
     rocksdb::WriteOptions options;
     options.disableWAL = FLAGS_bypass_wal;
     auto status = db_->Put(options, strkey.as<rocksdb::Slice>(),
@@ -119,14 +119,14 @@ class RocksDBInterface {
       std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {
     scan_out->clear();
     scan_out->reserve(amount);
-    const llsm::key_utils::IntKeyAsSlice strkey(key);
+    const tl::key_utils::IntKeyAsSlice strkey(key);
     rocksdb::ReadOptions options;
     // See https://github.com/facebook/rocksdb/wiki/Prefix-Seek#adaptive-prefix-mode
     options.auto_prefix_mode = true;
     rocksdb::Iterator* it = db_->NewIterator(options);
     it->Seek(strkey.as<rocksdb::Slice>());
     while (it->Valid() && scan_out->size() < amount) {
-      scan_out->emplace_back(llsm::key_utils::ExtractHead64(it->key()),
+      scan_out->emplace_back(tl::key_utils::ExtractHead64(it->key()),
                              it->value().ToString());
       it->Next();
     }

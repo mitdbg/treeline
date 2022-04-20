@@ -125,7 +125,7 @@ TEST_F(ARTOLCTest, StartNumberScan) {
   }
 
   uint64_t scan_length = 100;
-  std::vector<llsm::RecordCacheEntry> cache_entries;
+  std::vector<tl::RecordCacheEntry> cache_entries;
   cache_entries.resize(kNumKeys);
 
   for (uint64_t i = 0; i < kNumKeys; i++) {

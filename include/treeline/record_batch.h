@@ -2,9 +2,9 @@
 #include <string>
 #include <vector>
 
-namespace llsm {
+namespace tl {
 
-// Represents a complete record stored by LLSM. This is a convenience class used
+// Represents a complete record stored by TL. This is a convenience class used
 // to return range scan results.
 class Record {
  public:
@@ -23,4 +23,4 @@ class Record {
 
 using RecordBatch = std::vector<Record>;
 
-}  // namespace llsm
+}  // namespace tl

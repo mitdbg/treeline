@@ -10,7 +10,7 @@ static constexpr int kReadySignal = SIGUSR1;
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 namespace bench {
 
 void SendReadySignalToParent() {
@@ -21,4 +21,4 @@ void SendReadySignalToParent() {
 }
 
 }
-}  // namespace llsm
+}  // namespace tl

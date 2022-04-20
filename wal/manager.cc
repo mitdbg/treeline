@@ -35,7 +35,7 @@ bool ParseLogVersion(const std::string& filename, uint64_t* version_out) {
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 namespace wal {
 
 Manager::Manager(fs::path log_dir_path)
@@ -157,7 +157,7 @@ Status Manager::LogWrite(const WriteOptions& options, const Slice& key,
   // We do not need to encode the value size because the WAL already encodes the
   // total serialized record size.
   //
-  // NOTE: This encoding assumes key lengths are at most 2^32 - 1. LLSM
+  // NOTE: This encoding assumes key lengths are at most 2^32 - 1. TL
   // currently cannot store keys larger than the on-disk page size (64 KiB), so
   // this is a valid assumption.
   assert(key.size() <= std::numeric_limits<uint32_t>::max());
@@ -331,4 +331,4 @@ fs::path Manager::LogPathForVersion(uint64_t version) const {
 }
 
 }  // namespace wal
-}  // namespace llsm
+}  // namespace tl

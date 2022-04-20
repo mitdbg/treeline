@@ -6,11 +6,11 @@
 #include <vector>
 
 #include "key.h"
-#include "llsm/slice.h"
+#include "treeline/slice.h"
 #include "plr/data.h"
 #include "plr/greedy.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Stores information about the built segments.
@@ -75,4 +75,4 @@ class SegmentBuilder {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

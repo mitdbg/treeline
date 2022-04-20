@@ -15,7 +15,7 @@
 #include "../persist/segment_wrap.h"
 #include "../segment_builder.h"
 #include "gflags/gflags.h"
-#include "llsm/pg_options.h"
+#include "treeline/pg_options.h"
 
 DEFINE_string(db_path, "", "Path to the database to check.");
 DEFINE_bool(verbose, false,
@@ -30,8 +30,8 @@ DEFINE_uint64(scan_amount, 100000000ULL, "The number of records to scan.");
 
 namespace {
 
-using namespace llsm;
-using namespace llsm::pg;
+using namespace tl;
+using namespace tl::pg;
 namespace fs = std::filesystem;
 
 struct SegmentState {

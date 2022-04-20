@@ -17,9 +17,9 @@
 #include <string>
 #include <errno.h>
 
-#include "llsm/slice.h"
+#include "treeline/slice.h"
 
-namespace llsm {
+namespace tl {
 
 class Status {
  public:
@@ -126,4 +126,4 @@ inline Status& Status::operator=(Status&& rhs) noexcept {
   return *this;
 }
 
-}  // namespace llsm
+}  // namespace tl

@@ -13,15 +13,15 @@
 #include "bufmgr/buffer_manager.h"
 #include "db/format.h"
 #include "db/memtable.h"
-#include "llsm/db.h"
-#include "llsm/statistics.h"
+#include "treeline/db.h"
+#include "treeline/statistics.h"
 #include "model/model.h"
 #include "overflow_chain.h"
 #include "record_cache/record_cache.h"
 #include "util/thread_pool.h"
 #include "wal/manager.h"
 
-namespace llsm {
+namespace tl {
 
 class DBImpl : public DB {
  public:
@@ -92,4 +92,4 @@ class DBImpl : public DB {
   wal::Manager wal_;
 };
 
-}  // namespace llsm
+}  // namespace tl

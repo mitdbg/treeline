@@ -6,7 +6,7 @@
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 
 class PageTest : public testing::Test {
  public:

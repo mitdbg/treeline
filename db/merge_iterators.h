@@ -4,7 +4,7 @@
 
 #include "db/db_impl.h"
 
-namespace llsm {
+namespace tl {
 
 // A special merging iterator that handles iteration over both the active
 // memtable and immutable (being flushed) memtable. This iterator helps ensure
@@ -161,4 +161,4 @@ class PageMergeIterator {
       merged_iterators_;
 };
 
-}  // namespace llsm
+}  // namespace tl

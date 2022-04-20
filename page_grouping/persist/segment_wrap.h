@@ -2,10 +2,10 @@
 
 #include <cstdint>
 
-#include "llsm/pg_db.h"
+#include "treeline/pg_db.h"
 #include "page.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // A thin wrapper around a group of pages (a segment) to provide utility methods
@@ -50,4 +50,4 @@ class SegmentWrap {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

@@ -11,7 +11,7 @@
 #include <cstdlib>
 #include <memory>
 
-namespace llsm {
+namespace tl {
 
 // Options used to inform the database about the key space (the distribution is
 // assumed to be uniform).
@@ -47,7 +47,7 @@ struct Options {
   // Use direct I/O when writing to/reading from database files
   bool use_direct_io = false;
 
-  // The maximum size of LLSM's buffer pool, in bytes.
+  // The maximum size of TreeLine's buffer pool, in bytes.
   size_t buffer_pool_size = 64 * 1024 * 1024;
 
   // The maximum size of a memtable before it should be flushed to persistent
@@ -66,34 +66,35 @@ struct Options {
   // existing database, these values are ignored.
   KeyDistHints key_hints;
 
-  // The number of background threads LLSM should use (must be at least 2).
-  // LLSM uses one background thread to coordinate flushing the memtable and
+  // The number of background threads TreeLine should use (must be at least 2).
+  // TreeLine uses one background thread to coordinate flushing the memtable and
   // needs at least one other background thread to run the flush work.
   unsigned background_threads = 4;
 
-  // If true, LLSM will pin the background threads to cores `0` to
+  // If true, TreeLine will pin the background threads to cores `0` to
   // `background_threads - 1`.
   bool pin_threads = true;
 
-  // If true, LLSM will try to optimize the FlushOptions for every flush.
+  // If true, TreeLine will try to optimize the FlushOptions for every flush.
   // In this case, `batch_scaling_factor` will be used to calculate optimal
   // deferred I/O parameters.
   bool deferral_autotuning = false;
   double batch_scaling_factor = 1;
 
-  // If true, LLSM will try to optimize the memory allocation between the buffer
-  // pool and the memtables, keeping the total memory budget to buffer_pool_size
+  // If true, TreeLine will try to optimize the memory allocation between the
+  // buffer pool and the memtables, keeping the total memory budget to
+  // buffer_pool_size
   // + 2 * memtable_flush_threshold.
   bool memory_autotuning = false;
 
-  // If false, LLSM will use a BTreeModel instead of an ALEXModel.
+  // If false, TreeLine will use a BTreeModel instead of an ALEXModel.
   bool use_alex = true;
 
   // The minimum length of an overflow chain for which reorganization is
   // triggered.
   size_t reorg_length = 5;
 
-  // If true, LLSM will print messages to a debug log.
+  // If true, TreeLine will print messages to a debug log.
   bool enable_debug_log = true;
 
   // The maximum number of pages that reorganizing a single chain can produce.
@@ -114,7 +115,7 @@ struct Options {
 struct ReadOptions {};
 
 struct WriteOptions {
-  // If true, LLSM will optimize inserts for bulk loading sorted keys.
+  // If true, TreeLine will optimize inserts for bulk loading sorted keys.
   bool sorted_load = false;
   // Only checked when `sorted_load` is true. If true, the inserted values will
   // be checked to ensure they are indeed sorted. If not, the user is
@@ -124,7 +125,7 @@ struct WriteOptions {
   // be flushed to disk by the buffer manager after the bulk load is complete.
   bool flush_dirty_after_bulk = true;
 
-  // If true, the write will not be written to LLSM's write-ahead log.
+  // If true, the write will not be written to TreeLine's write-ahead log.
   //
   // If the database process crashes shortly after a write with
   // `bypass_wal == false` is made, the write may be lost.
@@ -146,4 +147,4 @@ struct WriteOptions {
   bool sync = false;
 };
 
-}  // namespace llsm
+}  // namespace tl

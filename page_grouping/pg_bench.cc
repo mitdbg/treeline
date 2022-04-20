@@ -40,7 +40,7 @@ DEFINE_bool(notify_after_init, false,
             "parent process after database initialization completes.");
 
 ycsbr::BenchmarkResult Run(
-    ycsbr::Session<llsm::pg::PageGroupingInterface>& session,
+    ycsbr::Session<tl::pg::PageGroupingInterface>& session,
     const ycsbr::gen::PhasedWorkload& workload) {
   if (!FLAGS_skip_load) {
     const auto load = workload.GetLoadTrace();
@@ -62,7 +62,7 @@ ycsbr::BenchmarkResult Run(
   }
 
   if (FLAGS_notify_after_init) {
-    llsm::bench::SendReadySignalToParent();
+    tl::bench::SendReadySignalToParent();
   }
 
   ycsbr::RunOptions options;
@@ -99,7 +99,7 @@ int main(int argc, char* argv[]) {
                 << std::endl;
     }
     std::vector<ycsbr::Request::Key> keys =
-        llsm::bench::LoadDatasetFromTextFile(
+        tl::bench::LoadDatasetFromTextFile(
             FLAGS_custom_dataset, /*warn_on_duplicates=*/FLAGS_verbose);
     if (FLAGS_verbose) {
       std::cerr << "> Loaded a custom dataset with " << keys.size() << " keys."
@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
   const fs::path output_dir = fs::path(FLAGS_output_path);
 
   // Run benchmark.
-  ycsbr::Session<llsm::pg::PageGroupingInterface> session(FLAGS_threads);
+  ycsbr::Session<tl::pg::PageGroupingInterface> session(FLAGS_threads);
   const auto result = Run(session, *workload);
   if (FLAGS_verbose) {
     std::cerr << "> Done running workload." << std::endl;

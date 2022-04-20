@@ -6,21 +6,21 @@
 #include <thread>
 
 #include "config.h"
-#include "llsm/pg_db.h"
-#include "llsm/pg_stats.h"
+#include "treeline/pg_db.h"
+#include "treeline/pg_stats.h"
 #include "util/key.h"
 #include "ycsbr/ycsbr.h"
 
-class PGLLSMInterface {
+class PGTreeLineInterface {
  public:
-  PGLLSMInterface() : db_(nullptr) {}
+  PGTreeLineInterface() : db_(nullptr) {}
 
   void InitializeWorker(const std::thread::id& id) {
-    llsm::pg::PageGroupedDBStats::Local().Reset();
+    tl::pg::PageGroupedDBStats::Local().Reset();
   }
 
   void ShutdownWorker(const std::thread::id& id) {
-    llsm::pg::PageGroupedDBStats::Local().PostToGlobal();
+    tl::pg::PageGroupedDBStats::Local().PostToGlobal();
   }
 
   void SetKeyDistHints(uint64_t min_key, uint64_t max_key, uint64_t num_keys) {
@@ -30,7 +30,7 @@ class PGLLSMInterface {
   void WriteOutStats(const std::filesystem::path& out_dir) {
     std::ofstream out(out_dir / "counters.csv");
     out << "name,value" << std::endl;
-    llsm::pg::PageGroupedDBStats::RunOnGlobal([&out](const auto& stats) {
+    tl::pg::PageGroupedDBStats::RunOnGlobal([&out](const auto& stats) {
       // clang-format off
       out << "cache_hits," << stats.GetCacheHits() << std::endl;
       out << "cache_misses," << stats.GetCacheMisses() << std::endl;
@@ -52,31 +52,32 @@ class PGLLSMInterface {
 
   // Called once before the benchmark.
   void InitializeDatabase() {
-    const std::string dbname = FLAGS_db_path + "/pg_llsm";
-    auto options = llsm::bench::BuildPGLLSMOptions();
+    const std::string dbname = FLAGS_db_path + "/pg_tl";
+    auto options = tl::bench::BuildPGTreeLineOptions();
     if (options.use_memory_based_io) {
-      std::cerr << "> WARNING: PGLLSM is using \"memory-based I/O\". "
+      std::cerr << "> WARNING: PGTreeLine is using \"memory-based I/O\". "
                    "Performance results may be inflated."
                 << std::endl;
     }
     if (FLAGS_verbose) {
-      std::cerr << "> PGLLSM using segments: "
+      std::cerr << "> PGTreeLine using segments: "
                 << (options.use_segments ? "true" : "false") << std::endl;
-      std::cerr << "> PGLLSM record cache size (# records): "
+      std::cerr << "> PGTreeLine record cache size (# records): "
                 << options.record_cache_capacity << std::endl;
-      std::cerr << "> PGLLSM records per page goal: "
+      std::cerr << "> PGTreeLine records per page goal: "
                 << options.records_per_page_goal << std::endl;
-      std::cerr << "> PGLLSM records per page delta: "
+      std::cerr << "> PGTreeLine records per page delta: "
                 << options.records_per_page_delta << std::endl;
-      std::cerr << "> Opening PGLLSM DB at " << dbname << std::endl;
+      std::cerr << "> Opening PGTreeLine DB at " << dbname << std::endl;
     }
 
-    llsm::pg::PageGroupedDBStats::RunOnGlobal(
+    tl::pg::PageGroupedDBStats::RunOnGlobal(
         [](auto& global_stats) { global_stats.Reset(); });
-    const llsm::Status status =
-        llsm::pg::PageGroupedDB::Open(options, dbname, &db_);
+    const tl::Status status =
+        tl::pg::PageGroupedDB::Open(options, dbname, &db_);
     if (!status.ok()) {
-      throw std::runtime_error("Failed to start PGLLSM: " + status.ToString());
+      throw std::runtime_error("Failed to start PGTreeLine: " +
+                               status.ToString());
     }
   }
 
@@ -91,13 +92,13 @@ class PGLLSMInterface {
 
   // Load the records into the database.
   void BulkLoad(const ycsbr::BulkLoadTrace& load) {
-    std::vector<llsm::pg::Record> records;
+    std::vector<tl::pg::Record> records;
     records.reserve(load.size());
     for (const auto& req : load) {
-      const llsm::key_utils::IntKeyAsSlice strkey(req.key);
-      records.emplace_back(req.key, llsm::Slice(req.value, req.value_size));
+      const tl::key_utils::IntKeyAsSlice strkey(req.key);
+      records.emplace_back(req.key, tl::Slice(req.value, req.value_size));
     }
-    llsm::Status s = db_->BulkLoad(records);
+    tl::Status s = db_->BulkLoad(records);
     if (!s.ok()) {
       throw std::runtime_error("Failed to bulk load records!");
     }
@@ -105,16 +106,16 @@ class PGLLSMInterface {
 
   // Update the value at the specified key. Return true if the update succeeded.
   bool Update(ycsbr::Request::Key key, const char* value, size_t value_size) {
-    llsm::pg::WriteOptions options;
+    tl::pg::WriteOptions options;
     options.is_update = true;
-    return db_->Put(options, key, llsm::Slice(value, value_size)).ok();
+    return db_->Put(options, key, tl::Slice(value, value_size)).ok();
   }
 
   // Insert the specified key value pair. Return true if the insert succeeded.
   bool Insert(ycsbr::Request::Key key, const char* value, size_t value_size) {
-    llsm::pg::WriteOptions options;
+    tl::pg::WriteOptions options;
     options.is_update = false;
-    return db_->Put(options, key, llsm::Slice(value, value_size)).ok();
+    return db_->Put(options, key, tl::Slice(value, value_size)).ok();
   }
 
   // Read the value at the specified key. Return true if the read succeeded.
@@ -131,5 +132,5 @@ class PGLLSMInterface {
   }
 
  private:
-  llsm::pg::PageGroupedDB* db_;
+  tl::pg::PageGroupedDB* db_;
 };

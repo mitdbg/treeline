@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.17)
-project(learnedlsm LANGUAGES CXX C)
+project(treeline LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17)
 
-option(LLSM_BUILD_TESTS "Set to build the Learned LSM test suite." OFF)
-option(LLSM_BUILD_BENCHMARKS "Set to build the Learned LSM benchmarks." OFF)
-option(LLSM_BUILD_SHARED "Set to build the Learned LSM database as a shared library." OFF)
+option(TL_BUILD_TESTS "Set to build the TreeLine test suite." OFF)
+option(TL_BUILD_BENCHMARKS "Set to build the TreeLine benchmarks." OFF)
+option(TL_BUILD_SHARED "Set to build TreeLine as a shared library." OFF)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")  # Needed for ALEX
 
@@ -18,42 +18,42 @@ find_library(tbb tbb)
 # Load any third party dependencies
 add_subdirectory(third_party)
 
-# The Learned LSM embedded database library targets
-if (LLSM_BUILD_SHARED)
-  add_library(llsm SHARED)
-  add_library(pg_llsm SHARED)
+# The TreeLine embedded database library targets
+if (TL_BUILD_SHARED)
+  add_library(treeline SHARED)
+  add_library(pg_treeline SHARED)
 else()
-  add_library(llsm STATIC)
-  add_library(pg_llsm STATIC)
+  add_library(treeline STATIC)
+  add_library(pg_treeline STATIC)
 endif()
-target_link_libraries(llsm PRIVATE crc32c tbb masstree)
-target_link_libraries(pg_llsm PRIVATE crc32c tbb masstree)
-target_include_directories(llsm
+target_link_libraries(treeline PRIVATE crc32c tbb masstree)
+target_link_libraries(pg_treeline PRIVATE crc32c tbb masstree)
+target_include_directories(treeline
   PUBLIC include
   PRIVATE .)
-target_include_directories(pg_llsm
+target_include_directories(pg_treeline
   PUBLIC include
   PRIVATE .)
 
 # Add API headers to the target for IDE support
-set(llsm_inc include/llsm)
-set(llsm_api
-  ${llsm_inc}/db.h
-  ${llsm_inc}/options.h
-  ${llsm_inc}/record_batch.h
-  ${llsm_inc}/slice.h
-  ${llsm_inc}/statistics.h
-  ${llsm_inc}/status.h
+set(treeline_inc include/treeline)
+set(treeline_api
+  ${treeline_inc}/db.h
+  ${treeline_inc}/options.h
+  ${treeline_inc}/record_batch.h
+  ${treeline_inc}/slice.h
+  ${treeline_inc}/statistics.h
+  ${treeline_inc}/status.h
 )
-target_sources(llsm PUBLIC ${llsm_api})
-set(pg_llsm_api
-  ${llsm_inc}/pg_db.h
-  ${llsm_inc}/pg_options.h
-  ${llsm_inc}/pg_stats.h
-  ${llsm_inc}/slice.h
-  ${llsm_inc}/status.h
+target_sources(treeline PUBLIC ${treeline_api})
+set(pg_treeline_api
+  ${treeline_inc}/pg_db.h
+  ${treeline_inc}/pg_options.h
+  ${treeline_inc}/pg_stats.h
+  ${treeline_inc}/slice.h
+  ${treeline_inc}/status.h
 )
-target_sources(pg_llsm PUBLIC ${pg_llsm_api})
+target_sources(pg_treeline PUBLIC ${pg_treeline_api})
 
 # Add our sources by traversing the repository
 add_subdirectory(alex)
@@ -63,20 +63,19 @@ add_subdirectory(db)
 add_subdirectory(masstree)
 add_subdirectory(masstree_wrapper)
 add_subdirectory(model)
+add_subdirectory(page_grouping)
 add_subdirectory(record_cache)
 add_subdirectory(tlx)
 add_subdirectory(util)
 add_subdirectory(wal)
 
-add_subdirectory(page_grouping)
-
 # Build the tests iff requested
-if(LLSM_BUILD_TESTS)
+if(TL_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
 
 # Build the benchmarks iff requested
-if(LLSM_BUILD_BENCHMARKS)
+if(TL_BUILD_BENCHMARKS)
   add_subdirectory(bench)
 endif()

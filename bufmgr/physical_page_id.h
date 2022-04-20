@@ -6,7 +6,7 @@
 
 #include "util/calc.h"
 
-namespace llsm {
+namespace tl {
 
 // Stores the file and PAGE-offset within the file where a specific page can
 // be found.
@@ -99,18 +99,18 @@ class PhysicalPageId {
   // the file_id.
   size_t value_;
 
-  friend struct std::hash<llsm::PhysicalPageId>;
+  friend struct std::hash<tl::PhysicalPageId>;
 };
 
-}  // namespace llsm
+}  // namespace tl
 
 namespace std {
 
-ostream& operator<<(ostream& os, const llsm::PhysicalPageId& id);
+ostream& operator<<(ostream& os, const tl::PhysicalPageId& id);
 
 template <>
-struct hash<llsm::PhysicalPageId> {
-  std::size_t operator()(const llsm::PhysicalPageId& id) const {
+struct hash<tl::PhysicalPageId> {
+  std::size_t operator()(const tl::PhysicalPageId& id) const {
     return std::hash<size_t>()(id.value_);
   }
 };

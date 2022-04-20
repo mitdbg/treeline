@@ -15,7 +15,7 @@
 #include "util/coding.h"
 #include "util/crc32c.h"
 
-namespace llsm {
+namespace tl {
 namespace wal {
 
 Reader::Reporter::~Reporter() = default;
@@ -319,4 +319,4 @@ Status Reader::ReadNextBlock() {
 }
 
 }  // namespace wal
-}  // namespace llsm
+}  // namespace tl

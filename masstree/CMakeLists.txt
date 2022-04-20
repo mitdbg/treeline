@@ -49,7 +49,6 @@ add_custom_command(
       LDFLAGS=-L${libjemalloc_dir}
   VERBATIM)
 
-
 add_library(masstree STATIC)
 set_source_files_properties(clp.c PROPERTIES LANGUAGE CXX )
 target_sources(masstree PRIVATE ${masstree_sources} ${CMAKE_CURRENT_SOURCE_DIR}/config.h)

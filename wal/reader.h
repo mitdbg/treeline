@@ -9,11 +9,11 @@
 #include <memory>
 #include <string>
 
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 #include "wal/format.h"
 
-namespace llsm {
+namespace tl {
 namespace wal {
 
 // A helper class for reading entries from a write ahead log (WAL). Instances of
@@ -110,4 +110,4 @@ class Reader {
 };
 
 }  // namespace wal
-}  // namespace llsm
+}  // namespace tl

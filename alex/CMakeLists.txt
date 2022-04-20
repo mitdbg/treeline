@@ -1,4 +1,4 @@
-target_sources(llsm PRIVATE
+target_sources(treeline PRIVATE
   alex_base.h
   alex_fanout_tree.h 
   alex_map.h

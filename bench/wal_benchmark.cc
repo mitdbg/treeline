@@ -1,11 +1,11 @@
 // Benchmarks that measure the write performance of the write-ahead log.
 //
-// Build the benchmarks by enabling the `LLSM_BUILD_BENCHMARKS` option when
+// Build the benchmarks by enabling the `TL_BUILD_BENCHMARKS` option when
 // configuring the project. Then run the `wal` executable under `bench`. You
 // need to specify a file path for the log using `--log_path`.
 //
 //   mkdir build && cd build
-//   cmake -DCMAKE_BUILD_TYPE=Release -DLLSM_BUILD_BENCHMARKS=ON ..
+//   cmake -DCMAKE_BUILD_TYPE=Release -DTL_BUILD_BENCHMARKS=ON ..
 //   make -j
 //   ./bench/wal --log_path=<path where the log file should be written>
 //
@@ -54,13 +54,13 @@
 #include "db/memtable.h"
 #include "db/options.h"
 #include "gflags/gflags.h"
-#include "llsm/options.h"
+#include "treeline/options.h"
 #include "util/coding.h"
 #include "wal/writer.h"
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 namespace fs = std::filesystem;
 
 bool ValidateLog(const char* flagname, const std::string& path) {
@@ -244,7 +244,7 @@ void MemTableSingle_64MiB(benchmark::State& state, bool use_log, bool sync) {
   WriteOptions write_options;
   write_options.sync = sync;
   for (auto _ : state) {
-    MemTable mtable(llsm::MemTableOptions{});
+    MemTable mtable(tl::MemTableOptions{});
     for (const auto& record : dataset) {
       if (use_log) {
         s = writer.AddEntry(
@@ -287,7 +287,7 @@ void MemTableBatch_64MiB(benchmark::State& state, bool use_log, bool sync) {
   WriteOptions write_options;
   write_options.sync = sync;
   for (auto _ : state) {
-    MemTable mtable(llsm::MemTableOptions{});
+    MemTable mtable(tl::MemTableOptions{});
     WriteBatch batch;
     for (const auto& record : dataset) {
       batch.Put(record.key(), record.value());

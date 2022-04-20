@@ -1,6 +1,6 @@
 # Pseudo target used to simplify compiling all page grouping related targets.
 add_custom_target(pg_all)
-add_dependencies(pg_all pg_llsm)
+add_dependencies(pg_all pg_treeline)
 
 # The page grouping sources.
 add_library(pg STATIC)
@@ -50,17 +50,17 @@ target_include_directories(pg
 target_link_libraries(pg PUBLIC libcuckoo PRIVATE crc32c)
 add_dependencies(pg_all pg)
 
-target_sources(pg_llsm PRIVATE
+target_sources(pg_treeline PRIVATE
   pg_db_impl.cc
   pg_db_impl.h
 )
-target_link_libraries(pg_llsm PRIVATE pg)
+target_link_libraries(pg_treeline PRIVATE pg)
 
-# The original LLSM source also uses the record cache, which depends on
+# The original TreeLine source also uses the record cache, which depends on
 # definitions in `pg_stats.cc`.
-target_sources(llsm PRIVATE pg_stats.cc)
+target_sources(treeline PRIVATE pg_stats.cc)
 
-if(LLSM_BUILD_BENCHMARKS)
+if(TL_BUILD_BENCHMARKS)
   # Primary workload runner.
   add_executable(pg_bench
     config.cc
@@ -79,7 +79,7 @@ if(LLSM_BUILD_BENCHMARKS)
   target_link_libraries(pg_shuffle PRIVATE gflags)
 
   add_executable(pg_flatten tools/flatten.cc)
-  target_link_libraries(pg_flatten PRIVATE pg_llsm gflags)
+  target_link_libraries(pg_flatten PRIVATE pg_treeline gflags)
 
   # Contains debug tools.
   add_subdirectory(debug)

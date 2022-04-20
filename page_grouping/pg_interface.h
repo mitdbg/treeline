@@ -10,12 +10,12 @@
 #include <vector>
 
 #include "config.h"
-#include "llsm/pg_options.h"
-#include "llsm/slice.h"
+#include "treeline/pg_options.h"
+#include "treeline/slice.h"
 #include "manager.h"
 #include "ycsbr/ycsbr.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Used to run YCSBR-generated workloads against the page grouping prototype
@@ -88,7 +88,7 @@ class PageGroupingInterface {
     std::vector<std::pair<ycsbr::Request::Key, Slice>> records;
     records.reserve(load.size());
     for (const auto& rec : load) {
-      records.emplace_back(rec.key, llsm::Slice(rec.value, rec.value_size));
+      records.emplace_back(rec.key, tl::Slice(rec.value, rec.value_size));
     }
     std::sort(records.begin(), records.end(),
               [](const std::pair<ycsbr::Request::Key, const Slice>& r1,
@@ -161,4 +161,4 @@ class PageGroupingInterface {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

@@ -10,7 +10,7 @@ constexpr uint32_t kBackoffSaturate = 12;
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 SegmentIndex::SegmentIndex(std::shared_ptr<LockManager> lock_manager)
@@ -285,4 +285,4 @@ uint64_t SegmentIndex::GetNumEntries() const {
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

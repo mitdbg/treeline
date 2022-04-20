@@ -1,4 +1,3 @@
-# Learned LSM Benchmarks
+# TreeLine Benchmarks
 
-This directory contains various benchmarks used to evaluate the Learned LSM
-database.
+This directory contains various benchmarks used to evaluate TreeLine.

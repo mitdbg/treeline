@@ -9,14 +9,14 @@
 
 #include <filesystem>
 
-#include "llsm/options.h"
-#include "llsm/record_batch.h"
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "treeline/options.h"
+#include "treeline/record_batch.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 
-namespace llsm {
+namespace tl {
 
-// The public Learned LSM (LLSM) database interface, representing an embedded,
+// The public TreeLine database interface, representing an embedded,
 // persistent, and ordered key-value store.
 //
 // All methods can be called concurrently without requiring external mutual
@@ -79,7 +79,7 @@ class DB {
   // will be an effective "no-op" in this case.
   virtual Status Delete(const WriteOptions& options, const Slice& key) = 0;
 
-  // Manually request LLSM to flush the data stored in its record cache to
+  // Manually request TreeLine to flush the data stored in its record cache to
   // persistent storage. This method will block until the flush completes.
   virtual Status FlushRecordCache(const bool disable_deferred_io) = 0;
 
@@ -87,4 +87,4 @@ class DB {
   virtual size_t GetNumIndexedPages() const = 0;
 };
 
-}  // namespace llsm
+}  // namespace tl

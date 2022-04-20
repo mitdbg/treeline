@@ -3,7 +3,7 @@
 #include "../bufmgr/page_memory_allocator.h"
 #include "persist/page.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 class CircularPageBuffer {
@@ -51,4 +51,4 @@ class CircularPageBuffer {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

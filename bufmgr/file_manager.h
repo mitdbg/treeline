@@ -8,7 +8,7 @@
 #include "bufmgr/options.h"
 #include "db/page.h"
 
-namespace llsm {
+namespace tl {
 
 // A wrapper for I/O to on-disk files.
 //
@@ -59,4 +59,4 @@ class FileManager {
   std::mutex page_allocation_mutex_;
 };
 
-}  // namespace llsm
+}  // namespace tl

@@ -10,7 +10,7 @@
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 
 TEST(Coding, Fixed32) {
   std::string s;

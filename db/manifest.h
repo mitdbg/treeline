@@ -5,11 +5,11 @@
 #include <memory>
 #include <optional>
 
-#include "llsm/status.h"
+#include "treeline/status.h"
 
-namespace llsm {
+namespace tl {
 
-// Holds database metadata that is needed when initializing an existing LLSM
+// Holds database metadata that is needed when initializing an existing TL
 // database. This class is mainly meant to help with serializing and
 // deserializing the manifest.
 class Manifest {
@@ -61,4 +61,4 @@ class Manifest::Builder {
   uint64_t num_segments_;
 };
 
-}  // namespace llsm
+}  // namespace tl

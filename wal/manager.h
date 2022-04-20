@@ -9,15 +9,15 @@
 #include <string>
 
 #include "db/format.h"
-#include "llsm/options.h"
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "treeline/options.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 #include "wal/writer.h"
 
-namespace llsm {
+namespace tl {
 namespace wal {
 
-// This class provides a high-level interface to LLSM's write-ahead log files,
+// This class provides a high-level interface to TL's write-ahead log files,
 // providing methods that help with replaying the log and then writing to the
 // log. The write-ahead log is segmented across multiple versioned files, so
 // this manager helps provide a single logical interface over the log files.
@@ -181,4 +181,4 @@ class Manager {
 };
 
 }  // namespace wal
-}  // namespace llsm
+}  // namespace tl

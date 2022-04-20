@@ -17,7 +17,7 @@
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 
 const std::string kWALDirName = "wal";
 const std::string kManifestFileName = "MANIFEST";
@@ -52,7 +52,7 @@ Status ValidateOptions(const Options& options) {
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 
 namespace fs = std::filesystem;
 
@@ -577,4 +577,4 @@ std::pair<key_utils::KeyHead, key_utils::KeyHead> DBImpl::GetPageBoundsFor(
   return {lower, upper};
 }
 
-}  // namespace llsm
+}  // namespace tl

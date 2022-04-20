@@ -9,7 +9,7 @@
 
 namespace {
 
-using namespace llsm;
+using namespace tl;
 
 void RecordCacheRW_64MiB(benchmark::State& state, bool is_safe) {
   constexpr size_t kDatasetSizeMiB = 64;
@@ -40,7 +40,7 @@ void RecordCacheRW_64MiB(benchmark::State& state, bool is_safe) {
         if (s.ok() && is_safe) rc.cache_entries[index_out].Unlock();
       } else {
         s = rc.Put(record.key(), record.value(), /*is_dirty  = */ true,
-                   llsm::format::WriteType::kWrite,
+                   tl::format::WriteType::kWrite,
                    RecordCache::kDefaultPriority, is_safe);
         if (!s.ok()) {
           throw std::runtime_error(

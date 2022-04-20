@@ -6,8 +6,8 @@
 
 namespace {
 
-using namespace llsm;
-using namespace llsm::pg;
+using namespace tl;
+using namespace tl::pg;
 
 TEST(PGLockManagerTest, PageLockCompatibility) {
   LockManager m;

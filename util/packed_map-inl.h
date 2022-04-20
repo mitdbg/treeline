@@ -7,7 +7,7 @@
 
 #include "util/key.h"
 
-namespace llsm {
+namespace tl {
 namespace packed_map_detail {
 
 static unsigned Min(unsigned a, unsigned b) { return a < b ? a : b; }
@@ -608,4 +608,4 @@ void PackedMap<MapSizeBytes>::RemoveFromHeapAndCompact(unsigned slot_id) {
   // We do not modify header_.count because we leave the slot unmodified
 }
 
-}  // namespace llsm
+}  // namespace tl

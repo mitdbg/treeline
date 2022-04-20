@@ -7,9 +7,9 @@
 #include <vector>
 
 #include "db/format.h"
-#include "llsm/slice.h"
+#include "treeline/slice.h"
 
-namespace llsm {
+namespace tl {
 
 class RecordCacheEntry {
  public:
@@ -96,4 +96,4 @@ class RecordCacheEntry {
   std::atomic<uint8_t> metadata_;
 };
 
-}  // namespace llsm
+}  // namespace tl

@@ -6,7 +6,7 @@
 #include "util/coding.h"
 #include "util/key.h"
 
-namespace llsm {
+namespace tl {
 
 BTreeModel::BTreeModel()
     : index_(TrackingAllocator<std::pair<key_utils::KeyHead, PhysicalPageId>>(
@@ -95,4 +95,4 @@ size_t BTreeModel::GetSizeBytes() {
   return size_bytes;
 }
 
-}  // namespace llsm
+}  // namespace tl

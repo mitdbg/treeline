@@ -10,7 +10,7 @@
 #include "file_manager.h"
 #include "twoqueue_eviction.h"
 
-namespace llsm {
+namespace tl {
 
 // Initializes a BufferManager to keep up to `options.buffer_pool_size /
 // Page::kSize` frames in main memory. Bypasses file system cache if
@@ -287,4 +287,4 @@ void BufferManager::ReadPageIn(BufferFrame* frame) {
   if (!s.ok()) throw std::runtime_error("Tried to read from unallocated page.");
 }
 
-}  // namespace llsm
+}  // namespace tl

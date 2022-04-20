@@ -1,8 +1,8 @@
 #include "record_cache.h"
 
-#include "llsm/pg_stats.h"
+#include "treeline/pg_stats.h"
 
-namespace llsm {
+namespace tl {
 
 std::vector<RecordCacheEntry> RecordCache::cache_entries{};
 
@@ -234,7 +234,7 @@ uint64_t RecordCache::WriteOutIfDirty(uint64_t index) {
   WriteOutBatch batch;
 
   if (key_bounds_) {
-    auto [_, upper_bound] = key_bounds_(llsm::key_utils::ExtractHead64(key));
+    auto [_, upper_bound] = key_bounds_(tl::key_utils::ExtractHead64(key));
     Status s =
         GetRangeImpl(key, key_utils::IntKeyAsSlice(upper_bound).as<Slice>(),
                      &indices, index);
@@ -328,4 +328,4 @@ RecordCache::GetMasstreePointer() {
   return tree_;
 }
 
-}  // namespace llsm
+}  // namespace tl

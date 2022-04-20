@@ -4,11 +4,11 @@
 #include <cstdint>
 #include <utility>
 
-#include "llsm/pg_db.h"
-#include "llsm/slice.h"
+#include "treeline/pg_db.h"
+#include "treeline/slice.h"
 #include "plr/data.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Returns an integer in the range [0, page_count) according to `model`.
@@ -28,4 +28,4 @@ Key FindLowerBoundary(const Key base_key, const plr::Line64& model,
                       size_t page_idx);
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

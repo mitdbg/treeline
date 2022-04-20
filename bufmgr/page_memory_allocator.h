@@ -8,7 +8,7 @@
 
 #include "db/page.h"
 
-namespace llsm {
+namespace tl {
 namespace detail {
 
 class PageBufferDeleter {
@@ -35,11 +35,12 @@ class PageMemoryAllocator {
   static void SetAlignmentFor(const std::filesystem::path& path);
 
  private:
-  // To support efficient direct I/O, LLSM needs to align its memory buffers to
-  // the block size of the underlying file system. When `SetAlignmentFor()` is
-  // called, it will attempt to automatically determine the file system's block
-  // size for the given path. In the unlikely event that the method is unable to
-  // find the block size, it will fall back to using this default alignment.
+  // To support efficient direct I/O, TreeLine needs to align its memory buffers
+  // to the block size of the underlying file system. When `SetAlignmentFor()`
+  // is called, it will attempt to automatically determine the file system's
+  // block size for the given path. In the unlikely event that the method is
+  // unable to find the block size, it will fall back to using this default
+  // alignment.
   static constexpr size_t kDefaultAlignment = 4096;
 
   // The alignment used for `PageBuffer` allocations.
@@ -59,4 +60,4 @@ inline PageBuffer PageMemoryAllocator::Allocate(const size_t num_pages) {
   return PageBuffer(reinterpret_cast<char*>(buffer));
 }
 
-}  // namespace llsm
+}  // namespace tl

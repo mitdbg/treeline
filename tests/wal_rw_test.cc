@@ -11,7 +11,7 @@
 #include <string>
 
 #include "gtest/gtest.h"
-#include "llsm/options.h"
+#include "treeline/options.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
 #include "util/random.h"
@@ -21,11 +21,11 @@
 namespace {
 
 namespace fs = std::filesystem;
-using namespace llsm;
-using namespace llsm::wal;
+using namespace tl;
+using namespace tl::wal;
 
 const std::string kTestDir =
-    "/tmp/llsm-test-" + std::to_string(std::time(nullptr));
+    "/tmp/tl-test-" + std::to_string(std::time(nullptr));
 const std::string kTestLogFile = kTestDir + "/test.wal";
 
 // Construct a string of the specified length made out of the supplied
@@ -130,8 +130,8 @@ class WALTest : public testing::Test {
                 record_size);
 
     // Compute crc of type/data.
-    uint32_t crc = llsm::crc32c::Value(&record[6], 1 + len);
-    crc = llsm::crc32c::Mask(crc);
+    uint32_t crc = tl::crc32c::Value(&record[6], 1 + len);
+    crc = tl::crc32c::Mask(crc);
 
     // The checksum goes in the first 4 bytes of the record.
     EncodeFixed32(reinterpret_cast<char*>(record), crc);
@@ -373,8 +373,9 @@ TEST_F(WALTest, BadRecordType) {
   IncrementByte(6, 100);
   FixChecksum(0, 3);
   ASSERT_EQ("EOF", Read());
-  // LevelDB expects 3 dropped bytes, but LLSM expects 10. This is because LLSM
-  // immediately drops the record if it does not recognize the record type.
+  // LevelDB expects 3 dropped bytes, but TreeLine expects 10. This is because
+  // TreeLine immediately drops the record if it does not recognize the record
+  // type.
   ASSERT_EQ(10, DroppedBytes());
   ASSERT_EQ("OK", MatchError("unknown record type"));
 }

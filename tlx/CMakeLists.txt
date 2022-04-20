@@ -1,4 +1,4 @@
-target_sources(llsm PRIVATE
+target_sources(treeline PRIVATE
   btree.h
   btree_map.h
   core.cc

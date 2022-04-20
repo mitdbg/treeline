@@ -9,9 +9,9 @@
 
 #include "free_list.h"
 #include "key.h"
-#include "llsm/pg_options.h"
-#include "llsm/slice.h"
-#include "llsm/status.h"
+#include "treeline/pg_options.h"
+#include "treeline/slice.h"
+#include "treeline/status.h"
 #include "lock_manager.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
@@ -21,7 +21,7 @@
 #include "util/thread_pool.h"
 #include "workspace.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // This implementation currently only supports unsigned integer keys up to 64
@@ -201,4 +201,4 @@ class Manager {
 };
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

@@ -77,7 +77,7 @@ class Tree {
   bool lookupRange(
       const Key& start, TID result[], std::size_t resultLen,
       std::size_t& resultCount, ThreadInfo& threadEpocheInfo,
-      std::vector<llsm::RecordCacheEntry>* cache_entries = nullptr,
+      std::vector<tl::RecordCacheEntry>* cache_entries = nullptr,
       Key* continueKey = nullptr,
       std::optional<uint64_t> index_locked_already = std::nullopt) const;
 

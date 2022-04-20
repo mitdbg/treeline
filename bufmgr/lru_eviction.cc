@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-namespace llsm {
+namespace tl {
 
 // Create a new eviction strategy.
 LRUEviction::LRUEviction(size_t num_elements) {
@@ -55,4 +55,4 @@ void LRUEviction::PrintState() {
   std::cout << "----------------------------" << std::endl;
 }
 
-}  // namespace llsm
+}  // namespace tl

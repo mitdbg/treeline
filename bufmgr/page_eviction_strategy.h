@@ -1,7 +1,7 @@
 #pragma once
 
 #include "buffer_frame.h"
-namespace llsm {
+namespace tl {
 
 // A strategy for evicting in-memory pages back to disk.
 class PageEvictionStrategy {
@@ -22,4 +22,4 @@ class PageEvictionStrategy {
   virtual void PrintState() = 0;
 };
 
-}  // namespace llsm
+}  // namespace tl

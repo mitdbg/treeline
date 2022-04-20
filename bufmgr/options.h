@@ -3,9 +3,9 @@
 #include <cstdlib>
 
 #include "db/page.h"
-#include "llsm/options.h"
+#include "treeline/options.h"
 
-namespace llsm {
+namespace tl {
 
 // Configuration options used by the `BufferManager`.
 struct BufMgrOptions {
@@ -34,4 +34,4 @@ struct BufMgrOptions {
   bool simulation_mode = false;
 };
 
-}  // namespace llsm
+}  // namespace tl

@@ -1,10 +1,10 @@
 // Benchmarks that measure the `ThreadPool`'s submit overhead.
 //
-// Build the benchmarks by enabling the `LLSM_BUILD_BENCHMARKS` option when
+// Build the benchmarks by enabling the `TL_BUILD_BENCHMARKS` option when
 // configuring the project. Then run the `microbench` executable under `bench`.
 //
 //   mkdir build && cd build
-//   cmake -DCMAKE_BUILD_TYPE=Release -DLLSM_BUILD_BENCHMARKS=ON ..
+//   cmake -DCMAKE_BUILD_TYPE=Release -DTL_BUILD_BENCHMARKS=ON ..
 //   make -j
 //   ./bench/microbench --benchmark_filter=ThreadPool*
 //
@@ -43,7 +43,7 @@ namespace {
 void NoOp() {}
 
 void BM_ThreadPoolSubmitOverhead(benchmark::State& state) {
-  llsm::ThreadPool pool(state.range(0));
+  tl::ThreadPool pool(state.range(0));
   std::vector<std::future<void>> futures;
   // Avoid measuring vector resizing
   futures.reserve(5000000);
@@ -59,7 +59,7 @@ void BM_ThreadPoolSubmitOverhead(benchmark::State& state) {
 }
 
 void BM_ThreadPoolSubmitNoWaitOverhead(benchmark::State& state) {
-  llsm::ThreadPool pool(state.range(0));
+  tl::ThreadPool pool(state.range(0));
   for (auto _ : state) {
     pool.SubmitNoWait(NoOp);
   }

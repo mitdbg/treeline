@@ -2,7 +2,7 @@
 
 #include "assert.h"
 
-namespace llsm {
+namespace tl {
 
 const uint8_t RecordCacheEntry::kValidMask = 0x80;      // 1000 0000
 const uint8_t RecordCacheEntry::kDirtyMask = 0x40;      // 0100 0000
@@ -161,7 +161,7 @@ void RecordCacheEntry::Unlock() { pthread_rwlock_unlock(&rwlock_); }
 uint64_t RecordCacheEntry::FindIndexWithin(std::vector<RecordCacheEntry>* vec) {
   return ((reinterpret_cast<uint8_t*>(this) -
            reinterpret_cast<uint8_t*>(vec->data())) /
-          sizeof(llsm::RecordCacheEntry));
+          sizeof(tl::RecordCacheEntry));
 }
 
-}  // namespace llsm
+}  // namespace tl

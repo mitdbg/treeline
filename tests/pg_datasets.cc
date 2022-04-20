@@ -6,7 +6,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 // Uniformly selects `num_samples` samples from the range [min_val, max_val]
@@ -45,4 +45,4 @@ const std::vector<uint64_t> Datasets::kUniformKeys =
     })(1000, 1, 1000000);
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

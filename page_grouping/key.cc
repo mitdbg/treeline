@@ -2,10 +2,10 @@
 
 #include <iterator>
 
-#include "llsm/pg_db.h"
+#include "treeline/pg_db.h"
 
-using namespace llsm;
-using namespace llsm::pg;
+using namespace tl;
+using namespace tl::pg;
 
 namespace {
 
@@ -48,7 +48,7 @@ class KeyDomainIterator
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 Key FindLowerBoundary(const Key base_key, const plr::Line64& model,
@@ -104,4 +104,4 @@ Key FindLowerBoundary(const Key base_key, const plr::Line64& model,
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

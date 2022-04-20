@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace llsm {
+namespace tl {
 namespace affinity {
 
 // Pins the current thread to core `core_id`, returning true if the pin
@@ -42,4 +42,4 @@ class PinInScope {
 };
 
 }  // namespace affinity
-}  // namespace llsm
+}  // namespace tl

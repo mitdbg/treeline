@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <iostream>
 
-namespace llsm {
+namespace tl {
 
 class Statistics {
  public:
@@ -140,4 +140,4 @@ class Statistics {
   std::atomic<size_t> preorg_post_total_length_;
 };
 
-}  // namespace llsm
+}  // namespace tl

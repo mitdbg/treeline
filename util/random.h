@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <random>
 
-namespace llsm {
+namespace tl {
 
 // A very simple random number generator.  Not especially good at
 // generating truly random bits, but good enough for our needs in this
@@ -181,4 +181,4 @@ void RandomShuffle(RandomIt first, RandomIt last) {
   RandomShuffle(first, last, std::random_device{}());
 }
 
-}  // namespace llsm
+}  // namespace tl

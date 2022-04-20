@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <unordered_map>
 
-namespace llsm {
+namespace tl {
 
 enum class Label {
   // Add labels here for your use case.
@@ -80,4 +80,4 @@ class ScopedTime {
   std::chrono::steady_clock::time_point start_;
 };
 
-}  // namespace llsm
+}  // namespace tl

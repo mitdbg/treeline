@@ -5,7 +5,7 @@
 
 #include "posix_logger.h"
 
-namespace llsm {
+namespace tl {
 
 // A singleton logger class for debug and other informative logging.
 // The `Log()` method is thread-safe. `Initialize()` and `Shutdown()` are not
@@ -29,4 +29,4 @@ class Logger {
   std::unique_ptr<PosixLogger> logger_;
 };
 
-}  // namespace llsm
+}  // namespace tl

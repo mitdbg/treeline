@@ -4,7 +4,7 @@
 
 #include "segment_builder.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 
 FreeList::FreeList()
@@ -56,4 +56,4 @@ uint64_t FreeList::GetNumEntries() const {
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl

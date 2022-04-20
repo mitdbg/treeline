@@ -4,7 +4,7 @@
 
 #include "util/affinity.h"
 
-namespace llsm {
+namespace tl {
 
 ThreadPool::ThreadPool(size_t num_threads, std::function<void()> run_on_exit)
     : shutdown_(false), run_on_exit_(std::move(run_on_exit)) {
@@ -62,4 +62,4 @@ void ThreadPool::ThreadMain() {
   }
 }
 
-}  // namespace llsm
+}  // namespace tl

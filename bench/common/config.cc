@@ -27,7 +27,7 @@ bool EnsureNonEmpty(const char* flagname, const std::string& value) {
 }
 
 bool ValidateDB(const char* flagname, const std::string& db) {
-  if (llsm::bench::ParseDBType(db).has_value()) return true;
+  if (tl::bench::ParseDBType(db).has_value()) return true;
   std::cerr << "ERROR: Unknown DB type: " << db << std::endl;
   return false;
 }
@@ -42,15 +42,16 @@ bool ValidateRecordSize(const char* flagname, uint32_t record_size) {
 
 bool ValidateBGThreads(const char* flagname, uint32_t bg_threads) {
   if (bg_threads >= 2) return true;
-  std::cerr << "ERROR: --bg_threads must be at least 2 (LLSM needs at least 2 "
-               "background threads)."
-            << std::endl;
+  std::cerr
+      << "ERROR: --bg_threads must be at least 2 (TreeLine needs at least 2 "
+         "background threads)."
+      << std::endl;
   return false;
 }
 
-bool ValidateLLSMPageFillPct(const char* flagname, uint32_t pct) {
+bool ValidateTLPageFillPct(const char* flagname, uint32_t pct) {
   if (pct >= 1 && pct <= 100) return true;
-  std::cerr << "ERROR: --llsm_page_fill_pct must be a value between 1 and 100 "
+  std::cerr << "ERROR: --tl_page_fill_pct must be a value between 1 and 100 "
                "inclusive."
             << std::endl;
   return false;
@@ -59,10 +60,10 @@ bool ValidateLLSMPageFillPct(const char* flagname, uint32_t pct) {
 }  // namespace
 
 DEFINE_string(db, "all",
-              "Which database(s) to use {all, rocksdb, llsm, leanstore}.");
+              "Which database(s) to use {all, rocksdb, tl, leanstore}.");
 DEFINE_validator(db, &ValidateDB);
 
-DEFINE_string(db_path, llsm::bench::GetDefaultDBPath(),
+DEFINE_string(db_path, tl::bench::GetDefaultDBPath(),
               "The path where the database(s) should be stored.");
 DEFINE_validator(db_path, &EnsureNonEmpty);
 
@@ -78,8 +79,9 @@ DEFINE_validator(record_size_bytes, &ValidateRecordSize);
 DEFINE_uint64(cache_size_mib, 64,
               "The size of the database's in memory cache, in MiB.");
 
-DEFINE_uint32(bg_threads, 2,  // LLSM needs at least 2 background threads.
-              "The number background threads that RocksDB/LLSM should use.");
+DEFINE_uint32(
+    bg_threads, 2,  // TreeLine needs at least 2 background threads.
+    "The number background threads that RocksDB/TreeLine should use.");
 DEFINE_validator(bg_threads, &ValidateBGThreads);
 
 DEFINE_bool(use_direct_io, true, "Whether or not to use direct I/O.");
@@ -87,10 +89,11 @@ DEFINE_bool(use_direct_io, true, "Whether or not to use direct I/O.");
 DEFINE_uint64(memtable_size_mib, 64,
               "The size of the memtable before it should be flushed, in MiB.");
 
-DEFINE_uint32(llsm_page_fill_pct, 50,
-              "How full each LLSM page should be, as a value between 1 and 100 "
-              "inclusive.");
-DEFINE_validator(llsm_page_fill_pct, &ValidateLLSMPageFillPct);
+DEFINE_uint32(
+    tl_page_fill_pct, 50,
+    "How full each TreeLine page should be, as a value between 1 and 100 "
+    "inclusive.");
+DEFINE_validator(tl_page_fill_pct, &ValidateTLPageFillPct);
 
 DEFINE_uint64(
     io_min_batch_size, 1,
@@ -116,7 +119,7 @@ DEFINE_uint32(latency_sample_period, 1,
 DEFINE_validator(latency_sample_period, &EnsureNonZero);
 
 DEFINE_bool(use_alex, true,
-            "If true, LLSM will use an ALEXModel. Otherwise, it will use a "
+            "If true, TreeLine will use an ALEXModel. Otherwise, it will use a "
             "BTreeModel.");
 
 DEFINE_uint32(rdb_bloom_bits, 0,
@@ -140,14 +143,16 @@ DEFINE_uint64(records_per_page_delta, 5,
 DEFINE_bool(pg_use_segments, true,
             "If set to false, all segments will be a single page (emulates not "
             "using page grouping).");
-DEFINE_bool(pg_use_memory_based_io, false,
-            "If set, PGLLSM will use memory-based I/O (only meant for setup; "
-            "not for use during evaluation).");
-DEFINE_bool(pg_bypass_cache, false,
-            "If set, PGLLSM will bypass the record cache. All requests will "
-            "incur I/O.");
+DEFINE_bool(
+    pg_use_memory_based_io, false,
+    "If set, PGTreeLine will use memory-based I/O (only meant for setup; "
+    "not for use during evaluation).");
+DEFINE_bool(
+    pg_bypass_cache, false,
+    "If set, PGTreeLine will bypass the record cache. All requests will "
+    "incur I/O.");
 DEFINE_bool(pg_parallelize_final_flush, false,
-            "If set, PGLLSM will attempt to parallelize its flush of dirty "
+            "If set, PGTreeLine will attempt to parallelize its flush of dirty "
             "records from the cache when it shuts down.");
 
 DEFINE_bool(rec_cache_batch_writeout, true,
@@ -155,7 +160,7 @@ DEFINE_bool(rec_cache_batch_writeout, true,
             "page when writing out a dirty entry.");
 
 DEFINE_bool(optimistic_rec_caching, false,
-            "If true, page-grouped LLSM and LLSM will optimistically cache "
+            "If true, PGTreeLine and TreeLine will optimistically cache "
             "records present on a page that was read in, even if the record(s) "
             "were not necessarily requested.");
 
@@ -189,14 +194,20 @@ DEFINE_uint64(
     "During reorganization, the system will leave sufficient space to "
     "accommodate forecasted inserts for the next `num_future_epochs` epochs.");
 
-namespace llsm {
+namespace tl {
 namespace bench {
 
 std::optional<DBType> ParseDBType(const std::string& candidate) {
   static const std::unordered_map<std::string, DBType> kStringToDBType = {
-      {"all", DBType::kAll},         {"llsm", DBType::kLLSM},
-      {"rocksdb", DBType::kRocksDB}, {"leanstore", DBType::kLeanStore},
-      {"kvell", DBType::kKVell},     {"pg_llsm", DBType::kPGLLSM}};
+      {"all", DBType::kAll},
+      {"treeline", DBType::kTreeLine},
+      {"rocksdb", DBType::kRocksDB},
+      {"leanstore", DBType::kLeanStore},
+      {"kvell", DBType::kKVell},
+      {"pg_treeline", DBType::kPGTreeLine},
+      // For legacy support.
+      {"llsm", DBType::kTreeLine},
+      {"pg_llsm", DBType::kPGTreeLine}};
 
   auto it = kStringToDBType.find(candidate);
   if (it == kStringToDBType.end()) {
@@ -217,7 +228,7 @@ rocksdb::Options BuildRocksDBOptions() {
   cache_options.capacity = FLAGS_cache_size_mib * 1024 * 1024;
   rocksdb::BlockBasedTableOptions table_options;
   table_options.block_size =
-      Page::kSize;  // Use the same block size as LLSM's pages.
+      Page::kSize;  // Use the same block size as TreeLine's pages.
   table_options.checksum = rocksdb::kNoChecksum;
   table_options.block_cache = rocksdb::NewLRUCache(cache_options);
   if (FLAGS_rdb_bloom_bits > 0) {
@@ -248,14 +259,14 @@ rocksdb::Options BuildRocksDBOptions() {
   return options;
 }
 
-llsm::Options BuildLLSMOptions() {
-  llsm::Options options;
+tl::Options BuildTreeLineOptions() {
+  tl::Options options;
   options.buffer_pool_size = FLAGS_cache_size_mib * 1024 * 1024;
   options.memtable_flush_threshold = FLAGS_memtable_size_mib * 1024 * 1024;
   options.use_direct_io = FLAGS_use_direct_io;
   options.background_threads = FLAGS_bg_threads;
   options.key_hints.record_size = FLAGS_record_size_bytes;
-  options.key_hints.page_fill_pct = FLAGS_llsm_page_fill_pct;
+  options.key_hints.page_fill_pct = FLAGS_tl_page_fill_pct;
   options.pin_threads = true;
   options.deferred_io_batch_size = FLAGS_io_min_batch_size;
   options.deferred_io_max_deferrals = FLAGS_max_deferrals;
@@ -268,8 +279,8 @@ llsm::Options BuildLLSMOptions() {
   return options;
 }
 
-llsm::pg::PageGroupedDBOptions BuildPGLLSMOptions() {
-  llsm::pg::PageGroupedDBOptions options;
+tl::pg::PageGroupedDBOptions BuildPGTreeLineOptions() {
+  tl::pg::PageGroupedDBOptions options;
   options.use_segments = FLAGS_pg_use_segments;
   options.records_per_page_goal = FLAGS_records_per_page_goal;
   options.records_per_page_delta = FLAGS_records_per_page_delta;
@@ -302,9 +313,9 @@ std::string AppendTimestamp(const std::string& prefix) {
   return output.str();
 }
 
-std::string GetDefaultOutputPath() { return AppendTimestamp("llsm-out"); }
+std::string GetDefaultOutputPath() { return AppendTimestamp("tl-out"); }
 
-std::string GetDefaultDBPath() { return AppendTimestamp("llsm-bench-db"); }
+std::string GetDefaultDBPath() { return AppendTimestamp("tl-bench-db"); }
 
 }  // namespace bench
-}  // namespace llsm
+}  // namespace tl

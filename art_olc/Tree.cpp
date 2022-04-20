@@ -347,7 +347,7 @@ restart:
 
 bool Tree::lookupRange(const Key& start, TID result[], std::size_t resultSize,
                        std::size_t& resultsFound, ThreadInfo& threadEpocheInfo,
-                       std::vector<llsm::RecordCacheEntry>* cache_entries,
+                       std::vector<tl::RecordCacheEntry>* cache_entries,
                        Key* continueKey,
                        std::optional<uint64_t> index_locked_already) const {
   EpocheGuard epocheGuard(threadEpocheInfo);

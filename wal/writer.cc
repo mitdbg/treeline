@@ -20,15 +20,15 @@
 namespace {
 
 void InitTypeCrc(uint32_t* type_crc) {
-  for (int i = 0; i <= llsm::wal::kMaxRecordType; i++) {
+  for (int i = 0; i <= tl::wal::kMaxRecordType; i++) {
     uint8_t t = static_cast<uint8_t>(i);
-    type_crc[i] = llsm::crc32c::Value(&t, 1);
+    type_crc[i] = tl::crc32c::Value(&t, 1);
   }
 }
 
 }  // namespace
 
-namespace llsm {
+namespace tl {
 namespace wal {
 
 Writer::Writer(const std::filesystem::path& log_path)
@@ -152,4 +152,4 @@ Status Writer::SyncLog() {
 }
 
 }  // namespace wal
-}  // namespace llsm
+}  // namespace tl

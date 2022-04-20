@@ -7,7 +7,7 @@
 
 #include "util/key.h"
 
-namespace llsm {
+namespace tl {
 namespace pg {
 namespace packed_map_detail {
 
@@ -609,4 +609,4 @@ void PackedMap<MapSizeBytes>::RemoveFromHeapAndCompact(unsigned slot_id) {
 }
 
 }  // namespace pg
-}  // namespace llsm
+}  // namespace tl
