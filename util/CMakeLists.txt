@@ -7,6 +7,7 @@ target_sources(treeline PRIVATE
   coding.h
   crc32c.h
   gcc_macros.h
+  hash_queue.h
   inlineskiplist.h
   insert_tracker.h
   key.h
