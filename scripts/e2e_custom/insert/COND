@@ -39,7 +39,7 @@ RECORD_SIZES = [64]
 COMMON_OPTIONS = {
   "bg_threads": 16,
   "bypass_wal": True,
-  "llsm_page_fill_pct": 50,
+  "tl_page_fill_pct": 50,
   "use_direct_io": True,
   "latency_sample_period": 10,
   "memtable_size_mib": 64,

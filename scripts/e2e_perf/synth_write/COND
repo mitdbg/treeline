@@ -8,7 +8,7 @@ COMMON_OPTIONS = {
   "bypass_wal": True,
   "memtable_size_mib": 64,
   "cache_size_mib": 64,
-  "llsm_page_fill_pct": 50,
+  "tl_page_fill_pct": 50,
 }
 DEFER_OPTIONS = [
   {
