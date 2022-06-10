@@ -69,7 +69,7 @@ class HashQueue {
   // queue).
   T Dequeue() {
     // Corner case: empty data structure
-    if (IsEmpty()) return nullptr;
+    if (IsEmpty()) return 0;
 
     // Dequeue from linked list
     struct HashQueueNode<T>* old_front = front_;
@@ -114,6 +114,41 @@ class HashQueue {
     // Remove from unordered map
     item_to_node_map_.erase(item);
     delete to_delete;
+
+    return true;
+  }
+
+  // Moves an item to the back of the queue if it is already in the HashQueue,
+  // or enqueues it otherwise. Returns true iff the item was already present in
+  // the HashQueue.
+  bool MoveToBack(T item) {
+    // Retrieve node
+    auto to_move_lookup = item_to_node_map_.find(item);
+    if (to_move_lookup == item_to_node_map_.end()) {
+      Enqueue(item);
+      return false;
+    }
+    struct HashQueueNode<T>* to_move = to_move_lookup->second;
+
+    // Remove node from its current position in the linked list.
+    if (to_move->prev != nullptr) {
+      to_move->prev->next = to_move->next;
+    } else {
+      front_ = to_move->next;
+    }
+    if (to_move->next != nullptr) {
+      to_move->next->prev = to_move->prev;
+    } else {
+      back_ = to_move->prev;
+    }
+
+    // Enqueue into the back of the linked list.
+    if (back_ != nullptr) {
+      back_->next = to_move;
+    } else {
+      front_ = to_move;
+    }
+    back_ = to_move;
 
     return true;
   }
