@@ -104,6 +104,9 @@ DECLARE_bool(rec_cache_batch_writeout);
 // necessarily requested.
 DECLARE_bool(optimistic_rec_caching);
 
+// Whether the record cache should use the LRU eviction policy.
+DECLARE_bool(rec_cache_use_lru);
+
 // If set to true, the workload runner will skip the initial data load.
 DECLARE_bool(skip_load);
 
