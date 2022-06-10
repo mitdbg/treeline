@@ -159,7 +159,9 @@ int main(int argc, char* argv[]) {
       PrintExperimentResult("rocksdb", dataset, RunRocksDBExperiment(dataset));
     }
     if (db == DBType::kAll || db == DBType::kTreeLine) {
-      PrintExperimentResult("tl", dataset, RunTreeLineExperiment(dataset));
+      // NOTE: We use the legacy `llsm` database name in the results for backward
+      // compatibility with our experiment scripts and cached results.
+      PrintExperimentResult("llsm", dataset, RunTreeLineExperiment(dataset));
     }
 
     fs::remove_all(FLAGS_db_path);

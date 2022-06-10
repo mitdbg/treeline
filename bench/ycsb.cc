@@ -101,7 +101,9 @@ int main(int argc, char* argv[]) {
     PrintExperimentResult("rocksdb", Run<RocksDBInterface>(load, workload));
   }
   if (db == DBType::kAll || db == DBType::kTreeLine) {
-    PrintExperimentResult("tl", Run<TreeLineInterface>(load, workload));
+    // NOTE: We use the legacy `llsm` database name in the results for backward
+    // compatibility with our experiment scripts and cached results.
+    PrintExperimentResult("llsm", Run<TreeLineInterface>(load, workload));
   }
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(load, workload));
