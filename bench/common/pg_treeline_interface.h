@@ -52,7 +52,7 @@ class PGTreeLineInterface {
 
   // Called once before the benchmark.
   void InitializeDatabase() {
-    const std::string dbname = FLAGS_db_path + "/pg_tl";
+    const std::filesystem::path dbname = GetDBPath(FLAGS_db_path);
     auto options = tl::bench::BuildPGTreeLineOptions();
     if (options.use_memory_based_io) {
       std::cerr << "> WARNING: PGTreeLine is using \"memory-based I/O\". "
@@ -132,5 +132,22 @@ class PGTreeLineInterface {
   }
 
  private:
+  // Returns a path to the PGTreeLine database checkpoint (used for
+  // benchmarking).  This function helps with handling checkpoints saved using
+  // the legacy name (pg_llsm).
+  std::filesystem::path GetDBPath(
+      const std::filesystem::path& checkpoint_path) {
+    // If a DB checkpoint exists using our legacy name, then return it.
+    // Otherwise use the new name.
+    const std::string legacy_name = "pg_llsm";
+    const std::filesystem::path legacy_path = checkpoint_path / legacy_name;
+    if (std::filesystem::is_directory(legacy_path)) {
+      return legacy_path;
+    }
+
+    const std::string expected_name = "pg_tl";
+    return checkpoint_path / expected_name;
+  }
+
   tl::pg::PageGroupedDB* db_;
 };

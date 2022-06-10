@@ -12,6 +12,8 @@
 #include "rocksdb/slice_transform.h"
 #include "rocksdb/table.h"
 
+namespace fs = std::filesystem;
+
 namespace {
 
 bool EnsureNonZero(const char* flagname, uint32_t value) {
