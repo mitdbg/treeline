@@ -9,10 +9,11 @@
 
 #include "db/format.h"
 #include "db/overflow_chain.h"
-#include "treeline/statistics.h"
-#include "treeline/status.h"
 #include "masstree_wrapper/masstree_wrapper.h"
 #include "record_cache_entry.h"
+#include "treeline/statistics.h"
+#include "treeline/status.h"
+#include "util/hash_queue.h"
 #include "util/key.h"
 
 namespace tl {
@@ -47,12 +48,14 @@ class RecordCache {
           key_utils::KeyHead)>;
 
   // Initializes a record cache in tandem with a database. `capacity` is
-  // measured in the number of records.
+  // measured in the number of records. Setting `use_lru` will use LRU as the
+  // eviction policy instead of the clock-priority algorithm.
   //
   // The last two arguments can optionally be omitted when using a standalone
   // RecordCache. In that case, no persistence guarantees are provided, and data
   // will be lost when exceeding the size of the record cache.
-  RecordCache(uint64_t capacity, WriteOutFn write_out = WriteOutFn(),
+  RecordCache(uint64_t capacity, bool use_lru = false,
+              WriteOutFn write_out = WriteOutFn(),
               KeyBoundsFn key_bounds = KeyBoundsFn());
 
   // Destroys the record cache, after writing back any dirty records.
@@ -90,7 +93,7 @@ class RecordCache {
   // not acquire locks upon lookup. It is intended purely for performance
   // benchmarking.
   Status GetCacheIndex(const Slice& key, bool exclusive, uint64_t* index_out,
-                       bool safe = true) const;
+                       bool safe = true);
 
   // Retrieve an ascending range of at most `num_records` records, starting from
   // the smallest record whose key is greater than or equal to `start_key`. The
@@ -142,8 +145,8 @@ class RecordCache {
 
   // Selects a cache entry according to the chosen policy, and returns the
   // corresponding index into the `cache_entries` vector. If the entry
-  // originally selected is dirty, will look at the next
-  // `kDefaultEvictionLookahead` entries to try to find a clean one.
+  // originally selected is dirty and `use_url_` is not set, will look at the
+  // next `kDefaultEvictionLookahead` entries to try to find a clean one.
   uint64_t SelectForEviction();
   const uint64_t kDefaultEvictionLookahead = 32;
 
@@ -163,6 +166,9 @@ class RecordCache {
 
   // The number of cache entries.
   const uint64_t capacity_;
+
+  // Whether to use the LRU policy for cache eviction.
+  const bool use_lru_;
 
 #ifndef NDEBUG
   // Debugging flag
@@ -191,6 +197,8 @@ class RecordCache {
   KeyBoundsFn key_bounds_;
 
   std::shared_ptr<MasstreeWrapper<RecordCacheEntry>> tree_;
+
+  std::optional<HashQueue<uint64_t>> lru_queue_;
 };
 
 }  // namespace tl

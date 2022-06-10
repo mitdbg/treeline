@@ -6,14 +6,21 @@ namespace tl {
 
 std::vector<RecordCacheEntry> RecordCache::cache_entries{};
 
-RecordCache::RecordCache(const uint64_t capacity, WriteOutFn write_out,
-                         KeyBoundsFn key_bounds)
+RecordCache::RecordCache(const uint64_t capacity, bool use_lru,
+                         WriteOutFn write_out, KeyBoundsFn key_bounds)
     : capacity_(capacity),
+      use_lru_(use_lru),
       clock_(0),
       write_out_(std::move(write_out)),
       key_bounds_(std::move(key_bounds)) {
   tree_ = std::make_shared<MasstreeWrapper<RecordCacheEntry>>();
   cache_entries.resize(capacity_);
+  if (use_lru_) {
+    lru_queue_ = HashQueue<uint64_t>(capacity_);
+    for (auto i = 0; i < capacity_; ++i) {
+      lru_queue_->Enqueue(i);
+    }
+  }
 }
 
 RecordCache::~RecordCache() {
@@ -127,7 +134,7 @@ Status RecordCache::PutFromRead(const Slice& key, const Slice& value,
 }
 
 Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
-                                  uint64_t* index_out, bool safe) const {
+                                  uint64_t* index_out, bool safe) {
   bool locked_successfully = false;
   RecordCacheEntry* entry;
 
@@ -140,8 +147,12 @@ Status RecordCache::GetCacheIndex(const Slice& key, bool exclusive,
     if (safe) locked_successfully = entry->TryLock(exclusive);
   } while (!locked_successfully && safe);
 
-  entry->IncrementPriority();
   *index_out = entry->FindIndexWithin(&cache_entries);
+  if (use_lru_) {
+    lru_queue_->MoveToBack(*index_out);
+  } else {
+    entry->IncrementPriority();
+  }
 
   pg::PageGroupedDBStats::Local().BumpCacheHits();
   return Status::OK();
@@ -184,6 +195,12 @@ uint64_t RecordCache::WriteOutDirty() {
 }
 
 uint64_t RecordCache::SelectForEviction() {
+  if (use_lru_) {
+    return lru_queue_->Dequeue();
+    // Even if the queue is empty, Dequeue() will return 0, which is a valid
+    // choice of an index to evict.
+  }
+
   uint64_t candidate;
   uint64_t local_clock;
   uint64_t lookahead = capacity_ < kDefaultEvictionLookahead
@@ -293,8 +310,8 @@ uint64_t RecordCache::ClearCache(bool write_out_dirty) {
 }
 
 std::vector<std::pair<Slice, Slice>> RecordCache::ExtractDirty() {
-  // NOTE: This method is not thread safe and cannot be called concurrently with
-  // any other public method. So we do not take locks.
+  // NOTE: This method is not thread safe and cannot be called concurrently
+  // with any other public method. So we do not take locks.
   std::vector<std::pair<Slice, Slice>> dirty_records;
   dirty_records.reserve(capacity_);
   for (uint64_t i = 0; i < capacity_; ++i) {
@@ -315,8 +332,8 @@ uint64_t RecordCache::GetSizeFootprintEstimate() const {
     if (!cache_entries[i].IsValid()) {
       continue;
     }
-    // It is possible for this to be an underestimate (e.g., if a smaller record
-    // replaced a larger one).
+    // It is possible for this to be an underestimate (e.g., if a smaller
+    // record replaced a larger one).
     entry_payloads += cache_entries[i].GetKey().size();
     entry_payloads += cache_entries[i].GetValue().size();
   }

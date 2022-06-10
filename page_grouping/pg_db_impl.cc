@@ -40,7 +40,7 @@ PageGroupedDBImpl::PageGroupedDBImpl(fs::path db_path,
     : db_path_(std::move(db_path)),
       options_(std::move(options)),
       mgr_(std::move(mgr)),
-      cache_(options_.record_cache_capacity,
+      cache_(options_.record_cache_capacity, options.rec_cache_use_lru,
              std::bind(&PageGroupedDBImpl::WriteBatch, this,
                        std::placeholders::_1),
              options_.rec_cache_batch_writeout
