@@ -7,7 +7,7 @@ from plot_common import COLORS
 plt.rcParams["font.size"] = 14
 
 DB_FORMAT = {
-    "llsm": "Disk-Based B-Tree",
+    "llsm": "Disk-Based B+ Tree",
     "rocksdb": "RocksDB",
     "pg_llsm": "TreeLine",
 }
@@ -36,7 +36,7 @@ def plot_e2e(
         tight_layout=True,
         frameon=False,
     )
-    # Plotting order: Disk-based B-tree, RocksDB, TreeLine
+    # Plotting order: Disk-based B+ Tree, RocksDB, TreeLine
     dbs = ["llsm", "rocksdb", "pg_llsm"]
     for db in dbs:
         df_filter = (
@@ -58,7 +58,7 @@ def plot_e2e(
             color="#762439" if db == "llsm" else COLORS[db],
         )
     if show_legend:
-        legend_order = ["TreeLine", "Disk-Based B-Tree", "RocksDB"]
+        legend_order = ["TreeLine", "Disk-Based B+ Tree", "RocksDB"]
         handles, labels = ax.get_legend_handles_labels()
         reordered = []
         for lbl in legend_order:
