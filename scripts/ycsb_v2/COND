@@ -34,6 +34,8 @@ CONFIG_64B = {
   # These values are scaled up by the dataset size multiplier.
   "point_requests": 15000000,  # 15 million
   "scan_requests":  1000000,   # 1 million
+
+  "rec_cache_use_lru": False,
 }
 
 CONFIG_1024B = {
