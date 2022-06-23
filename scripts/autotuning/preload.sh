@@ -43,7 +43,7 @@ mkdir -p $DB_CHECKPOINT_PATH
   --db_path=$full_checkpoint_path \
   --bg_threads=16 \
   --bypass_wal=true \
-  --llsm_page_fill_pct=50 \
+  --tl_page_fill_pct=50 \
   --memtable_size_mib=2048 \
   --workload_config=$preload_file \
   --seed=$SEED \

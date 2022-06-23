@@ -11,13 +11,13 @@ mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release .. && make -j
 ```
 
-To build the tests, turn on the `LLSM_BUILD_TESTS` option when configuring.
+To build the tests, turn on the `TL_BUILD_TESTS` option when configuring.
 ```bash
-cmake -DCMAKE_BUILD_TYPE=Release -DLLSM_BUILD_TESTS=ON .. && make -j
+cmake -DCMAKE_BUILD_TYPE=Release -DTL_BUILD_TESTS=ON .. && make -j
 ```
 
-To build the benchmarks, turn on the `LLSM_BUILD_BENCHMARKS` option when
+To build the benchmarks, turn on the `TL_BUILD_BENCHMARKS` option when
 configuring.
 ```bash
-cmake -DCMAKE_BUILD_TYPE=Release -DLLSM_BUILD_BENCHMARKS=ON .. && make -j
+cmake -DCMAKE_BUILD_TYPE=Release -DTL_BUILD_BENCHMARKS=ON .. && make -j
 ```

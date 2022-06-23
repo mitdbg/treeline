@@ -171,13 +171,17 @@ int main(int argc, char* argv[]) {
     PrintExperimentResult("rocksdb", Run<RocksDBInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kTreeLine) {
-    PrintExperimentResult("tl", Run<TreeLineInterface>(*workload));
+    // NOTE: We use the legacy `llsm` database name in the results for backward
+    // compatibility with our experiment scripts and cached results.
+    PrintExperimentResult("llsm", Run<TreeLineInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kLeanStore) {
     PrintExperimentResult("leanstore", Run<LeanStoreInterface>(*workload));
   }
   if (db == DBType::kAll || db == DBType::kPGTreeLine) {
-    PrintExperimentResult("pg_tl", Run<PGTreeLineInterface>(*workload));
+    // NOTE: We use the legacy `pg_llsm` database name in the results for
+    // backward compatibility with our experiment scripts and cached results.
+    PrintExperimentResult("pg_llsm", Run<PGTreeLineInterface>(*workload));
   }
 
   return 0;

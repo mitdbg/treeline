@@ -19,7 +19,7 @@ CONFIG_64B = {
   "record_size_bytes": 64,
 
   # Used by LLSM.
-  "llsm_page_fill_pct": 70,
+  "tl_page_fill_pct": 70,
 
   # Used by page-grouped LLSM.
   "records_per_page_goal": 45,
@@ -41,7 +41,7 @@ CONFIG_1024B = {
   "record_size_bytes": 1024,
 
   # Used by LLSM.
-  "llsm_page_fill_pct": 50,
+  "tl_page_fill_pct": 50,
 
   # Used by page-grouped LLSM.
   "records_per_page_goal": 2,
