@@ -2,6 +2,7 @@ from itertools import product
 
 JOBS = [
   "psync-4k",
+  "psync-8k",
   "psync-16k",
   "psync-64k",
   "uring-4k",
@@ -67,4 +68,12 @@ run_experiment(
   name="read_rand_sweep",
   run="../run_fio.sh",
   args=["nvme_ssd_ext4", "psync-sweep"],
+)
+
+combine(
+  name="rand-sweep",
+  deps=[
+    ":read-nvme_ssd_ext4-{}".format(jobfile)
+    for jobfile in JOBS if "psync" in jobfile
+  ]
 )

@@ -14,7 +14,7 @@ linewidth = 3.5
 
 
 # Load and process data given a results directory
-def load_and_combine(path):
+def load_and_combine(path, key):
     results = []
     loc = pathlib.Path(path)
 
@@ -31,7 +31,7 @@ def load_and_combine(path):
         with open(exp / "fio.json", "r") as file:
             raw_json = json.load(file)
 
-        data = aggregate_bw(process_write(raw_json))
+        data = aggregate_bw(process_raw(raw_json, key))
         data["fs"] = fs
         data["method"] = method
         data["blocksize"] = blocksize
@@ -40,16 +40,18 @@ def load_and_combine(path):
     return pd.concat(results, ignore_index=True)
 
 
-def process_write(raw_json):
+def process_raw(raw_json, key):
     punits = []
     bw_bytes = []
     lat_ns = []
     for job in raw_json["jobs"]:
         name = job["jobname"]
         parts = name.split("-")
+        if not parts[0].startswith("rand"):
+            continue
         punits.append(int(parts[-1]))
-        bw_bytes.append(int(job["write"]["bw_bytes"]))
-        lat_ns.append(int(job["write"]["lat_ns"]["mean"]))
+        bw_bytes.append(int(job[key]["bw_bytes"]))
+        lat_ns.append(int(job[key]["lat_ns"]["mean"]))
 
     df = pd.DataFrame({"punits": punits, "bw_bytes": bw_bytes, "lat_ns": lat_ns})
     return df
@@ -71,7 +73,7 @@ def block_size_display(bs):
     return value + " KiB"
 
 
-def plot_write_results(df, xlim, peak_seq_bw_mb=1100):
+def plot_results(df, xlim, peak_seq_bw_mb=1100, show_legend=True):
     peak_seqr_bw_mib = peak_seq_bw_mb * 1000 * 1000 / 1024 / 1024
     blocksizes = ["4K", "8K", "16K"]
     markers = ["o", "^", "s"]
@@ -103,18 +105,29 @@ def plot_write_results(df, xlim, peak_seq_bw_mb=1100):
     ax.set_ylabel("Throughput (MiB/s)")
     ax.set_xlabel("Threads")
     ax.set_xticks(rel["punits"])
-    ax.legend(edgecolor="#000", fancybox=False, loc="lower right")
+    if show_legend:
+        ax.legend(edgecolor="#000", fancybox=False, loc="lower right")
 
-    ax.set_ylim(0, 1150)
+    ax.set_ylim(0, peak_seq_bw_mb + 50)
     ax.set_xlim(0, xlim)
     return fig, ax
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--key", type=str)  # e.g. read or write
+    parser.add_argument("--out-name", type=str)
+    parser.add_argument("--peak-seq-bw-mb", type=int)
+    args = parser.parse_args()
     out_dir = cond.get_output_path()
-    data = load_and_combine(cond.get_deps_paths()[0])
-    fig, _ = plot_write_results(data, xlim=17)
-    fig.savefig(out_dir / "rand_write.pdf", format="pdf")
+    data = load_and_combine(cond.get_deps_paths()[0], key=args.key)
+    fig, _ = plot_results(
+        data,
+        xlim=17,
+        peak_seq_bw_mb=args.peak_seq_bw_mb,
+        show_legend=args.key == "write",
+    )
+    fig.savefig(out_dir / args.out_name, format="pdf")
 
 
 if __name__ == "__main__":

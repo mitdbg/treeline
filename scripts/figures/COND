@@ -94,8 +94,26 @@ run_command(
 # Plot the fio random write motivational microbenchmark.
 run_command(
   name="rand_write",
-  run="python3 plot_rand_write.py",
+  run="python3 plot_rand_io.py",
+  options={
+    "key": "write",
+    "out-name": "rand_write.pdf",
+    "peak-seq-bw-mb": 1100,
+  },
   deps=[
     "//scripts/iochar/write:rand-sweep",
+  ],
+)
+
+run_command(
+  name="rand_read",
+  run="python3 plot_rand_io.py",
+  options={
+    "key": "read",
+    "out-name": "rand_read.pdf",
+    "peak-seq-bw-mb": 2850,
+  },
+  deps=[
+    "//scripts/iochar/read:rand-sweep",
   ],
 )
