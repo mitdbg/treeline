@@ -161,6 +161,9 @@ class HashQueue {
       back_ = to_move->prev;
     }
 
+    to_move->next = nullptr;
+    to_move->prev = back_;
+
     // Enqueue into the back of the linked list.
     if (back_ != nullptr) {
       back_->next = to_move;
