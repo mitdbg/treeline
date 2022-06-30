@@ -30,7 +30,6 @@ class HashQueue {
     item_to_node_map_.reserve(num_elements);
     front_ = nullptr;
     back_ = nullptr;
-    mu_ = new std::mutex;
   }
 
   // Free all resources.
@@ -41,7 +40,6 @@ class HashQueue {
         delete pair.second;
       }
     }
-    delete mu_;
   }
 
   // Return whether the HashQueue is currently empty.
@@ -55,7 +53,7 @@ class HashQueue {
 
     new_node->item = item;
     new_node->next = nullptr;
-    mu_->lock();
+    mu_.lock();
     new_node->prev = back_;
 
     // Enqueue into linked list
@@ -68,7 +66,7 @@ class HashQueue {
 
     // Insert into unordered_map
     item_to_node_map_.insert({item, new_node});
-    mu_->unlock();
+    mu_.unlock();
   }
 
   // Remove and return the next item from the HashQueue (at the front of the
@@ -78,7 +76,7 @@ class HashQueue {
     if (IsEmpty()) return 0;
 
     // Dequeue from linked list
-    mu_->lock();
+    mu_.lock();
     struct HashQueueNode<T>* old_front = front_;
     front_ = old_front->next;
     T item = old_front->item;
@@ -92,16 +90,16 @@ class HashQueue {
     item_to_node_map_.erase(item);
     delete old_front;
 
-    mu_->unlock();
+    mu_.unlock();
 
     return item;
   }
 
   // Return whether or not `item` is currently in the HashQueue.
   bool Contains(T item) {
-    mu_->lock();
+    mu_.lock();
     bool found = item_to_node_map_.contains(item);
-    mu_->unlock();
+    mu_.unlock();
     return found;
   }
 
@@ -109,10 +107,10 @@ class HashQueue {
   // successful deletion, false if the item was not found.
   bool Delete(T item) {
     // Retrieve node
-    mu_->lock();
+    mu_.lock();
     auto to_delete_lookup = item_to_node_map_.find(item);
     if (to_delete_lookup == item_to_node_map_.end()) {
-      mu_->unlock();
+      mu_.unlock();
       return false;
     }
     struct HashQueueNode<T>* to_delete = to_delete_lookup->second;
@@ -132,7 +130,7 @@ class HashQueue {
     // Remove from unordered map
     item_to_node_map_.erase(item);
     delete to_delete;
-    mu_->unlock();
+    mu_.unlock();
 
     return true;
   }
@@ -142,10 +140,10 @@ class HashQueue {
   // the HashQueue.
   bool MoveToBack(T item) {
     // Retrieve node
-    mu_->lock();
+    mu_.lock();
     auto to_move_lookup = item_to_node_map_.find(item);
     if (to_move_lookup == item_to_node_map_.end()) {
-      mu_->unlock();
+      mu_.unlock();
       Enqueue(item);
       return false;
     }
@@ -171,7 +169,7 @@ class HashQueue {
     }
     back_ = to_move;
 
-    mu_->unlock();
+    mu_.unlock();
 
     return true;
   }
@@ -224,7 +222,7 @@ class HashQueue {
   struct HashQueueNode<T>* back_;
 
   // A mutex for concurrency control.
-  std::mutex* mu_;
+  std::mutex mu_;
 };
 
 }  // namespace tl
