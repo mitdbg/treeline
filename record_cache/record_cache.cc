@@ -16,7 +16,7 @@ RecordCache::RecordCache(const uint64_t capacity, bool use_lru,
   tree_ = std::make_shared<MasstreeWrapper<RecordCacheEntry>>();
   cache_entries.resize(capacity_);
   if (use_lru_) {
-    lru_queue_ = HashQueue<uint64_t>(capacity_);
+    lru_queue_ = std::make_unique<HashQueue<uint64_t>>(capacity_);
     for (auto i = 0; i < capacity_; ++i) {
       lru_queue_->Enqueue(i);
     }

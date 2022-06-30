@@ -3,7 +3,6 @@
 #include <atomic>
 #include <functional>
 #include <memory>
-#include <optional>
 #include <tuple>
 #include <vector>
 
@@ -198,7 +197,7 @@ class RecordCache {
 
   std::shared_ptr<MasstreeWrapper<RecordCacheEntry>> tree_;
 
-  std::optional<HashQueue<uint64_t>> lru_queue_;
+  std::unique_ptr<HashQueue<uint64_t>> lru_queue_;
 };
 
 }  // namespace tl
