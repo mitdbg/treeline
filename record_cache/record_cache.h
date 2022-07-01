@@ -144,7 +144,7 @@ class RecordCache {
 
   // Selects a cache entry according to the chosen policy, and returns the
   // corresponding index into the `cache_entries` vector. If the entry
-  // originally selected is dirty and `use_url_` is not set, will look at the
+  // originally selected is dirty and `use_lru_` is not set, will look at the
   // next `kDefaultEvictionLookahead` entries to try to find a clean one.
   uint64_t SelectForEviction();
   const uint64_t kDefaultEvictionLookahead = 32;
