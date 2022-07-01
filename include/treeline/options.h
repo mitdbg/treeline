@@ -110,6 +110,9 @@ struct Options {
   // If true, the record cache will try to batch writes for the same page when
   // writing out a dirty entry.
   bool rec_cache_batch_writeout = true;
+
+  // Whether the record cache should use the LRU eviction policy.
+  bool rec_cache_use_lru = false;
 };
 
 struct ReadOptions {};

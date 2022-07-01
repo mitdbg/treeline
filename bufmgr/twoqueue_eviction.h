@@ -6,7 +6,7 @@
 #include <set>
 
 #include "buffer_frame.h"
-#include "hash_queue.h"
+#include "../util/hash_queue.h"
 #include "page_eviction_strategy.h"
 namespace tl {
 

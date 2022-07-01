@@ -164,6 +164,9 @@ DEFINE_bool(optimistic_rec_caching, false,
             "records present on a page that was read in, even if the record(s) "
             "were not necessarily requested.");
 
+DEFINE_bool(rec_cache_use_lru, false,
+            "Whether the record cache should use the LRU eviction policy.");
+
 DEFINE_bool(
     skip_load, false,
     "If set to true, the workload runner will skip the initial data load.");
@@ -276,6 +279,7 @@ tl::Options BuildTreeLineOptions() {
   options.reorg_length = FLAGS_reorg_length;
   options.rec_cache_batch_writeout = FLAGS_rec_cache_batch_writeout;
   options.optimistic_caching = FLAGS_optimistic_rec_caching;
+  options.rec_cache_use_lru = FLAGS_rec_cache_use_lru;
   return options;
 }
 
@@ -293,6 +297,7 @@ tl::pg::PageGroupedDBOptions BuildPGTreeLineOptions() {
   options.rec_cache_batch_writeout = FLAGS_rec_cache_batch_writeout;
   options.parallelize_final_flush = FLAGS_pg_parallelize_final_flush;
   options.optimistic_caching = FLAGS_optimistic_rec_caching;
+  options.rec_cache_use_lru = FLAGS_rec_cache_use_lru;
 
   options.forecasting.use_insert_forecasting = FLAGS_use_insert_forecasting;
   options.forecasting.num_inserts_per_epoch = FLAGS_num_inserts_per_epoch;

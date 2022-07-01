@@ -6,7 +6,6 @@ target_sources(treeline PRIVATE
   file_manager.cc
   file_manager.h
   file.h
-  hash_queue.h
   lru_eviction.cc
   lru_eviction.h
   options.h

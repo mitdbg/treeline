@@ -30,7 +30,7 @@ void RecordCacheRW_64MiB(benchmark::State& state, bool is_safe) {
   std::shuffle(std::begin(v), std::end(v), rng);
 
   for (auto _ : state) {
-    RecordCache rc(cache_entries);
+    RecordCache rc(cache_entries, state.range(4));
     uint64_t i = 0;
     uint64_t index_out;
     for (const auto& record : dataset) {
@@ -54,35 +54,59 @@ void RecordCacheRW_64MiB(benchmark::State& state, bool is_safe) {
 }
 
 // Arguments are: {record_size, data:cache ratio, has_lookups(0/1),
-// ops:lookups ratio}
+// ops:lookups ratio, use_lru}
 BENCHMARK_CAPTURE(RecordCacheRW_64MiB, unsafe, /*is_safe = */ false)
-    ->Args({16, 10, 0, 0})
-    ->Args({512, 10, 0, 0})
-    ->Args({16, 1, 0, 0})
-    ->Args({512, 1, 0, 0})
-    ->Args({16, 10, 1, 2})
-    ->Args({512, 10, 1, 2})
-    ->Args({16, 1, 1, 2})
-    ->Args({512, 1, 1, 2})
-    ->Args({16, 10, 1, 1})
-    ->Args({512, 10, 1, 1})
-    ->Args({16, 1, 1, 1})
-    ->Args({512, 1, 1, 1})
+    ->Args({16, 10, 0, 0, 0})
+    ->Args({512, 10, 0, 0, 0})
+    ->Args({16, 1, 0, 0, 0})
+    ->Args({512, 1, 0, 0, 0})
+    ->Args({16, 10, 1, 2, 0})
+    ->Args({512, 10, 1, 2, 0})
+    ->Args({16, 1, 1, 2, 0})
+    ->Args({512, 1, 1, 2, 0})
+    ->Args({16, 10, 1, 1, 0})
+    ->Args({512, 10, 1, 1, 0})
+    ->Args({16, 1, 1, 1, 0})
+    ->Args({512, 1, 1, 1, 0})
+    ->Args({16, 10, 0, 0, 1})
+    ->Args({512, 10, 0, 0, 1})
+    ->Args({16, 1, 0, 0, 1})
+    ->Args({512, 1, 0, 0, 1})
+    ->Args({16, 10, 1, 2, 1})
+    ->Args({512, 10, 1, 2, 1})
+    ->Args({16, 1, 1, 2, 1})
+    ->Args({512, 1, 1, 2, 1})
+    ->Args({16, 10, 1, 1, 1})
+    ->Args({512, 10, 1, 1, 1})
+    ->Args({16, 1, 1, 1, 1})
+    ->Args({512, 1, 1, 1, 1})
     ->Unit(benchmark::kMillisecond);
 
 BENCHMARK_CAPTURE(RecordCacheRW_64MiB, safe, /*is_safe = */ true)
-    ->Args({16, 10, 0, 0})
-    ->Args({512, 10, 0, 0})
-    ->Args({16, 1, 0, 0})
-    ->Args({512, 1, 0, 0})
-    ->Args({16, 10, 1, 2})
-    ->Args({512, 10, 1, 2})
-    ->Args({16, 1, 1, 2})
-    ->Args({512, 1, 1, 2})
-    ->Args({16, 10, 1, 1})
-    ->Args({512, 10, 1, 1})
-    ->Args({16, 1, 1, 1})
-    ->Args({512, 1, 1, 1})
+    ->Args({16, 10, 0, 0, 0})
+    ->Args({512, 10, 0, 0, 0})
+    ->Args({16, 1, 0, 0, 0})
+    ->Args({512, 1, 0, 0, 0})
+    ->Args({16, 10, 1, 2, 0})
+    ->Args({512, 10, 1, 2, 0})
+    ->Args({16, 1, 1, 2, 0})
+    ->Args({512, 1, 1, 2, 0})
+    ->Args({16, 10, 1, 1, 0})
+    ->Args({512, 10, 1, 1, 0})
+    ->Args({16, 1, 1, 1, 0})
+    ->Args({512, 1, 1, 1, 0})
+    ->Args({16, 10, 0, 0, 1})
+    ->Args({512, 10, 0, 0, 1})
+    ->Args({16, 1, 0, 0, 1})
+    ->Args({512, 1, 0, 0, 1})
+    ->Args({16, 10, 1, 2, 1})
+    ->Args({512, 10, 1, 2, 1})
+    ->Args({16, 1, 1, 2, 1})
+    ->Args({512, 1, 1, 2, 1})
+    ->Args({16, 10, 1, 1, 1})
+    ->Args({512, 10, 1, 1, 1})
+    ->Args({16, 1, 1, 1, 1})
+    ->Args({512, 1, 1, 1, 1})
     ->Unit(benchmark::kMillisecond);
 
 }  // namespace

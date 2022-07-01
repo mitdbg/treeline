@@ -134,7 +134,7 @@ Status DBImpl::InitializeNewDB() {
       model_ = std::make_shared<BTreeModel>();
     }
     rec_cache_ = std::make_unique<RecordCache>(
-        options_.record_cache_capacity,
+        options_.record_cache_capacity, options_.rec_cache_use_lru,
         std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1),
         options_.rec_cache_batch_writeout
             ? std::bind(&DBImpl::GetPageBoundsFor, this, std::placeholders::_1)
@@ -183,7 +183,7 @@ Status DBImpl::InitializeExistingDB() {
     model_ = std::make_shared<BTreeModel>();
   }
   rec_cache_ = std::make_unique<RecordCache>(
-      options_.record_cache_capacity,
+      options_.record_cache_capacity, options_.rec_cache_use_lru,
       std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1),
       options_.rec_cache_batch_writeout
           ? std::bind(&DBImpl::GetPageBoundsFor, this, std::placeholders::_1)

@@ -68,6 +68,9 @@ struct PageGroupedDBOptions {
   // The capacity of the record cache in records.
   size_t record_cache_capacity = 1024 * 1024;
 
+  // Whether the record cache should use the LRU eviction policy.
+  bool rec_cache_use_lru = false;
+
   // Optimistically cache, with a lower priority, all records on the same page
   // as a record requested by the user.
   bool optimistic_caching = false;

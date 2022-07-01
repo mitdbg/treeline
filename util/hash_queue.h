@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #include <unordered_map>
 
 namespace tl {
@@ -21,7 +22,7 @@ class HashQueue {
  public:
   // The default minimum number of elements based on which the buckets are set.
   static const size_t kDefaultMinNumElements = 1024;
-  
+
   // Construct a new HashQueue of type T, optionally reserving enough space for
   // the buckets needed to efficiently access `num_elements`.
   HashQueue<T>() : HashQueue<T>::HashQueue(kDefaultMinNumElements) {}
@@ -42,6 +43,8 @@ class HashQueue {
   }
 
   // Return whether the HashQueue is currently empty.
+  // DEPRECATED, NOT THREAD SAFE
+  // (left for compatibility with old LRU buffer manager code)
   bool IsEmpty() { return (front_ == nullptr); }
 
   // Insert `item` into the HashQueue (at the back of the queue and in the
@@ -49,9 +52,11 @@ class HashQueue {
   void Enqueue(T item) {
     // Create a new node
     struct HashQueueNode<T>* new_node = new struct HashQueueNode<T>;
-    new_node->prev = back_;
+
     new_node->item = item;
     new_node->next = nullptr;
+    mu_.lock();
+    new_node->prev = back_;
 
     // Enqueue into linked list
     if (back_ != nullptr) {
@@ -63,15 +68,21 @@ class HashQueue {
 
     // Insert into unordered_map
     item_to_node_map_.insert({item, new_node});
+    mu_.unlock();
   }
 
   // Remove and return the next item from the HashQueue (at the front of the
   // queue).
   T Dequeue() {
-    // Corner case: empty data structure
-    if (IsEmpty()) return nullptr;
-
     // Dequeue from linked list
+    mu_.lock();
+
+    if (front_ == nullptr) {
+      // Corner case: empty data structure
+      mu_.unlock();
+      return 0;
+    }
+
     struct HashQueueNode<T>* old_front = front_;
     front_ = old_front->next;
     T item = old_front->item;
@@ -85,18 +96,29 @@ class HashQueue {
     item_to_node_map_.erase(item);
     delete old_front;
 
+    mu_.unlock();
+
     return item;
   }
 
   // Return whether or not `item` is currently in the HashQueue.
-  bool Contains(T item) { return item_to_node_map_.contains(item); }
+  bool Contains(T item) {
+    mu_.lock();
+    bool found = item_to_node_map_.contains(item);
+    mu_.unlock();
+    return found;
+  }
 
   // Delete `item` from the HashQueue, if it is there. Returns true for
   // successful deletion, false if the item was not found.
   bool Delete(T item) {
     // Retrieve node
+    mu_.lock();
     auto to_delete_lookup = item_to_node_map_.find(item);
-    if (to_delete_lookup == item_to_node_map_.end()) return false;
+    if (to_delete_lookup == item_to_node_map_.end()) {
+      mu_.unlock();
+      return false;
+    }
     struct HashQueueNode<T>* to_delete = to_delete_lookup->second;
 
     // Remove from linked list
@@ -114,6 +136,49 @@ class HashQueue {
     // Remove from unordered map
     item_to_node_map_.erase(item);
     delete to_delete;
+    mu_.unlock();
+
+    return true;
+  }
+
+  // Moves an item to the back of the queue if it is already in the HashQueue,
+  // or enqueues it otherwise. Returns true iff the item was already present in
+  // the HashQueue.
+  bool MoveToBack(T item) {
+    // Retrieve node
+    mu_.lock();
+    auto to_move_lookup = item_to_node_map_.find(item);
+    if (to_move_lookup == item_to_node_map_.end()) {
+      mu_.unlock();
+      Enqueue(item);
+      return false;
+    }
+    struct HashQueueNode<T>* to_move = to_move_lookup->second;
+
+    // Remove node from its current position in the linked list.
+    if (to_move->prev != nullptr) {
+      to_move->prev->next = to_move->next;
+    } else {
+      front_ = to_move->next;
+    }
+    if (to_move->next != nullptr) {
+      to_move->next->prev = to_move->prev;
+    } else {
+      back_ = to_move->prev;
+    }
+
+    to_move->next = nullptr;
+    to_move->prev = back_;
+
+    // Enqueue into the back of the linked list.
+    if (back_ != nullptr) {
+      back_->next = to_move;
+    } else {
+      front_ = to_move;
+    }
+    back_ = to_move;
+
+    mu_.unlock();
 
     return true;
   }
@@ -164,6 +229,9 @@ class HashQueue {
 
   // The back of the queue
   struct HashQueueNode<T>* back_;
+
+  // A mutex for concurrency control.
+  std::mutex mu_;
 };
 
 }  // namespace tl
