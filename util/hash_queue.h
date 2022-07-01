@@ -43,6 +43,8 @@ class HashQueue {
   }
 
   // Return whether the HashQueue is currently empty.
+  // DEPRECATED, NOT THREAD SAFE
+  // (left for compatibility with old LRU buffer manager code)
   bool IsEmpty() { return (front_ == nullptr); }
 
   // Insert `item` into the HashQueue (at the back of the queue and in the
@@ -72,11 +74,15 @@ class HashQueue {
   // Remove and return the next item from the HashQueue (at the front of the
   // queue).
   T Dequeue() {
-    // Corner case: empty data structure
-    if (IsEmpty()) return 0;
-
     // Dequeue from linked list
     mu_.lock();
+
+    if (front_ == nullptr) {
+      // Corner case: empty data structure
+      mu_.unlock();
+      return 0;
+    }
+
     struct HashQueueNode<T>* old_front = front_;
     front_ = old_front->next;
     T item = old_front->item;
