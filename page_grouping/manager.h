@@ -67,9 +67,8 @@ class Manager {
   Status ScanWhole(const Key& start_key, const size_t amount,
                    std::vector<std::pair<Key, std::string>>* values_out);
 
-  // Will read partial segments. Cannot run concurrently with writes (this
-  // implementation is experimental).
-  Status PrefetchScanWithEstimatesExperimental(
+  // Cannot run concurrently with writes (this implementation is experimental).
+  Status ScanWithExperimentalPrefetching(
       const Key& start_key, const size_t amount,
       std::vector<std::pair<Key, std::string>>* values_out);
 
