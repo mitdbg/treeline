@@ -139,6 +139,11 @@ DECLARE_double(overestimation_factor);
 // accommodate forecasted inserts for the next `num_future_epochs` epochs.
 DECLARE_uint64(num_future_epochs);
 
+// Set this flag to enable scan prefetching. This flag should only be used when
+// the workload is read-only (for implementation simplicity, the prefetching
+// code cannot run concurrently with writers).
+DECLARE_bool(use_experimental_scan_prefetching);
+
 namespace tl {
 namespace bench {
 

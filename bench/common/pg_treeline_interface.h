@@ -136,7 +136,10 @@ class PGTreeLineInterface {
   bool Scan(
       const ycsbr::Request::Key key, const size_t amount,
       std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {
-    return db_->GetRange(key, amount, scan_out).ok();
+    return db_
+        ->GetRange(key, amount, scan_out,
+                   FLAGS_use_experimental_scan_prefetching)
+        .ok();
   }
 
  private:

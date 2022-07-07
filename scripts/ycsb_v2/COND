@@ -616,3 +616,76 @@ for config in CONFIGS:
       "pg_use_pgm_builder": False,
     },
   )
+
+
+###
+### Prefetching experiments.
+###
+
+PREFETCH_COMMON = {
+  **COMMON_OPTIONS,
+  **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET, workload="scan_only"),
+  "db": "pg_llsm",
+  "custom_dataset": AMZN_DATASET["path"],
+  "gen_template": "workloads/scan_only.yml",
+  "gen_distribution": "uniform",
+  # 1 thread making the requests. 16 background threads to help with
+  # prefetching.
+  "threads": 1,
+  "bg_threads": 16,
+}
+
+run_experiment_group(
+  name="prefetch-amzn-1024B",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="prefetch-amzn-1024B-base",
+      options={
+        **PREFETCH_COMMON,
+        "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
+        # Disable page grouping.
+        "pg_use_segments": False,
+        # Disable prefetching.
+        "use_experimental_scan_prefetching": False,
+      },
+    ),
+    ExperimentInstance(
+      name="prefetch-amzn-1024B-prefetch",
+      options={
+        **PREFETCH_COMMON,
+        "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
+        # Disable page grouping.
+        "pg_use_segments": False,
+        # Enable prefetching.
+        "use_experimental_scan_prefetching": True,
+      },
+    ),
+    ExperimentInstance(
+      name="prefetch-amzn-1024B-grouping",
+      options={
+        **PREFETCH_COMMON,
+        "checkpoint_name": "ycsb-amzn-pg_llsm-1024B",
+        # Enable page grouping.
+        "pg_use_segments": True,
+        # Disable prefetching.
+        "use_experimental_scan_prefetching": False,
+      },
+    ),
+    ExperimentInstance(
+      name="prefetch-amzn-1024B-grouping-prefetch",
+      options={
+        **PREFETCH_COMMON,
+        "checkpoint_name": "ycsb-amzn-pg_llsm-1024B",
+        # Enable page grouping.
+        "pg_use_segments": True,
+        # Enable prefetching.
+        "use_experimental_scan_prefetching": True,
+      },
+    ),
+  ],
+  deps=[
+    ":preload-amzn-pg_llsm_nogrp-1024B",
+    ":preload-amzn-pg_llsm-1024B",
+  ],
+)

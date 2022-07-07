@@ -201,6 +201,12 @@ DEFINE_uint64(
     "During reorganization, the system will leave sufficient space to "
     "accommodate forecasted inserts for the next `num_future_epochs` epochs.");
 
+DEFINE_bool(
+    use_experimental_scan_prefetching, false,
+    "Set this flag to enable scan prefetching. This flag should only be used "
+    "when the workload is read-only (for implementation simplicity, the "
+    "prefetching code cannot run concurrently with writers).");
+
 namespace tl {
 namespace bench {
 
