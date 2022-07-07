@@ -46,6 +46,8 @@ class PGTreeLineInterface {
       out << "free_list_entries," << stats.GetFreeListEntries() << std::endl;
       out << "free_list_bytes," << stats.GetFreeListBytes() << std::endl;
       out << "cache_bytes," << stats.GetCacheBytes() << std::endl;
+
+      out << "overfetched_pages," << stats.GetOverfetchedPages() << std::endl;
       // clang-format on
     });
   }

@@ -67,9 +67,9 @@ class PageGroupedDB {
 
   // Retrieve an ascending range of at most `num_records` records, starting from
   // the smallest record whose key is greater than or equal to `start_key`.
-  virtual Status GetRange(
-      const Key start_key, const size_t num_records,
-      std::vector<std::pair<Key, std::string>>* results_out) = 0;
+  virtual Status GetRange(const Key start_key, const size_t num_records,
+                          std::vector<std::pair<Key, std::string>>* results_out,
+                          bool use_experimental_prefetch = false) = 0;
 
   // Removes all overflow pages in the specified key range. The `end_key` is
   // exclusive.

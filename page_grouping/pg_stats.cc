@@ -25,6 +25,8 @@ void PageGroupedDBStats::PostToGlobal() const {
   global_.segment_index_bytes_ += segment_index_bytes_;
   global_.lock_manager_bytes_ += lock_manager_bytes_; 
   global_.cache_bytes_ += cache_bytes_;
+
+  global_.overfetched_pages_ += overfetched_pages_;
 }
 
 void PageGroupedDBStats::Reset() {
@@ -43,6 +45,8 @@ void PageGroupedDBStats::Reset() {
   segment_index_bytes_ = 0;
   lock_manager_bytes_ = 0;
   cache_bytes_ = 0;
+
+  overfetched_pages_ = 0;
 }
 
 }  // namespace pg

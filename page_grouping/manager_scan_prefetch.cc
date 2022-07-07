@@ -5,6 +5,7 @@
 
 #include "manager.h"
 #include "persist/merge_iterator.h"
+#include "treeline/pg_stats.h"
 #include "util/key.h"
 #include "workspace.h"
 
@@ -193,6 +194,7 @@ Status Manager::ScanWithExperimentalPrefetching(
   };
 
   bool is_first_page = true;
+  size_t fetched_pages_used = 0;
   for (auto& f : ready_pages) {
     if (records_left == 0) break;
 
@@ -207,6 +209,7 @@ Status Manager::ScanWithExperimentalPrefetching(
       } else {
         scan_page(page);
       }
+      ++fetched_pages_used;
     }
   }
 
@@ -219,7 +222,11 @@ Status Manager::ScanWithExperimentalPrefetching(
     throw std::runtime_error(err_msg.str());
   }
 
-  // N.B. The thread will implicitly wait for any remaining outstanding I/Os.
+  // If we reach here, it must be the case that `est_pages_to_fetch >=
+  // fetched_pages_used`. We track the number of "overfetched" pages.
+  // N.B. This thread will implicitly wait for any remaining outstanding I/Os.
+  PageGroupedDBStats::Local().BumpOverfetchedPages(est_pages_to_fetch -
+                                                   fetched_pages_used);
 
   return Status::OK();
 }
