@@ -309,6 +309,7 @@ TEST_F(PGManagerTest, ScanSegmentsSequential) {
 
 TEST_F(PGManagerTest, ScanSegmentsPrefetch) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  options.num_bg_threads = 16;  // Must be non-zero for prefetching.
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -326,6 +327,7 @@ TEST_F(PGManagerTest, ScanSegmentsPrefetch) {
 
 TEST_F(PGManagerTest, ScanSegmentsSequentialPrefetch) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  options.num_bg_threads = 16;  // Must be non-zero for prefetching.
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kSequentialKeys, u8"08 bytes");
@@ -359,6 +361,7 @@ TEST_F(PGManagerTest, ScanPages) {
 
 TEST_F(PGManagerTest, ScanPagesPrefetch) {
   auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  options.num_bg_threads = 16;  // Must be non-zero for prefetching.
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
