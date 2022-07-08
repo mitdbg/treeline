@@ -24,7 +24,7 @@ class Workspace {
     return buf_;
   }
 
-  static constexpr size_t kPrefetchBufferPages = 60;
+  static constexpr size_t kPrefetchBufferPages = 80;
 
   PageBuffer& prefetch_buffer() {
     if (prefetch_buf_ != nullptr) return prefetch_buf_;

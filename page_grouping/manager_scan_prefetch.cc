@@ -17,11 +17,13 @@ class PrefetchBuffer {
 
   char* Allocate(size_t pages) {
     if (pages > pages_left_) {
-      // We do not expect to hit this case in our experiments.
+      // We do not expect to hit this case in our experiments. So we want this
+      // case to be a fatal error.
       throw std::bad_alloc();
     }
     char* const to_return = buf_;
     buf_ += tl::pg::Page::kSize * pages;
+    pages_left_ -= pages;
     return to_return;
   }
 
@@ -213,8 +215,10 @@ Status Manager::ScanWithExperimentalPrefetching(
     }
   }
 
-  if (records_left > 0) {
-    // We want this case to be a fatal error.
+  if (records_left > 0 && curr_seg.has_value()) {
+    // This represents a situation where we underestimated the number of pages
+    // to prefetch. We want this case to be a fatal error to avoid incorrectness
+    // in the experiments.
     std::stringstream err_msg;
     err_msg << "Underestimated prefetch. Scan length: " << amount
             << " Estimated pages: " << est_pages_to_fetch
