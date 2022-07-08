@@ -189,7 +189,11 @@ Status Manager::ScanWithExperimentalPrefetching(
     }
 
     PageMergeIterator pmi(std::move(page_its));
+    if (pmi.Valid()) {
+      assert(pmi.RecordsLeft() > 0);
+    }
     for (; records_left > 0 && pmi.Valid(); --records_left, pmi.Next()) {
+      assert(pmi.RecordsLeft() > 0);
       values_out->emplace_back(key_utils::ExtractHead64(pmi.key()),
                                pmi.value().ToString());
     }
