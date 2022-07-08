@@ -6,9 +6,9 @@
 #include <vector>
 
 #include "key.h"
-#include "treeline/slice.h"
 #include "plr/data.h"
 #include "plr/greedy.h"
+#include "treeline/slice.h"
 
 namespace tl {
 namespace pg {
@@ -25,8 +25,14 @@ struct Segment {
 
 class SegmentBuilder {
  public:
+  enum class Strategy {
+    kGreedy,
+    kPGM,
+  };
+
   SegmentBuilder(const size_t records_per_page_goal,
-                 const size_t records_per_page_delta);
+                 const size_t records_per_page_delta,
+                 Strategy strategy = Strategy::kGreedy);
 
   // Build segments when the entire dataset can fit in memory.
   //
@@ -69,7 +75,8 @@ class SegmentBuilder {
   // Used by the stream-based builder.
   enum class State { kNeedBase, kHasBase, kFillingSinglePage };
   State state_;
-  std::optional<plr::GreedyPLRBuilder64> plr_;
+  Strategy strategy_;
+  std::unique_ptr<plr::PLRBuilder<double>> plr_;
   Key base_key_;
   std::deque<std::pair<Key, Slice>> processed_records_;
 };
