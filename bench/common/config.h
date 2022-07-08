@@ -95,6 +95,10 @@ DECLARE_bool(pg_use_memory_based_io);
 DECLARE_bool(pg_bypass_cache);
 DECLARE_bool(pg_parallelize_final_flush);
 
+// If set, PGTreeLine will use the PGM piecewise linear regression algorithm for
+// page grouping. This flag has no effect if `pg_use_segments` is set to false.
+DECLARE_bool(pg_use_pgm_builder);
+
 // If true, the record cache will try to batch writes for the same page when
 // writing out a dirty entry.
 DECLARE_bool(rec_cache_batch_writeout);

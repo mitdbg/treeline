@@ -4,12 +4,12 @@
 
 #include "../bufmgr/page_memory_allocator.h"
 #include "circular_page_buffer.h"
-#include "treeline/pg_db.h"
-#include "treeline/pg_stats.h"
 #include "manager.h"
 #include "persist/merge_iterator.h"
 #include "persist/page.h"
 #include "persist/segment_wrap.h"
+#include "treeline/pg_db.h"
+#include "treeline/pg_stats.h"
 #include "util/key.h"
 
 namespace {
@@ -267,7 +267,10 @@ Status Manager::RewriteSegmentsImpl(
   // End insert forecasting
   //
 
-  SegmentBuilder seg_builder(future_goal, future_delta);
+  SegmentBuilder seg_builder(future_goal, future_delta,
+                             options_.use_pgm_builder
+                                 ? SegmentBuilder::Strategy::kPGM
+                                 : SegmentBuilder::Strategy::kGreedy);
 
   // Keeps track of the pages in memory (the "sliding window"). The pages'
   // backing memory is in `page_buf`. The page chains in the deques are sorted

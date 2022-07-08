@@ -89,6 +89,10 @@ struct PageGroupedDBOptions {
 
   // Options for insert forecasting.
   InsertForecastingOptions forecasting;
+
+  // If true, the DB will use PGM's piecewise linear regression algorithm for
+  // page grouping. This flag has no effect if `use_segments` is set to false.
+  bool use_pgm_builder = false;
 };
 
 struct WriteOptions {
