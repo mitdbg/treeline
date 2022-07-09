@@ -575,20 +575,20 @@ run_experiment_group(
   experiments=[
     # e.g. amzn_pgm-pg_llsm-64B-a-zipfian-16
     ExperimentInstance(
-      name="amzn_pgm-pg_llsm-{}-{}-zipfian-16".format(config["name"], workload),
+      name="amzn_pgm-pg_llsm-{}-{}-zipfian-{}".format(config["name"], workload, threads),
       options={
         **COMMON_OPTIONS,
         **process_config("pg_llsm", config, AMZN_DATASET, workload=workload),
         "db": "pg_llsm",
         "checkpoint_name": "ycsb-amzn_pgm-pg_llsm-{}".format(config["name"]),
         "custom_dataset": AMZN_DATASET["path"],
-        "threads": 16,
+        "threads": threads,
         "gen_template": "workloads/{}.yml".format(workload),
         "gen_distribution": "zipfian",
         "pg_use_pgm_builder": True,
       },
     )
-    for config, workload in product(CONFIGS, WORKLOADS)
+    for config, workload, threads in product(CONFIGS, WORKLOADS, THREADS)
   ],
   deps=[
     # e.g. :preload-amzn-pg_llsm-64B
