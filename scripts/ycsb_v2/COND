@@ -629,9 +629,14 @@ PREFETCH_COMMON = {
   "custom_dataset": AMZN_DATASET["path"],
   "gen_template": "workloads/scan_only.yml",
   "gen_distribution": "uniform",
-  # 16 background threads to help with prefetching.
-  "bg_threads": 16,
 }
+
+run_command(
+  name="combine-prefetch-amzn-1024B",
+  run="python3 combine_raw.py",
+  args=["--for-prefetch"],
+  deps=[":prefetch-amzn-1024B"],
+)
 
 run_experiment_group(
   name="prefetch-amzn-1024B",
@@ -643,6 +648,7 @@ run_experiment_group(
         **PREFETCH_COMMON,
         "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
         "threads": threads,
+        "bg_threads": 4,  # Same as original experiments.
         # Disable page grouping.
         "pg_use_segments": False,
         # Disable prefetching.
@@ -657,6 +663,7 @@ run_experiment_group(
         **PREFETCH_COMMON,
         "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
         "threads": threads,
+        "bg_threads": threads * 16,  # 16 prefetch threads per request thread
         # Disable page grouping.
         "pg_use_segments": False,
         # Enable prefetching.
@@ -671,6 +678,7 @@ run_experiment_group(
         **PREFETCH_COMMON,
         "checkpoint_name": "ycsb-amzn-pg_llsm-1024B",
         "threads": threads,
+        "bg_threads": 4,  # Same as original experiments.
         # Enable page grouping.
         "pg_use_segments": True,
         # Disable prefetching.
