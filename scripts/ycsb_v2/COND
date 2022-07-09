@@ -563,3 +563,54 @@ run_command(
     "pg_use_segments": False,
   },
 )
+
+
+###
+### PGM experiments.
+###
+
+run_experiment_group(
+  name="amzn-pgm",
+  run="./run.sh",
+  experiments=[
+    # e.g. amzn-pg_llsm-64B-a-zipfian-16
+    ExperimentInstance(
+      name="amzn-pg_llsm-{}-{}-zipfian-16".format(config["name"], workload),
+      options={
+        **COMMON_OPTIONS,
+        **process_config("pg_llsm", config, AMZN_DATASET, workload=workload),
+        "db": db,
+        "checkpoint_name": "ycsb-amzn_pgm-pg_llsm-{}".format(config["name"]),
+        "custom_dataset": AMZN_DATASET["path"],
+        "threads": 16,
+        "gen_template": "workloads/{}.yml".format(workload),
+        "gen_distribution": "zipfian",
+        "use_pgm_builder": True,
+      },
+    )
+    for config, workload in product(CONFIGS, WORKLOADS)
+  ],
+  deps=[
+    # e.g. :preload-amzn-pg_llsm-64B
+    ":preload-amzn_pgm-pg_llsm-{}".format(config["name"])
+    for config in CONFIGS
+  ],
+)
+
+for config in CONFIGS:
+  run_command(
+    name="preload-amzn_pgm-pg_llsm-{}".format(config["name"]),
+    run="./preload.sh" ,
+    options={
+      **COMMON_OPTIONS,
+      **process_config("pg_llsm", config, AMZN_DATASET),
+      "db": db,
+      "checkpoint_name": "ycsb-amzn_pgm-pg_llsm-{}".format(config["name"]),
+      "custom_dataset": AMZN_DATASET["path"],
+      "threads": 1,
+      "gen_template": "workloads/setup.yml",
+      # NOTE: This overrides any previously set value.
+      "gen_num_requests": NUM_PRELOAD_UPDATES,
+      "use_pgm_builder": True,
+    },
+  )
