@@ -579,7 +579,7 @@ run_experiment_group(
       options={
         **COMMON_OPTIONS,
         **process_config("pg_llsm", config, AMZN_DATASET, workload=workload),
-        "db": db,
+        "db": "pg_llsm",
         "checkpoint_name": "ycsb-amzn_pgm-pg_llsm-{}".format(config["name"]),
         "custom_dataset": AMZN_DATASET["path"],
         "threads": 16,
@@ -604,7 +604,7 @@ for config in CONFIGS:
     options={
       **COMMON_OPTIONS,
       **process_config("pg_llsm", config, AMZN_DATASET),
-      "db": db,
+      "db": "pg_llsm",
       "checkpoint_name": "ycsb-amzn_pgm-pg_llsm-{}".format(config["name"]),
       "custom_dataset": AMZN_DATASET["path"],
       "threads": 1,
