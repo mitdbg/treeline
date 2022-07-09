@@ -629,9 +629,7 @@ PREFETCH_COMMON = {
   "custom_dataset": AMZN_DATASET["path"],
   "gen_template": "workloads/scan_only.yml",
   "gen_distribution": "uniform",
-  # 1 thread making the requests. 16 background threads to help with
-  # prefetching.
-  "threads": 1,
+  # 16 background threads to help with prefetching.
   "bg_threads": 16,
 }
 
@@ -640,49 +638,46 @@ run_experiment_group(
   run="./run.sh",
   experiments=[
     ExperimentInstance(
-      name="prefetch-amzn-1024B-base",
+      name="prefetch-amzn-1024B-base-{}".format(threads),
       options={
         **PREFETCH_COMMON,
         "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
+        "threads": threads,
         # Disable page grouping.
         "pg_use_segments": False,
         # Disable prefetching.
         "use_experimental_scan_prefetching": False,
       },
-    ),
+    )
+    for threads in THREADS
+  ] + [
     ExperimentInstance(
-      name="prefetch-amzn-1024B-prefetch",
+      name="prefetch-amzn-1024B-prefetch-{}".format(threads),
       options={
         **PREFETCH_COMMON,
         "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
+        "threads": threads,
         # Disable page grouping.
         "pg_use_segments": False,
         # Enable prefetching.
         "use_experimental_scan_prefetching": True,
       },
-    ),
+    )
+    for threads in THREADS
+  ] + [
     ExperimentInstance(
-      name="prefetch-amzn-1024B-grouping",
+      name="prefetch-amzn-1024B-grouping-{}".format(threads),
       options={
         **PREFETCH_COMMON,
         "checkpoint_name": "ycsb-amzn-pg_llsm-1024B",
+        "threads": threads,
         # Enable page grouping.
         "pg_use_segments": True,
         # Disable prefetching.
         "use_experimental_scan_prefetching": False,
       },
-    ),
-    ExperimentInstance(
-      name="prefetch-amzn-1024B-grouping-prefetch",
-      options={
-        **PREFETCH_COMMON,
-        "checkpoint_name": "ycsb-amzn-pg_llsm-1024B",
-        # Enable page grouping.
-        "pg_use_segments": True,
-        # Enable prefetching.
-        "use_experimental_scan_prefetching": True,
-      },
-    ),
+    )
+    for threads in THREADS
   ],
   deps=[
     ":preload-amzn-pg_llsm_nogrp-1024B",
