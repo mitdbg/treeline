@@ -46,6 +46,7 @@ def parse_space_file(file_path, db):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--for-factor", action="store_true")
+    parser.add_argument("--for-prefetch", action="store_true")
     args = parser.parse_args()
     deps = cond.get_deps_paths()
     out_dir = cond.get_output_path()
@@ -88,6 +89,34 @@ def main():
                 df.insert(0, "workload", workload)
                 df.insert(1, "order", order)
                 df.insert(2, "name", name)
+
+            elif args.for_prefetch:
+                # The prefetch experiments also have a different name format.
+                # e.g.: prefetch-amzn-1024B-base-1
+                exp_parts = exp_inst.name.split("-")
+                dataset = exp_parts[1]
+                db = "pg_llsm"
+                config = exp_parts[2]
+                dist = "uniform"
+                threads = int(exp_parts[4])
+                variant = exp_parts[3]
+
+                if variant == "base":
+                    order = 1
+                elif variant == "prefetch":
+                    order = 2
+                elif variant == "grouping":
+                    order = 3
+                else:
+                    raise RuntimeError
+
+                # Process end-to-end results
+                df.insert(0, "dataset", dataset)
+                df.insert(1, "config", config)
+                df.insert(2, "dist", dist)
+                df.insert(3, "threads", threads)
+                df.insert(4, "variant", variant)
+                df.insert(5, "order", order)
 
             else:
                 # e.g.: synth-pg_llsm-64B-a-zipfian-1
@@ -158,6 +187,26 @@ def main():
                 "workload",
                 "order",
                 "name",
+                *orig_columns,
+                "phys_read_kb",
+                "phys_written_kb",
+                "disk_usage_bytes",
+            ]
+        ]
+    elif args.for_prefetch:
+        combined.sort_values(
+            ["dataset", "config", "dist", "db", "threads", "order"],
+            inplace=True,
+            ignore_index=True,
+        )
+        combined = combined[
+            [
+                "dataset",
+                "config",
+                "dist",
+                "db",
+                "threads",
+                "variant",
                 *orig_columns,
                 "phys_read_kb",
                 "phys_written_kb",
