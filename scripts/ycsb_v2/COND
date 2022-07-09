@@ -573,9 +573,9 @@ run_experiment_group(
   name="amzn-pgm",
   run="./run.sh",
   experiments=[
-    # e.g. amzn-pg_llsm-64B-a-zipfian-16
+    # e.g. amzn_pgm-pg_llsm-64B-a-zipfian-16
     ExperimentInstance(
-      name="amzn-pg_llsm-{}-{}-zipfian-16".format(config["name"], workload),
+      name="amzn_pgm-pg_llsm-{}-{}-zipfian-16".format(config["name"], workload),
       options={
         **COMMON_OPTIONS,
         **process_config("pg_llsm", config, AMZN_DATASET, workload=workload),
@@ -585,7 +585,7 @@ run_experiment_group(
         "threads": 16,
         "gen_template": "workloads/{}.yml".format(workload),
         "gen_distribution": "zipfian",
-        "use_pgm_builder": True,
+        "pg_use_pgm_builder": True,
       },
     )
     for config, workload in product(CONFIGS, WORKLOADS)
@@ -611,6 +611,6 @@ for config in CONFIGS:
       "gen_template": "workloads/setup.yml",
       # NOTE: This overrides any previously set value.
       "gen_num_requests": NUM_PRELOAD_UPDATES,
-      "use_pgm_builder": True,
+      "pg_use_pgm_builder": True,
     },
   )
