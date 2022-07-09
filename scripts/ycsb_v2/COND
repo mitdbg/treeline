@@ -597,16 +597,27 @@ run_experiment_group(
   ],
 )
 
-for config in CONFIGS:
+group(
+  name="pgm-preload",
+  deps=[
+    ":preload-{}_pgm-pg_llsm-{}".format(dataset["name"], config["name"])
+    for dataset, config in product(CUSTOM_DATASETS, CONFIGS)
+  ] + [
+    ":preload-synth_pgm-pg_llsm-{}".format(config["name"])
+    for config in CONFIGS
+  ],
+)
+
+for dataset, config in product(CUSTOM_DATASETS, CONFIGS):
   run_command(
-    name="preload-amzn_pgm-pg_llsm-{}".format(config["name"]),
+    name="preload-{}_pgm-pg_llsm-{}".format(dataset["name"], config["name"]),
     run="./preload.sh" ,
     options={
       **COMMON_OPTIONS,
-      **process_config("pg_llsm", config, AMZN_DATASET),
+      **process_config("pg_llsm", config, dataset),
       "db": "pg_llsm",
-      "checkpoint_name": "ycsb-amzn_pgm-pg_llsm-{}".format(config["name"]),
-      "custom_dataset": AMZN_DATASET["path"],
+      "checkpoint_name": "ycsb-{}_pgm-pg_llsm-{}".format(dataset["name"], config["name"]),
+      "custom_dataset": dataset["path"],
       "threads": 1,
       "gen_template": "workloads/setup.yml",
       # NOTE: This overrides any previously set value.
@@ -614,3 +625,20 @@ for config in CONFIGS:
       "pg_use_pgm_builder": True,
     },
   )
+
+for config in CONFIGS:
+  run_command(
+    name="preload-synth_pgm-pg_llsm-{}".format(config["name"]),
+    run="./preload.sh" ,
+    options={
+      **COMMON_OPTIONS,
+      **process_config("pg_llsm", config, SYNTH_DATASET),
+      "db": "pg_llsm",
+      "checkpoint_name": "ycsb-synth_pgm-pg_llsm-{}".format(config["name"]),
+      "threads": 1,
+      "gen_template": "workloads/setup.yml",
+      # NOTE: This overrides any previously set value.
+      "gen_num_requests": NUM_PRELOAD_UPDATES,
+      "pg_use_pgm_builder": True,
+    },
+)
