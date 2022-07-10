@@ -686,6 +686,21 @@ run_experiment_group(
       },
     )
     for threads in THREADS
+  ] + [
+    ExperimentInstance(
+      name="prefetch-amzn-1024B-grouping_prefetch-{}".format(threads),
+      options={
+        **PREFETCH_COMMON,
+        "checkpoint_name": "ycsb-amzn-pg_llsm-1024B",
+        "threads": threads,
+        "bg_threads": threads * 16,  # 16 prefetch threads per request thread
+        # Enable page grouping.
+        "pg_use_segments": True,
+        # Enable prefetching.
+        "use_experimental_scan_prefetching": True,
+      },
+    )
+    for threads in THREADS
   ],
   deps=[
     ":preload-amzn-pg_llsm_nogrp-1024B",

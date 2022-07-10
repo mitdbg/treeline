@@ -107,6 +107,8 @@ def main():
                     order = 2
                 elif variant == "grouping":
                     order = 3
+                elif variant == "grouping_prefetch":
+                    order = 4
                 else:
                     raise RuntimeError
 
