@@ -569,6 +569,12 @@ run_command(
 ### PGM experiments.
 ###
 
+run_command(
+  name="combine-amzn-pgm",
+  run="python3 combine_raw.py",
+  deps=[":amzn-pgm"],
+)
+
 run_experiment_group(
   name="amzn-pgm",
   run="./run.sh",

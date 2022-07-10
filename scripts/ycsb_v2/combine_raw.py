@@ -37,6 +37,9 @@ def parse_space_file(file_path, db):
             if not line.endswith(db):
                 continue
             return int(line.split("\t")[0])
+    if db == "pg_llsm":
+        # To handle the name change.
+        return parse_space_file(file_path, "pg_tl")
     raise RuntimeError("Failed to parse space usage for {}:".format(db), str(file_path))
 
 
