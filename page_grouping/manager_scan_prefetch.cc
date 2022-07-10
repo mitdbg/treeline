@@ -65,9 +65,8 @@ Status Manager::ScanWithExperimentalPrefetching(
 
   // This is a rough estimate that should be good enough for the prefetching
   // experiments.
-  const size_t est_pages_to_fetch =
-      2ULL + std::ceil(records_left /
-                       static_cast<double>(options_.records_per_page_goal));
+  const size_t est_pages_to_fetch = 1ULL + std::ceil(
+      records_left / static_cast<double>(options_.records_per_page_goal));
   size_t pages_prefetched = 0;
 
   // 1. Find the segment that should hold the start key.
@@ -130,15 +129,16 @@ Status Manager::ScanWithExperimentalPrefetching(
     const size_t seg_page_count = curr_seg->sinfo.page_count();
     const size_t seg_byte_offset =
         curr_seg->sinfo.id().GetOffset() * Page::kSize;
+    const size_t pages_to_read = std::min(seg_page_count, est_pages_to_fetch - pages_prefetched);
 
     ready_pages.emplace_back(bg_threads_->Submit(
-        [this, curr_seg = *curr_seg, seg_byte_offset, seg_page_count,
-         buf = prefetch_buf.Allocate(seg_page_count)]() {
+        [this, curr_seg = *curr_seg, seg_byte_offset, pages_to_read,
+         buf = prefetch_buf.Allocate(pages_to_read)]() {
           const std::unique_ptr<SegmentFile>& sf =
               segment_files_[curr_seg.sinfo.id().GetFileId()];
-          sf->ReadPages(seg_byte_offset, buf, seg_page_count);
-          w_.BumpReadCount(seg_page_count);
-          return std::make_pair(buf, seg_page_count);
+          sf->ReadPages(seg_byte_offset, buf, pages_to_read);
+          w_.BumpReadCount(pages_to_read);
+          return std::make_pair(buf, pages_to_read);
         }));
     pages_prefetched += seg_page_count;
 
