@@ -90,7 +90,7 @@ DECLARE_uint32(rdb_prefix_bloom_size);
 // Page grouping configuration options.
 DECLARE_bool(pg_use_segments);
 DECLARE_uint64(records_per_page_goal);
-DECLARE_uint64(records_per_page_delta);
+DECLARE_double(records_per_page_epsilon);
 DECLARE_bool(pg_use_memory_based_io);
 DECLARE_bool(pg_bypass_cache);
 DECLARE_bool(pg_parallelize_final_flush);

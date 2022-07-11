@@ -40,10 +40,10 @@ std::vector<std::pair<uint64_t, Slice>> BuildRecords(
   return records;
 }
 
-PageGroupedDBOptions GetOptions(size_t goal, size_t delta, bool use_segments) {
+PageGroupedDBOptions GetOptions(size_t goal, size_t epsilon, bool use_segments) {
   PageGroupedDBOptions options;
   options.records_per_page_goal = goal;
-  options.records_per_page_delta = delta;
+  options.records_per_page_epsilon = epsilon;
   options.use_segments = use_segments;
   options.write_debug_info = false;
   options.use_memory_based_io = true;
@@ -52,7 +52,7 @@ PageGroupedDBOptions GetOptions(size_t goal, size_t delta, bool use_segments) {
 }
 
 TEST_F(PGManagerTest, CreateReopenSegments) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -86,7 +86,7 @@ TEST_F(PGManagerTest, CreateReopenSegments) {
 }
 
 TEST_F(PGManagerTest, CreateReopenPages) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -120,7 +120,7 @@ TEST_F(PGManagerTest, CreateReopenPages) {
 }
 
 TEST_F(PGManagerTest, PointReadSegments) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -162,7 +162,7 @@ TEST_F(PGManagerTest, PointReadSegments) {
 }
 
 TEST_F(PGManagerTest, PointReadPages) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -204,7 +204,7 @@ TEST_F(PGManagerTest, PointReadPages) {
 }
 
 TEST_F(PGManagerTest, PointReadSegmentsSequential) {
-  auto options = GetOptions(/*goal=*/45, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/45, /*epsilon=*/5, /*use_segments=*/true);
 
   // Use the sequential dataset instead of the uniform one.
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -276,7 +276,7 @@ const std::vector<std::pair<size_t, size_t>> kScanRequests = ([]() {
 })();
 
 TEST_F(PGManagerTest, ScanSegments) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -292,7 +292,7 @@ TEST_F(PGManagerTest, ScanSegments) {
 }
 
 TEST_F(PGManagerTest, ScanSegmentsSequential) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kSequentialKeys, u8"08 bytes");
@@ -308,7 +308,7 @@ TEST_F(PGManagerTest, ScanSegmentsSequential) {
 }
 
 TEST_F(PGManagerTest, ScanPages) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -324,7 +324,7 @@ TEST_F(PGManagerTest, ScanPages) {
 }
 
 TEST_F(PGManagerTest, BatchedUpdateSegments) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/true);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -389,7 +389,7 @@ TEST_F(PGManagerTest, BatchedUpdateSegments) {
 }
 
 TEST_F(PGManagerTest, BatchedUpdatePages) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/false);
 
   std::vector<std::pair<uint64_t, Slice>> dataset =
       BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
@@ -454,7 +454,7 @@ TEST_F(PGManagerTest, BatchedUpdatePages) {
 }
 
 TEST_F(PGManagerTest, InsertOverflowSegments) {
-  auto options = GetOptions(/*goal=*/4, /*delta=*/1, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/4, /*epsilon=*/1, /*use_segments=*/true);
 
   // 512 B string.
   std::string value;
@@ -509,7 +509,7 @@ TEST_F(PGManagerTest, InsertOverflowSegments) {
 }
 
 TEST_F(PGManagerTest, InsertOverflowPages) {
-  auto options = GetOptions(/*goal=*/4, /*delta=*/1, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/4, /*epsilon=*/1, /*use_segments=*/false);
 
   // 512 B string.
   std::string value;
@@ -564,7 +564,7 @@ TEST_F(PGManagerTest, InsertOverflowPages) {
 }
 
 TEST_F(PGManagerTest, PageBoundsConsistency) {
-  auto options = GetOptions(/*goal=*/45, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/45, /*epsilon=*/5, /*use_segments=*/true);
 
   // Use the sequential dataset instead of the uniform one.
   std::vector<std::pair<uint64_t, Slice>> dataset =

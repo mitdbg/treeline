@@ -41,7 +41,7 @@ struct PageGroupedDBOptions {
 
   // By default, put 45 +/- (2 * 5) records into each page.
   size_t records_per_page_goal = 45;
-  size_t records_per_page_delta = 5;
+  double records_per_page_epsilon = 5;
 
   // If set to true, will write out the segment sizes and models to a CSV file
   // for debug purposes.

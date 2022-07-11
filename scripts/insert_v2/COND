@@ -12,7 +12,7 @@ CONFIG_64B = {
 
   # Used by page-grouped LLSM.
   "records_per_page_goal": 45,
-  "records_per_page_delta": 5,
+  "records_per_page_epsilon": 5,
 
   # Used by all DBs.
   # 18 MiB in total (2 x 4 MiB + 10 MiB)
@@ -26,7 +26,7 @@ CONFIG_512B = {
 
   # Used by page-grouped LLSM.
   "records_per_page_goal": 4,
-  "records_per_page_delta": 1,
+  "records_per_page_epsilon": 1,
 
   # Used by all DBs.
   # 146 MiB in total
@@ -40,7 +40,7 @@ CONFIG_1024B = {
 
   # Used by page-grouped LLSM.
   "records_per_page_goal": 2,
-  "records_per_page_delta": 1,
+  "records_per_page_epsilon": 1,
 
   # Used by all DBs.
   # 292 MiB in total

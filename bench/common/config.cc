@@ -138,7 +138,7 @@ DEFINE_uint64(reorg_length, 5,
 
 // Page grouping related flags.
 DEFINE_uint64(records_per_page_goal, 45, "Page grouping fill rate goal.");
-DEFINE_uint64(records_per_page_delta, 5,
+DEFINE_double(records_per_page_epsilon, 5,
               "Page grouping model error tolerance.");
 DEFINE_bool(pg_use_segments, true,
             "If set to false, all segments will be a single page (emulates not "
@@ -291,7 +291,7 @@ tl::pg::PageGroupedDBOptions BuildPGTreeLineOptions() {
   tl::pg::PageGroupedDBOptions options;
   options.use_segments = FLAGS_pg_use_segments;
   options.records_per_page_goal = FLAGS_records_per_page_goal;
-  options.records_per_page_delta = FLAGS_records_per_page_delta;
+  options.records_per_page_epsilon = FLAGS_records_per_page_epsilon;
   options.num_bg_threads = FLAGS_bg_threads;
   // Each record cache entry takes 96 bytes of space (metadata).
   options.record_cache_capacity = (FLAGS_cache_size_mib * 1024ULL * 1024ULL) /

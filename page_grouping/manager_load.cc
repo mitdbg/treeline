@@ -129,7 +129,7 @@ void Manager::BulkLoadIntoSegmentsImpl(const std::vector<Record>& records) {
 
   // 1. Generate the segments.
   SegmentBuilder builder(
-      options_.records_per_page_goal, options_.records_per_page_delta,
+      options_.records_per_page_goal, options_.records_per_page_epsilon,
       options_.use_pgm_builder ? SegmentBuilder::Strategy::kPGM
                                : SegmentBuilder::Strategy::kGreedy);
   const auto segments =

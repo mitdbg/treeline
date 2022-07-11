@@ -18,12 +18,12 @@ BASE_CONFIGS = [
   {
     "name": "64B",
     "records_per_page_goal": 45,
-    "records_per_page_delta": 5,
+    "records_per_page_epsilon": 5,
   },
   {
     "name": "1024B",
     "records_per_page_goal": 2,
-    "records_per_page_delta": 1,
+    "records_per_page_epsilon": 1,
   }
 ]
 
@@ -121,19 +121,21 @@ run_experiment_group(
   run="./run_load.sh",
   experiments=[
     ExperimentInstance(
-      name="goal_45-{}-{}".format(dataset["name"], delta),
+      name="goal_45-{}-{}".format(dataset["name"], epsilon),
       options={
         **COMMON_OPTIONS,
         **dataset_to_options(dataset),
         "records_per_page_goal": 45,
-        "records_per_page_delta": delta,
+        "records_per_page_epsilon": epsilon,
       },
       parallelizable=True,
     )
-    for dataset, delta in product(DATASETS, list(range(2, 21, 2)))
+    for dataset, epsilon in product(DATASETS, list(range(2, 21, 2)))
   ],
 )
 
+# This experiment is called "delta_5" for backward compatibility reasons (the
+# epsilon parameter used to be called delta).
 run_experiment_group(
   name="delta_5",
   run="./run_load.sh",
@@ -144,7 +146,7 @@ run_experiment_group(
         **COMMON_OPTIONS,
         **dataset_to_options(dataset),
         "records_per_page_goal": goal,
-        "records_per_page_delta": 5,
+        "records_per_page_epsilon": 5,
       },
       parallelizable=True,
     )

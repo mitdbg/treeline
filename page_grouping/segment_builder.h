@@ -31,7 +31,7 @@ class SegmentBuilder {
   };
 
   SegmentBuilder(const size_t records_per_page_goal,
-                 const size_t records_per_page_delta,
+                 const double records_per_page_epsilon,
                  Strategy strategy = Strategy::kGreedy);
 
   // Build segments when the entire dataset can fit in memory.
@@ -68,7 +68,8 @@ class SegmentBuilder {
   Segment CreateSegmentUsing(std::optional<plr::BoundedLine64> model,
                              size_t page_count, size_t num_records);
 
-  size_t records_per_page_goal_, records_per_page_delta_;
+  size_t records_per_page_goal_;
+  double records_per_page_epsilon_;
   size_t max_records_in_segment_;
   std::vector<size_t> allowed_records_per_segment_;
 

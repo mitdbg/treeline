@@ -45,12 +45,12 @@ static const size_t kMaxSegmentSize =
 static constexpr Key kMaxKeyDiff = 1ULL << std::numeric_limits<double>::digits;
 
 SegmentBuilder::SegmentBuilder(const size_t records_per_page_goal,
-                               const size_t records_per_page_delta,
+                               const double records_per_page_epsilon,
                                Strategy strategy)
     : records_per_page_goal_(records_per_page_goal),
-      records_per_page_delta_(records_per_page_delta),
+      records_per_page_epsilon_(records_per_page_epsilon),
       max_records_in_segment_(
-          (records_per_page_goal_ + records_per_page_delta_) * kMaxSegmentSize),
+          (records_per_page_goal_ + records_per_page_epsilon_) * kMaxSegmentSize),
       state_(State::kNeedBase),
       strategy_(strategy),
       plr_(nullptr),
@@ -91,9 +91,9 @@ std::vector<Segment> SegmentBuilder::Offer(std::pair<Key, Slice> record) {
     assert(processed_records_.empty());
     base_key_ = record.first;
     if (strategy_ == Strategy::kGreedy) {
-      plr_ = std::make_unique<plr::GreedyPLRBuilder64>(records_per_page_delta_);
+      plr_ = std::make_unique<plr::GreedyPLRBuilder64>(records_per_page_epsilon_);
     } else if (strategy_ == Strategy::kPGM) {
-      plr_ = std::make_unique<plr::PGMBuilder<double>>(records_per_page_delta_);
+      plr_ = std::make_unique<plr::PGMBuilder<double>>(records_per_page_epsilon_);
     } else {
       assert(false);
     }
