@@ -93,6 +93,7 @@ def main():
             elif args.for_prefetch:
                 # The prefetch experiments also have a different name format.
                 # e.g.: prefetch-amzn-1024B-base-1
+                # e.g.: prefetch-amzn-1024B-prefetch-1-256
                 exp_parts = exp_inst.name.split("-")
                 dataset = exp_parts[1]
                 db = "pg_llsm"
@@ -100,6 +101,11 @@ def main():
                 dist = "uniform"
                 threads = int(exp_parts[4])
                 variant = exp_parts[3]
+                if len(exp_parts) > 5:
+                    bg_threads = int(exp_parts[5])
+                else:
+                    # Hardcoded in the experiments.
+                    bg_threads = 4
 
                 if variant == "base":
                     order = 1
@@ -118,7 +124,8 @@ def main():
                 df.insert(2, "dist", dist)
                 df.insert(3, "threads", threads)
                 df.insert(4, "variant", variant)
-                df.insert(5, "order", order)
+                df.insert(5, "bg_threads", threads)
+                df.insert(6, "order", order)
 
             else:
                 # e.g.: synth-pg_llsm-64B-a-zipfian-1
@@ -197,7 +204,7 @@ def main():
         ]
     elif args.for_prefetch:
         combined.sort_values(
-            ["dataset", "config", "dist", "db", "threads", "order"],
+            ["dataset", "config", "dist", "db", "threads", "bg_threads", "order"],
             inplace=True,
             ignore_index=True,
         )
@@ -209,6 +216,7 @@ def main():
                 "db",
                 "threads",
                 "variant",
+                "bg_threads",
                 *orig_columns,
                 "phys_read_kb",
                 "phys_written_kb",

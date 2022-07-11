@@ -65,7 +65,7 @@ Status Manager::ScanWithExperimentalPrefetching(
 
   // This is a rough estimate that should be good enough for the prefetching
   // experiments.
-  const size_t est_pages_to_fetch = 1ULL + std::ceil(
+  const size_t est_pages_to_fetch = 2ULL + std::ceil(
       records_left / static_cast<double>(options_.records_per_page_goal));
   size_t pages_prefetched = 0;
 

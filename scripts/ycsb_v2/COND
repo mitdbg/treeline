@@ -631,6 +631,8 @@ PREFETCH_COMMON = {
   "gen_distribution": "uniform",
 }
 
+PREFETCH_BG_THREADS = [32, 64, 128, 256]
+
 run_command(
   name="combine-prefetch-amzn-1024B",
   run="python3 combine_raw.py",
@@ -655,22 +657,22 @@ run_experiment_group(
         "use_experimental_scan_prefetching": False,
       },
     )
-    for threads in THREADS
+    for threads in [16]
   ] + [
     ExperimentInstance(
-      name="prefetch-amzn-1024B-prefetch-{}".format(threads),
+      name="prefetch-amzn-1024B-prefetch-{}-{}".format(threads, bg_threads),
       options={
         **PREFETCH_COMMON,
         "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
         "threads": threads,
-        "bg_threads": threads * 16,  # 16 prefetch threads per request thread
+        "bg_threads": bg_threads,
         # Disable page grouping.
         "pg_use_segments": False,
         # Enable prefetching.
         "use_experimental_scan_prefetching": True,
       },
     )
-    for threads in THREADS
+    for threads, bg_threads in product([16], PREFETCH_BG_THREADS)
   ] + [
     ExperimentInstance(
       name="prefetch-amzn-1024B-grouping-{}".format(threads),
@@ -688,22 +690,33 @@ run_experiment_group(
     for threads in THREADS
   ] + [
     ExperimentInstance(
-      name="prefetch-amzn-1024B-grouping_prefetch-{}".format(threads),
+      name="prefetch-amzn-1024B-grouping_prefetch-{}-{}".format(threads, bg_threads),
       options={
         **PREFETCH_COMMON,
         "checkpoint_name": "ycsb-amzn-pg_llsm-1024B",
         "threads": threads,
-        "bg_threads": threads * 16,  # 16 prefetch threads per request thread
+        "bg_threads": bg_threads,
         # Enable page grouping.
         "pg_use_segments": True,
         # Enable prefetching.
         "use_experimental_scan_prefetching": True,
       },
     )
-    for threads in THREADS
+    for threads, bg_threads in product([16], PREFETCH_BG_THREADS)
   ],
   deps=[
     ":preload-amzn-pg_llsm_nogrp-1024B",
     ":preload-amzn-pg_llsm-1024B",
+  ],
+)
+
+group(
+  name="prefetch-vary",
+  deps=[
+    ":prefetch-amzn-1024B-prefetch-{}-{}".format(threads, bg_threads)
+    for threads, bg_threads in product([16], PREFETCH_BG_THREADS)
+  ] + [
+    ":prefetch-amzn-1024B-grouping_prefetch-{}-{}".format(threads, bg_threads)
+    for threads, bg_threads in product([16], PREFETCH_BG_THREADS)
   ],
 )
