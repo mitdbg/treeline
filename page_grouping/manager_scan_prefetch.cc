@@ -65,8 +65,9 @@ Status Manager::ScanWithExperimentalPrefetching(
 
   // This is a rough estimate that should be good enough for the prefetching
   // experiments.
-  const size_t est_pages_to_fetch = 2ULL + std::ceil(
-      records_left / static_cast<double>(options_.records_per_page_goal));
+  const size_t est_pages_to_fetch =
+      2ULL + std::ceil(records_left /
+                       static_cast<double>(options_.records_per_page_goal));
   size_t pages_prefetched = 0;
 
   // 1. Find the segment that should hold the start key.
@@ -125,11 +126,18 @@ Status Manager::ScanWithExperimentalPrefetching(
                                       SegmentMode::kPageRead);
   }
 
+  // Flag used for correctness checking.
+  bool has_pages_remaining_in_last_segment = false;
+
   while (pages_prefetched < est_pages_to_fetch && curr_seg.has_value()) {
     const size_t seg_page_count = curr_seg->sinfo.page_count();
     const size_t seg_byte_offset =
         curr_seg->sinfo.id().GetOffset() * Page::kSize;
-    const size_t pages_to_read = std::min(seg_page_count, est_pages_to_fetch - pages_prefetched);
+    const size_t pages_to_read =
+        std::min(seg_page_count, est_pages_to_fetch - pages_prefetched);
+    if (pages_to_read < seg_page_count) {
+      has_pages_remaining_in_last_segment = true;
+    }
 
     ready_pages.emplace_back(bg_threads_->Submit(
         [this, curr_seg = *curr_seg, seg_byte_offset, pages_to_read,
@@ -219,7 +227,8 @@ Status Manager::ScanWithExperimentalPrefetching(
     }
   }
 
-  if (records_left > 0 && curr_seg.has_value()) {
+  if (records_left > 0 &&
+      (curr_seg.has_value() || has_pages_remaining_in_last_segment)) {
     // This represents a situation where we underestimated the number of pages
     // to prefetch. We want this case to be a fatal error to avoid incorrectness
     // in the experiments.
