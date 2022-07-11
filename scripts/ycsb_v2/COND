@@ -621,6 +621,9 @@ for config in CONFIGS:
 ###
 ### Prefetching experiments.
 ###
+### NOTE: We only use the 16 thread results in the revision letter. To have
+###       these experiments complete faster, change `THREADS` below to `[16]`.
+###
 
 PREFETCH_COMMON = {
   **COMMON_OPTIONS,
@@ -687,7 +690,7 @@ run_experiment_group(
         "use_experimental_scan_prefetching": False,
       },
     )
-    for threads in [16]
+    for threads in THREADS
   ] + [
     ExperimentInstance(
       name="prefetch-amzn-1024B-grouping_prefetch-{}-{}".format(threads, bg_threads),
