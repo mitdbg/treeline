@@ -32,7 +32,7 @@ class SegmentBuilder {
 
   SegmentBuilder(const size_t records_per_page_goal,
                  const double records_per_page_epsilon,
-                 Strategy strategy = Strategy::kGreedy);
+                 Strategy strategy = Strategy::kPGM);
 
   // Build segments when the entire dataset can fit in memory.
   //

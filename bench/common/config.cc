@@ -154,8 +154,8 @@ DEFINE_bool(
 DEFINE_bool(pg_parallelize_final_flush, false,
             "If set, PGTreeLine will attempt to parallelize its flush of dirty "
             "records from the cache when it shuts down.");
-DEFINE_bool(pg_use_pgm_builder, false,
-            "If set, PGTreeLine will use the PGM piecewise linear regression "
+DEFINE_bool(pg_use_pgm_builder, true,
+            "If set to false, PGTreeLine will use the GreedyPLR "
             "algorithm for page grouping. This flag has no effect if "
             "`pg_use_segments` is set to false.");
 

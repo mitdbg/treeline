@@ -82,6 +82,9 @@ COMMON_OPTIONS = {
 
   # Affects LLSM and page-grouped LLSM
   "optimistic_rec_caching": False,
+
+  # Affects page-grouped LLSM
+  "pg_use_pgm_builder": True,
 }
 
 SYNTH_DATASET = {
@@ -566,39 +569,39 @@ run_command(
 
 
 ###
-### PGM experiments.
+### GreedyPLR experiments.
 ###
 
 run_command(
-  name="combine-amzn-pgm",
+  name="combine-amzn-greedyplr",
   run="python3 combine_raw.py",
-  deps=[":amzn-pgm"],
+  deps=[":amzn-greedyplr"],
 )
 
 run_experiment_group(
-  name="amzn-pgm",
+  name="amzn-greedyplr",
   run="./run.sh",
   experiments=[
     # e.g. amzn_pgm-pg_llsm-64B-a-zipfian-16
     ExperimentInstance(
-      name="amzn_pgm-pg_llsm-{}-{}-zipfian-{}".format(config["name"], workload, threads),
+      name="amzn_greedyplr-pg_llsm-{}-{}-zipfian-{}".format(config["name"], workload, threads),
       options={
         **COMMON_OPTIONS,
         **process_config("pg_llsm", config, AMZN_DATASET, workload=workload),
         "db": "pg_llsm",
-        "checkpoint_name": "ycsb-amzn_pgm-pg_llsm-{}".format(config["name"]),
+        "checkpoint_name": "ycsb-amzn_greedyplr-pg_llsm-{}".format(config["name"]),
         "custom_dataset": AMZN_DATASET["path"],
         "threads": threads,
         "gen_template": "workloads/{}.yml".format(workload),
         "gen_distribution": "zipfian",
-        "pg_use_pgm_builder": True,
+        "pg_use_pgm_builder": False,
       },
     )
     for config, workload, threads in product(CONFIGS, WORKLOADS, THREADS)
   ],
   deps=[
     # e.g. :preload-amzn-pg_llsm-64B
-    ":preload-amzn_pgm-pg_llsm-{}".format(config["name"])
+    ":preload-amzn_greedyplr-pg_llsm-{}".format(config["name"])
     for config in CONFIGS
   ],
 )
@@ -606,45 +609,45 @@ run_experiment_group(
 group(
   name="pgm-preload",
   deps=[
-    ":preload-{}_pgm-pg_llsm-{}".format(dataset["name"], config["name"])
+    ":preload-{}_greedyplr-pg_llsm-{}".format(dataset["name"], config["name"])
     for dataset, config in product(CUSTOM_DATASETS, CONFIGS)
   ] + [
-    ":preload-synth_pgm-pg_llsm-{}".format(config["name"])
+    ":preload-synth_greedyplr-pg_llsm-{}".format(config["name"])
     for config in CONFIGS
   ],
 )
 
 for dataset, config in product(CUSTOM_DATASETS, CONFIGS):
   run_command(
-    name="preload-{}_pgm-pg_llsm-{}".format(dataset["name"], config["name"]),
+    name="preload-{}_greedyplr-pg_llsm-{}".format(dataset["name"], config["name"]),
     run="./preload.sh" ,
     options={
       **COMMON_OPTIONS,
       **process_config("pg_llsm", config, dataset),
       "db": "pg_llsm",
-      "checkpoint_name": "ycsb-{}_pgm-pg_llsm-{}".format(dataset["name"], config["name"]),
+      "checkpoint_name": "ycsb-{}_greedyplr-pg_llsm-{}".format(dataset["name"], config["name"]),
       "custom_dataset": dataset["path"],
       "threads": 1,
       "gen_template": "workloads/setup.yml",
       # NOTE: This overrides any previously set value.
       "gen_num_requests": NUM_PRELOAD_UPDATES,
-      "pg_use_pgm_builder": True,
+      "pg_use_pgm_builder": False,
     },
   )
 
 for config in CONFIGS:
   run_command(
-    name="preload-synth_pgm-pg_llsm-{}".format(config["name"]),
+    name="preload-synth_greedyplr-pg_llsm-{}".format(config["name"]),
     run="./preload.sh" ,
     options={
       **COMMON_OPTIONS,
       **process_config("pg_llsm", config, SYNTH_DATASET),
       "db": "pg_llsm",
-      "checkpoint_name": "ycsb-synth_pgm-pg_llsm-{}".format(config["name"]),
+      "checkpoint_name": "ycsb-synth_greedyplr-pg_llsm-{}".format(config["name"]),
       "threads": 1,
       "gen_template": "workloads/setup.yml",
       # NOTE: This overrides any previously set value.
       "gen_num_requests": NUM_PRELOAD_UPDATES,
-      "pg_use_pgm_builder": True,
+      "pg_use_pgm_builder": False,
     },
-)
+  )
