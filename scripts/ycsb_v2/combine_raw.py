@@ -123,8 +123,8 @@ def main():
                 df.insert(1, "config", config)
                 df.insert(2, "dist", dist)
                 df.insert(3, "threads", threads)
-                df.insert(4, "variant", variant)
-                df.insert(5, "bg_threads", threads)
+                df.insert(4, "bg_threads", bg_threads)
+                df.insert(5, "variant", variant)
                 df.insert(6, "order", order)
 
             else:
@@ -215,8 +215,8 @@ def main():
                 "dist",
                 "db",
                 "threads",
-                "variant",
                 "bg_threads",
+                "variant",
                 *orig_columns,
                 "phys_read_kb",
                 "phys_written_kb",

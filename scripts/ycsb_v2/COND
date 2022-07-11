@@ -657,7 +657,7 @@ run_experiment_group(
         "use_experimental_scan_prefetching": False,
       },
     )
-    for threads in [16]
+    for threads in THREADS
   ] + [
     ExperimentInstance(
       name="prefetch-amzn-1024B-prefetch-{}-{}".format(threads, bg_threads),
@@ -672,7 +672,7 @@ run_experiment_group(
         "use_experimental_scan_prefetching": True,
       },
     )
-    for threads, bg_threads in product([16], PREFETCH_BG_THREADS)
+    for threads, bg_threads in product(THREADS, PREFETCH_BG_THREADS)
   ] + [
     ExperimentInstance(
       name="prefetch-amzn-1024B-grouping-{}".format(threads),
@@ -687,7 +687,7 @@ run_experiment_group(
         "use_experimental_scan_prefetching": False,
       },
     )
-    for threads in THREADS
+    for threads in [16]
   ] + [
     ExperimentInstance(
       name="prefetch-amzn-1024B-grouping_prefetch-{}-{}".format(threads, bg_threads),
@@ -702,7 +702,7 @@ run_experiment_group(
         "use_experimental_scan_prefetching": True,
       },
     )
-    for threads, bg_threads in product([16], PREFETCH_BG_THREADS)
+    for threads, bg_threads in product(THREADS, PREFETCH_BG_THREADS)
   ],
   deps=[
     ":preload-amzn-pg_llsm_nogrp-1024B",
@@ -714,9 +714,9 @@ group(
   name="prefetch-vary",
   deps=[
     ":prefetch-amzn-1024B-prefetch-{}-{}".format(threads, bg_threads)
-    for threads, bg_threads in product([16], PREFETCH_BG_THREADS)
+    for threads, bg_threads in product(THREADS, PREFETCH_BG_THREADS)
   ] + [
     ":prefetch-amzn-1024B-grouping_prefetch-{}-{}".format(threads, bg_threads)
-    for threads, bg_threads in product([16], PREFETCH_BG_THREADS)
+    for threads, bg_threads in product(THREADS, PREFETCH_BG_THREADS)
   ],
 )
