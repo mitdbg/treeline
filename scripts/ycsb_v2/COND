@@ -409,26 +409,18 @@ combine(
   name="factor",
   deps=[
     # No page grouping, no caching.
-    ":factor-nogrp_nocache-a-16",
-    ":factor-nogrp_nocache-b-16",
-    ":factor-nogrp_nocache-c-16",
-    ":factor-nogrp_nocache-d-16",
-    ":factor-nogrp_nocache-e-16",
-    ":factor-nogrp_nocache-f-16",
+    ":factor-nogrp_nocache-{}-16".format(wkload)
+    for wkload in WORKLOADS
+
+  ] + [
+    
     # No page grouping, yes caching.
-    ":factor-nogrp-a-16",
-    ":factor-nogrp-b-16",
-    ":factor-nogrp-c-16",
-    ":factor-nogrp-d-16",
-    ":factor-nogrp-e-16",
-    ":factor-nogrp-f-16",
+    ":factor-nogrp-{}-16".format(wkload)
+    for wkload in WORKLOADS
+  ] + [
     # Yes page grouping, yes caching.
-    ":amzn-pg_llsm-1024B-a-zipfian-16",
-    ":amzn-pg_llsm-1024B-b-zipfian-16",
-    ":amzn-pg_llsm-1024B-c-zipfian-16",
-    ":amzn-pg_llsm-1024B-d-zipfian-16",
-    ":amzn-pg_llsm-1024B-e-zipfian-16",
-    ":amzn-pg_llsm-1024B-f-zipfian-16",
+    ":amzn-pg_llsm-1024B-{}-zipfian-16".format(wkload)
+    for wkload in WORKLOADS
   ],
 )
 
