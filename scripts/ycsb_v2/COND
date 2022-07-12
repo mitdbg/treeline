@@ -6,13 +6,15 @@ WORKLOADS = [
 
 DBS = [
   "pg_llsm",
-  "rocksdb",
-  "leanstore"
+  #"rocksdb",
+  #"leanstore"
 ]
 
-DISTRIBUTIONS = ["zipfian", "uniform"]
+DISTRIBUTIONS = ["zipfian", #"uniform"
+]
 
-THREADS = [1, 2, 4, 8, 16]
+THREADS = [#1, 2, 4, 8, 
+16]
 
 CONFIG_64B = {
   "name": "64B",
@@ -408,92 +410,67 @@ combine(
   deps=[
     # No page grouping, no caching.
     ":factor-nogrp_nocache-a-16",
-    ":factor-nogrp_nocache-scan_only-16",
+    ":factor-nogrp_nocache-b-16",
+    ":factor-nogrp_nocache-c-16",
+    ":factor-nogrp_nocache-d-16",
+    ":factor-nogrp_nocache-e-16",
+    ":factor-nogrp_nocache-f-16",
     # No page grouping, yes caching.
     ":factor-nogrp-a-16",
-    ":factor-nogrp-scan_only-16",
+    ":factor-nogrp-b-16",
+    ":factor-nogrp-c-16",
+    ":factor-nogrp-d-16",
+    ":factor-nogrp-e-16",
+    ":factor-nogrp-f-16",
     # Yes page grouping, yes caching.
     ":amzn-pg_llsm-1024B-a-zipfian-16",
-    ":amzn-pg_llsm-1024B-scan_only-zipfian-16",
+    ":amzn-pg_llsm-1024B-b-zipfian-16",
+    ":amzn-pg_llsm-1024B-c-zipfian-16",
+    ":amzn-pg_llsm-1024B-d-zipfian-16",
+    ":amzn-pg_llsm-1024B-e-zipfian-16",
+    ":amzn-pg_llsm-1024B-f-zipfian-16",
   ],
 )
 
-run_experiment(
-  name="factor-nogrp_nocache-a-16",
-  run="./run.sh",
-  options={
-    **COMMON_OPTIONS,
-    **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET, workload="a"),
-    "db": "pg_llsm",
-    "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
-    "custom_dataset": AMZN_DATASET["path"],
-    "threads": 16,
-    "gen_template": "workloads/a.yml",
-    "gen_distribution": "zipfian",
-    # Disable the cache and page grouping
-    "pg_bypass_cache": True,
-    "pg_use_segments": False,
-  },
-  deps=[":preload-amzn-pg_llsm_nogrp-1024B"],
-)
+for wkload in WORKLOADS:
+  run_experiment(
+    name="factor-nogrp_nocache-{}-16".format(wkload),
+    run="./run.sh",
+    options={
+      **COMMON_OPTIONS,
+      **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET, workload=wkload),
+      "db": "pg_llsm",
+      "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
+      "custom_dataset": AMZN_DATASET["path"],
+      "threads": 16,
+      "gen_template": "workloads/{}.yml".format(wkload),
+      "gen_distribution": "zipfian",
+      # Disable the cache and page grouping
+      "pg_bypass_cache": True,
+      "pg_use_segments": False,
+    },
+    deps=[":preload-amzn-pg_llsm_nogrp-1024B"],
+) 
 
-run_experiment(
-  name="factor-nogrp_nocache-scan_only-16",
-  run="./run.sh",
-  options={
-    **COMMON_OPTIONS,
-    **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET, workload="scan_only"),
-    "db": "pg_llsm",
-    "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
-    "custom_dataset": AMZN_DATASET["path"],
-    "threads": 16,
-    "gen_template": "workloads/scan_only.yml",
-    "gen_distribution": "zipfian",
-    # Disable the cache and page grouping
-    "pg_bypass_cache": True,
-    "pg_use_segments": False,
-  },
-  deps=[":preload-amzn-pg_llsm_nogrp-1024B"],
-)
-
-run_experiment(
-  name="factor-nogrp-a-16",
-  run="./run.sh",
-  options={
-    **COMMON_OPTIONS,
-    **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET, workload="a"),
-    "db": "pg_llsm",
-    "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
-    "custom_dataset": AMZN_DATASET["path"],
-    "threads": 16,
-    "gen_template": "workloads/a.yml",
-    "gen_distribution": "zipfian",
-    # Enable the cache, disable page grouping
-    "pg_bypass_cache": False,
-    "pg_use_segments": False,
-  },
-  deps=[":preload-amzn-pg_llsm_nogrp-1024B"],
-)
-
-run_experiment(
-  name="factor-nogrp-scan_only-16",
-  run="./run.sh",
-  options={
-    **COMMON_OPTIONS,
-    **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET, workload="scan_only"),
-    "db": "pg_llsm",
-    "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
-    "custom_dataset": AMZN_DATASET["path"],
-    "threads": 16,
-    "gen_template": "workloads/scan_only.yml",
-    "gen_distribution": "zipfian",
-    # Enable the cache, disable page grouping
-    "pg_bypass_cache": False,
-    "pg_use_segments": False,
-  },
-  deps=[":preload-amzn-pg_llsm_nogrp-1024B"],
-),
-
+for wkload in WORKLOADS:
+  run_experiment(
+    name="factor-nogrp-{}-16".format(wkload),
+    run="./run.sh",
+    options={
+      **COMMON_OPTIONS,
+      **process_config("pg_llsm", CONFIG_1024B, AMZN_DATASET, workload=wkload),
+      "db": "pg_llsm",
+      "checkpoint_name": "ycsb-amzn-pg_llsm_nogrp-1024B",
+      "custom_dataset": AMZN_DATASET["path"],
+      "threads": 16,
+      "gen_template": "workloads/{}.yml".format(wkload),
+      "gen_distribution": "zipfian",
+      # Enable the cache, disable page grouping
+      "pg_bypass_cache": False,
+      "pg_use_segments": False,
+    },
+    deps=[":preload-amzn-pg_llsm_nogrp-1024B"],
+  )
 
 ###
 ### Preload.
