@@ -258,7 +258,7 @@ rocksdb::Options BuildRocksDBOptions() {
   }
   options.table_factory.reset(
       rocksdb::NewBlockBasedTableFactory(table_options));
-
+  options.statistics = rocksdb::CreateDBStatistics();
   return options;
 }
 

@@ -19,22 +19,39 @@ class RocksDBInterface {
   void InitializeWorker(const std::thread::id& id) {}
   void ShutdownWorker(const std::thread::id& id) {}
   void SetKeyDistHints(uint64_t min_key, uint64_t max_key, uint64_t num_keys) {}
-  void WriteOutStats(const std::filesystem::path& out_dir) {}
+  void WriteOutStats(const std::filesystem::path& out_dir) {
+    std::ofstream out(out_dir / "counters.csv");
+    out << "memtable_hit, memtable_miss, block_cache_index_hit, "
+           "block_cache_index_miss"
+           "block_cache_filter_hit, block_cache_filter_miss, "
+           "block_cache_data_hit, block_cache_data_miss"
+        << std::endl;
+
+    out << options_.statistics->getTickerCount(rocksdb::MEMTABLE_HIT) << ","
+        << options_.statistics->getTickerCount(rocksdb::MEMTABLE_MISS) << ","
+        << options_.statistics->getTickerCount(rocksdb::BLOCK_CACHE_INDEX_HIT) << "," 
+        << options_.statistics->getTickerCount(rocksdb::BLOCK_CACHE_INDEX_MISS) << ","
+        << options_.statistics->getTickerCount(rocksdb::BLOCK_CACHE_FILTER_HIT) << "," 
+        << options_.statistics->getTickerCount(rocksdb::BLOCK_CACHE_FILTER_MISS) << ","
+        << options_.statistics->getTickerCount(rocksdb::BLOCK_CACHE_DATA_HIT) << "," 
+        << options_.statistics->getTickerCount(rocksdb::BLOCK_CACHE_DATA_MISS) << ","
+        << std::endl;
+  }
 
   // Called once before the benchmark.
   void InitializeDatabase() {
     const std::string dbname = FLAGS_db_path + "/rocksdb";
-    rocksdb::Options options = tl::bench::BuildRocksDBOptions();
-    options.create_if_missing = true;
+    options_ = tl::bench::BuildRocksDBOptions();
+    options_.create_if_missing = true;
     if (FLAGS_verbose) {
       std::cerr << "> RocksDB memtable flush threshold: "
-                << options.write_buffer_size << " bytes" << std::endl;
+                << options_.write_buffer_size << " bytes" << std::endl;
       std::cerr << "> RocksDB block cache: " << FLAGS_cache_size_mib << " MiB"
                 << std::endl;
       std::cerr << "> Opening RocksDB DB at " << dbname << std::endl;
     }
 
-    rocksdb::Status status = rocksdb::DB::Open(options, dbname, &db_);
+    rocksdb::Status status = rocksdb::DB::Open(options_, dbname, &db_);
     if (!status.ok()) {
       throw std::runtime_error("Failed to start RocksDB: " + status.ToString());
     }
@@ -91,7 +108,8 @@ class RocksDBInterface {
   bool Read(ycsbr::Request::Key key, std::string* value_out) {
     const tl::key_utils::IntKeyAsSlice strkey(key);
     rocksdb::ReadOptions options;
-    // See https://github.com/facebook/rocksdb/wiki/Prefix-Seek#adaptive-prefix-mode
+    // See
+    // https://github.com/facebook/rocksdb/wiki/Prefix-Seek#adaptive-prefix-mode
     options.auto_prefix_mode = true;
     auto status = db_->Get(options, strkey.as<rocksdb::Slice>(), value_out);
     return status.ok();
@@ -121,7 +139,8 @@ class RocksDBInterface {
     scan_out->reserve(amount);
     const tl::key_utils::IntKeyAsSlice strkey(key);
     rocksdb::ReadOptions options;
-    // See https://github.com/facebook/rocksdb/wiki/Prefix-Seek#adaptive-prefix-mode
+    // See
+    // https://github.com/facebook/rocksdb/wiki/Prefix-Seek#adaptive-prefix-mode
     options.auto_prefix_mode = true;
     rocksdb::Iterator* it = db_->NewIterator(options);
     it->Seek(strkey.as<rocksdb::Slice>());
@@ -136,4 +155,5 @@ class RocksDBInterface {
 
  private:
   rocksdb::DB* db_;
+  rocksdb::Options options_;
 };
