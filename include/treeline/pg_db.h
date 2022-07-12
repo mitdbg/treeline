@@ -67,6 +67,12 @@ class PageGroupedDB {
 
   // Retrieve an ascending range of at most `num_records` records, starting from
   // the smallest record whose key is greater than or equal to `start_key`.
+  //
+  // If `use_experimental_prefetch` is set to true, this operation will use
+  // prefetching when performing I/O. Prefetching relies on background threads,
+  // so `PageGroupedDBOptions::num_bg_threads` must be greater than 0. The
+  // prefetching implementation is not thread-safe and thus cannot run
+  // concurrently with write requests.
   virtual Status GetRange(const Key start_key, const size_t num_records,
                           std::vector<std::pair<Key, std::string>>* results_out,
                           bool use_experimental_prefetch = false) = 0;
