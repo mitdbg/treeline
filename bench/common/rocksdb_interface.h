@@ -22,7 +22,7 @@ class RocksDBInterface {
   void WriteOutStats(const std::filesystem::path& out_dir) {
     std::ofstream out(out_dir / "counters.csv");
     out << "memtable_hit, memtable_miss, block_cache_index_hit, "
-           "block_cache_index_miss"
+           "block_cache_index_miss, "
            "block_cache_filter_hit, block_cache_filter_miss, "
            "block_cache_data_hit, block_cache_data_miss"
         << std::endl;
