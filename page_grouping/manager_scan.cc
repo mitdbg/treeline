@@ -3,7 +3,6 @@
 #include "manager.h"
 #include "persist/merge_iterator.h"
 #include "util/key.h"
-#include "workspace.h"
 
 namespace tl {
 namespace pg {
