@@ -17,13 +17,13 @@ DATASETS = [
 BASE_CONFIGS = [
   {
     "name": "64B",
-    "records_per_page_goal": 45,
+    "records_per_page_goal": 44,
     "records_per_page_epsilon": 5,
   },
   {
     "name": "1024B",
     "records_per_page_goal": 2,
-    "records_per_page_epsilon": 1,
+    "records_per_page_epsilon": 0.5,
   }
 ]
 
@@ -117,15 +117,15 @@ run_experiment_group(
 ###
 
 run_experiment_group(
-  name="goal_45",
+  name="goal_44",
   run="./run_load.sh",
   experiments=[
     ExperimentInstance(
-      name="goal_45-{}-{}".format(dataset["name"], epsilon),
+      name="goal_44-{}-{}".format(dataset["name"], epsilon),
       options={
         **COMMON_OPTIONS,
         **dataset_to_options(dataset),
-        "records_per_page_goal": 45,
+        "records_per_page_goal": 44,
         "records_per_page_epsilon": epsilon,
       },
       parallelizable=True,

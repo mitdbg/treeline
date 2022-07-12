@@ -352,8 +352,8 @@ run_experiment_group(
   ],
   deps=[
     # e.g. :preload-synth-pg_llsm-64B
-    ":preload-synth-{}-{}".format(db, config["name"])
-    for db, config in product(DBS, CONFIGS)
+    ":preload-synth-{}-{}".format("pg_llsm", config["name"])
+    for config in CONFIGS
   ],
 )
 
@@ -389,8 +389,8 @@ for dataset in CUSTOM_DATASETS:
     ],
     deps=[
       # e.g. :preload-amzn-pg_llsm-64B
-      ":preload-{}-{}-{}".format(dataset["name"], db, config["name"])
-      for db, config in product(DBS, CONFIGS)
+      ":preload-{}-{}-{}".format(dataset["name"], "pg_llsm", config["name"])
+      for config in CONFIGS
     ],
   )
 
@@ -582,7 +582,7 @@ run_experiment_group(
   name="amzn-greedyplr",
   run="./run.sh",
   experiments=[
-    # e.g. amzn_pgm-pg_llsm-64B-a-zipfian-16
+    # e.g. amzn_greedyplr-pg_llsm-64B-a-zipfian-16
     ExperimentInstance(
       name="amzn_greedyplr-pg_llsm-{}-{}-zipfian-{}".format(config["name"], workload, threads),
       options={
@@ -607,7 +607,7 @@ run_experiment_group(
 )
 
 group(
-  name="pgm-preload",
+  name="greedyplr-preload",
   deps=[
     ":preload-{}_greedyplr-pg_llsm-{}".format(dataset["name"], config["name"])
     for dataset, config in product(CUSTOM_DATASETS, CONFIGS)

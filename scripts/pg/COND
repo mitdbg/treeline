@@ -1,16 +1,16 @@
 from itertools import product
 
 CONFIGS = [
-  # Represents 64 B records, 2880 bytes per page +/- (2 * 320) bytes
+  # Represents 64 B records, 2816 bytes per page +/- (5 * 2 * 64) bytes
   {
-    "goal": 45,
+    "goal": 44,
     "epsilon": 5,
     "record_size_bytes": 64,
   },
-  # Represents 1024 B records, 2048 bytes per page +/- (2 * 1024) bytes
+  # Represents 1024 B records, 2048 bytes per page +/- (0.5 * 2 * 1024) bytes
   {
     "goal": 2,
-    "epsilon": 1,
+    "epsilon": 0.5,
     "record_size_bytes": 1024,
   },
 ]

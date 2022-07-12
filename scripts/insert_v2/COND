@@ -11,7 +11,7 @@ CONFIG_64B = {
   "record_size_bytes": 64,
 
   # Used by page-grouped LLSM.
-  "records_per_page_goal": 45,
+  "records_per_page_goal": 44,
   "records_per_page_epsilon": 5,
 
   # Used by all DBs.
@@ -40,7 +40,7 @@ CONFIG_1024B = {
 
   # Used by page-grouped LLSM.
   "records_per_page_goal": 2,
-  "records_per_page_epsilon": 1,
+  "records_per_page_epsilon": 0.5,
 
   # Used by all DBs.
   # 292 MiB in total

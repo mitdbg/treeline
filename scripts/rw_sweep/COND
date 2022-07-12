@@ -19,7 +19,7 @@ COMMON_OPTIONS = {
 
 PG_LLSM_OPTIONS_64 = {
   "optimistic_rec_caching": False,
-  "records_per_page_goal": 45,
+  "records_per_page_goal": 44,
   "records_per_page_epsilon": 5,
 }
 
