@@ -49,11 +49,6 @@ Status Manager::ScanWithExperimentalPrefetching(
   // - Start scanning the segments as they are fetched, loading overflows as
   // needed.
   //
-  // NOTE: This implementation is designed primarily with single-page segments
-  // in mind (i.e., with page grouping disabled). It will work with multi-page
-  // segments, but does not attempt to avoid reading all the pages in a segment
-  // at the end of a scan (for implementation simplicity).
-  //
   // NOTE: For implementation simplicity, no locks are held. This implementation
   // is **experimental** and not designed to run concurrently with writes.
 
