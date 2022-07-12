@@ -4,12 +4,12 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "treeline/pg_options.h"
-#include "treeline/slice.h"
 #include "page_grouping/key.h"
 #include "page_grouping/manager.h"
 #include "page_grouping/segment_info.h"
 #include "pg_datasets.h"
+#include "treeline/pg_options.h"
+#include "treeline/slice.h"
 #include "util/key.h"
 
 using namespace tl;
@@ -307,6 +307,42 @@ TEST_F(PGManagerTest, ScanSegmentsSequential) {
   }
 }
 
+TEST_F(PGManagerTest, ScanSegmentsPrefetch) {
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  options.num_bg_threads = 16;  // Must be non-zero for prefetching.
+
+  std::vector<std::pair<uint64_t, Slice>> dataset =
+      BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
+
+  Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+  ASSERT_EQ(m.NumSegmentFiles(), 5);
+
+  std::vector<std::pair<uint64_t, std::string>> scanned;
+  for (const auto& [start_idx, scan_amount] : kScanRequests) {
+    m.ScanWithExperimentalPrefetching(dataset[start_idx].first, scan_amount,
+                                      &scanned);
+    ValidateScanResults(start_idx, scan_amount, dataset, scanned);
+  }
+}
+
+TEST_F(PGManagerTest, ScanSegmentsSequentialPrefetch) {
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  options.num_bg_threads = 16;  // Must be non-zero for prefetching.
+
+  std::vector<std::pair<uint64_t, Slice>> dataset =
+      BuildRecords(Datasets::kSequentialKeys, u8"08 bytes");
+
+  Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+  ASSERT_EQ(m.NumSegmentFiles(), 5);
+
+  std::vector<std::pair<uint64_t, std::string>> scanned;
+  for (const auto& [start_idx, scan_amount] : kScanRequests) {
+    m.ScanWithExperimentalPrefetching(dataset[start_idx].first, scan_amount,
+                                      &scanned);
+    ValidateScanResults(start_idx, scan_amount, dataset, scanned);
+  }
+}
+
 TEST_F(PGManagerTest, ScanPages) {
   auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/false);
 
@@ -319,6 +355,24 @@ TEST_F(PGManagerTest, ScanPages) {
   std::vector<std::pair<uint64_t, std::string>> scanned;
   for (const auto& [start_idx, scan_amount] : kScanRequests) {
     m.Scan(dataset[start_idx].first, scan_amount, &scanned);
+    ValidateScanResults(start_idx, scan_amount, dataset, scanned);
+  }
+}
+
+TEST_F(PGManagerTest, ScanPagesPrefetch) {
+  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  options.num_bg_threads = 16;  // Must be non-zero for prefetching.
+
+  std::vector<std::pair<uint64_t, Slice>> dataset =
+      BuildRecords(Datasets::kUniformKeys, u8"08 bytes");
+
+  Manager m = Manager::LoadIntoNew(kDBDir, dataset, options);
+  ASSERT_EQ(m.NumSegmentFiles(), 1);
+
+  std::vector<std::pair<uint64_t, std::string>> scanned;
+  for (const auto& [start_idx, scan_amount] : kScanRequests) {
+    m.ScanWithExperimentalPrefetching(dataset[start_idx].first, scan_amount,
+                                      &scanned);
     ValidateScanResults(start_idx, scan_amount, dataset, scanned);
   }
 }

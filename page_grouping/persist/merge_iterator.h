@@ -22,6 +22,7 @@ class PageMergeIterator {
     for (auto& it : page_iterators_) {
       if (start_key != nullptr) it.Seek(*start_key);
       if (!it.Valid()) continue;
+      assert(it.Valid());
       merged_iterators_.push(&it);
     }
   }
@@ -70,15 +71,17 @@ class PageMergeIterator {
 
   // REQUIRES: `Valid()` is true.
   Slice key() const {
+    assert(Valid());
     Page::Iterator* const it = merged_iterators_.top();
-    assert(Valid() && it->Valid());
+    assert(it->Valid());
     return it->key();
   }
 
   // REQUIRES: `Valid()` is true.
   Slice value() const {
+    assert(Valid());
     Page::Iterator* const it = merged_iterators_.top();
-    assert(Valid() && it->Valid());
+    assert(it->Valid());
     return it->value();
   }
 

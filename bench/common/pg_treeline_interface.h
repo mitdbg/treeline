@@ -46,6 +46,8 @@ class PGTreeLineInterface {
       out << "free_list_entries," << stats.GetFreeListEntries() << std::endl;
       out << "free_list_bytes," << stats.GetFreeListBytes() << std::endl;
       out << "cache_bytes," << stats.GetCacheBytes() << std::endl;
+
+      out << "overfetched_pages," << stats.GetOverfetchedPages() << std::endl;
       // clang-format on
     });
   }
@@ -134,7 +136,10 @@ class PGTreeLineInterface {
   bool Scan(
       const ycsbr::Request::Key key, const size_t amount,
       std::vector<std::pair<ycsbr::Request::Key, std::string>>* scan_out) {
-    return db_->GetRange(key, amount, scan_out).ok();
+    return db_
+        ->GetRange(key, amount, scan_out,
+                   FLAGS_use_experimental_scan_prefetching)
+        .ok();
   }
 
  private:

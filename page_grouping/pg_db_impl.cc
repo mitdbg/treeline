@@ -192,7 +192,8 @@ Status PageGroupedDBImpl::Get(const Key key, std::string* value_out) {
 
 Status PageGroupedDBImpl::GetRange(
     const Key start_key, const size_t num_records,
-    std::vector<std::pair<Key, std::string>>* results_out) {
+    std::vector<std::pair<Key, std::string>>* results_out,
+    bool use_experimental_prefetch) {
   if (!mgr_.has_value()) {
     results_out->clear();
     return Status::OK();
@@ -208,7 +209,11 @@ Status PageGroupedDBImpl::GetRange(
   const Slice key_slice = key_slice_helper.as<Slice>();
 
   std::vector<std::pair<Key, std::string>> results;
-  mgr_->Scan(start_key, num_records, &results);
+  if (use_experimental_prefetch) {
+    mgr_->ScanWithExperimentalPrefetching(start_key, num_records, &results);
+  } else {
+    mgr_->Scan(start_key, num_records, &results);
+  }
 
   std::vector<uint64_t> indices;
   if (!options_.bypass_cache) {

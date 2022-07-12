@@ -7,11 +7,11 @@
 #include <vector>
 
 #include "db/format.h"
+#include "manager.h"
+#include "record_cache/record_cache.h"
 #include "treeline/pg_db.h"
 #include "treeline/pg_options.h"
 #include "treeline/slice.h"
-#include "manager.h"
-#include "record_cache/record_cache.h"
 #include "util/insert_tracker.h"
 
 namespace tl {
@@ -30,9 +30,9 @@ class PageGroupedDBImpl : public PageGroupedDB {
   Status Put(const WriteOptions& options, const Key key,
              const Slice& value) override;
   Status Get(const Key key, std::string* value_out) override;
-  Status GetRange(
-      const Key start_key, const size_t num_records,
-      std::vector<std::pair<Key, std::string>>* results_out) override;
+  Status GetRange(const Key start_key, const size_t num_records,
+                  std::vector<std::pair<Key, std::string>>* results_out,
+                  bool use_experimental_prefetch = false) override;
 
   Status FlattenRange(
       const Key start_key = 1,

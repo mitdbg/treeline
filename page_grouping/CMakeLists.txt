@@ -22,6 +22,7 @@ target_sources(pg PRIVATE
   lock_manager.h
   manager_load.cc
   manager_rewrite.cc
+  manager_scan_prefetch.cc
   manager_scan.cc
   manager.cc
   manager.h

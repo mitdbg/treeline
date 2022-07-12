@@ -43,6 +43,8 @@ class PageGroupedDBStats {
   uint64_t GetLockManagerBytes() const { return lock_manager_bytes_; }
   uint64_t GetCacheBytes() const { return cache_bytes_; }
 
+  uint64_t GetOverfetchedPages() const { return overfetched_pages_; }
+
   void BumpCacheHits() { ++cache_hits_; }
   void BumpCacheMisses() { ++cache_misses_; }
   void BumpCacheCleanEvictions() { ++cache_clean_evictions_; }
@@ -51,6 +53,8 @@ class PageGroupedDBStats {
   void BumpOverflowsCreated() { ++overflows_created_; }
   void BumpRewrites() { ++rewrites_; }
   void BumpRewrittenPages(uint64_t delta = 1) { rewritten_pages_ += delta; }
+
+  void BumpOverfetchedPages(uint64_t delta = 1) { overfetched_pages_ += delta; }
 
   void SetSegments(uint64_t segments) { segments_ = segments; }
   void SetFreeListEntries(uint64_t entries) { free_list_entries_ = entries; }
@@ -89,6 +93,9 @@ class PageGroupedDBStats {
   uint64_t lock_manager_bytes_;
   // The size footprint of the cache (in bytes).
   uint64_t cache_bytes_;
+
+  // Prefetching debug stats.
+  uint64_t overfetched_pages_;
 };
 
 }  // namespace pg
