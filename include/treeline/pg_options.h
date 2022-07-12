@@ -39,8 +39,8 @@ struct PageGroupedDBOptions {
   // after one overflow page becomes full.
   bool use_segments = true;
 
-  // By default, put 45 +/- (2 * 5) records into each page.
-  size_t records_per_page_goal = 45;
+  // By default, put 44 +/- (2 * 5) records into each page.
+  size_t records_per_page_goal = 44;
   double records_per_page_epsilon = 5;
 
   // If set to true, will write out the segment sizes and models to a CSV file

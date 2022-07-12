@@ -66,7 +66,7 @@ run_command(
   name="process_sweep",
   run="python3 process_sweep.py",
   deps=[
-    ":goal_45",
+    ":goal_44",
     ":delta_5",
   ]
 )
@@ -76,7 +76,7 @@ group(
   name="pg_analysis",
   deps=[
     ":segment_size",
-    ":goal_45",
+    ":goal_44",
     ":delta_5",
   ],
 )

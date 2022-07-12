@@ -137,7 +137,7 @@ DEFINE_uint64(reorg_length, 5,
               "reorganization is triggered.");
 
 // Page grouping related flags.
-DEFINE_uint64(records_per_page_goal, 45, "Page grouping fill rate goal.");
+DEFINE_uint64(records_per_page_goal, 44, "Page grouping fill rate goal.");
 DEFINE_double(records_per_page_epsilon, 5,
               "Page grouping model error tolerance.");
 DEFINE_bool(pg_use_segments, true,

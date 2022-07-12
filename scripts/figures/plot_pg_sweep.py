@@ -44,9 +44,9 @@ def main():
     out_dir = cond.get_output_path()
     in_dir = deps[0]
 
-    vary_delta = pd.read_csv(in_dir / "goal_45.csv")
+    vary_delta = pd.read_csv(in_dir / "goal_44.csv")
     fig = plot_seg_efficiency(vary_delta, "delta", show_ylabel=True, show_legend=True)
-    fig.savefig(out_dir / "goal_45.pdf")
+    fig.savefig(out_dir / "goal_44.pdf")
     plt.close(fig)
 
     vary_goal = pd.read_csv(in_dir / "delta_5.csv")

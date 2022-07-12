@@ -204,7 +204,7 @@ TEST_F(PGManagerTest, PointReadPages) {
 }
 
 TEST_F(PGManagerTest, PointReadSegmentsSequential) {
-  auto options = GetOptions(/*goal=*/45, /*epsilon=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/44, /*epsilon=*/5, /*use_segments=*/true);
 
   // Use the sequential dataset instead of the uniform one.
   std::vector<std::pair<uint64_t, Slice>> dataset =
@@ -564,7 +564,7 @@ TEST_F(PGManagerTest, InsertOverflowPages) {
 }
 
 TEST_F(PGManagerTest, PageBoundsConsistency) {
-  auto options = GetOptions(/*goal=*/45, /*epsilon=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/44, /*epsilon=*/5, /*use_segments=*/true);
 
   // Use the sequential dataset instead of the uniform one.
   std::vector<std::pair<uint64_t, Slice>> dataset =

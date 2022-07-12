@@ -3,7 +3,7 @@
 DEFINE_string(db_path, "", "The path where the database(s) should be stored.");
 DEFINE_bool(disable_segments, false,
             "If set, the initial bulk load will not create segments.");
-DEFINE_uint32(records_per_page_goal, 45,
+DEFINE_uint32(records_per_page_goal, 44,
               "Aim to put this many records on a page.");
 DEFINE_double(
     records_per_page_epsilon, 5,

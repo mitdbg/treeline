@@ -12,7 +12,7 @@ DEFINE_uint64(
 DEFINE_uint64(end_key, std::numeric_limits<uint64_t>::max(),
               "The upper boundary (exclusive) of the key space to pass to "
               "`FlattenRange()`.");
-DEFINE_uint32(goal, 45,
+DEFINE_uint32(goal, 44,
               "Passed to PageGroupedDBOptions::records_per_page_goal.");
 DEFINE_double(epsilon, 5,
               "Passed to PageGroupedDBOptions::records_per_page_epsilon.");

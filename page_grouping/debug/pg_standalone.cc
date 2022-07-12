@@ -11,16 +11,16 @@
 #include "treeline/slice.h"
 
 DEFINE_string(custom_dataset, "", "A path to a custom dataset.");
-DEFINE_uint32(goal, 45, "Records per page goal.");
-DEFINE_uint32(delta, 10, "Records per page delta.");
+DEFINE_uint32(goal, 44, "Records per page goal.");
+DEFINE_uint32(epsilon, 5, "Records per page epsilon.");
 
 using namespace tl;
 using namespace tl::pg;
 
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
-  const size_t max_records_per_page = FLAGS_goal + 2 * FLAGS_delta;
-  const size_t min_records_per_page = FLAGS_goal - 2 * FLAGS_delta;
+  const size_t max_records_per_page = FLAGS_goal + 2 * FLAGS_epsilon;
+  const size_t min_records_per_page = FLAGS_goal - 2 * FLAGS_epsilon;
 
   std::vector<uint64_t> keys = tl::bench::LoadDatasetFromTextFile(
       FLAGS_custom_dataset, /*warn_on_duplicates=*/true);
@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
     dataset.emplace_back(key << 16, Slice());
   }
 
-  SegmentBuilder builder(FLAGS_goal, FLAGS_delta);
+  SegmentBuilder builder(FLAGS_goal, FLAGS_epsilon);
   const auto segments = builder.BuildFromDataset(dataset);
 
   // Assign records to "pages" and validate the fill proportion.
