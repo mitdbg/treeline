@@ -119,10 +119,10 @@ run_command(
 )
 
 run_command(
-  name="pgm-compare",
-  run="python3 plot_pgm_compare.py",
+  name="greedyplr-compare",
+  run="python3 plot_greedyplr_compare.py",
   deps=[
     "//scripts/ycsb_v2:combine-main",
-    "//scripts/ycsb_v2:combine-amzn-pgm",
+    "//scripts/ycsb_v2:combine-amzn-greedyplr",
   ],
 )

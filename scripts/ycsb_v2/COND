@@ -352,8 +352,8 @@ run_experiment_group(
   ],
   deps=[
     # e.g. :preload-synth-pg_llsm-64B
-    ":preload-synth-{}-{}".format("pg_llsm", config["name"])
-    for config in CONFIGS
+    ":preload-synth-{}-{}".format(db, config["name"])
+    for db, config in product(DBS, CONFIGS)
   ],
 )
 
@@ -389,8 +389,8 @@ for dataset in CUSTOM_DATASETS:
     ],
     deps=[
       # e.g. :preload-amzn-pg_llsm-64B
-      ":preload-{}-{}-{}".format(dataset["name"], "pg_llsm", config["name"])
-      for config in CONFIGS
+      ":preload-{}-{}-{}".format(dataset["name"], db, config["name"])
+      for db, config in product(DBS, CONFIGS)
     ],
   )
 

@@ -28,12 +28,12 @@ def plot_scale(
 
     ax.plot(
         relevant["threads"],
-        relevant["krequests_per_s_pgm"],
+        relevant["krequests_per_s_plr"],
         color=COLORS["rocksdb"],
         marker="^",
         linewidth=linewidth,
         markersize=markersize,
-        label="PGM",
+        label="GreedyPLR",
     )
     ax.plot(
         relevant["threads"],
@@ -42,7 +42,7 @@ def plot_scale(
         marker="o",
         linewidth=linewidth,
         markersize=markersize,
-        label="GreedyPLR",
+        label="PGM",
     )
 
     ax.set_xlabel("Threads")
@@ -83,7 +83,6 @@ def make_point_plots(data, out_dir):
             fig, ax = plt.subplots(figsize=(5, 3.2), tight_layout=True)
         else:
             fig, ax = plt.subplots(figsize=(4, 3.2), tight_layout=True)
-        #fig, ax = plt.subplots(figsize=(4, 3.2), tight_layout=True)
         plot_scale(
             ax,
             data,
@@ -94,7 +93,7 @@ def make_point_plots(data, out_dir):
             ylim=(0, 1700),
             legend_order=["PGM", "GreedyPLR"],
         )
-        fig.savefig(out_dir / "amzn_pgm-{}-{}.pdf".format(config, workload))
+        fig.savefig(out_dir / "amzn_greedyplr-{}-{}.pdf".format(config, workload))
         plt.close(fig)
 
 
@@ -102,8 +101,6 @@ def make_scan_plots(data, out_dir):
     # Create the scan workload plots.
     configs = ["64B", "1024B"]
     for config in configs:
-        #show_legend = config == "64B"
-        #show_ylabel = config == "64B"
         show_legend = False
         show_ylabel = False
         if show_legend or show_ylabel:
@@ -120,13 +117,13 @@ def make_scan_plots(data, out_dir):
             ylim=(0, 100) if config == "64B" else (0, 15),
             legend_order=["PGM", "GreedyPLR"],
         )
-        fig.savefig(out_dir / "amzn_pgm-{}-e.pdf".format(config))
+        fig.savefig(out_dir / "amzn_greedyplr-{}-e.pdf".format(config))
         plt.close(fig)
 
 
 def process_data(raw_data):
     orig = raw_data[raw_data["dataset"] == "amzn"]
-    pgm = raw_data[raw_data["dataset"] == "amzn_pgm"]
+    plr = raw_data[raw_data["dataset"] == "amzn_greedyplr"]
     orig_rel = orig[
         (orig["dataset"] == "amzn")
         & (orig["db"] == "pg_llsm")
@@ -134,26 +131,26 @@ def process_data(raw_data):
     ]
     comb = pd.merge(
         orig_rel,
-        pgm,
+        plr,
         on=["config", "dist", "db", "workload", "threads"],
-        suffixes=["_orig", "_pgm"],
+        suffixes=["_orig", "_plr"],
     )
-    comb["ratio"] = comb["krequests_per_s_pgm"] / comb["krequests_per_s_orig"]
+    comb["ratio"] = comb["krequests_per_s_plr"] / comb["krequests_per_s_orig"]
     return comb
 
 
 def compute_summary(data):
     ratios = data["ratio"]
     geomean = gmean(ratios)
-    print("Geomean PGM speedup:", geomean)
-    print("Max. PGM speedup:", ratios.max())
-    print("Min. PGM speedup:", ratios.min())
+    print("Geomean GreedyPLR speedup:", geomean)
+    print("Max. GreedyPLR speedup:", ratios.max())
+    print("Min. GreedyPLR speedup:", ratios.min())
 
     ratios_e = data[data["workload"] == "e"]["ratio"]
     geomean_e = gmean(ratios_e)
-    print("Geomean E PGM speedup:", geomean_e)
-    print("Max. E PGM speedup:", ratios_e.max())
-    print("Min. E PGM speedup:", ratios_e.min())
+    print("Geomean E GreedyPLR speedup:", geomean_e)
+    print("Max. E GreedyPLR speedup:", ratios_e.max())
+    print("Min. E GreedyPLR speedup:", ratios_e.min())
 
 
 def main():
