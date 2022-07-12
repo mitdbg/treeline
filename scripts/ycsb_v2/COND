@@ -409,9 +409,7 @@ combine(
     # No page grouping, no caching.
     ":factor-nogrp_nocache-{}-16".format(wkload)
     for wkload in WORKLOADS
-
   ] + [
-    
     # No page grouping, yes caching.
     ":factor-nogrp-{}-16".format(wkload)
     for wkload in WORKLOADS
