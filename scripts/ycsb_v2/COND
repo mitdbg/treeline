@@ -6,15 +6,13 @@ WORKLOADS = [
 
 DBS = [
   "pg_llsm",
-  #"rocksdb",
-  #"leanstore"
+  "rocksdb",
+  "leanstore"
 ]
 
-DISTRIBUTIONS = ["zipfian", #"uniform"
-]
+DISTRIBUTIONS = ["zipfian", "uniform"]
 
-THREADS = [#1, 2, 4, 8, 
-16]
+THREADS = [1, 2, 4, 8, 16]
 
 CONFIG_64B = {
   "name": "64B",
