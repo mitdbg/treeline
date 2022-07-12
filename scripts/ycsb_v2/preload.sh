@@ -100,9 +100,15 @@ if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
 
   # 2. Shuffle the on-disk pages.
   echo >&2 "Done loading. Shuffling the pages now..."
-  ../../build/page_grouping/pg_shuffle \
-    --db_path=$full_checkpoint_path/pg_llsm \
-    --seed=$SEED
+  if [ -d $full_checkpoint_path/pg_tl ]; then
+    ../../build/page_grouping/pg_shuffle \
+      --db_path=$full_checkpoint_path/pg_tl \
+      --seed=$SEED
+  else
+    ../../build/page_grouping/pg_shuffle \
+      --db_path=$full_checkpoint_path/pg_llsm \
+      --seed=$SEED
+  fi
 
   # 3. Run the preload workload.
   echo >&2 "Done shuffling. Running the setup workload now..."

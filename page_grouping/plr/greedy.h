@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "data.h"
+#include "plr.h"
 
 namespace tl {
 namespace pg {
@@ -52,7 +53,7 @@ class GreedyPLRSegmenter {
 // N.B. This algorithm does not produce connected line segments (i.e.,
 // discontinuities across the linear functions are allowed).
 template <typename T>
-class GreedyPLRBuilder {
+class GreedyPLRBuilder : public PLRBuilder<T> {
  public:
   // Perform piecewise linear regression with an error of at most `delta`.
   GreedyPLRBuilder(T delta);
@@ -60,10 +61,10 @@ class GreedyPLRBuilder {
   // Extend the segment to include `p`. If the return value is not empty, it
   // will include a bounded line segment that is part of the piecewise linear
   // regression.
-  std::optional<BoundedLine<T>> Offer(const Point<T>& p);
+  std::optional<BoundedLine<T>> Offer(const Point<T>& p) override;
 
   // Retrieve the final built line.
-  std::optional<BoundedLine<T>> Finish() const;
+  std::optional<BoundedLine<T>> Finish() const override;
 
  private:
   T delta_;

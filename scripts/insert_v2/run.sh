@@ -18,12 +18,12 @@ for val in "${orig_args[@]}"; do
     db_type=${phys_arg:5}
   fi
 
-  # Extract goal/delta.
+  # Extract goal/epsilon.
   if [[ $phys_arg =~ --records_per_page_goal=.+ ]]; then
     goal=${phys_arg:24}
   fi
-  if [[ $phys_arg =~ --records_per_page_delta=.+ ]]; then
-    delta=${phys_arg:25}
+  if [[ $phys_arg =~ --records_per_page_epsilon=.+ ]]; then
+    epsilon=${phys_arg:25}
   fi
 
   # Skip the "perfect allocation" part of the experiment.
@@ -129,7 +129,7 @@ mkdir -p $COND_OUT/perfect_alloc
 
 # Remove all overflows.
 echo >&2 "Removing all overflows in the generated DB..."
-../../build/page_grouping/pg_flatten --db_path=$DB_PATH --goal=$goal --delta=$delta
+../../build/page_grouping/pg_flatten --db_path=$DB_PATH --goal=$goal --epsilon=$epsilon
 
 # Run again, this time with "perfect allocation".
 echo >&2 "Now running the \"perfect allocation\" experiment..."

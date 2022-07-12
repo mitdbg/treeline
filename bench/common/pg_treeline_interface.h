@@ -66,8 +66,14 @@ class PGTreeLineInterface {
                 << options.record_cache_capacity << std::endl;
       std::cerr << "> PGTreeLine records per page goal: "
                 << options.records_per_page_goal << std::endl;
-      std::cerr << "> PGTreeLine records per page delta: "
-                << options.records_per_page_delta << std::endl;
+      std::cerr << "> PGTreeLine records per page epsilon: "
+                << options.records_per_page_epsilon << std::endl;
+      if (options.use_pgm_builder) {
+        std::cerr << "> PGTreeLine is using the PGM linear model builder."
+                  << std::endl;
+      } else {
+        std::cerr << "> PGTreeLine is using GreedyPLR." << std::endl;
+      }
       std::cerr << "> Opening PGTreeLine DB at " << dbname << std::endl;
     }
 

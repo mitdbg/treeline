@@ -3,17 +3,17 @@ from itertools import product
 BUFFER_SIZE_BYTES = 64 * 1024 * 1024
 
 CONFIGS = [
-  # Represents 64 B records, 2880 bytes per page +/- (2 * 320) bytes
+  # Represents 64 B records, 2816 bytes per page +/- (5 * 2 * 64) bytes
   {
-    "records_per_page_goal": 45,
-    "records_per_page_delta": 5,
+    "records_per_page_goal": 44,
+    "records_per_page_epsilon": 5,
     "record_size_bytes": 64,
     "write_batch_size": BUFFER_SIZE_BYTES // 64,
   },
-  # Represents 1024 B records, 2048 bytes per page +/- (2 * 1024) bytes
+  # Represents 1024 B records, 2048 bytes per page +/- (0.5 * 2 * 1024) bytes
   {
     "records_per_page_goal": 2,
-    "records_per_page_delta": 1,
+    "records_per_page_epsilon": 0.5,
     "record_size_bytes": 1024,
     "write_batch_size": BUFFER_SIZE_BYTES // 1024,
   },
@@ -25,10 +25,10 @@ CUSTOM_DATASETS = [
 ]
 
 def suffix(config, segs):
-  return "{rsb}-{goal}-{delta}-{segs}".format(
+  return "{rsb}-{goal}-{epsilon}-{segs}".format(
     rsb=config["record_size_bytes"],
     goal=config["records_per_page_goal"],
-    delta=config["records_per_page_delta"],
+    epsilon=config["records_per_page_epsilon"],
     segs=segs,
   )
 

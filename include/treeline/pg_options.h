@@ -39,9 +39,9 @@ struct PageGroupedDBOptions {
   // after one overflow page becomes full.
   bool use_segments = true;
 
-  // By default, put 45 +/- (2 * 5) records into each page.
-  size_t records_per_page_goal = 45;
-  size_t records_per_page_delta = 5;
+  // By default, put 44 +/- (2 * 5) records into each page.
+  size_t records_per_page_goal = 44;
+  double records_per_page_epsilon = 5;
 
   // If set to true, will write out the segment sizes and models to a CSV file
   // for debug purposes.
@@ -89,6 +89,10 @@ struct PageGroupedDBOptions {
 
   // Options for insert forecasting.
   InsertForecastingOptions forecasting;
+
+  // If true, the DB will use PGM's piecewise linear regression algorithm for
+  // page grouping. This flag has no effect if `use_segments` is set to false.
+  bool use_pgm_builder = false;
 };
 
 struct WriteOptions {

@@ -40,10 +40,10 @@ std::vector<std::pair<uint64_t, Slice>> BuildRecords(
   return records;
 }
 
-PageGroupedDBOptions GetOptions(size_t goal, size_t delta, bool use_segments) {
+PageGroupedDBOptions GetOptions(size_t goal, size_t epsilon, bool use_segments) {
   PageGroupedDBOptions options;
   options.records_per_page_goal = goal;
-  options.records_per_page_delta = delta;
+  options.records_per_page_epsilon = epsilon;
   options.use_segments = use_segments;
   options.write_debug_info = false;
   options.use_memory_based_io = true;
@@ -52,7 +52,7 @@ PageGroupedDBOptions GetOptions(size_t goal, size_t delta, bool use_segments) {
 }
 
 TEST_F(PGManagerRewriteTest, AppendSegments) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/true);
   options.num_bg_threads = 2;
 
   // Insert sequential records.
@@ -108,7 +108,7 @@ TEST_F(PGManagerRewriteTest, AppendSegments) {
 }
 
 TEST_F(PGManagerRewriteTest, AppendPages) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/false);
   options.num_bg_threads = 2;
 
   // Insert sequential records.
@@ -164,7 +164,7 @@ TEST_F(PGManagerRewriteTest, AppendPages) {
 }
 
 TEST_F(PGManagerRewriteTest, InsertMiddleSegments) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/true);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/true);
   options.num_bg_threads = 2;
 
   // Create a new dataset by multiplying each sequential key by 1000.
@@ -244,7 +244,7 @@ TEST_F(PGManagerRewriteTest, InsertMiddleSegments) {
 }
 
 TEST_F(PGManagerRewriteTest, InsertMiddlePages) {
-  auto options = GetOptions(/*goal=*/15, /*delta=*/5, /*use_segments=*/false);
+  auto options = GetOptions(/*goal=*/15, /*epsilon=*/5, /*use_segments=*/false);
   options.num_bg_threads = 2;
 
   // Create a new dataset by multiplying each sequential key by 1000.

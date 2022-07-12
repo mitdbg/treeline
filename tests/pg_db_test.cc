@@ -53,8 +53,8 @@ std::vector<Record> GetRangeDataset(const Key step, size_t num_records,
 TEST_F(PGDBTest, LoadReadWriteRead) {
   PageGroupedDB* db = nullptr;
   auto options = GetCommonTestOptions();
-  options.records_per_page_goal = 45;
-  options.records_per_page_delta = 5;
+  options.records_per_page_goal = 44;
+  options.records_per_page_epsilon = 5;
   ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
   ASSERT_NE(db, nullptr);
 
@@ -91,8 +91,8 @@ TEST_F(PGDBTest, LoadReadWriteRead) {
 TEST_F(PGDBTest, LoadWriteScanReopenScan) {
   PageGroupedDB* db = nullptr;
   auto options = GetCommonTestOptions();
-  options.records_per_page_goal = 45;
-  options.records_per_page_delta = 5;
+  options.records_per_page_goal = 44;
+  options.records_per_page_epsilon = 5;
   ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
   ASSERT_NE(db, nullptr);
 
@@ -148,8 +148,8 @@ TEST_F(PGDBTest, LoadWriteScanReopenScan) {
 TEST_F(PGDBTest, ScanAmount) {
   PageGroupedDB* db = nullptr;
   auto options = GetCommonTestOptions();
-  options.records_per_page_goal = 45;
-  options.records_per_page_delta = 5;
+  options.records_per_page_goal = 44;
+  options.records_per_page_epsilon = 5;
   ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
   ASSERT_NE(db, nullptr);
 
@@ -185,8 +185,8 @@ TEST_F(PGDBTest, ScanAmount) {
 TEST_F(PGDBTest, LoadParallelFlushReopenScan) {
   PageGroupedDB* db = nullptr;
   auto options = GetCommonTestOptions();
-  options.records_per_page_goal = 45;
-  options.records_per_page_delta = 5;
+  options.records_per_page_goal = 44;
+  options.records_per_page_epsilon = 5;
   options.parallelize_final_flush = true;
   options.num_bg_threads = 3;
   ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
@@ -236,7 +236,7 @@ TEST_F(PGDBTest, InsertSmaller) {
   PageGroupedDB* db = nullptr;
   auto options = GetCommonTestOptions();
   options.records_per_page_goal = 2;
-  options.records_per_page_delta = 1;
+  options.records_per_page_epsilon = 0.5;
   options.parallelize_final_flush = true;
   options.num_bg_threads = 3;
   ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
@@ -289,7 +289,7 @@ TEST_F(PGDBTest, BadBulkLoad) {
   PageGroupedDB* db = nullptr;
   auto options = GetCommonTestOptions();
   options.records_per_page_goal = 2;
-  options.records_per_page_delta = 1;
+  options.records_per_page_epsilon = 0.5;
   options.parallelize_final_flush = true;
   options.num_bg_threads = 3;
   ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());
@@ -312,7 +312,7 @@ TEST_F(PGDBTest, ReservedKeyUse) {
   PageGroupedDB* db = nullptr;
   auto options = GetCommonTestOptions();
   options.records_per_page_goal = 2;
-  options.records_per_page_delta = 1;
+  options.records_per_page_epsilon = 0.5;
   options.parallelize_final_flush = true;
   options.num_bg_threads = 3;
   ASSERT_TRUE(PageGroupedDB::Open(options, kDBDir, &db).ok());

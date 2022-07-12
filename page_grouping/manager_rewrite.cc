@@ -4,12 +4,12 @@
 
 #include "../bufmgr/page_memory_allocator.h"
 #include "circular_page_buffer.h"
-#include "treeline/pg_db.h"
-#include "treeline/pg_stats.h"
 #include "manager.h"
 #include "persist/merge_iterator.h"
 #include "persist/page.h"
 #include "persist/segment_wrap.h"
+#include "treeline/pg_db.h"
+#include "treeline/pg_stats.h"
 #include "util/key.h"
 
 namespace {
@@ -236,7 +236,7 @@ Status Manager::RewriteSegmentsImpl(
           : false;
 
   size_t future_goal = options_.records_per_page_goal;
-  size_t future_delta = options_.records_per_page_delta;
+  const double future_epsilon = options_.records_per_page_epsilon;
 
   if (forecast_exists) {
     size_t current_pages = 0;
@@ -247,7 +247,7 @@ Status Manager::RewriteSegmentsImpl(
     // The default parameter combination must be viable for counting the max
     // records per page.
     size_t max_records_per_page =
-        options_.records_per_page_goal + 2 * options_.records_per_page_delta;
+        options_.records_per_page_goal + 2 * options_.records_per_page_epsilon;
 
     // Estimate total current keys in range, assumming some reocrds in overflows
     // and some extra records in cache.
@@ -267,7 +267,10 @@ Status Manager::RewriteSegmentsImpl(
   // End insert forecasting
   //
 
-  SegmentBuilder seg_builder(future_goal, future_delta);
+  SegmentBuilder seg_builder(future_goal, future_epsilon,
+                             options_.use_pgm_builder
+                                 ? SegmentBuilder::Strategy::kPGM
+                                 : SegmentBuilder::Strategy::kGreedy);
 
   // Keeps track of the pages in memory (the "sliding window"). The pages'
   // backing memory is in `page_buf`. The page chains in the deques are sorted

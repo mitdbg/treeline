@@ -117,3 +117,12 @@ run_command(
     "//scripts/iochar/read:rand-sweep",
   ],
 )
+
+run_command(
+  name="greedyplr-compare",
+  run="python3 plot_greedyplr_compare.py",
+  deps=[
+    "//scripts/ycsb_v2:combine-main",
+    "//scripts/ycsb_v2:combine-amzn-greedyplr",
+  ],
+)

@@ -134,7 +134,7 @@ class PageGroupingInterface {
   PageGroupedDBOptions GetOptions() {
     PageGroupedDBOptions options;
     options.records_per_page_goal = FLAGS_records_per_page_goal;
-    options.records_per_page_delta = FLAGS_records_per_page_delta;
+    options.records_per_page_epsilon = FLAGS_records_per_page_epsilon;
     options.use_segments = !FLAGS_disable_segments;
     options.num_bg_threads = FLAGS_bg_threads;
     options.use_memory_based_io = FLAGS_use_memory_based_io;

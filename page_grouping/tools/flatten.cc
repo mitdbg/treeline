@@ -12,10 +12,10 @@ DEFINE_uint64(
 DEFINE_uint64(end_key, std::numeric_limits<uint64_t>::max(),
               "The upper boundary (exclusive) of the key space to pass to "
               "`FlattenRange()`.");
-DEFINE_uint32(goal, 45,
+DEFINE_uint32(goal, 44,
               "Passed to PageGroupedDBOptions::records_per_page_goal.");
-DEFINE_uint32(delta, 5,
-              "Passed to PageGroupedDBOptions::records_per_page_delta.");
+DEFINE_double(epsilon, 5,
+              "Passed to PageGroupedDBOptions::records_per_page_epsilon.");
 
 using namespace tl;
 using namespace tl::pg;
@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
   PageGroupedDBOptions options;
   options.use_segments = true;
   options.records_per_page_goal = FLAGS_goal;
-  options.records_per_page_delta = FLAGS_delta;
+  options.records_per_page_epsilon = FLAGS_epsilon;
   options.use_memory_based_io = true;
 
   PageGroupedDB* db = nullptr;

@@ -4,10 +4,10 @@
 #include <vector>
 
 #include "key.h"
-#include "treeline/pg_db.h"
-#include "treeline/pg_options.h"
 #include "manager.h"
 #include "persist/segment_wrap.h"
+#include "treeline/pg_db.h"
+#include "treeline/pg_options.h"
 #include "util/key.h"
 
 namespace fs = std::filesystem;
@@ -128,8 +128,10 @@ void Manager::BulkLoadIntoSegmentsImpl(const std::vector<Record>& records) {
   std::vector<std::pair<Key, SegmentInfo>> segment_boundaries;
 
   // 1. Generate the segments.
-  SegmentBuilder builder(options_.records_per_page_goal,
-                         options_.records_per_page_delta);
+  SegmentBuilder builder(
+      options_.records_per_page_goal, options_.records_per_page_epsilon,
+      options_.use_pgm_builder ? SegmentBuilder::Strategy::kPGM
+                               : SegmentBuilder::Strategy::kGreedy);
   const auto segments =
       builder.BuildFromDataset(records, /*force_add_min_key=*/true);
   if (options_.write_debug_info) {
@@ -290,7 +292,8 @@ std::vector<std::pair<Key, SegmentInfo>> Manager::LoadIntoNewPages(
       seg_id = SegmentId(/*file_id=*/0,
                          /*page_offset=*/byte_offset / pg::Page::kSize);
     }
-    sf->WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), /*num_pages=*/1);
+    sf->WritePages(seg_id.GetOffset() * Page::kSize, buf.get(),
+                   /*num_pages=*/1);
     w_.BumpWriteCount(1);
 
     // Record the page boundary.
@@ -322,7 +325,8 @@ std::vector<std::pair<Key, SegmentInfo>> Manager::LoadIntoNewPages(
       seg_id = SegmentId(/*file_id=*/0,
                          /*page_offset=*/byte_offset / pg::Page::kSize);
     }
-    sf->WritePages(seg_id.GetOffset() * Page::kSize, buf.get(), /*num_pages=*/1);
+    sf->WritePages(seg_id.GetOffset() * Page::kSize, buf.get(),
+                   /*num_pages=*/1);
     w_.BumpWriteCount(1);
 
     segment_boundaries.emplace_back(
