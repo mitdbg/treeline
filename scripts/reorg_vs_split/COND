@@ -1,3 +1,5 @@
+from itertools import product
+
 CONFIG_64B = {
   "name": "64B",
   "record_size_bytes": 64,
@@ -66,6 +68,7 @@ AMZN_DATASET = {
 
 CUSTOM_DATASETS = [OSM_DATASET, AMZN_DATASET]
 
+REWRITE_SEARCH_RADIUSES = [5, 2, 0]
 
 ###
 ### Utilities.
@@ -92,49 +95,120 @@ def process_config(config, dataset):
 run_command(
   name="combine",
   run="python3 combine_raw.py",
-  deps=[":middle-64B"],
-)
-
-combine(
-  name="middle-64B",
   deps=[
-    ":middle-grouping-64B",
-    ":middle-pages-64B",
+    ":linear-grouping",
+    ":linear-pages",
+    ":amzn-grouping",
+    ":amzn-pages",
   ],
 )
 
-run_experiment(
-  name="middle-grouping-64B",
+run_experiment_group(
+  name="linear-grouping",
   run="./run.sh",
-  options={
-    **COMMON_OPTIONS,
-    **process_config(CONFIG_64B, SYNTH_DATASET),
-    "db": "pg_llsm",
-    "checkpoint_name": "rs-grouping-64B",
-    "threads": 8,
-    "workload_config": "insert_middle.yml",
-    # Page grouping enabled.
-    "pg_use_segments": True,
-  },
-  deps=[":preload-grouping-64B"],
+  experiments=[
+    ExperimentInstance(
+      name="linear-grouping-{}-{}".format(config["name"], rsr),
+      options={
+        **COMMON_OPTIONS,
+        **process_config(config, SYNTH_DATASET),
+        "db": "pg_llsm",
+        "checkpoint_name": "linear-grouping-{}".format(config["name"]),
+        "threads": 8,
+        "workload_config": "insert_middle.yml",
+        "pg_rewrite_search_radius": rsr,
+        # Page grouping enabled.
+        "pg_use_segments": True,
+      },
+    )
+    for config, rsr in product(CONFIGS, REWRITE_SEARCH_RADIUSES)
+  ],
+  deps=[
+    ":preload-linear-grouping-64B",
+    ":preload-linear-grouping-1024B",
+  ],
 )
 
-run_experiment(
-  name="middle-pages-64B",
+run_experiment_group(
+  name="amzn-grouping",
   run="./run.sh",
-  options={
-    **COMMON_OPTIONS,
-    **process_config(CONFIG_64B, SYNTH_DATASET),
-    "db": "pg_llsm",
-    "checkpoint_name": "rs-pages-64B",
-    "threads": 8,
-    "workload_config": "insert_middle.yml",
-    # Page grouping **disabled**.
-    "pg_use_segments": False,
-    # No overflows - always split a page that becomes full.
-    "pg_disable_overflow_creation": True,
-  },
-  deps=[":preload-pages-64B"],
+  experiments=[
+    ExperimentInstance(
+      name="amzn-grouping-{}-{}".format(config["name"], rsr),
+      options={
+        **COMMON_OPTIONS,
+        **process_config(config, AMZN_DATASET),
+        "db": "pg_llsm",
+        "checkpoint_name": "amzn-grouping-{}".format(config["name"]),
+        "threads": 8,
+        "workload_config": "insert_middle_amzn.yml",
+        "custom_dataset": AMZN_DATASET["path"],
+        "pg_rewrite_search_radius": rsr,
+        # Page grouping enabled.
+        "pg_use_segments": True,
+      },
+    )
+    for config, rsr in product(CONFIGS, REWRITE_SEARCH_RADIUSES)
+  ],
+  deps=[
+    ":preload-amzn-grouping-64B",
+    ":preload-amzn-grouping-1024B",
+  ],
+)
+
+run_experiment_group(
+  name="linear-pages",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="linear-pages-{}".format(config["name"]),
+      options={
+        **COMMON_OPTIONS,
+        **process_config(config, SYNTH_DATASET),
+        "db": "pg_llsm",
+        "checkpoint_name": "linear-pages-{}".format(config["name"]),
+        "threads": 8,
+        "workload_config": "insert_middle.yml",
+        # Page grouping **disabled**.
+        "pg_use_segments": False,
+        # No overflows - always split a page that becomes full.
+        "pg_disable_overflow_creation": True,
+      },
+    )
+    for config in CONFIGS
+  ]
+  deps=[
+    ":preload-linear-pages-64B",
+    ":preload-linear-pages-1024B",
+  ],
+)
+
+run_experiment_group(
+  name="amzn-pages",
+  run="./run.sh",
+  experiments=[
+    ExperimentInstance(
+      name="amzn-pages-{}".format(config["name"]),
+      options={
+        **COMMON_OPTIONS,
+        **process_config(config, AMZN_DATASET),
+        "db": "pg_llsm",
+        "checkpoint_name": "amzn-pages-{}".format(config["name"]),
+        "threads": 8,
+        "workload_config": "insert_middle_amzn.yml",
+        "custom_dataset": AMZN_DATASET["path"],
+        # Page grouping **disabled**.
+        "pg_use_segments": False,
+        # No overflows - always split a page that becomes full.
+        "pg_disable_overflow_creation": True,
+      },
+    )
+    for config in CONFIGS
+  ]
+  deps=[
+    ":preload-amzn-pages-64B",
+    ":preload-amzn-pages-1024B",
+  ],
 )
 
 
@@ -142,32 +216,65 @@ run_experiment(
 ### Preload tasks.
 ###
 
-run_command(
-  name="preload-grouping-64B",
-  run="./preload.sh",
-  options={
-    **COMMON_OPTIONS,
-    **process_config(CONFIG_64B, SYNTH_DATASET),
-    "db": "pg_llsm",
-    "checkpoint_name": "rs-grouping-64B",
-    "threads": 1,
-    "workload_config": "insert_middle.yml",
-    # Page grouping enabled.
-    "pg_use_segments": True,
-  },
-)
+for config in CONFIGS:
+  run_command(
+    name="preload-linear-grouping-{}".format(config["name"]),
+    run="./preload.sh",
+    options={
+      **COMMON_OPTIONS,
+      **process_config(config, SYNTH_DATASET),
+      "db": "pg_llsm",
+      "checkpoint_name": "linear-grouping-{}".format(config["name"]),
+      "threads": 1,
+      "workload_config": "insert_middle.yml",
+      # Page grouping enabled.
+      "pg_use_segments": True,
+    },
+  )
 
-run_command(
-  name="preload-pages-64B",
-  run="./preload.sh",
-  options={
-    **COMMON_OPTIONS,
-    **process_config(CONFIG_64B, SYNTH_DATASET),
-    "db": "pg_llsm",
-    "checkpoint_name": "rs-pages-64B",
-    "threads": 1,
-    "workload_config": "insert_middle.yml",
-    # Page grouping **disabled**.
-    "pg_use_segments": False,
-  },
-)
+  run_command(
+    name="preload-linear-pages-{}".format(config["name"]),
+    run="./preload.sh",
+    options={
+      **COMMON_OPTIONS,
+      **process_config(config, SYNTH_DATASET),
+      "db": "pg_llsm",
+      "checkpoint_name": "linear-pages-{}".format(config["name"]),
+      "threads": 1,
+      "workload_config": "insert_middle.yml",
+      # Page grouping **disabled**.
+      "pg_use_segments": False,
+    },
+  )
+
+  run_command(
+    name="preload-amzn-grouping-{}".format(config["name"]),
+    run="./preload.sh",
+    options={
+      **COMMON_OPTIONS,
+      **process_config(config, AMZN_DATASET),
+      "db": "pg_llsm",
+      "checkpoint_name": "amzn-grouping-{}".format(config["name"]),
+      "threads": 1,
+      "workload_config": "insert_middle_amzn.yml",
+      "custom_dataset": AMZN_DATASET["path"],
+      # Page grouping enabled.
+      "pg_use_segments": True,
+    },
+  )
+
+  run_command(
+    name="preload-amzn-pages-{}".format(config["name"]),
+    run="./preload.sh",
+    options={
+      **COMMON_OPTIONS,
+      **process_config(config, AMZN_DATASET),
+      "db": "pg_llsm",
+      "checkpoint_name": "amzn-pages-{}".format(config["name"]),
+      "threads": 1,
+      "workload_config": "insert_middle_amzn.yml",
+      "custom_dataset": AMZN_DATASET["path"],
+      # Page grouping **disabled**.
+      "pg_use_segments": False,
+    },
+  )

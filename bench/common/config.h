@@ -94,6 +94,7 @@ DECLARE_double(records_per_page_epsilon);
 DECLARE_bool(pg_use_memory_based_io);
 DECLARE_bool(pg_bypass_cache);
 DECLARE_bool(pg_parallelize_final_flush);
+DECLARE_uint32(pg_rewrite_search_radius);
 
 // If set, PGTreeLine will use the PGM piecewise linear regression algorithm for
 // page grouping. This flag has no effect if `pg_use_segments` is set to false.

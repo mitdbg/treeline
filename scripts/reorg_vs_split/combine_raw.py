@@ -78,10 +78,16 @@ def main():
             df.pop("write_mib_per_s")
             orig_columns = list(df.columns)
 
-            # e.g.: middle-pages-64B
+            # e.g.: linear-pages-64B
+            # e.g.: linear-grouping-64B-1
             parts = exp_inst.name.split("-")
+            dataset = parts[0]
             variant = parts[1]
             config = parts[2]
+            if len(parts) > 3:
+                search_radius = int(parts[3])
+            else:
+                search_radius = 0
 
             if variant == "grouping":
                 order = 1
@@ -90,9 +96,11 @@ def main():
             else:
                 raise AssertionError
 
-            df.insert(0, "config", config)
-            df.insert(1, "variant", variant)
-            df.insert(2, "order", order)
+            df.insert(0, "dataset", dataset)
+            df.insert(1, "config", config)
+            df.insert(2, "variant", variant)
+            df.insert(3, "order", order)
+            df.insert(4, "search_radius", search_radius)
 
             # Process iostat results (physical I/O)
             read_kb, written_kb = process_iostat(
@@ -128,14 +136,16 @@ def main():
     combined = pd.concat(all_results)
     orig_columns.remove("db")
     combined.sort_values(
-        ["config", "order"],
+        ["dataset", "config", "order", "search_radius"],
         inplace=True,
         ignore_index=True,
     )
     combined = combined[
         [
+            "dataset",
             "config",
             "variant",
+            "search_radius",
             *orig_columns,
             "phys_read_kb",
             "phys_written_kb",
