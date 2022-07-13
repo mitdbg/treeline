@@ -89,6 +89,12 @@ def process_config(config, dataset):
 ### Experiments
 ###
 
+run_command(
+  name="combine",
+  run="python3 combine_raw.py",
+  deps=[":middle-64B"],
+)
+
 combine(
   name="middle-64B",
   deps=[
