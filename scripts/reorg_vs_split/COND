@@ -89,6 +89,14 @@ def process_config(config, dataset):
 ### Experiments
 ###
 
+combine(
+  name="middle-64B",
+  deps=[
+    ":middle-grouping-64B",
+    ":middle-pages-64B",
+  ],
+)
+
 run_experiment(
   name="middle-grouping-64B",
   run="./run.sh",
@@ -97,7 +105,7 @@ run_experiment(
     **process_config(CONFIG_64B, SYNTH_DATASET),
     "db": "pg_llsm",
     "checkpoint_name": "rs-grouping-64B",
-    "threads": 1,
+    "threads": 8,
     "workload_config": "insert_middle.yml",
     # Page grouping enabled.
     "pg_use_segments": True,
@@ -113,7 +121,7 @@ run_experiment(
     **process_config(CONFIG_64B, SYNTH_DATASET),
     "db": "pg_llsm",
     "checkpoint_name": "rs-pages-64B",
-    "threads": 1,
+    "threads": 8,
     "workload_config": "insert_middle.yml",
     # Page grouping **disabled**.
     "pg_use_segments": False,
