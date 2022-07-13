@@ -103,6 +103,9 @@ run_command(
   ],
 )
 
+group(name="linear", deps=[":linear-grouping", ":linear-pages"])
+group(name="amzn", deps=[":amzn-grouping", ":amzn-pages"])
+
 run_experiment_group(
   name="linear-grouping",
   run="./run.sh",
@@ -176,7 +179,7 @@ run_experiment_group(
       },
     )
     for config in CONFIGS
-  ]
+  ],
   deps=[
     ":preload-linear-pages-64B",
     ":preload-linear-pages-1024B",
@@ -204,7 +207,7 @@ run_experiment_group(
       },
     )
     for config in CONFIGS
-  ]
+  ],
   deps=[
     ":preload-amzn-pages-64B",
     ":preload-amzn-pages-1024B",
