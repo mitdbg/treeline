@@ -52,6 +52,8 @@ du -b $full_db_path > $COND_OUT/db_space.log
 # non-segment case by consulting the debug counters file.
 if [ -d "${full_db_path}/pg_llsm/debug" ]; then
   cp -r $full_db_path/pg_llsm/debug $COND_OUT
+elif [ -d "${full_db_path}/pg_tl/debug" ]; then
+  cp -r $full_db_path/pg_tl/debug $COND_OUT
 fi
 
 # Report that the experiment failed if the `run_custom` exit code is not 0

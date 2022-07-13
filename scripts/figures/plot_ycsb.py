@@ -400,7 +400,7 @@ def make_scan_plots(args, data, out_dir):
             workload="e",
             legend_pos=("upper left", (-0.035, 1.06)) if show_legend else None,
             show_ylabel=show_ylabel,
-            ylim=(0, 100) if config == "64B" else (0, 15),
+            ylim=(0, 120) if config == "64B" else (0, 15),
             legend_order=["TreeLine", "RocksDB", "LeanStore"],
         )
         if args.data is not None:
