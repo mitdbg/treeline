@@ -1,0 +1,157 @@
+CONFIG_64B = {
+  "name": "64B",
+  "record_size_bytes": 64,
+
+  # Used by page-grouped LLSM.
+  "records_per_page_goal": 44,
+  "records_per_page_epsilon": 5,
+
+  # Used by all DBs.
+  # 408 MiB in total (2 x 64 MiB + 280 MiB, ~33% of the dataset)
+  "memtable_mib": 64,
+  "cache_mib": 280,
+}
+
+CONFIG_1024B = {
+  "name": "1024B",
+  "record_size_bytes": 1024,
+
+  # Used by page-grouped LLSM.
+  "records_per_page_goal": 2,
+  "records_per_page_epsilon": 0.5,
+
+  # Used by all DBs.
+  # 6510 MiB in total ~33% of the dataset
+  "memtable_mib": 1024,
+  "cache_mib": 4462,
+}
+
+CONFIGS = [CONFIG_64B, CONFIG_1024B]
+
+COMMON_OPTIONS = {
+  "bg_threads": 4,
+  "latency_sample_period": 10,
+  "bypass_wal": True,
+  "use_direct_io": True,
+  "optimistic_rec_caching": False,
+  "pg_use_pgm_builder": True,
+}
+
+SYNTH_DATASET = {
+  "name": "synth",
+  "multiplier": 1,
+  "range_min": 1,
+  "range_max": 2000000001,
+}
+
+OSM_DATASET = {
+  "name": "osm",
+  "path": "'$TP_DATASET_PATH/osm_ny.txt'",
+  # The dataset is this many times larger than the standard 20 M synthetic
+  # dataset we use.
+  "multiplier": 1.160804,
+  "range_min": 699540,
+  "range_max": 6820987374,
+}
+
+AMZN_DATASET = {
+  "name": "amzn",
+  "path": "'$TP_DATASET_PATH/amazon_reviews.txt'",
+  # The dataset is this many times larger than the standard 20 M synthetic
+  # dataset we use.
+  "multiplier": 1.674881,
+  "range_min": 10001,
+  "range_max": 53096592,
+}
+
+CUSTOM_DATASETS = [OSM_DATASET, AMZN_DATASET]
+
+
+###
+### Utilities.
+###
+
+def process_config(config, dataset):
+  copy = config.copy()
+  del copy["cache_mib"]
+  del copy["memtable_mib"]
+  del copy["name"]
+
+  # Set the memory configuration.
+  copy["cache_size_mib"] = int(dataset["multiplier"] * (
+    config["cache_mib"] + (2 * config["memtable_mib"])
+  ))
+
+  return copy
+
+
+###
+### Experiments
+###
+
+run_experiment(
+  name="middle-grouping-64B",
+  run="./run.sh",
+  options={
+    **COMMON_OPTIONS,
+    **process_config(CONFIG_64B, SYNTH_DATASET),
+    "db": "pg_llsm",
+    "checkpoint_name": "rs-grouping-64B",
+    "threads": 1,
+    "workload_config": "insert_middle.yml",
+    # Page grouping enabled.
+    "pg_use_segments": True,
+  },
+  deps=[":preload-grouping-64B"],
+)
+
+run_experiment(
+  name="middle-pages-64B",
+  run="./run.sh",
+  options={
+    **COMMON_OPTIONS,
+    **process_config(CONFIG_64B, SYNTH_DATASET),
+    "db": "pg_llsm",
+    "checkpoint_name": "rs-pages-64B",
+    "threads": 1,
+    "workload_config": "insert_middle.yml",
+    # Page grouping **disabled**.
+    "pg_use_segments": False,
+  },
+  deps=[":preload-pages-64B"],
+)
+
+
+###
+### Preload tasks.
+###
+
+run_command(
+  name="preload-grouping-64B",
+  run="./preload.sh",
+  options={
+    **COMMON_OPTIONS,
+    **process_config(CONFIG_64B, SYNTH_DATASET),
+    "db": "pg_llsm",
+    "checkpoint_name": "rs-grouping-64B",
+    "threads": 1,
+    "workload_config": "insert_middle.yml",
+    # Page grouping enabled.
+    "pg_use_segments": True,
+  },
+)
+
+run_command(
+  name="preload-pages-64B",
+  run="./preload.sh",
+  options={
+    **COMMON_OPTIONS,
+    **process_config(CONFIG_64B, SYNTH_DATASET),
+    "db": "pg_llsm",
+    "checkpoint_name": "rs-pages-64B",
+    "threads": 1,
+    "workload_config": "insert_middle.yml",
+    # Page grouping **disabled**.
+    "pg_use_segments": False,
+  },
+)
