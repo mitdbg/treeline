@@ -99,6 +99,10 @@ DECLARE_bool(pg_parallelize_final_flush);
 // page grouping. This flag has no effect if `pg_use_segments` is set to false.
 DECLARE_bool(pg_use_pgm_builder);
 
+// If set, PGTreeLine will not create any overflow pages. If a page becomes
+// full, PGTreeLine will start a reorganization.
+DECLARE_bool(pg_disable_overflow_creation);
+
 // If true, the record cache will try to batch writes for the same page when
 // writing out a dirty entry.
 DECLARE_bool(rec_cache_batch_writeout);

@@ -117,6 +117,8 @@ run_experiment(
     "workload_config": "insert_middle.yml",
     # Page grouping **disabled**.
     "pg_use_segments": False,
+    # No overflows - always split a page that becomes full.
+    "pg_disable_overflow_creation": True,
   },
   deps=[":preload-pages-64B"],
 )
