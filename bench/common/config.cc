@@ -313,6 +313,7 @@ tl::pg::PageGroupedDBOptions BuildPGTreeLineOptions() {
   options.optimistic_caching = FLAGS_optimistic_rec_caching;
   options.rec_cache_use_lru = FLAGS_rec_cache_use_lru;
   options.use_pgm_builder = FLAGS_pg_use_pgm_builder;
+  options.disable_overflow_creation = FLAGS_pg_disable_overflow_creation;
 
   options.forecasting.use_insert_forecasting = FLAGS_use_insert_forecasting;
   options.forecasting.num_inserts_per_epoch = FLAGS_num_inserts_per_epoch;

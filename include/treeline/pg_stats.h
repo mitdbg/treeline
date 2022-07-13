@@ -34,7 +34,8 @@ class PageGroupedDBStats {
 
   uint64_t GetOverflowsCreated() const { return overflows_created_; }
   uint64_t GetRewrites() const { return rewrites_; }
-  uint64_t GetRewrittenPages() const { return rewritten_pages_; }
+  uint64_t GetRewriteInputPages() const { return rewrite_input_pages_; }
+  uint64_t GetRewriteOutputPages() const { return rewrite_output_pages_; }
 
   uint64_t GetSegments() const { return segments_; }
   uint64_t GetFreeListEntries() const { return free_list_entries_; }
@@ -51,8 +52,15 @@ class PageGroupedDBStats {
   void BumpCacheDirtyEvictions() { ++cache_dirty_evictions_; }
 
   void BumpOverflowsCreated() { ++overflows_created_; }
+
+  // Number of times a reorganization was initiated.
   void BumpRewrites() { ++rewrites_; }
-  void BumpRewrittenPages(uint64_t delta = 1) { rewritten_pages_ += delta; }
+
+  // Number of pages read during a reorganization. These pages will be re-written.
+  void BumpRewriteInputPages(uint64_t delta = 1) { rewrite_input_pages_ += delta; }
+
+  // Number of pages written out during a reoganization.
+  void BumpRewriteOutputPages(uint64_t delta = 1) { rewrite_output_pages_ += delta; }
 
   void BumpOverfetchedPages(uint64_t delta = 1) { overfetched_pages_ += delta; }
 
@@ -80,10 +88,12 @@ class PageGroupedDBStats {
   uint64_t cache_clean_evictions_;
   uint64_t cache_dirty_evictions_;
 
-  // Segment rewrite related counters.
+  // Reorganization related counters.
+  // N.B. Rewrite/reorganization are used interchangeably.
   uint64_t overflows_created_;
   uint64_t rewrites_;
-  uint64_t rewritten_pages_;
+  uint64_t rewrite_input_pages_;
+  uint64_t rewrite_output_pages_;
 
   // Size-related stats. These are meant to be set once.
   uint64_t segments_;
