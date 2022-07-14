@@ -83,6 +83,8 @@ def main():
             parts = exp_inst.name.split("-")
             dataset = parts[0]
             variant = parts[1]
+            if variant.endswith("20m"):
+                variant = variant[:-3]
             config = parts[2]
             if len(parts) > 3:
                 search_radius = int(parts[3])

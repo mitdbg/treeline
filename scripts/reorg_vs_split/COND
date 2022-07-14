@@ -100,6 +100,8 @@ run_command(
     ":linear-pages",
     ":amzn-grouping",
     ":amzn-pages",
+    ":amzn-grouping20m",
+    ":amzn-pages20m",
   ],
 )
 
