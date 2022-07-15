@@ -65,8 +65,6 @@ def main():
     for dep in deps:
         for exp_inst in dep.iterdir():
             df = pd.read_csv(exp_inst / "results.csv")
-            df.pop("read_mib_per_s")
-            df.pop("write_mib_per_s")
             orig_columns = list(df.columns)
 
             if args.for_factor:
@@ -76,15 +74,23 @@ def main():
 
                 if "-a-" in name:
                     workload = "a"
+                elif "-b-" in name:
+                    workload = "b"
+                elif "-c-" in name:
+                    workload = "c"
+                elif "-d-" in name:
+                    workload = "d"
+                elif "-e-" in name:
+                    workload = "e"
                 else:
-                    workload = "scan_only"
+                    workload = "f"
 
                 if "nogrp_nocache" in name:
-                    order = 1
+                    order = "nogrp_nocache"
                 elif "nogrp" in name:
-                    order = 2
+                    order = "nogrp"
                 else:
-                    order = 3
+                    order = "normal"
 
                 df.insert(0, "workload", workload)
                 df.insert(1, "order", order)
