@@ -533,10 +533,14 @@ Status Manager::RewriteSegmentsImpl(
   // be forced to disk for crash consistency).
 
   // Keep track of how many pages were affected.
+  // All pages written out.
   for (const auto& new_seg : rewritten_segments) {
     PageGroupedDBStats::Local().BumpRewriteOutputPages(
         new_seg.second.page_count());
   }
+  // Count invalidated pages (one per segment and each overflow page).
+  PageGroupedDBStats::Local().BumpRewriteOutputPages(rewritten_segments.size() +
+                                                     overflows_to_clear.size());
 
   return Status::OK();
 }
@@ -669,7 +673,12 @@ Status Manager::FlattenChain(
   }
 
   // Keep track of the number of affected pages.
+  // Newly written pages.
   PageGroupedDBStats::Local().BumpRewriteOutputPages(new_pages.size());
+
+  // Invalidated old pages.
+  PageGroupedDBStats::Local().BumpRewriteOutputPages(
+      overflow_page_id.IsValid() ? 2 : 1);
 
   return Status::OK();
 }
