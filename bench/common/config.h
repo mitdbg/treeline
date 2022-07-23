@@ -94,10 +94,15 @@ DECLARE_double(records_per_page_epsilon);
 DECLARE_bool(pg_use_memory_based_io);
 DECLARE_bool(pg_bypass_cache);
 DECLARE_bool(pg_parallelize_final_flush);
+DECLARE_uint32(pg_rewrite_search_radius);
 
 // If set, PGTreeLine will use the PGM piecewise linear regression algorithm for
 // page grouping. This flag has no effect if `pg_use_segments` is set to false.
 DECLARE_bool(pg_use_pgm_builder);
+
+// If set, PGTreeLine will not create any overflow pages. If a page becomes
+// full, PGTreeLine will start a reorganization.
+DECLARE_bool(pg_disable_overflow_creation);
 
 // If true, the record cache will try to batch writes for the same page when
 // writing out a dirty entry.

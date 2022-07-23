@@ -39,7 +39,8 @@ class PGTreeLineInterface {
 
       out << "overflows_created," << stats.GetOverflowsCreated() << std::endl;
       out << "rewrites," << stats.GetRewrites() << std::endl;
-      out << "rewritten_pages," << stats.GetRewrittenPages() << std::endl;
+      out << "rewrite_input_pages," << stats.GetRewriteInputPages() << std::endl;
+      out << "rewrite_output_pages," << stats.GetRewriteOutputPages() << std::endl;
 
       out << "segments," << stats.GetSegments() << std::endl;
       out << "segment_index_bytes," << stats.GetSegmentIndexBytes() << std::endl;

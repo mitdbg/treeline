@@ -194,7 +194,7 @@ Status Manager::RewriteSegmentsImpl(
   // Track rewrite statistics.
   PageGroupedDBStats::Local().BumpRewrites();
   for (const auto& seg : segments_to_rewrite) {
-    PageGroupedDBStats::Local().BumpRewrittenPages(seg.sinfo.page_count());
+    PageGroupedDBStats::Local().BumpRewriteInputPages(seg.sinfo.page_count());
   }
 
   // 2. Load and merge the segments.
@@ -410,6 +410,7 @@ Status Manager::RewriteSegmentsImpl(
 
     // Load all overflows into memory.
     ReadOverflows(overflows_to_load);
+    PageGroupedDBStats::Local().BumpRewriteInputPages(overflows_to_load.size());
 
     // Add chains into the deque.
     pages_to_process.insert(pages_to_process.end(), chains_in_segment.begin(),
@@ -530,6 +531,17 @@ Status Manager::RewriteSegmentsImpl(
 
   // TODO: Log that the rewrite has finished (this log record does not need to
   // be forced to disk for crash consistency).
+
+  // Keep track of how many pages were affected.
+  // All pages written out.
+  for (const auto& new_seg : rewritten_segments) {
+    PageGroupedDBStats::Local().BumpRewriteOutputPages(
+        new_seg.second.page_count());
+  }
+  // Count invalidated pages (one per segment and each overflow page).
+  PageGroupedDBStats::Local().BumpRewriteOutputPages(rewritten_segments.size() +
+                                                     overflows_to_clear.size());
+
   return Status::OK();
 }
 
@@ -566,6 +578,9 @@ Status Manager::FlattenChain(
           ? PageChain::WithOverflow(buf.get(), buf.get() + pg::Page::kSize)
           : PageChain::SingleOnly(buf.get());
   PageMergeIterator pmi = pc.GetIterator();
+
+  PageGroupedDBStats::Local().BumpRewrites();
+  PageGroupedDBStats::Local().BumpRewriteInputPages(main.HasOverflow() ? 2 : 1);
 
   // Merge the records in the chain with those in memory. If two records have
   // the same key, we prefer the in-memory one (it is a more recent write).
@@ -656,6 +671,14 @@ Status Manager::FlattenChain(
     }
     free_->Add(overflow_page_id);
   }
+
+  // Keep track of the number of affected pages.
+  // Newly written pages.
+  PageGroupedDBStats::Local().BumpRewriteOutputPages(new_pages.size());
+
+  // Invalidated old pages.
+  PageGroupedDBStats::Local().BumpRewriteOutputPages(
+      overflow_page_id.IsValid() ? 2 : 1);
 
   return Status::OK();
 }

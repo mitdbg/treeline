@@ -1,0 +1,18 @@
+load:
+  num_records: 20000000     # 20,000,000
+  distribution:
+    type: linspace
+    start_key: 1
+    step_size: 100
+#    range_min: 1
+#    range_max: 2000000000
+
+run:
+- num_requests: 20000000
+  insert:
+    proportion_pct: 100
+    distribution:
+      type: uniform
+      range_min: 990000000   #   990,000,000
+      range_max: 1010000000  # 1,010,000,000
+

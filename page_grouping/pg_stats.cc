@@ -17,7 +17,8 @@ void PageGroupedDBStats::PostToGlobal() const {
 
   global_.overflows_created_ += overflows_created_;
   global_.rewrites_ += rewrites_;
-  global_.rewritten_pages_ += rewritten_pages_;
+  global_.rewrite_input_pages_ += rewrite_input_pages_;
+  global_.rewrite_output_pages_ += rewrite_output_pages_;
 
   global_.segments_ = segments_;
   global_.free_list_entries_ += free_list_entries_;
@@ -37,7 +38,8 @@ void PageGroupedDBStats::Reset() {
 
   overflows_created_ = 0;
   rewrites_ = 0;
-  rewritten_pages_ = 0;
+  rewrite_input_pages_ = 0;
+  rewrite_output_pages_ = 0;
 
   segments_ = 0;
   free_list_entries_ = 0;

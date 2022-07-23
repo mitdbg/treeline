@@ -9,13 +9,13 @@
 
 #include "bufmgr/page_memory_allocator.h"
 #include "key.h"
-#include "treeline/pg_db.h"
-#include "treeline/pg_stats.h"
 #include "persist/merge_iterator.h"
 #include "persist/page.h"
 #include "persist/segment_file.h"
 #include "persist/segment_wrap.h"
 #include "segment_builder.h"
+#include "treeline/pg_db.h"
+#include "treeline/pg_stats.h"
 #include "util/key.h"
 
 namespace fs = std::filesystem;
@@ -338,8 +338,9 @@ size_t Manager::WriteToSegment(
     }
 
     // `curr_page` is full. Create/load an overflow page if possible.
-    if (curr_page == &overflow_page) {
-      // Cannot allocate another overflow (reached max length)
+    if (curr_page == &overflow_page || options_.disable_overflow_creation) {
+      // Cannot allocate another overflow (reached max length, or overflow
+      // creation was disabled).
       return false;
     }
 

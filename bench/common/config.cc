@@ -158,6 +158,13 @@ DEFINE_bool(pg_use_pgm_builder, true,
             "If set to false, PGTreeLine will use the GreedyPLR "
             "algorithm for page grouping. This flag has no effect if "
             "`pg_use_segments` is set to false.");
+DEFINE_uint32(pg_rewrite_search_radius, 5,
+              "The search radius to use when rewriting segments. This flag has "
+              "no effect is `pg_use_segments` is set to false.");
+
+DEFINE_bool(pg_disable_overflow_creation, false,
+            "If set, PGTreeLine will not create any overflow pages. If a page "
+            "becomes full, PGTreeLine will start a reorganization.");
 
 DEFINE_bool(rec_cache_batch_writeout, true,
             "If true, the record cache will try to batch writes for the same "
@@ -309,6 +316,8 @@ tl::pg::PageGroupedDBOptions BuildPGTreeLineOptions() {
   options.optimistic_caching = FLAGS_optimistic_rec_caching;
   options.rec_cache_use_lru = FLAGS_rec_cache_use_lru;
   options.use_pgm_builder = FLAGS_pg_use_pgm_builder;
+  options.disable_overflow_creation = FLAGS_pg_disable_overflow_creation;
+  options.rewrite_search_radius = FLAGS_pg_rewrite_search_radius;
 
   options.forecasting.use_insert_forecasting = FLAGS_use_insert_forecasting;
   options.forecasting.num_inserts_per_epoch = FLAGS_num_inserts_per_epoch;

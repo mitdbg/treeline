@@ -1,0 +1,16 @@
+load:
+  num_records: 20000000    # 20,000,000
+  distribution:
+    type: uniform
+    range_min: 1
+    range_max: 2000000000
+
+run:
+- num_requests: 20000000   # 20,000,000
+  insert:
+    proportion_pct: 100
+    distribution:
+      type: uniform
+      range_min: 21543296  # 21,543,296
+      range_max: 31543296  # 31,543,296
+
