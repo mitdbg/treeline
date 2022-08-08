@@ -23,7 +23,7 @@ for val in "${orig_args[@]}"; do
     goal=${phys_arg:24}
   fi
   if [[ $phys_arg =~ --records_per_page_epsilon=.+ ]]; then
-    epsilon=${phys_arg:25}
+    epsilon=${phys_arg:27}
   fi
 
   # Skip the "perfect allocation" part of the experiment.
