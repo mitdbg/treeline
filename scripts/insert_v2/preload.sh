@@ -78,9 +78,15 @@ if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
 
   # 2. Shuffle the on-disk pages.
   echo >&2 "Done loading. Shuffling the pages now..."
-  ../../build/page_grouping/pg_shuffle \
-    --db_path=$full_checkpoint_path/pg_llsm \
-    --seed=$SEED
+  if [ -d $full_checkpoint_path/pg_llsm ]; then
+    ../../build/page_grouping/pg_shuffle \
+      --db_path=$full_checkpoint_path/pg_llsm \
+      --seed=$SEED
+  else
+    ../../build/page_grouping/pg_shuffle \
+      --db_path=$full_checkpoint_path/pg_tl \
+      --seed=$SEED
+  fi
 
   # Store a copy of the database debug information if it exists.
   if [ -d $COND_OUT ] && [ -d "$full_checkpoint_path/debug" ]; then

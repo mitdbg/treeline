@@ -7,7 +7,7 @@
 
 DEFINE_string(db_path, "", "Path to the database directory.");
 DEFINE_uint64(
-    start_key, 0,
+    start_key, 1,
     "The lower boundary of the key space to pass to `FlattenRange()`.");
 DEFINE_uint64(end_key, std::numeric_limits<uint64_t>::max(),
               "The upper boundary (exclusive) of the key space to pass to "
@@ -37,7 +37,10 @@ int main(int argc, char* argv[]) {
   PageGroupedDB* db = nullptr;
   PageGroupedDB::Open(options, FLAGS_db_path, &db);
   assert(db != nullptr);
-  db->FlattenRange(FLAGS_start_key, FLAGS_end_key);
+  const auto status = db->FlattenRange(FLAGS_start_key, FLAGS_end_key);
+  if (!status.ok()) {
+    throw std::runtime_error(status.ToString());
+  }
   delete db;
 
   return 0;
