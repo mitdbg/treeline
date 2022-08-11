@@ -34,6 +34,7 @@ int main(int argc, char* argv[]) {
   options.records_per_page_epsilon = FLAGS_epsilon;
   options.use_memory_based_io = true;
 
+  std::cerr << "Flattening PGTreeLine DB at: " << FLAGS_db_path << std::endl;
   PageGroupedDB* db = nullptr;
   PageGroupedDB::Open(options, FLAGS_db_path, &db);
   assert(db != nullptr);

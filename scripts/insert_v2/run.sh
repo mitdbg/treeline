@@ -129,7 +129,14 @@ mkdir -p $COND_OUT/perfect_alloc
 
 # Remove all overflows.
 echo >&2 "Removing all overflows in the generated DB..."
-../../build/page_grouping/pg_flatten --db_path=$DB_PATH --goal=$goal --epsilon=$epsilon
+tl_path=$DB_PATH/pg_tl
+if [ ! -d $tl_path ]; then
+  tl_path=$DB_PATH/pg_llsm
+fi
+../../build/page_grouping/pg_flatten \
+  --db_path=$tl_path \
+  --goal=$goal \
+  --epsilon=$epsilon
 
 # Run again, this time with "perfect allocation".
 echo >&2 "Now running the \"perfect allocation\" experiment..."
