@@ -130,7 +130,7 @@ fi
 
 set -e
 # Verify that the physical DB files are still consistent.
-../../build/debug/pg_check --db_path=$tl_path
+../../build/page_grouping/debug/pg_check --db_path=$tl_path
 set +e
 
 # Skip the "perfect allocation" case when it is not relevant.
@@ -153,7 +153,7 @@ echo >&2 "Removing all overflows in the generated DB..."
 set -e
 # Verify that the physical DB files are still consistent and that the DB has no
 # overflow pages.
-../../build/debug/pg_check --db_path=$tl_path --ensure_no_overflows
+../../build/page_grouping/debug/pg_check --db_path=$tl_path --ensure_no_overflows
 set +e
 
 # Run again, this time with "perfect allocation".
