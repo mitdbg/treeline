@@ -136,7 +136,7 @@ SegmentIndex::FindAndLockNextOverflowRegion(const Key start_key,
     std::shared_lock<std::shared_mutex> lock(mutex_);
 
     // Find the segment that contains `start_key`. The index stores segment
-    // (inclusive) lower boundaries.
+    // lower boundaries (inclusive).
     auto it = index_.upper_bound(start_key);
     if (it != index_.begin()) {
       --it;

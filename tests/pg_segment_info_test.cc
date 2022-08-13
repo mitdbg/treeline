@@ -26,4 +26,12 @@ TEST(SegmentInfoTest, NoOverflowDefault2) {
   ASSERT_FALSE(info.HasOverflow());
 }
 
+TEST(SegmentInfoTest, SetOverflow) {
+  SegmentId id(0, 100);
+  SegmentInfo info(id, plr::Line64(1.0, 1.0));
+  ASSERT_FALSE(info.HasOverflow());
+  info.SetOverflow(true);
+  ASSERT_TRUE(info.HasOverflow());
+}
+
 }  // namespace
