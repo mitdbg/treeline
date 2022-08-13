@@ -22,6 +22,9 @@ DEFINE_bool(verbose, false,
             "If set to true, will print details about all errors.");
 DEFINE_bool(stop_early, false,
             "If set, will abort later checks if earlier checks fail.");
+DEFINE_bool(ensure_no_overflows, false,
+            "If set, will return a non-zero exit code if the database has "
+            "overflow pages.");
 
 DEFINE_bool(scan_db, false,
             "Set to true to scan `scan_amount` records from the DB and to "
@@ -65,6 +68,14 @@ class DBState {
   // Check that overflows appear in single-page segment file only and that there
   // are no dangling overflows.
   bool CheckOverflows() const;
+
+  // Returns false iff there exist overflow pages. This check is useful when you
+  // want to ensure the DB is "flat".
+  //
+  // NOTE: This check should only run if `CheckOverflows()` passes (i.e.,
+  // returns true). Otherwise this check's output is not meaningful, since there
+  // exist corrupted overflow pages.
+  bool CheckNoOverflows() const;
 
   // Check segment checksums.
   bool CheckChecksums() const;
@@ -316,6 +327,8 @@ bool DBState::CheckOverflows() const {
          0;
 }
 
+bool DBState::CheckNoOverflows() const { return declared_overflows_.empty(); }
+
 bool DBState::CheckChecksums() const {
   size_t invalid_checksums = 0;
   std::cout << std::endl << ">>> Checking segment checksums..." << std::endl;
@@ -505,6 +518,11 @@ bool RunCheck() {
   valid = db.CheckOverflows() && valid;
   if (FLAGS_stop_early && !valid) return valid;
 
+  bool num_overflows_ok = true;
+  if (FLAGS_ensure_no_overflows && valid) {
+    num_overflows_ok = db.CheckNoOverflows();
+  }
+
   db.PrintFreeSegmentsSummary(std::cout);
 
   valid = db.CheckPageRanges() && valid;
@@ -517,7 +535,13 @@ bool RunCheck() {
               << ">>> ✗ Detected errors in the on-disk files." << std::endl;
   }
 
-  return valid;
+  if (!num_overflows_ok) {
+    std::cout << ">>> ✗ The DB contains overflow pages but "
+                 "--ensure_no_overflows was set."
+              << std::endl;
+  }
+
+  return valid && num_overflows_ok;
 }
 
 // Attempt to scan "all" records from the DB and then check that the scanned

@@ -117,8 +117,24 @@ if [ $code -ne 0 ]; then
   exit $code
 fi
 
+# Skip the consistency check and "perfect allocation" case when it is not
+# relevant.
+if [ $db_type != "pg_llsm" ]; then
+  exit 0
+fi
+
+tl_path=$DB_PATH/pg_tl
+if [ ! -d $tl_path ]; then
+  tl_path=$DB_PATH/pg_llsm
+fi
+
+set -e
+# Verify that the physical DB files are still consistent.
+../../build/debug/pg_check --db_path=$tl_path
+set +e
+
 # Skip the "perfect allocation" case when it is not relevant.
-if [ $db_type != "pg_llsm" ] || [ $no_alloc_only = true ]; then
+if [ $no_alloc_only = true ]; then
   exit 0
 fi
 
@@ -129,14 +145,16 @@ mkdir -p $COND_OUT/perfect_alloc
 
 # Remove all overflows.
 echo >&2 "Removing all overflows in the generated DB..."
-tl_path=$DB_PATH/pg_tl
-if [ ! -d $tl_path ]; then
-  tl_path=$DB_PATH/pg_llsm
-fi
 ../../build/page_grouping/pg_flatten \
   --db_path=$tl_path \
   --goal=$goal \
   --epsilon=$epsilon
+
+set -e
+# Verify that the physical DB files are still consistent and that the DB has no
+# overflow pages.
+../../build/debug/pg_check --db_path=$tl_path --ensure_no_overflows
+set +e
 
 # Run again, this time with "perfect allocation".
 echo >&2 "Now running the \"perfect allocation\" experiment..."
