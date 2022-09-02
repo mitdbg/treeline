@@ -67,12 +67,12 @@ class DBState {
 
   // Check that overflows appear in single-page segment file only and that there
   // are no dangling overflows.
-  bool CheckOverflows() const;
+  bool CheckCorrectOverflows() const;
 
   // Returns false iff there exist overflow pages. This check is useful when you
   // want to ensure the DB is "flat".
   //
-  // NOTE: This check should only run if `CheckOverflows()` passes (i.e.,
+  // NOTE: This check should only run if `CheckCorrectOverflows()` passes (i.e.,
   // returns true). Otherwise this check's output is not meaningful, since there
   // exist corrupted overflow pages.
   bool CheckNoOverflows() const;
@@ -236,7 +236,7 @@ bool DBState::CheckSegmentRanges() const {
   return internal_range_errors + cross_segment_errors == 0;
 }
 
-bool DBState::CheckOverflows() const {
+bool DBState::CheckCorrectOverflows() const {
   // Check that overflow pages are allocated in the correct file.
   std::cout << std::endl << ">>> Checking overflows..." << std::endl;
   size_t num_incorrect_overflows = 0;
@@ -515,7 +515,7 @@ bool RunCheck() {
   valid = db.CheckSegmentRanges() && valid;
   if (FLAGS_stop_early && !valid) return valid;
 
-  valid = db.CheckOverflows() && valid;
+  valid = db.CheckCorrectOverflows() && valid;
   if (FLAGS_stop_early && !valid) return valid;
 
   bool num_overflows_ok = true;
