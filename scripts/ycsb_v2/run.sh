@@ -106,3 +106,15 @@ du -b $DB_PATH >$COND_OUT/db_space.log
 if [ $code -ne 0 ]; then
   exit $code
 fi
+
+# For TreeLine, verify that the DB's physical files are consistent.
+if [ $db_type = "pg_llsm" ]; then
+  if [ -d $DB_PATH/pg_tl ]; then
+    tl_path=$DB_PATH/pg_tl
+  else
+    tl_path=$DB_PATH/pg_llsm
+  fi
+
+  set -e
+  ../../build/page_grouping/debug/pg_check --db_path=$tl_path
+fi

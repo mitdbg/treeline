@@ -76,17 +76,20 @@ if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then
     --verbose \
     --skip_workload
 
+  if [ -d $full_checkpoint_path/pg_llsm ]; then
+    tl_path=$full_checkpoint_path/pg_llsm
+  else
+    tl_path=$full_checkpoint_path/pg_tl
+  fi
+
   # 2. Shuffle the on-disk pages.
   echo >&2 "Done loading. Shuffling the pages now..."
-  if [ -d $full_checkpoint_path/pg_llsm ]; then
-    ../../build/page_grouping/pg_shuffle \
-      --db_path=$full_checkpoint_path/pg_llsm \
-      --seed=$SEED
-  else
-    ../../build/page_grouping/pg_shuffle \
-      --db_path=$full_checkpoint_path/pg_tl \
-      --seed=$SEED
-  fi
+  ../../build/page_grouping/pg_shuffle \
+    --db_path=$tl_path \
+    --seed=$SEED
+
+  # 3. Verify that the DB's physical files are consistent.
+  ../../build/page_grouping/debug/pg_check --db_path=$tl_path
 
   # Store a copy of the database debug information if it exists.
   if [ -d $COND_OUT ] && [ -d "$full_checkpoint_path/debug" ]; then

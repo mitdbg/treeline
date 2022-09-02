@@ -19,6 +19,7 @@ target_sources(tester
     pg_lock_manager_test.cc
     pg_manager_rewrite_test.cc
     pg_manager_test.cc
+    pg_segment_info_test.cc
     pg_segment_test.cc
     record_cache_test.cc
     thread_pool_test.cc

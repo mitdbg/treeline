@@ -44,7 +44,7 @@ class SegmentInfo {
     }
   }
 
-  bool HasOverflow() const { return (raw_id_ & kHasOverflowMask != 0); }
+  bool HasOverflow() const { return (raw_id_ & kHasOverflowMask) != 0; }
 
  private:
   // Most significant bit used to indicate whether or not this segment has an
