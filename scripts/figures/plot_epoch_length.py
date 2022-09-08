@@ -1,75 +1,107 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[89]:
+# In[3]:
 
 
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 plt.rcParams["font.size"] = 14
 
 
-# In[90]:
+# In[4]:
 
 
 # Data input
-x1 = (25, 50, 75, 100, 125, 150, 175, 200)
-y1 = (9.8948,10.661,10.5342,10.6564,10.5823,10.2704,10.5971,10.5497)
-perf = (10.7215, 10.7215, 10.7215, 10.7215, 10.7215, 10.7215, 10.7215, 10.7215)
-base = (8.607, 8.607, 8.607, 8.607, 8.607, 8.607, 8.607, 8.607)
+x = (10, 100, 1000, 10000, 
+     25000, 50000, 75000, 100000, 
+     125000, 150000, 175000, 200000)
+        
+y = (1.43976,6.0383,8.77653,9.98891,
+           10.7142,10.8255,10.7379,11.2312,
+           10.9765,10.8194, 10.5838, 10.6265)
 
-x2 = (10, 100, 1000, 10000, 100000)
-y2 = (0.979029,5.13152,8.18957,9.13109,10.6564)
-
-
-# In[92]:
-
-
-fig, ax = plt.subplots(1,1,figsize=(6.65, 3))
-
-# Powers of 10
-ax.plot(x2, perf[:5], linestyle='-', marker='o', color = "#958934", label="Perfect", linewidth = 3.5, markersize = 15)
-ax.plot(x2, y2, linestyle='-', marker='o',color = "#9fc55a", label = "Forecasting", linewidth = 3.5, markersize = 15)
-ax.plot(x2, base[:5], linestyle='-', marker='o', color = "#397624", label="Base", linewidth = 3.5, markersize = 15)
-ax.plot(x2[4], y2[4], marker='s', markersize=15, color = "#9fc55a")
-ax.set_xscale('log')
-ax.set_xlabel("Epoch length (insert ops)")
-ax.set_ylabel('Throughput (kreq/s)')
-ax.set_ylim([0, 12])
+perf = 11.4505
+base = 9.13726
 
 
-ax.legend(fancybox=False,
-            edgecolor="#000",
-            #fontsize="medium",
-            loc="lower right",
-         #bbox_to_anchor=(0.41, 1)
-         )
-fig.tight_layout()
-plt.savefig("epoch_length_comparison1.pdf")
-plt.show()
-    
-
-
-# In[96]:
+# In[5]:
 
 
 fig, ax = plt.subplots(1,1,figsize=(6.65, 3))
 
-# Close search
-ax.plot(x1, perf, linestyle='-', marker='o', color = "#958934", label="Perfect", linewidth = 3.5, markersize = 15)
-ax.plot(x1, y1, linestyle='-', marker='o', color = "#9fc55a", label="Forecasting", linewidth = 3.5, markersize = 15)
-ax.plot(x1, base, linestyle='-', marker='o', color = "#397624", label="Base", linewidth = 3.5, markersize = 15)
-ax.plot(x1[3], y1[3], marker='s', markersize=15, color = "#9fc55a")
-ax.set_xlabel("Epoch length (thousands of insert ops)")
-ax.set_ylabel('Throughput (kreq/s)')
-ax.set_ylim([8, 11])
 
-ax.legend(fancybox=False,
+axMain = plt.subplot(111)
+axMain.plot(x[0], perf, linestyle=':', marker='o', color = "#958934", label="Perfect", linewidth = 3.5, markersize = 0)
+axMain.plot(x[4:], y[4:], linestyle='-', marker='o',color = "#397624", label = "Forecasting", linewidth = 3.5, markersize = 15)
+axMain.plot(x[0], base, linestyle=':', marker='o', color = "#9fc55a", label="No Forecasting", linewidth = 3.5, markersize = 0)
+axMain.plot(x[7], y[7], marker='s', markersize=15, color = "#397624")
+axMain.set_xscale('linear')
+axMain.set_xlim((25000, 225000))
+axMain.spines['left'].set_visible(True)
+axMain.yaxis.set_ticks_position('right')
+axMain.yaxis.set_visible(False)
+
+divider = make_axes_locatable(axMain)
+axLin = divider.append_axes("left", size=2.0, pad=0, sharey=axMain)
+axLin.set_xscale('log')
+axLin.set_xlim((1, 25000))
+axLin.plot(x[0], perf, linestyle=':', marker='o', color = "#958934", label="Perfect", linewidth = 3.5, markersize = 0)
+axLin.plot(x[:5], y[:5], linestyle='-', marker='o',color = "#397624", label = "Forecasting", linewidth = 3.5, markersize = 15)
+axLin.plot(x[0], base, linestyle=':', marker='o', color = "#9fc55a", label="No Forecasting", linewidth = 3.5, markersize = 0)
+axLin.spines['right'].set_visible(False)
+axLin.yaxis.set_ticks_position('left')
+plt.setp(axLin.get_xticklabels(), visible=True)
+
+axMain.legend(fancybox=False,
             edgecolor="#000",
             fontsize="medium",
             loc="lower right",
          #bbox_to_anchor=(0.41, 1)
          )
+
+axMain.axhline(
+        y=perf,
+        linestyle=":",
+        linewidth=3.5,
+        color="#958934",
+    )
+
+axLin.axhline(
+        y=perf,
+        linestyle=":",
+        linewidth=3.5,
+        color="#958934",
+    )
+
+axMain.axhline(
+        y=base,
+        linestyle=":",
+        linewidth=3.5,
+        color="#9fc55a",
+    )
+
+axLin.axhline(
+        y=base,
+        linestyle=":",
+        linewidth=3.5,
+        color="#9fc55a",
+    )
+
+axMain.set_xlabel("Epoch length (insert ops)")
+axLin.set_ylabel('Throughput (kreq/s)')
+
 fig.tight_layout()
-plt.savefig("epoch_length_comparison2.pdf")
+plt.savefig("epoch_length_comparison.pdf")
+
 plt.show()
+
+
+
+# In[ ]:
+
+
+
+
