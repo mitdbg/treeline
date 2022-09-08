@@ -6,6 +6,18 @@ DBS = [
   #"leanstore",
 ]
 
+INSERTS_PER_EPOCH = [
+  #10, 100, 1000, 10000, 
+  #25000, 50000, 75000,
+  100000, 
+  #125000, 150000, 175000, 200000,
+]
+
+THREADS = [
+  1,
+  8,
+]
+
 CONFIG_64B = {
   "name": "64B",
   "record_size_bytes": 64,
@@ -75,8 +87,6 @@ COMMON_OPTIONS = {
 
 FORECASTING_OPTIONS = {
   "use_insert_forecasting": True,
-  "num_inserts_per_epoch": 100000,
-  "num_partitions": 20000,
   "sample_size": 200000,
   "random_seed": 42,
   "overestimation_factor": 1,
@@ -95,7 +105,10 @@ WIKI_DATASET = {
   "insert_trace_path": "'$TP_DATASET_PATH/inserts/wiki_ts_insert_8M.txt'",
 }
 
-CUSTOM_DATASETS = [TAXI_DATASET, WIKI_DATASET]
+CUSTOM_DATASETS = [
+  TAXI_DATASET, 
+  WIKI_DATASET
+]
 
 
 def process_config(db, config):
@@ -150,7 +163,7 @@ run_experiment_group(
         "use_insert_forecasting": False,
       },
     )
-    for db, config, dataset, threads in product(DBS, CONFIGS, CUSTOM_DATASETS, [1, 8])
+    for db, config, dataset, threads in product(DBS, CONFIGS, CUSTOM_DATASETS, THREADS)
   ],
   deps=[
     ":preload-{}-{}-{}".format(db, config["name"], dataset["name"])
@@ -164,7 +177,7 @@ run_experiment_group(
   run="./run.sh",
   experiments=[
     ExperimentInstance(
-      name="forecasting-{}-{}-{}".format(config["name"], dataset["name"], threads),
+      name="forecasting-{}-{}-{}-{}".format(config["name"], dataset["name"], threads, inserts_per_epoch),
       args=["--no_alloc_only"],
       options={
         **COMMON_OPTIONS,
@@ -176,9 +189,11 @@ run_experiment_group(
         "custom_inserts": "custom:" + dataset["insert_trace_path"],
         "custom_dataset": dataset["path"],
         "threads": threads,
+        "num_inserts_per_epoch": inserts_per_epoch,
+        "num_partitions": int(inserts_per_epoch/5),
       },
     )
-    for config, dataset, threads in product(CONFIGS, CUSTOM_DATASETS, [1, 8])
+    for config, dataset, threads, inserts_per_epoch in product(CONFIGS, CUSTOM_DATASETS, THREADS, INSERTS_PER_EPOCH)
   ],
   deps=[
     ":preload-pg_llsm-{}-{}".format(config["name"], dataset["name"])
