@@ -53,8 +53,6 @@ class Statistics {
     // This is only "atomic" because we know it is ONLY called within
     // DBImpl::ScheduleMemTableFlush() (which owns locks) and DBImpl::~DBImpl.
     // Not necessarily safe to call it elsewhere.
-    //
-    // TODO: Where is this called?
     total_flush_bufmgr_hits_pages_ += temp_flush_bufmgr_hits_pages_;
     total_flush_bufmgr_misses_pages_ += temp_flush_bufmgr_misses_pages_;
     total_flush_deferred_pages_ += temp_flush_deferred_pages_;
