@@ -139,6 +139,5 @@ class TreeLineInterface {
   // These variables are used to provide hints about the key distribution to
   // TreeLine when creating a new database. We need these hints because TreeLine
   // currently does not support adjusting itself to a changing key distribution.
-  // TODO: Remove these once TreeLine can start up without requiring hints.
   uint64_t min_key_, max_key_, num_keys_;
 };

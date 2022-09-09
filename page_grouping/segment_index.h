@@ -118,7 +118,7 @@ class SegmentIndex {
 
   mutable std::shared_mutex mutex_;
   uint64_t bytes_allocated_;
-  // TODO: In theory, this can be any ordered key-value data structure (e.g.,
+  // Note: In theory, this can be any ordered key-value data structure (e.g.,
   // ART).
   OrderedMap index_;
 };
