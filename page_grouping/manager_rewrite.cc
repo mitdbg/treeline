@@ -261,6 +261,10 @@ Status Manager::RewriteSegmentsImpl(
     future_goal = std::max(
         1UL, static_cast<size_t>(future_goal * current_num_keys_estimate /
                                  future_num_keys_estimate));
+    // If goal is less than 2 * epsilon, we can potentially get empty pages
+    // (i.e., pages that do not cover any keys in the key space).
+    future_goal =
+        std::max(static_cast<size_t>(2 * future_epsilon), future_goal);
   }
 
   //
