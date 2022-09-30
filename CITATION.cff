@@ -1,0 +1,43 @@
+cff-version: 1.2.0
+message: "If you use TreeLine, please cite it as below."
+authors:
+- family-names: "Yu"
+  given-names: "Geoffrey X."
+- family-names: "Markakis"
+  given-names: "Markos"
+- family-names: "Kipf"
+  given-names: "Andreas"
+- family-names: "Larson"
+  given-names: "Per-Åke"
+- family-names: "Minhas"
+  given-names: "Umar Farooq"
+- family-names: "Kraska"
+  given-names: "Tim"
+title: "TreeLine: An Update-In-Place Key-Value Store for Modern Storage"
+version: 1.0.0
+date-released: 2022-09-25
+url: "https://github.com/mitdbg/treeline"
+preferred-citation:
+  type: article
+  authors:
+  - family-names: "Yu"
+    given-names: "Geoffrey X."
+  - family-names: "Markakis"
+    given-names: "Markos"
+  - family-names: "Kipf"
+    given-names: "Andreas"
+  - family-names: "Larson"
+    given-names: "Per-Åke"
+  - family-names: "Minhas"
+    given-names: "Umar Farooq"
+  - family-names: "Kraska"
+    given-names: "Tim"
+  doi: "10.14778/3561261.3561270"
+  journal: "Proceedings of the VLDB Endowment"
+  month: 9
+  start: 99
+  end: 112
+  title: "TreeLine: An Update-In-Place Key-Value Store for Modern Storage"
+  issue: 1
+  volume: 16
+  year: 2022
