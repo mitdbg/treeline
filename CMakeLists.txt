@@ -15,9 +15,6 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 find_library(tbb tbb)
 
-# Load any third party dependencies
-add_subdirectory(third_party)
-
 # The TreeLine embedded database library targets
 if (TL_BUILD_SHARED)
   add_library(treeline SHARED)
@@ -26,6 +23,10 @@ else()
   add_library(treeline STATIC)
   add_library(pg_treeline STATIC)
 endif()
+
+# Load any third party dependencies
+add_subdirectory(third_party)
+
 target_link_libraries(treeline PRIVATE crc32c tbb masstree)
 target_link_libraries(pg_treeline PRIVATE crc32c tbb masstree)
 target_include_directories(treeline
@@ -56,7 +57,6 @@ set(pg_treeline_api
 target_sources(pg_treeline PUBLIC ${pg_treeline_api})
 
 # Add our sources by traversing the repository
-add_subdirectory(alex)
 add_subdirectory(art_olc)
 add_subdirectory(bufmgr)
 add_subdirectory(db)

@@ -1,4 +1,4 @@
-#include "alex/alex.h"
+#include "third_party/alex/alex.h"
 #include "benchmark/benchmark.h"
 #include "bufmgr/buffer_manager.h"
 #include "common/config.h"

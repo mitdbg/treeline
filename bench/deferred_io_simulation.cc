@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 
-#include "alex/alex.h"
+#include "third_party/alex/alex.h"
 #include "bufmgr/physical_page_id.h"
 #include "db/format.h"
 #include "db/memtable.h"
