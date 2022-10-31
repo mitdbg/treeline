@@ -36,10 +36,10 @@ target_sources(pg PRIVATE
   workspace.h
   ../bufmgr/page_memory_allocator.cc
   ../bufmgr/page_memory_allocator.h
-  ../tlx/btree_map.h
-  ../tlx/btree.h
-  ../tlx/core.cc
-  ../tlx/core.h
+  ../third_party/tlx/btree_map.h
+  ../third_party/tlx/btree.h
+  ../third_party/tlx/core.cc
+  ../third_party/tlx/core.h
   ../util/status.cc
   ../util/thread_pool.cc
 )

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "model.h"
-#include "tlx/btree_map.h"
+#include "third_party/tlx/btree_map.h"
 #include "util/tracking_allocator.h"
 
 namespace tl {

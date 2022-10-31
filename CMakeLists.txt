@@ -65,7 +65,6 @@ add_subdirectory(masstree_wrapper)
 add_subdirectory(model)
 add_subdirectory(page_grouping)
 add_subdirectory(record_cache)
-add_subdirectory(tlx)
 add_subdirectory(util)
 add_subdirectory(wal)
 
