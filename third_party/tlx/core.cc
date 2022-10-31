@@ -8,7 +8,7 @@
  * All rights reserved. Published under the Boost Software License, Version 1.0
  ******************************************************************************/
 
-#include "tlx/core.h"
+#include "core.h"
 
 #include <atomic>
 #include <iostream>

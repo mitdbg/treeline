@@ -121,3 +121,9 @@ if(TL_BUILD_BENCHMARKS)
   set(BUILD_LEANSTORE_FRONTEND OFF)
   FetchContent_MakeAvailable(leanstore)
 endif()
+
+# Include embedded CMake projects.
+add_subdirectory(alex)
+add_subdirectory(tlx)
+add_subdirectory(masstree)
+add_subdirectory(masstree_wrapper)

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../alex/alex.h"
+#include "third_party/alex/alex.h"
 #include "model.h"
 
 namespace tl {

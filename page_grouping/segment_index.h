@@ -8,7 +8,7 @@
 #include "treeline/pg_db.h"
 #include "lock_manager.h"
 #include "segment_info.h"
-#include "tlx/btree_map.h"
+#include "third_party/tlx/btree_map.h"
 #include "util/tracking_allocator.h"
 
 namespace tl {
