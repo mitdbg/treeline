@@ -125,3 +125,5 @@ endif()
 # Include embedded CMake projects.
 add_subdirectory(alex)
 add_subdirectory(tlx)
+add_subdirectory(masstree)
+add_subdirectory(masstree_wrapper)

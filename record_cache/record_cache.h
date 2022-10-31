@@ -8,8 +8,8 @@
 
 #include "db/format.h"
 #include "db/overflow_chain.h"
-#include "masstree_wrapper/masstree_wrapper.h"
 #include "record_cache_entry.h"
+#include "third_party/masstree_wrapper/masstree_wrapper.h"
 #include "treeline/statistics.h"
 #include "treeline/status.h"
 #include "util/hash_queue.h"

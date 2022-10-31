@@ -1,19 +1,19 @@
 #pragma once
 
-#include "masstree/config.h"
+#include "third_party/masstree/config.h"
 // DO NOT REORDER (config.h needs to be included before other headers)
 #include <optional>
 
-#include "masstree/compiler.hh"
-#include "masstree/kvthread.hh"
-#include "masstree/masstree.hh"
-#include "masstree/masstree_insert.hh"
-#include "masstree/masstree_print.hh"
-#include "masstree/masstree_remove.hh"
-#include "masstree/masstree_scan.hh"
-#include "masstree/masstree_stats.hh"
-#include "masstree/masstree_tcursor.hh"
-#include "masstree/string.hh"
+#include "third_party/masstree/compiler.hh"
+#include "third_party/masstree/kvthread.hh"
+#include "third_party/masstree/masstree.hh"
+#include "third_party/masstree/masstree_insert.hh"
+#include "third_party/masstree/masstree_print.hh"
+#include "third_party/masstree/masstree_remove.hh"
+#include "third_party/masstree/masstree_scan.hh"
+#include "third_party/masstree/masstree_stats.hh"
+#include "third_party/masstree/masstree_tcursor.hh"
+#include "third_party/masstree/string.hh"
 #include "record_cache/record_cache_entry.h"
 
 class key_unparse_unsigned {
