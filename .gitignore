@@ -5,13 +5,13 @@ build/
 cmake-build-debug/
 cmake-build-release/
 cond-out*
-masstree/autom4te.cache*
-masstree/config.*
-masstree/configure
-masstree/GNUmakefile
 scripts/experiment_config.sh
 scripts/e2e_perf/results
 scripts/iochar/fio_config.sh
+third_party/masstree/autom4te.cache*
+third_party/masstree/config.*
+third_party/masstree/configure
+third_party/masstree/GNUmakefile
 
 .idea/
 .vscode/
