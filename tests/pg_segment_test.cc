@@ -5,10 +5,10 @@
 
 #include "gtest/gtest.h"
 #include "treeline/slice.h"
-#include "page_grouping/key.h"
-#include "page_grouping/plr/data.h"
-#include "page_grouping/plr/greedy.h"
-#include "page_grouping/segment_builder.h"
+#include "db_treeline/key.h"
+#include "db_treeline/plr/data.h"
+#include "db_treeline/plr/greedy.h"
+#include "db_treeline/segment_builder.h"
 #include "pg_datasets.h"
 
 using namespace tl;

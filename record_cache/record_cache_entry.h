@@ -6,7 +6,7 @@
 #include <atomic>
 #include <vector>
 
-#include "db/format.h"
+#include "db_treepoint/format.h"
 #include "treeline/slice.h"
 
 namespace tl {

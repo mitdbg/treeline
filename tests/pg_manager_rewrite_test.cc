@@ -7,9 +7,9 @@
 #include "gtest/gtest.h"
 #include "treeline/pg_options.h"
 #include "treeline/slice.h"
-#include "page_grouping/key.h"
-#include "page_grouping/manager.h"
-#include "page_grouping/segment_info.h"
+#include "db_treeline/key.h"
+#include "db_treeline/manager.h"
+#include "db_treeline/segment_info.h"
 #include "pg_datasets.h"
 
 namespace {

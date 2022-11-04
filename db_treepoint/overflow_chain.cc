@@ -5,8 +5,8 @@
 #include <tuple>
 
 #include "bufmgr/page_memory_allocator.h"
-#include "db/logger.h"
-#include "db/merge_iterators.h"
+#include "db_treepoint/logger.h"
+#include "db_treepoint/merge_iterators.h"
 
 namespace tl {
 

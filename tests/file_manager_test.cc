@@ -4,7 +4,7 @@
 #include <memory>
 #include <vector>
 
-#include "db/page.h"
+#include "db_treepoint/page.h"
 #include "gtest/gtest.h"
 #include "treeline/options.h"
 #include "model/alex_model.h"

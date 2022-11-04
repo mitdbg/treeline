@@ -1,8 +1,8 @@
 #include <optional>
 #include "gtest/gtest.h"
-#include "page_grouping/persist/segment_id.h"
-#include "page_grouping/plr/data.h"
-#include "page_grouping/segment_info.h"
+#include "db_treeline/persist/segment_id.h"
+#include "db_treeline/plr/data.h"
+#include "db_treeline/segment_info.h"
 
 namespace {
 

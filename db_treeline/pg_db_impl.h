@@ -6,7 +6,7 @@
 #include <tuple>
 #include <vector>
 
-#include "db/format.h"
+#include "db_treepoint/format.h"
 #include "manager.h"
 #include "record_cache/record_cache.h"
 #include "treeline/pg_db.h"

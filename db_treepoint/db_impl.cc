@@ -7,9 +7,9 @@
 #include <limits>
 
 #include "bufmgr/page_memory_allocator.h"
-#include "db/logger.h"
-#include "db/manifest.h"
-#include "db/page.h"
+#include "db_treepoint/logger.h"
+#include "db_treepoint/manifest.h"
+#include "db_treepoint/page.h"
 #include "model/alex_model.h"
 #include "model/btree_model.h"
 #include "util/affinity.h"

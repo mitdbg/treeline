@@ -8,12 +8,12 @@
 #include <vector>
 
 #include "bufmgr/page_memory_allocator.h"
-#include "db/page.h"
+#include "db_treepoint/page.h"
 #include "gtest/gtest.h"
 #include "util/key.h"
 
 #define private public
-#include "db/db_impl.h"
+#include "db_treepoint/db_impl.h"
 
 namespace {
 

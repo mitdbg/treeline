@@ -8,7 +8,7 @@
 #include <string>
 
 #include "bufmgr/page_memory_allocator.h"
-#include "db/page.h"
+#include "db_treepoint/page.h"
 #include "treeline/status.h"
 
 #define CHECK_ERROR(call)                                                    \

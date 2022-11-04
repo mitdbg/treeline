@@ -2,7 +2,7 @@
 
 #include <cstdlib>
 
-#include "db/page.h"
+#include "db_treepoint/page.h"
 #include "treeline/options.h"
 
 namespace tl {

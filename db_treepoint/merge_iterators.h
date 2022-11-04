@@ -2,7 +2,7 @@
 #include <optional>
 #include <queue>
 
-#include "db/db_impl.h"
+#include "db_treepoint/db_impl.h"
 
 namespace tl {
 

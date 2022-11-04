@@ -2,7 +2,7 @@
 #include "benchmark/benchmark.h"
 #include "bufmgr/buffer_manager.h"
 #include "common/config.h"
-#include "db/page.h"
+#include "db_treepoint/page.h"
 #include "gflags/gflags.h"
 #include "treeline/options.h"
 #include "ycsbr/ycsbr.h"

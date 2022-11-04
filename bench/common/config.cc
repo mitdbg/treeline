@@ -7,7 +7,7 @@
 #include <sstream>
 #include <unordered_map>
 
-#include "db/page.h"
+#include "db_treepoint/page.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/slice_transform.h"
 #include "rocksdb/table.h"

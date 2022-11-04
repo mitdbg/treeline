@@ -8,7 +8,7 @@
 #include <mutex>
 #include <string>
 
-#include "db/format.h"
+#include "db_treepoint/format.h"
 #include "treeline/options.h"
 #include "treeline/slice.h"
 #include "treeline/status.h"

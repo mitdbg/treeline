@@ -2,7 +2,7 @@
 #include <thread>
 
 #include "gtest/gtest.h"
-#include "page_grouping/lock_manager.h"
+#include "db_treeline/lock_manager.h"
 
 namespace {
 

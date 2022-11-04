@@ -1,4 +1,4 @@
-#include "db/page.h"
+#include "db_treepoint/page.h"
 
 #include <cstring>
 

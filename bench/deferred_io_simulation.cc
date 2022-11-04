@@ -3,8 +3,8 @@
 
 #include "third_party/alex/alex.h"
 #include "bufmgr/physical_page_id.h"
-#include "db/format.h"
-#include "db/memtable.h"
+#include "db_treepoint/format.h"
+#include "db_treepoint/memtable.h"
 #include "gflags/gflags.h"
 #include "treeline/options.h"
 #include "util/inlineskiplist.h"

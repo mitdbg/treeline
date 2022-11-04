@@ -58,9 +58,9 @@ target_sources(pg_treeline PUBLIC ${pg_treeline_api})
 
 # Add our sources by traversing the repository
 add_subdirectory(bufmgr)
-add_subdirectory(db)
+add_subdirectory(db_treeline)
+add_subdirectory(db_treepoint)
 add_subdirectory(model)
-add_subdirectory(page_grouping)
 add_subdirectory(record_cache)
 add_subdirectory(util)
 add_subdirectory(wal)

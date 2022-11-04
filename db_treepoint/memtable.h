@@ -2,8 +2,8 @@
 
 #include <atomic>
 
-#include "db/format.h"
-#include "db/options.h"
+#include "db_treepoint/format.h"
+#include "db_treepoint/options.h"
 #include "treeline/slice.h"
 #include "treeline/status.h"
 #include "util/arena.h"

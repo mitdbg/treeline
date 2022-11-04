@@ -6,7 +6,7 @@
 #include <memory>
 #include <new>
 
-#include "db/page.h"
+#include "db_treepoint/page.h"
 
 namespace tl {
 namespace detail {

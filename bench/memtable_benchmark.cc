@@ -2,7 +2,7 @@
 
 #include "bench/common/data.h"
 #include "benchmark/benchmark.h"
-#include "db/memtable.h"
+#include "db_treepoint/memtable.h"
 
 namespace {
 

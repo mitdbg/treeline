@@ -1,6 +1,6 @@
 #include <optional>
 
-#include "db/merge_iterators.h"
+#include "db_treepoint/merge_iterators.h"
 
 namespace tl {
 

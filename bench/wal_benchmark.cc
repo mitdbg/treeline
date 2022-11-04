@@ -50,9 +50,9 @@
 
 #include "bench/common/data.h"
 #include "benchmark/benchmark.h"
-#include "db/format.h"
-#include "db/memtable.h"
-#include "db/options.h"
+#include "db_treepoint/format.h"
+#include "db_treepoint/memtable.h"
+#include "db_treepoint/options.h"
 #include "gflags/gflags.h"
 #include "treeline/options.h"
 #include "util/coding.h"

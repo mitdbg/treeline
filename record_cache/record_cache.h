@@ -6,8 +6,8 @@
 #include <tuple>
 #include <vector>
 
-#include "db/format.h"
-#include "db/overflow_chain.h"
+#include "db_treepoint/format.h"
+#include "db_treepoint/overflow_chain.h"
 #include "record_cache_entry.h"
 #include "third_party/masstree_wrapper/masstree_wrapper.h"
 #include "treeline/statistics.h"

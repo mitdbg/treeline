@@ -5,7 +5,7 @@
 
 #include <atomic>
 
-#include "db/page.h"
+#include "db_treepoint/page.h"
 #include "page_memory_allocator.h"
 
 namespace tl {

@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "bufmgr/buffer_manager.h"
-#include "db/format.h"
-#include "db/memtable.h"
+#include "db_treepoint/format.h"
+#include "db_treepoint/memtable.h"
 #include "treeline/db.h"
 #include "treeline/statistics.h"
 #include "model/model.h"

@@ -2,7 +2,7 @@
 
 #include <limits>
 
-#include "db/page.h"
+#include "db_treepoint/page.h"
 #include "util/coding.h"
 #include "util/key.h"
 
