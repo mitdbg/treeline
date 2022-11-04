@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 #include "bufmgr/file.h"
 #include "bufmgr/options.h"
