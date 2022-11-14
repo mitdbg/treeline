@@ -72,7 +72,6 @@ if [ $db_type == "llsm" ] || [ $db_type == "all" ]; then
     --workload_config=$COND_OUT/workload.yml \
     --seed=$SEED \
     --verbose \
-    --use_alex=false \
     ${args[@]}
 fi
 

@@ -87,9 +87,6 @@ struct Options {
   // + 2 * memtable_flush_threshold.
   bool memory_autotuning = false;
 
-  // If false, TreeLine will use a BTreeModel instead of an ALEXModel.
-  bool use_alex = true;
-
   // The minimum length of an overflow chain for which reorganization is
   // triggered.
   size_t reorg_length = 5;

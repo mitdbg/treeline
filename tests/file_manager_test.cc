@@ -7,7 +7,7 @@
 #include "db/page.h"
 #include "gtest/gtest.h"
 #include "treeline/options.h"
-#include "model/alex_model.h"
+#include "model/btree_model.h"
 #include "util/key.h"
 
 namespace {
@@ -58,7 +58,7 @@ TEST(FileManagerTest, WriteReadSequential) {
   // Create file manager.
   BufMgrOptions bm_options;
 
-  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
+  const std::unique_ptr<Model> model = std::make_unique<BTreeModel>();
   const std::shared_ptr<BufferManager> buffer_manager =
       std::make_shared<BufferManager>(bm_options, dbpath);
   model->PreallocateAndInitialize(buffer_manager, records,

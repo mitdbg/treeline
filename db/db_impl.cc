@@ -10,7 +10,6 @@
 #include "db/logger.h"
 #include "db/manifest.h"
 #include "db/page.h"
-#include "model/alex_model.h"
 #include "model/btree_model.h"
 #include "util/affinity.h"
 #include "util/key.h"
@@ -128,11 +127,7 @@ Status DBImpl::InitializeNewDB() {
     bm_options.num_segments = options_.background_threads;
 
     buf_mgr_ = std::make_shared<BufferManager>(bm_options, db_path_);
-    if (options_.use_alex) {
-      model_ = std::make_shared<ALEXModel>();
-    } else {
-      model_ = std::make_shared<BTreeModel>();
-    }
+    model_ = std::make_shared<BTreeModel>();
     rec_cache_ = std::make_unique<RecordCache>(
         options_.record_cache_capacity, options_.rec_cache_use_lru,
         std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1),
@@ -145,8 +140,7 @@ Status DBImpl::InitializeNewDB() {
     buf_mgr_->ClearStats();
     stats_.ClearAll();
     Logger::Log("Created new %s. Total size: %zu bytes. Indexed pages: %zu",
-                options_.use_alex ? "ALEX" : "BTree", model_->GetSizeBytes(),
-                model_->GetNumPages());
+                "BTree", model_->GetSizeBytes(), model_->GetNumPages());
 
     // Write the DB metadata to persistent storage.
     const Status s = Manifest::Builder()
@@ -177,11 +171,7 @@ Status DBImpl::InitializeExistingDB() {
   bm_options.num_segments = manifest->num_segments();
 
   buf_mgr_ = std::make_shared<BufferManager>(bm_options, db_path_);
-  if (options_.use_alex) {
-    model_ = std::make_shared<ALEXModel>();
-  } else {
-    model_ = std::make_shared<BTreeModel>();
-  }
+  model_ = std::make_shared<BTreeModel>();
   rec_cache_ = std::make_unique<RecordCache>(
       options_.record_cache_capacity, options_.rec_cache_use_lru,
       std::bind(&DBImpl::WriteBatch, this, std::placeholders::_1),
@@ -193,9 +183,8 @@ Status DBImpl::InitializeExistingDB() {
   buf_mgr_->ClearStats();
   stats_.ClearAll();
 
-  Logger::Log("Rebuilt %s. Total size: %zu bytes. Indexed pages: %zu",
-              options_.use_alex ? "ALEX" : "BTree", model_->GetSizeBytes(),
-              model_->GetNumPages());
+  Logger::Log("Rebuilt %s. Total size: %zu bytes. Indexed pages: %zu", "BTree",
+              model_->GetSizeBytes(), model_->GetNumPages());
 
   // Before we can accept requests, we need to replay the writes (if any) that
   // exist in the write-ahead log.
