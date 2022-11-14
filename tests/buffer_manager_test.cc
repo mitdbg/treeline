@@ -8,7 +8,7 @@
 #include "db/page.h"
 #include "gtest/gtest.h"
 #include "treeline/options.h"
-#include "model/alex_model.h"
+#include "model/btree_model.h"
 #include "util/key.h"
 
 namespace {
@@ -41,7 +41,7 @@ TEST(BufferManagerTest, WriteReadSequential) {
   // Create buffer manager.
   BufMgrOptions bm_options;
 
-  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
+  const std::unique_ptr<Model> model = std::make_unique<BTreeModel>();
   const std::shared_ptr<BufferManager> buffer_manager =
       std::make_shared<BufferManager>(bm_options, dbname);
   model->PreallocateAndInitialize(buffer_manager, records,
@@ -84,7 +84,7 @@ TEST(BufferManagerTest, FlushDirty) {
   // Create buffer manager.
   BufMgrOptions bm_options;
 
-  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
+  const std::unique_ptr<Model> model = std::make_unique<BTreeModel>();
   const std::shared_ptr<BufferManager> buffer_manager =
       std::make_shared<BufferManager>(bm_options, dbname);
   model->PreallocateAndInitialize(buffer_manager, records,
@@ -135,7 +135,7 @@ TEST(BufferManagerTest, Contains) {
   // Create buffer manager.
   BufMgrOptions bm_options;
   bm_options.buffer_pool_size = 3 * Page::kSize;
-  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
+  const std::unique_ptr<Model> model = std::make_unique<BTreeModel>();
   const std::shared_ptr<BufferManager> buffer_manager =
       std::make_shared<BufferManager>(bm_options, dbname);
   model->PreallocateAndInitialize(buffer_manager, records,
@@ -179,7 +179,7 @@ TEST(BufferManagerTest, IncreaseNumPages) {
   key_hints.num_keys = 100000;
   const auto values = key_utils::CreateValues<uint64_t>(key_hints);
   const auto records = key_utils::CreateRecords<uint64_t>(values);
-  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
+  const std::unique_ptr<Model> model = std::make_unique<BTreeModel>();
 
   // Create buffer manager with 3 pages.
   BufMgrOptions bm_options;
@@ -233,7 +233,7 @@ TEST(BufferManagerTest, DecreaseNumPages) {
   key_hints.num_keys = 100000;
   const auto values = key_utils::CreateValues<uint64_t>(key_hints);
   const auto records = key_utils::CreateRecords<uint64_t>(values);
-  const std::unique_ptr<Model> model = std::make_unique<ALEXModel>();
+  const std::unique_ptr<Model> model = std::make_unique<BTreeModel>();
 
   // Create buffer manager with 4 pages.
   BufMgrOptions bm_options;

@@ -118,10 +118,6 @@ DEFINE_uint32(latency_sample_period, 1,
               "measure latency every N-th request).");
 DEFINE_validator(latency_sample_period, &EnsureNonZero);
 
-DEFINE_bool(use_alex, true,
-            "If true, TreeLine will use an ALEXModel. Otherwise, it will use a "
-            "BTreeModel.");
-
 DEFINE_uint32(rdb_bloom_bits, 0,
               "The number of bloom filter bits to use in RocksDB. Set to 0 to "
               "disable the use of bloom filters.");
@@ -290,7 +286,6 @@ tl::Options BuildTreeLineOptions() {
   options.pin_threads = true;
   options.deferred_io_batch_size = FLAGS_io_min_batch_size;
   options.deferred_io_max_deferrals = FLAGS_max_deferrals;
-  options.use_alex = FLAGS_use_alex;
   options.deferral_autotuning = FLAGS_deferral_autotuning;
   options.memory_autotuning = FLAGS_memory_autotuning;
   options.reorg_length = FLAGS_reorg_length;

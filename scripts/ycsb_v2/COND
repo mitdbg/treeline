@@ -76,7 +76,6 @@ COMMON_OPTIONS = {
 
   # Affects LLSM
   "reorg_length": 2,
-  "use_alex": False,
   "deferral_autotuning": True,
   "max_deferrals": 1,
 

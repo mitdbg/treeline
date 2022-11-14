@@ -77,8 +77,7 @@ if [ $db_type == "llsm" ] || [ $db_type == "all" ]; then
     --memtable_size_mib=2048 \
     --workload_config=$workload_path \
     --seed=$SEED \
-    --verbose \
-    --use_alex=false
+    --verbose
 fi
 
 if [ $db_type == "pg_llsm" ] || [ $db_type == "all" ]; then

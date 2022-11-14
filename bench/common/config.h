@@ -75,9 +75,6 @@ DECLARE_uint32(latency_sample_period);
 // triggered.
 DECLARE_uint64(reorg_length);
 
-// If true, TreeLine will use an ALEXModel. Otherwise, it will use a BTreeModel.
-DECLARE_bool(use_alex);
-
 // The number of bloom filter bits to use in RocksDB. Set to 0 to disable the
 // use of bloom filters.
 DECLARE_uint32(rdb_bloom_bits);
