@@ -6,9 +6,9 @@
 #include <utility>
 #include <vector>
 
-#include "../bufmgr/sync_hash_table.h"
+#include "bufmgr/sync_hash_table.h"
 #include "gflags/gflags.h"
-#include "hash_tables/libcuckoo/cuckoohash_map.hh"
+#include "libcuckoo/cuckoohash_map.hh"
 #include "ycsbr/ycsbr.h"
 
 namespace {

@@ -10,7 +10,11 @@ add_library(bench_common
 # Any targets linking to `bench_common` will also link to `treeline` and will be
 # able to include TreeLine internal headers.
 target_link_libraries(bench_common PUBLIC treeline)
-target_include_directories(bench_common PUBLIC ${PROJECT_SOURCE_DIR})
+target_include_directories(bench_common
+  PUBLIC
+    ${PROJECT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
 # All `bench_common` utilities plus configuration utilities used in benchmarks
 # comparing TreeLine against RocksDB.
@@ -33,49 +37,13 @@ target_link_libraries(bench_common_config PUBLIC
   pg_treeline
   libcuckoo)
 
-# Synthetic Write: Measure the write throughput when writing synthetic data.
-# This benchmark compares TreeLine against RocksDB.
-add_executable(synth_write synth_write.cc)
-target_link_libraries(synth_write bench_common_config)
+# The microbench directory contains microbenchmarks used to guide TreeLine's
+# development.
+add_subdirectory(microbench)
 
 # YCSB: Run extracted YCSB workloads against TreeLine and RocksDB.
 add_executable(ycsb ycsb.cc)
 target_link_libraries(ycsb bench_common_config ycsbr)
-
-# Hash Table YCSB: Run extracted YCSB workloads against different hash table implementations.
-add_executable(hashtable_ycsb hashtable_ycsb.cc)
-target_link_libraries(hashtable_ycsb Threads::Threads gflags ycsbr)
-
-# Microbench: An executable containing all of TreeLine's microbenchmarks.
-add_executable(microbench
-  memtable_benchmark.cc
-  packed_map_benchmark.cc
-  thread_pool_benchmark.cc)
-target_link_libraries(microbench
-  bench_common
-  benchmark::benchmark
-  benchmark::benchmark_main)
-
-# Record cache: A microbenchmark for the performance of the ART-based record cache.
-add_executable(record_cache record_cache_benchmark.cc)
-target_link_libraries(record_cache 
-  bench_common
-  benchmark::benchmark
-  benchmark::benchmark_main)
-
-# Deferred I/O: A test microbenchmark for deferring certain I/O operations.
-add_executable(deferred_io deferred_io_simulation.cc)
-target_link_libraries(deferred_io bench_common gflags ycsbr)
-
-# Write-ahead Log: A microbenchmark used to evaluate the overhead of writing to
-# a write-ahead log.
-add_executable(wal wal_benchmark.cc)
-target_link_libraries(wal bench_common gflags benchmark::benchmark)
-
-# Buffer manager simulation: A microbenchmark for the added latency of the 
-# buffer manager, excluding the underlying I/O operations.
-add_executable(bufmgr_benchmark buffer_manager_benchmark.cc)
-target_link_libraries(bufmgr_benchmark bench_common_config gflags ycsbr benchmark::benchmark)
 
 # Run Custom: An executable that runs YSCBR-generated workloads against TreeLine
 # and RocksDB.
