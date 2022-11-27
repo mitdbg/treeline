@@ -1,4 +1,5 @@
-#include "third_party/alex/alex.h"
+#include <map>
+
 #include "benchmark/benchmark.h"
 #include "bufmgr/buffer_manager.h"
 #include "common/config.h"
@@ -45,13 +46,13 @@ void SimulateBM(benchmark::State& state, bool large_buffer) {
   key_hints.record_size = record_size;
 
   // Initialize an alex instance.
-  alex::Alex<uint64_t, tl::PhysicalPageId> model;
+  std::map<uint64_t, tl::PhysicalPageId> model;
   size_t records_per_page = key_hints.records_per_page();
   size_t i = 0;
   for (const auto& req : load) {
     if (i % records_per_page == 0) {
       tl::PhysicalPageId page_id(0, i / records_per_page);
-      model.insert(__builtin_bswap64(req.key), page_id);
+      model.insert({__builtin_bswap64(req.key), page_id});
     }
     ++i;
   }
@@ -67,16 +68,16 @@ void SimulateBM(benchmark::State& state, bool large_buffer) {
   // Pre-calculate page numbers appropriately
   std::vector<tl::PhysicalPageId> page_ids;
   for (const auto& req : workload) {
-    page_ids.push_back(
-        *model.get_payload_last_no_greater_than(__builtin_bswap64(req.key)));
+    auto it = model.upper_bound(__builtin_bswap64(req.key));
+    --it;
+    page_ids.push_back(it->second);
   }
 
   // Create buffer manager options.
   tl::BufMgrOptions bm_options;
   bm_options.simulation_mode = true;
-  bm_options.buffer_pool_size = large_buffer
-                                    ? model.size() * tl::Page::kSize
-                                    : 64 * 1024 * 1024;
+  bm_options.buffer_pool_size =
+      large_buffer ? model.size() * tl::Page::kSize : 64 * 1024 * 1024;
 
   // Bookkeeping
   std::string db_path = "test";

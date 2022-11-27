@@ -1,7 +1,7 @@
 #include <iostream>
+#include <map>
 #include <vector>
 
-#include "third_party/alex/alex.h"
 #include "bufmgr/physical_page_id.h"
 #include "db/format.h"
 #include "db/memtable.h"
@@ -62,13 +62,13 @@ int main(int argc, char* argv[]) {
   key_hints.page_fill_pct = FLAGS_page_fill_pct;
   key_hints.record_size = FLAGS_record_size_bytes;
 
-  // Initialize an alex instance.
-  alex::Alex<uint64_t, size_t> model;
+  // Initialize a model.
+  std::map<uint64_t, size_t> model;
   size_t records_per_page = key_hints.records_per_page();
   size_t i = 0;
   for (const auto& req : load) {
     if (i % records_per_page == 0) {
-      model.insert(__builtin_bswap64(req.key), i / records_per_page);
+      model.insert({__builtin_bswap64(req.key), i / records_per_page});
     }
     ++i;
   }
@@ -106,8 +106,9 @@ int main(int argc, char* argv[]) {
     // Perform the insert
     memtable->Add(tl::Slice(reinterpret_cast<const char*>(&req.key), 8),
                   tl::Slice(req.value, 8), tl::format::WriteType::kWrite);
-    const size_t insert_page_id =
-        *model.get_payload_last_no_greater_than(__builtin_bswap64(req.key));
+    auto it = model.upper_bound(__builtin_bswap64(req.key));
+    --it;
+    const size_t insert_page_id = it->second;
     ++memtable_entries_per_page[insert_page_id];
 
     // Check if the memtable is large enough to flush.
@@ -116,9 +117,10 @@ int main(int argc, char* argv[]) {
 
       auto it = memtable->GetIterator();
       for (it.SeekToFirst(); it.Valid(); it.Next()) {
-        const size_t page_id =
-            *model.get_payload_last_no_greater_than(__builtin_bswap64(
-                *reinterpret_cast<const uint64_t*>(it.key().data())));
+        auto it2 = model.upper_bound(__builtin_bswap64(
+            *reinterpret_cast<const uint64_t*>(it.key().data())));
+        --it2;
+        const size_t page_id = it2->second;
         if (memtable_entries_per_page[page_id] >= FLAGS_io_threshold ||
             page_deferral_count[page_id] >= FLAGS_max_deferrals) {
           flushed_this_time[page_id] = true;
