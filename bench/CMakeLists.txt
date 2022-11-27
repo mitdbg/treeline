@@ -41,10 +41,6 @@ target_link_libraries(bench_common_config PUBLIC
 # development.
 add_subdirectory(microbench)
 
-# YCSB: Run extracted YCSB workloads against TreeLine and RocksDB.
-add_executable(ycsb ycsb.cc)
-target_link_libraries(ycsb bench_common_config ycsbr)
-
 # Run Custom: An executable that runs YSCBR-generated workloads against TreeLine
 # and RocksDB.
 add_executable(run_custom run_custom.cc)
