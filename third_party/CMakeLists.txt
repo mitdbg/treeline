@@ -113,13 +113,8 @@ if(TL_BUILD_BENCHMARKS)
       ${libaio_src_SOURCE_DIR}/src)
   endif()
 
-  FetchContent_Declare(
-    leanstore
-    GIT_REPOSITORY git@github.com:mitdbg/leanstore.git
-    GIT_TAG        master-compatible
-  )
   set(BUILD_LEANSTORE_FRONTEND OFF)
-  FetchContent_MakeAvailable(leanstore)
+  add_subdirectory(leanstore)
 endif()
 
 # Include embedded CMake projects.
