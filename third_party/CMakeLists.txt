@@ -72,7 +72,7 @@ if(TL_BUILD_BENCHMARKS)
 
   FetchContent_Declare(
     ycsbr
-    GIT_REPOSITORY git@github.com:mitdbg/ycsbr.git
+    GIT_REPOSITORY https://github.com/mitdbg/ycsbr.git
     GIT_TAG        v4.1.0
   )
   FetchContent_MakeAvailable(ycsbr)
