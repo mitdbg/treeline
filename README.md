@@ -4,6 +4,24 @@
 An embedded key-value store for modern SSDs.
 
 ## Building from source
+
+### Install Dependencies
+
+A few packages that Treeline depends on are
+
+- `libtbb-dev`
+- `autoconf`
+- `libjemalloc-dev`
+
+On Ubuntu distribution the dependency installation command would look something like this
+
+```
+sudo apt-get install libtbb-dev autoconf libjemalloc-dev
+```
+
+Depending on the distro you have, ensure the above packages are installed. In case you do not
+find the above packages, run the CMake, and fix as and when it throws errors.
+
 CMake 3.17+ is required for building this project.
 
 ```bash
