@@ -13,14 +13,16 @@ A few packages that Treeline depends on are
 - `autoconf`
 - `libjemalloc-dev`
 
-On Ubuntu distribution the dependency installation command would look something like this
+Depending on the distribution you have, ensure the above packages are installed.
+On Ubuntu, you can install the dependencies using `apt`:
 
 ```
-sudo apt-get install libtbb-dev autoconf libjemalloc-dev
+sudo apt install libtbb-dev autoconf libjemalloc-dev
 ```
 
-Depending on the distro you have, ensure the above packages are installed. In case you do not
-find the above packages, run the CMake, and fix as and when it throws errors.
+TreeLine's other dependencies are fetched by CMake during compilation.
+
+### Compile
 
 CMake 3.17+ is required for building this project.
 
