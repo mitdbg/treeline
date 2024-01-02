@@ -7,7 +7,7 @@ An embedded key-value store for modern SSDs.
 
 ### Install Dependencies
 
-A few packages that Treeline depends on are
+A few packages that TreeLine depends on are
 
 - `libtbb-dev`
 - `autoconf`
@@ -41,3 +41,13 @@ configuring.
 ```bash
 cmake -DCMAKE_BUILD_TYPE=Release -DTL_BUILD_BENCHMARKS=ON .. && make -j
 ```
+
+## Inspecting the codebase
+
+If you would like to read more about the internals of TreeLine, you can start at [this header file](https://github.com/mitdbg/treeline/blob/master/include/treeline/pg_db.h).
+
+The bulk of the code that comprises the current version of the system can be found in the [`page_grouping/`](https://github.com/mitdbg/treeline/tree/master/page_grouping) directory.
+
+Thank you for your interest in diving deeper in our work!
+
+
